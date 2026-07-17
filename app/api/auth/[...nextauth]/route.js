@@ -43,6 +43,8 @@ export const authOptions = {
     }),
   ],
 
+  trustHost: true,
+
   callbacks: {
     // ← Always fetch fresh role from DB
     async jwt({ token, user, account }) {
