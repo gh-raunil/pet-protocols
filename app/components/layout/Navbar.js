@@ -35,7 +35,7 @@ const Navbar = () => {
     <nav className={`
       w-full fixed top-0 z-50 border-b border-brand-border
       transition-all duration-300
-      ${scrolled ? 'bg-brand-dark/95 backdrop-blur-md' : 'bg-brand-dark'}
+      ${scrolled ? 'bg-brand-dark/95 backdrop-blur-xl' : 'bg-brand-dark'}
       ${showNavbar ? 'translate-y-0' : '-translate-y-full'}
     `}>
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center gap-4">

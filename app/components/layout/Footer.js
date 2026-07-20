@@ -6,7 +6,7 @@ import { Facebook, Instagram, Twitter, YouTube } from '@deemlol/next-icons'
 const Footer = () => {
   
   return (
-    <footer className="bg-brand-card border-t border-brand-border">
+    <footer className="bg-brand-dark/95 border-t border-brand-border">
       <div className="max-w-7xl mx-auto px-6 py-12">
 
         {/* Main 3 column grid */}

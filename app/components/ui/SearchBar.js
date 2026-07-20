@@ -122,7 +122,7 @@ export default function SearchBar() {
                 </button>
               ))}
 
-              {/* View all results */}
+              {/* View all results */}  
               <button
                 onClick={handleSearch}
                 className="w-full px-4 py-3 text-brand-orange text-sm font-medium hover:bg-brand-border transition text-center">
