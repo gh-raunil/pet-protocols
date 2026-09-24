@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Pet Protocols — Multi-Tenant Food Ordering Monorepo
 
-## Getting Started
+Pet Protocols is architected into 4 independently runnable Next.js services:
 
-First, run the development server:
+1. **`backend/` (Port 4000)**: Unified REST API, MongoDB/Mongoose models, NextAuth handler, Razorpay payments, Cloudinary media, and multi-tenant authorization middleware.
+2. **`frontend-user/` (Port 3000)**: Customer-facing food ordering storefront, interactive cart drawer, menu catalog, checkout, order tracking, and customer profile.
+3. **`frontend-admin/` (Port 3001)**: Dedicated Restaurant Partner & Kitchen Management portal (live order processing, menu/dishes CRUD, kitchen SOPs, branch settings, superadmin broadcast ticker).
+4. **`frontend-superadmin/` (Port 3002)**: Platform Governance & Multi-tenant control center (tenant/restaurant lifecycle management, multi-admin staff provisioning, platform revenue/order analytics).
+
+---
+
+## Service Ports Overview
+
+| Service | Port | Description | Default Login |
+| :--- | :--- | :--- | :--- |
+| **Backend API** | `http://localhost:4000` | Core API, Auth & DB | N/A (Headless) |
+| **Customer App** | `http://localhost:3000` | Customer Storefront | `customer@petprotocols.com` / `rounak` |
+| **Restaurant Admin** | `http://localhost:3001` | Kitchen & Menu Hub | `admin@flagship.com` / `rounak` |
+| **Superadmin Portal** | `http://localhost:3002` | Platform Governance | `superadmin@petprotocols.com` / `rounak` |
+
+---
+
+## Quick Start
+
+### 1. Install Dependencies
+
+Install the monorepo orchestrator and each service:
+
+```bash
+# Root
+npm install
+
+# Sub-projects
+cd backend && npm install
+cd ..\frontend-user && npm install
+cd ..\frontend-admin && npm install
+cd ..\frontend-superadmin && npm install
+cd ..
+```
+
+### 2. Environment Variables
+
+Copy `.env.example` to `.env.local` in each subfolder:
+
+```bash
+copy backend\.env.example backend\.env.local
+copy frontend-user\.env.example frontend-user\.env.local
+copy frontend-admin\.env.example frontend-admin\.env.local
+copy frontend-superadmin\.env.example frontend-superadmin\.env.local
+```
+
+Ensure `backend/.env.local` contains your `MONGODB_URI` and `NEXTAUTH_SECRET`. All frontends proxy `/api/*` requests to the backend (`http://127.0.0.1:4000`).
+
+### 3. Database Seeding
+
+You can seed the database from root:
+
+```bash
+# Clean slate: creates ONLY the Root Superadmin (superadmin@petprotocols.com / rounak)
+npm run seed
+
+# Demo mode: creates Superadmin + Flagship Restaurant + Restaurant Admin + 6 Dishes + Customer
+npm run seed:demo
+```
+
+### 4. Running Locally
+
+Start all 4 services concurrently in one terminal:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Or run any service individually:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npm run dev:backend       # Port 4000
+npm run dev:user          # Port 3000
+npm run dev:admin         # Port 3001
+npm run dev:superadmin    # Port 3002
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Validation & Production Builds
 
-To learn more about Next.js, take a look at the following resources:
+Validate all builds across the entire workspace:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build:all
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Or build a specific application:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build:backend
+npm run build:user
+npm run build:admin
+npm run build:superadmin
+```
