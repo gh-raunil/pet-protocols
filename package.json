@@ -1,34 +1,27 @@
 {
-  "name": "pet-protocols",
-  "version": "0.1.0",
+  "name": "pet-protocols-monorepo",
+  "version": "2.0.0",
   "private": true,
+  "description": "Pet Protocols multi-tenant food ordering platform monorepo",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@deemlol/next-icons": "^0.2.7",
-    "bcryptjs": "^3.0.3",
-    "cloudinary": "^2.10.0",
-    "dotenv": "^17.4.2",
-    "lucide": "^1.25.0",
-    "lucide-react": "^1.16.0",
-    "mongoose": "^9.6.2",
-    "next": "16.2.6",
-    "next-auth": "^4.24.14",
-    "razorpay": "^2.9.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-hot-toast": "^2.6.0",
-    "zustand": "^5.0.13"
+    "dev": "concurrently -n \"BACKEND,USER,ADMIN,SUPERADMIN\" -c \"blue,green,magenta,yellow\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-user\" \"npm run dev --prefix frontend-admin\" \"npm run dev --prefix frontend-superadmin\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:user": "npm run dev --prefix frontend-user",
+    "dev:admin": "npm run dev --prefix frontend-admin",
+    "dev:superadmin": "npm run dev --prefix frontend-superadmin",
+    "build": "npm run build:all",
+    "build:all": "npm run build --prefix backend && npm run build --prefix frontend-user && npm run build --prefix frontend-admin && npm run build --prefix frontend-superadmin",
+    "build:backend": "npm run build --prefix backend",
+    "build:user": "npm run build --prefix frontend-user",
+    "build:admin": "npm run build --prefix frontend-admin",
+    "build:superadmin": "npm run build --prefix frontend-superadmin",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend-user && npm install --prefix frontend-admin && npm install --prefix frontend-superadmin",
+    "postinstall": "npm run install:all",
+    "seed": "npm run seed --prefix backend",
+    "seed:demo": "npm run seed:demo --prefix backend"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/bcryptjs": "^2.4.6",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.6",
-    "tailwindcss": "^4"
+    "concurrently": "^9.2.4"
   }
 }
+
