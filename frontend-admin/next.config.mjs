@@ -1,16 +1,16 @@
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 /** @type {import('next').NextConfig} */
-const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:4000'
+function normalizeUrl(url, fallback) {
+  let val = (url || fallback || '').trim()
+  if (!val) return fallback
+  if (!val.startsWith('http://') && !val.startsWith('https://')) {
+    val = `https://${val}`
+  }
+  return val.replace(/\/+$/, '')
+}
+
+const backendUrl = normalizeUrl(process.env.BACKEND_INTERNAL_URL, 'http://127.0.0.1:4000')
 
 const nextConfig = {
-  turbopack: {
-    root: __dirname,
-  },
   images: {
     remotePatterns: [
       {
@@ -46,3 +46,4 @@ const nextConfig = {
 }
 
 export default nextConfig
+
