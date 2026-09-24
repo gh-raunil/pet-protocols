@@ -9,11 +9,14 @@
     "dev:user": "npm run dev --prefix frontend-user",
     "dev:admin": "npm run dev --prefix frontend-admin",
     "dev:superadmin": "npm run dev --prefix frontend-superadmin",
+    "build": "npm run build:all",
     "build:all": "npm run build --prefix backend && npm run build --prefix frontend-user && npm run build --prefix frontend-admin && npm run build --prefix frontend-superadmin",
     "build:backend": "npm run build --prefix backend",
     "build:user": "npm run build --prefix frontend-user",
     "build:admin": "npm run build --prefix frontend-admin",
     "build:superadmin": "npm run build --prefix frontend-superadmin",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend-user && npm install --prefix frontend-admin && npm install --prefix frontend-superadmin",
+    "postinstall": "npm run install:all",
     "seed": "npm run seed --prefix backend",
     "seed:demo": "npm run seed:demo --prefix backend"
   },
@@ -21,3 +24,4 @@
     "concurrently": "^9.2.4"
   }
 }
+
