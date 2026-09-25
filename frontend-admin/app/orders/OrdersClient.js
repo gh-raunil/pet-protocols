@@ -238,17 +238,20 @@ export default function OrdersClient() {
     return () => clearInterval(timer);
   }, []);
 
-  // Check if a dish is packed (automatically true for out_for_delivery / delivered)
+  // Check if a dish is packed (locked before order is accepted)
   const isDishPacked = (order, idx) => {
+    if (order.status === "pending" || order.status === "cancelled") {
+      return false;
+    }
     if (order.status === "out_for_delivery" || order.status === "delivered") {
       return true;
     }
     return Boolean(packedItems[`${order._id}_${idx}`]);
   };
 
-  // Once an order is accepted and a dish is packed, it should NOT be unchecked
+  // Only allowed to pack dishes once order is accepted and actively being prepared
   const toggleItemPacked = (order, idx) => {
-    if (order.status === "out_for_delivery" || order.status === "delivered" || order.status === "cancelled") {
+    if (order.status !== "preparing") {
       return;
     }
     const key = `${order._id}_${idx}`;
@@ -265,8 +268,9 @@ export default function OrdersClient() {
     });
   };
 
-  // Pack all dishes in an order
+  // Pack all dishes in an order (only during preparing)
   const packAllDishes = (order) => {
+    if (order.status !== "preparing") return;
     setPackedItems((prev) => {
       const next = { ...prev };
       (order.items || []).forEach((_, idx) => {
@@ -948,23 +952,32 @@ export default function OrdersClient() {
                               >
                                 Pack All
                               </button>
+                            ) : order.status === "pending" ? (
+                              <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-1">
+                                🔒 Locked
+                              </span>
                             ) : null}
                           </div>
 
                           <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canPack = !isPacked && (order.status === "preparing" || order.status === "pending");
+                              const canPack = !isPacked && order.status === "preparing";
                               return (
                                 <div
                                   key={idx}
+                                  title={order.status === "pending" ? "Accept order & start cooking to unlock dish packing" : canPack ? "Click to mark packed" : "Packed"}
                                   onClick={() => canPack && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-1.5 rounded-lg border text-xs select-none transition ${
-                                    canPack ? "cursor-pointer" : "cursor-default"
+                                    canPack
+                                      ? "cursor-pointer hover:border-orange-500/40"
+                                      : order.status === "pending"
+                                      ? "cursor-not-allowed opacity-80"
+                                      : "cursor-default"
                                   } ${
                                     isPacked
                                       ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-600 dark:text-stone-300 font-medium"
-                                      : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
+                                      : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0">
@@ -1193,6 +1206,10 @@ export default function OrdersClient() {
                                     Pack All
                                   </button>
                                 </>
+                              ) : order.status === "pending" ? (
+                                <span className="text-stone-400 text-xs font-semibold flex items-center gap-1">
+                                  🔒 Locked (Accept order to begin packing)
+                                </span>
                               ) : (
                                 <span>Awaiting Kitchen Acceptance</span>
                               )}
@@ -1202,17 +1219,22 @@ export default function OrdersClient() {
                           <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canPack = !isPacked && (order.status === "preparing" || order.status === "pending");
+                              const canPack = !isPacked && order.status === "preparing";
                               return (
                                 <div
                                   key={idx}
+                                  title={order.status === "pending" ? "Accept order & start cooking to unlock dish packing" : canPack ? "Click to mark packed" : "Packed"}
                                   onClick={() => canPack && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-2 rounded-xl border text-xs select-none transition ${
-                                    canPack ? "cursor-pointer" : "cursor-default"
+                                    canPack
+                                      ? "cursor-pointer hover:border-orange-500/40"
+                                      : order.status === "pending"
+                                      ? "cursor-not-allowed opacity-80"
+                                      : "cursor-default"
                                   } ${
                                     isPacked
                                       ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-700 dark:text-stone-300 font-medium"
-                                      : "bg-white dark:bg-white/[0.03] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
+                                      : "bg-white dark:bg-white/[0.03] border-stone-200/70 dark:border-white/5 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
