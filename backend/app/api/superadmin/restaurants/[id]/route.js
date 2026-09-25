@@ -30,6 +30,8 @@ export async function PUT(request, { params }) {
     if (body.address !== undefined) restaurant.address = body.address;
     if (body.cuisineType !== undefined) restaurant.cuisineType = body.cuisineType;
     if (body.rating !== undefined) restaurant.rating = body.rating;
+    if (body.image !== undefined) restaurant.image = body.image;
+    if (body.bannerImage !== undefined) restaurant.bannerImage = body.bannerImage;
 
     await restaurant.save();
 

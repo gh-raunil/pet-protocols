@@ -244,10 +244,12 @@ export default function OrderConfirmationClient() {
                 <Building size={16} className="text-orange-400" />
                 {restaurantName}
               </p>
-              {order.restaurant?.phone && (
-                <p className="text-xs text-white/50 flex items-center gap-1.5 mt-1">
+              {order.restaurant?.phone && order.restaurant?.showPhoneToCustomers !== false && (
+                <p className="text-xs text-white/70 flex items-center gap-1.5 mt-1">
                   <Phone size={12} className="text-orange-400" />
-                  {order.restaurant.phone}
+                  <a href={`tel:${order.restaurant.phone}`} className="hover:text-orange-400 underline font-mono">
+                    {order.restaurant.phone}
+                  </a>
                 </p>
               )}
               {order.restaurant?.address?.street && (
@@ -256,14 +258,14 @@ export default function OrderConfirmationClient() {
                   {order.restaurant.address.street}, {order.restaurant.address.city}
                 </p>
               )}
-              {order.restaurant?.whatsappNumber && (
+              {order.restaurant?.whatsappNumber && order.restaurant?.showWhatsappToCustomers !== false && (
                 <div className="mt-2 pt-2 border-t border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">
                     Contact Restaurant
                   </span>
                   <a
                     href={`https://wa.me/${order.restaurant.whatsappNumber.replace(/\D/g, "")}?text=${encodeURIComponent(
-                      `Hi ${restaurantName}, I'm checking on my order #${order.orderId || order._id.slice(-6).toUpperCase()}.`
+                      `Hi ${restaurantName}, I'm checking on my order #${order.orderId ? order.orderId.replace("ORD_", "PET-") : order._id.slice(-6).toUpperCase()}.`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"

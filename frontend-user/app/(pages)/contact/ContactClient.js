@@ -269,12 +269,12 @@ export default function ContactClient() {
                       </p>
                     )}
 
-                    {/* Standard Phone (Never treated as WhatsApp) */}
+                    {/* Standard Phone (Respect showPhoneToCustomers flag) */}
                     <div className="pt-3 border-t border-white/5 space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
                         Telephone
                       </span>
-                      {restaurant.phone ? (
+                      {restaurant.phone && restaurant.showPhoneToCustomers !== false ? (
                         <a
                           href={`tel:${restaurant.phone.replace(/\s+/g, "")}`}
                           className="text-xs font-semibold text-gray-200 hover:text-orange-400 flex items-center gap-1.5 transition"
@@ -283,14 +283,16 @@ export default function ContactClient() {
                           <span>{restaurant.phone}</span>
                         </a>
                       ) : (
-                        <span className="text-xs text-gray-500">Not provided</span>
+                        <span className="text-xs text-gray-500">
+                          {restaurant.showPhoneToCustomers === false ? "Phone inquiries disabled" : "Not provided"}
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {/* WhatsApp Section: ONLY rendered when whatsappNumber is explicitly provided */}
+                  {/* WhatsApp Section: ONLY rendered when enabled by restaurant and provided */}
                   <div className="mt-5 pt-4 border-t border-white/5">
-                    {hasWhatsapp ? (
+                    {hasWhatsapp && restaurant.showWhatsappToCustomers !== false ? (
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
                           Contact Restaurant

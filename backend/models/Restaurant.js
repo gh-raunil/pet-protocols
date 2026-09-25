@@ -68,6 +68,14 @@ const RestaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    showPhoneToCustomers: {
+      type: Boolean,
+      default: true,
+    },
+    showWhatsappToCustomers: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import RestaurantAdminNav from "@/components/layout/RestaurantAdminNav";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import { CHIME_OPTIONS, getSavedChime, setSavedChime, playChime } from "@/lib/soundChimes";
 import {
   Settings,
   Building,
@@ -17,6 +19,10 @@ import {
   Save,
   RefreshCw,
   MessageSquare,
+  SunMoon,
+  Volume2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function SettingsClient() {
@@ -27,6 +33,8 @@ export default function SettingsClient() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [platformSupportWhatsapp, setPlatformSupportWhatsapp] = useState("");
+  const [selectedChime, setSelectedChime] = useState("bell");
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -35,6 +43,8 @@ export default function SettingsClient() {
     whatsappNumber: "",
     email: "",
     openingHours: "10:00 AM - 11:00 PM",
+    showPhoneToCustomers: true,
+    showWhatsappToCustomers: true,
     address: {
       street: "",
       city: "",
@@ -42,6 +52,16 @@ export default function SettingsClient() {
       pincode: "",
     },
   });
+
+  useEffect(() => {
+    setSelectedChime(getSavedChime());
+  }, []);
+
+  function handleChimeChange(chimeId) {
+    setSelectedChime(chimeId);
+    setSavedChime(chimeId);
+    playChime(chimeId, 1.0);
+  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -64,6 +84,8 @@ export default function SettingsClient() {
           whatsappNumber: r.whatsappNumber || "",
           email: r.email || "",
           openingHours: r.openingHours || "10:00 AM - 11:00 PM",
+          showPhoneToCustomers: r.showPhoneToCustomers !== undefined ? r.showPhoneToCustomers : true,
+          showWhatsappToCustomers: r.showWhatsappToCustomers !== undefined ? r.showWhatsappToCustomers : true,
           address: {
             street: r.address?.street || "",
             city: r.address?.city || "",
@@ -179,6 +201,71 @@ export default function SettingsClient() {
               <span>WhatsApp Support</span>
             </a>
           )}
+        </div>
+
+        {/* ── APPEARANCE & AUDIO SETTINGS CARDS ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+          {/* Theme Card */}
+          <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <SunMoon size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-stone-900 dark:text-white">
+                  Appearance & Theme
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  Toggle between Light and Dark kitchen theme
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 scale-105">
+              <ThemeToggle />
+            </div>
+          </div>
+
+          {/* Audio Chime Card */}
+          <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 shadow-xs flex flex-col justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                  <Volume2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-stone-900 dark:text-white">
+                    Order Alert Chime
+                  </h3>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                    Audio sound played when new orders arrive
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <select
+                value={selectedChime}
+                onChange={(e) => handleChimeChange(e.target.value)}
+                className="flex-1 bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 dark:text-stone-200 outline-none focus:border-orange-500"
+              >
+                {CHIME_OPTIONS.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-white dark:bg-[#11141f] text-stone-900 dark:text-white">
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => playChime(selectedChime, 1.0)}
+                className="px-3 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-[#F97316] font-bold text-xs transition shrink-0 flex items-center gap-1 active:scale-95"
+                title="Preview Chime Sound"
+              >
+                <Volume2 size={13} />
+                <span>Test 🔊</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Feedback */}
@@ -305,6 +392,59 @@ export default function SettingsClient() {
                     placeholder="e.g. 9876543210 (leave empty if none)"
                     className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none"
                   />
+                </div>
+              </div>
+
+              {/* Customer Contact Visibility Toggles */}
+              <div className="md:col-span-2 p-5 rounded-2xl bg-orange-500/5 border border-orange-500/20 space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-orange-500" />
+                    Customer Contact Visibility
+                  </h4>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                    Control whether customers can view and contact your restaurant directly before or after ordering.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  {/* Phone visibility toggle */}
+                  <label className="flex items-start gap-3 p-3.5 rounded-xl bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 cursor-pointer hover:border-orange-500/40 transition">
+                    <input
+                      type="checkbox"
+                      checked={form.showPhoneToCustomers}
+                      onChange={(e) => setForm({ ...form, showPhoneToCustomers: e.target.checked })}
+                      className="mt-0.5 w-4 h-4 accent-orange-500 rounded cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                        {form.showPhoneToCustomers ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5 text-stone-400" />}
+                        Show Phone to Customers
+                      </div>
+                      <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        Customers can call your restaurant phone directly from order tracker and details.
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* WhatsApp visibility toggle */}
+                  <label className="flex items-start gap-3 p-3.5 rounded-xl bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 cursor-pointer hover:border-emerald-500/40 transition">
+                    <input
+                      type="checkbox"
+                      checked={form.showWhatsappToCustomers}
+                      onChange={(e) => setForm({ ...form, showWhatsappToCustomers: e.target.checked })}
+                      className="mt-0.5 w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                        {form.showWhatsappToCustomers ? <Eye className="w-3.5 h-3.5 text-emerald-500" /> : <EyeOff className="w-3.5 h-3.5 text-stone-400" />}
+                        Show WhatsApp to Customers
+                      </div>
+                      <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        Customers can tap WhatsApp button to chat with your kitchen before or after ordering.
+                      </div>
+                    </div>
+                  </label>
                 </div>
               </div>
 

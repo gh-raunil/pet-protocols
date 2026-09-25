@@ -66,6 +66,8 @@ export async function PUT(request) {
     if (body.openingHours !== undefined) restaurant.openingHours = body.openingHours;
     if (body.image !== undefined) restaurant.image = body.image;
     if (body.bannerImage !== undefined) restaurant.bannerImage = body.bannerImage;
+    if (body.showPhoneToCustomers !== undefined) restaurant.showPhoneToCustomers = Boolean(body.showPhoneToCustomers);
+    if (body.showWhatsappToCustomers !== undefined) restaurant.showWhatsappToCustomers = Boolean(body.showWhatsappToCustomers);
 
     await restaurant.save();
 

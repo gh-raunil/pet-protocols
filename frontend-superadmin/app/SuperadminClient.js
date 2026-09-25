@@ -26,6 +26,10 @@ import {
   Copy,
   Check,
   Bell,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import MessagesManager from "@/components/messages/MessagesManager";
@@ -45,12 +49,18 @@ export default function SuperadminClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSlug, setCopiedSlug] = useState("");
 
+  // Logo edit modal states
+  const [editingLogoRestaurant, setEditingLogoRestaurant] = useState(null);
+  const [logoModalImage, setLogoModalImage] = useState("");
+  const [savingLogo, setSavingLogo] = useState(false);
+
   // Form states
   const [newRestaurant, setNewRestaurant] = useState({
     name: "",
     cuisineType: "",
     address: { street: "", city: "", state: "", pincode: "" },
     phone: "",
+    image: "",
     adminName: "",
     adminEmail: "",
     adminPassword: "",
@@ -148,6 +158,7 @@ export default function SuperadminClient() {
           cuisineType: newRestaurant.cuisineType.split(",").map((s) => s.trim()),
           address: newRestaurant.address,
           phone: newRestaurant.phone,
+          image: newRestaurant.image,
           adminName: newRestaurant.adminName,
           adminEmail: newRestaurant.adminEmail,
           adminPassword: newRestaurant.adminPassword,
@@ -170,6 +181,7 @@ export default function SuperadminClient() {
         cuisineType: "",
         address: { street: "", city: "", state: "", pincode: "" },
         phone: "",
+        image: "",
         adminName: "",
         adminEmail: "",
         adminPassword: "",
@@ -182,6 +194,37 @@ export default function SuperadminClient() {
       toast.error("Error creating restaurant.");
     } finally {
       setCreatingRestaurant(false);
+    }
+  }
+
+  // Handle Save Logo in Superadmin
+  async function handleSaveLogo(e) {
+    e.preventDefault();
+    if (!editingLogoRestaurant) return;
+    try {
+      setSavingLogo(true);
+      const res = await fetch(`/api/superadmin/restaurants/${editingLogoRestaurant._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: logoModalImage }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Logo updated for ${editingLogoRestaurant.name}!`);
+        setRestaurants((prev) =>
+          prev.map((r) =>
+            r._id === editingLogoRestaurant._id ? { ...r, image: logoModalImage } : r
+          )
+        );
+        setEditingLogoRestaurant(null);
+      } else {
+        toast.error(data.message || "Failed to update logo.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update logo.");
+    } finally {
+      setSavingLogo(false);
     }
   }
 
@@ -682,17 +725,25 @@ export default function SuperadminClient() {
                       {/* Name & thumbnail */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                            <Image
+                          <div
+                            onClick={() => {
+                              setEditingLogoRestaurant(rest);
+                              setLogoModalImage(rest.image || "");
+                            }}
+                            className="relative group w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer shadow-xs hover:border-indigo-500 transition"
+                            title="Click to change restaurant logo / photo"
+                          >
+                            <img
                               alt={rest.name}
-                              width={40}
-                              height={40}
                               className="w-full h-full object-cover"
                               src={
                                 rest.image ||
                                 "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=120"
                               }
                             />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                              <Camera size={14} />
+                            </div>
                           </div>
                           <div>
                             <span className="font-semibold text-slate-900 dark:text-white block">
@@ -769,6 +820,18 @@ export default function SuperadminClient() {
                       {/* Actions */}
                       <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingLogoRestaurant(rest);
+                              setLogoModalImage(rest.image || "");
+                            }}
+                            className="px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition border border-indigo-200/80 dark:border-indigo-800/40 inline-flex items-center gap-1.5"
+                            title="Change restaurant logo / picture"
+                          >
+                            <Camera size={13} />
+                            <span>Logo</span>
+                          </button>
                           <a
                             className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                             href={`${customerBaseUrl}/menu?restaurant=${rest._id}`}
@@ -908,6 +971,25 @@ export default function SuperadminClient() {
                       setNewRestaurant({
                         ...newRestaurant,
                         address: { ...newRestaurant.address, city: e.target.value },
+                      })
+                    }
+                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
+                  />
+                </div>
+
+                {/* Restaurant Logo / Picture */}
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                    Restaurant Logo / Pic URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://... or paste image URL"
+                    value={newRestaurant.image}
+                    onChange={(e) =>
+                      setNewRestaurant({
+                        ...newRestaurant,
+                        image: e.target.value,
                       })
                     }
                     className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
@@ -1171,6 +1253,103 @@ export default function SuperadminClient() {
           <div className="text-xs text-slate-400 dark:text-slate-500">Super Admin Control Panel</div>
         </footer>
       </main>
+
+      {/* ── RESTAURANT LOGO & PHOTO EDIT MODAL ───────────────────────── */}
+      {editingLogoRestaurant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+              <div className="flex items-center gap-2">
+                <Camera size={18} className="text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Update Restaurant Logo / Pic
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingLogoRestaurant(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLogo} className="space-y-4">
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Changing logo & photo for <strong className="text-slate-900 dark:text-white">{editingLogoRestaurant.name}</strong>.
+                </p>
+
+                {/* Preview Box */}
+                <div className="flex items-center justify-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 mb-4">
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                    {logoModalImage ? (
+                      <img
+                        src={logoModalImage}
+                        alt="Logo Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Building2 className="w-10 h-10 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Image URL input */}
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Logo / Photo URL
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://... image URL"
+                  value={logoModalImage}
+                  onChange={(e) => setLogoModalImage(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition"
+                />
+              </div>
+
+              {/* Upload File Alternative */}
+              <div className="pt-1">
+                <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-500 cursor-pointer transition">
+                  <Upload size={14} className="text-indigo-500" />
+                  <span>Or Upload From Device</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setLogoModalImage(reader.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingLogoRestaurant(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingLogo}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95"
+                >
+                  {savingLogo ? "Saving..." : "Save Restaurant Logo"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

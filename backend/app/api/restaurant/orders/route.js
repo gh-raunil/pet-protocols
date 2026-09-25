@@ -11,22 +11,44 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
-    const { restaurantId } = auth;
+    const { restaurant, restaurantId } = auth;
     await connectDB();
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const dateParam = searchParams.get("date"); // YYYY-MM-DD or 'all'
+    const searchQuery = (searchParams.get("search") || "").trim();
 
     let filter = { restaurant: restaurantId };
     if (status && status !== "all") {
       filter.status = status;
     }
 
+    if (dateParam && dateParam !== "all" && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const [year, month, day] = dateParam.split("-").map(Number);
+      const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      filter.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (searchQuery) {
+      filter.$or = [
+        { orderId: { $regex: searchQuery, $options: "i" } },
+        { "address.fullName": { $regex: searchQuery, $options: "i" } },
+        { "address.phone": { $regex: searchQuery, $options: "i" } },
+      ];
+    }
+
     const orders = await Order.find(filter)
       .populate("user", "name email phone")
       .sort({ createdAt: -1 });
 
-    return NextResponse.json({ success: true, orders });
+    return NextResponse.json({
+      success: true,
+      orders,
+      restaurantCreatedAt: restaurant?.createdAt || null,
+      restaurantName: restaurant?.name || "",
+    });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

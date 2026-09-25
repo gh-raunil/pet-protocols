@@ -49,7 +49,7 @@ export async function GET(request) {
     }
 
     const orders = await Order.find(query)
-      .populate('restaurant', 'name slug image phone address')
+      .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers')
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
@@ -167,7 +167,7 @@ export async function POST(request) {
       });
 
       const populatedOrder = await Order.findById(newOrder._id)
-        .populate("restaurant", "name slug image phone address")
+        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers")
         .populate("user", "name email");
 
       createdOrders.push(populatedOrder);
