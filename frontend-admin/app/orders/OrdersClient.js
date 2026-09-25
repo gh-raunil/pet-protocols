@@ -238,9 +238,9 @@ export default function OrdersClient() {
     return () => clearInterval(timer);
   }, []);
 
-  // Check if a dish is packed (locked before order is accepted)
+  // Check if a dish is packed
   const isDishPacked = (order, idx) => {
-    if (order.status === "pending" || order.status === "cancelled") {
+    if (order.status === "cancelled") {
       return false;
     }
     if (order.status === "out_for_delivery" || order.status === "delivered") {
@@ -249,23 +249,38 @@ export default function OrdersClient() {
     return Boolean(packedItems[`${order._id}_${idx}`]);
   };
 
-  // Only allowed to pack dishes once order is accepted and actively being prepared
+  // Dish checklist toggle: selectable when pending, locked once order is accepted
   const toggleItemPacked = (order, idx) => {
-    if (order.status !== "preparing") {
+    if (order.status === "out_for_delivery" || order.status === "delivered" || order.status === "cancelled") {
       return;
     }
     const key = `${order._id}_${idx}`;
-    // Once packed, do not uncheck it!
-    if (packedItems[key]) {
+
+    // 1. When order arrives (pending), admin can freely check/uncheck dishes to verify them
+    if (order.status === "pending") {
+      setPackedItems((prev) => {
+        const next = { ...prev, [key]: !prev[key] };
+        try {
+          localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
       return;
     }
-    setPackedItems((prev) => {
-      const next = { ...prev, [key]: true };
-      try {
-        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+
+    // 2. Once order is accepted (preparing), any checked item CANNOT be unchecked
+    if (order.status === "preparing") {
+      if (packedItems[key]) {
+        return; // Locked: cannot be unchecked after order is accepted
+      }
+      setPackedItems((prev) => {
+        const next = { ...prev, [key]: true };
+        try {
+          localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+    }
   };
 
   // Pack all dishes in an order (only during preparing)
@@ -945,16 +960,21 @@ export default function OrdersClient() {
                                 <Check size={11} /> All Packed
                               </span>
                             ) : order.status === "preparing" ? (
-                              <button
-                                type="button"
-                                onClick={() => packAllDishes(order)}
-                                className="text-[10px] text-orange-600 dark:text-orange-400 hover:underline font-bold"
-                              >
-                                Pack All
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-orange-500 font-bold">
+                                  Locked 🔒
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => packAllDishes(order)}
+                                  className="text-[10px] text-orange-600 dark:text-orange-400 hover:underline font-bold"
+                                >
+                                  Pack All
+                                </button>
+                              </div>
                             ) : order.status === "pending" ? (
-                              <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-1">
-                                🔒 Locked
+                              <span className="text-[10px] text-stone-500 dark:text-stone-400 font-semibold">
+                                Tap to verify dishes
                               </span>
                             ) : null}
                           </div>
@@ -962,21 +982,28 @@ export default function OrdersClient() {
                           <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canPack = !isPacked && order.status === "preparing";
+                              const canClick = order.status === "pending" || (order.status === "preparing" && !isPacked);
+                              const itemTitle =
+                                order.status === "pending"
+                                  ? isPacked
+                                    ? "Verified (click to uncheck before accepting)"
+                                    : "Click to select/verify dish before accepting"
+                                  : isPacked
+                                  ? "Locked: Cannot be unchecked after order is accepted"
+                                  : "Click to pack (locks once checked)";
+
                               return (
                                 <div
                                   key={idx}
-                                  title={order.status === "pending" ? "Accept order & start cooking to unlock dish packing" : canPack ? "Click to mark packed" : "Packed"}
-                                  onClick={() => canPack && toggleItemPacked(order, idx)}
+                                  title={itemTitle}
+                                  onClick={() => canClick && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-1.5 rounded-lg border text-xs select-none transition ${
-                                    canPack
+                                    canClick
                                       ? "cursor-pointer hover:border-orange-500/40"
-                                      : order.status === "pending"
-                                      ? "cursor-not-allowed opacity-80"
                                       : "cursor-default"
                                   } ${
                                     isPacked
-                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-600 dark:text-stone-300 font-medium"
+                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-700 dark:text-stone-300 font-medium"
                                       : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
@@ -1197,7 +1224,7 @@ export default function OrdersClient() {
                                 </span>
                               ) : order.status === "preparing" ? (
                                 <>
-                                  <span className="text-orange-500 font-medium">Tap dish to mark packed</span>
+                                  <span className="text-orange-500 font-medium">Checked items locked 🔒</span>
                                   <button
                                     type="button"
                                     onClick={() => packAllDishes(order)}
@@ -1207,8 +1234,8 @@ export default function OrdersClient() {
                                   </button>
                                 </>
                               ) : order.status === "pending" ? (
-                                <span className="text-stone-400 text-xs font-semibold flex items-center gap-1">
-                                  🔒 Locked (Accept order to begin packing)
+                                <span className="text-stone-500 dark:text-stone-400 text-xs font-semibold">
+                                  Select dishes to verify • Locks once accepted
                                 </span>
                               ) : (
                                 <span>Awaiting Kitchen Acceptance</span>
@@ -1219,17 +1246,24 @@ export default function OrdersClient() {
                           <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canPack = !isPacked && order.status === "preparing";
+                              const canClick = order.status === "pending" || (order.status === "preparing" && !isPacked);
+                              const itemTitle =
+                                order.status === "pending"
+                                  ? isPacked
+                                    ? "Verified (click to uncheck before accepting order)"
+                                    : "Click to select/verify dish before accepting order"
+                                  : isPacked
+                                  ? "Locked: Checked item cannot be unchecked after order is accepted"
+                                  : "Click to mark packed (locks once checked)";
+
                               return (
                                 <div
                                   key={idx}
-                                  title={order.status === "pending" ? "Accept order & start cooking to unlock dish packing" : canPack ? "Click to mark packed" : "Packed"}
-                                  onClick={() => canPack && toggleItemPacked(order, idx)}
+                                  title={itemTitle}
+                                  onClick={() => canClick && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-2 rounded-xl border text-xs select-none transition ${
-                                    canPack
+                                    canClick
                                       ? "cursor-pointer hover:border-orange-500/40"
-                                      : order.status === "pending"
-                                      ? "cursor-not-allowed opacity-80"
                                       : "cursor-default"
                                   } ${
                                     isPacked
