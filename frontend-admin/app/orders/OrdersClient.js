@@ -37,7 +37,39 @@ import { formatOrderId } from "../dashboard/DashboardClient";
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
 
 // Live elapsed kitchen timer helper with progressive urgency colors
-export function getOrderElapsedInfo(createdAt) {
+export function getOrderElapsedInfo(createdAt, status, updatedAt) {
+  // If order is delivered, stop timer and show completion badge
+  if (status === "delivered") {
+    let completionText = "Delivered";
+    if (updatedAt && createdAt) {
+      const totalMins = Math.max(1, Math.round((new Date(updatedAt) - new Date(createdAt)) / 60000));
+      completionText = `Delivered (${totalMins}m)`;
+    }
+    return {
+      text: `✓ ${completionText}`,
+      color: "bg-stone-100 text-stone-700 border-stone-200 dark:bg-stone-800/80 dark:text-stone-300 dark:border-white/10 font-semibold",
+      urgent: false,
+    };
+  }
+
+  // If order is cancelled, stop timer and show cancelled badge
+  if (status === "cancelled") {
+    return {
+      text: "✕ Cancelled",
+      color: "bg-stone-100 text-stone-500 border-stone-200 dark:bg-stone-900/60 dark:text-stone-400 dark:border-white/5",
+      urgent: false,
+    };
+  }
+
+  // If order is out for delivery, show in-transit badge
+  if (status === "out_for_delivery") {
+    return {
+      text: "🛵 Dispatched (On Delivery)",
+      color: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-500/30 font-semibold",
+      urgent: false,
+    };
+  }
+
   if (!createdAt) {
     return {
       text: "Just now",
@@ -45,6 +77,7 @@ export function getOrderElapsedInfo(createdAt) {
       urgent: false,
     };
   }
+
   const elapsedMs = Date.now() - new Date(createdAt).getTime();
   const elapsedMins = Math.max(0, Math.floor(elapsedMs / (1000 * 60)));
   if (elapsedMins < 1) {
@@ -56,7 +89,7 @@ export function getOrderElapsedInfo(createdAt) {
   }
   if (elapsedMins < 10) {
     return {
-      text: `${elapsedMins}m ago`,
+      text: `${elapsedMins}m ago • On track`,
       color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
       urgent: false,
     };
@@ -180,7 +213,17 @@ export default function OrdersClient() {
   const [newOrderAlert, setNewOrderAlert] = useState(null);
   const [highlightedOrderIds, setHighlightedOrderIds] = useState(new Set());
   const [rushMode, setRushMode] = useState(false);
-  const [packedItems, setPackedItems] = useState({});
+  const [packedItems, setPackedItems] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("restaurant_packed_items");
+        return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  });
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
   const [kitchenActive, setKitchenActive] = useState(() => {
     if (typeof window !== "undefined") {
@@ -195,12 +238,45 @@ export default function OrdersClient() {
     return () => clearInterval(timer);
   }, []);
 
-  const toggleItemPacked = (orderId, idx) => {
-    const key = `${orderId}_${idx}`;
-    setPackedItems((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  // Check if a dish is packed (automatically true for out_for_delivery / delivered)
+  const isDishPacked = (order, idx) => {
+    if (order.status === "out_for_delivery" || order.status === "delivered") {
+      return true;
+    }
+    return Boolean(packedItems[`${order._id}_${idx}`]);
+  };
+
+  // Once an order is accepted and a dish is packed, it should NOT be unchecked
+  const toggleItemPacked = (order, idx) => {
+    if (order.status === "out_for_delivery" || order.status === "delivered" || order.status === "cancelled") {
+      return;
+    }
+    const key = `${order._id}_${idx}`;
+    // Once packed, do not uncheck it!
+    if (packedItems[key]) {
+      return;
+    }
+    setPackedItems((prev) => {
+      const next = { ...prev, [key]: true };
+      try {
+        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // Pack all dishes in an order
+  const packAllDishes = (order) => {
+    setPackedItems((prev) => {
+      const next = { ...prev };
+      (order.items || []).forEach((_, idx) => {
+        next[`${order._id}_${idx}`] = true;
+      });
+      try {
+        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
 
   // Refs for polling and concurrency management
@@ -335,8 +411,21 @@ export default function OrdersClient() {
           message: `Order ${displayId} updated to ${nextStatus.toUpperCase()}`,
         });
         setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus } : o))
+          prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus, updatedAt: new Date().toISOString() } : o))
         );
+        if (nextStatus === "out_for_delivery" || nextStatus === "delivered") {
+          setPackedItems((prev) => {
+            const next = { ...prev };
+            const orderObj = orders.find((o) => o._id === orderId);
+            (orderObj?.items || []).forEach((_, idx) => {
+              next[`${orderId}_${idx}`] = true;
+            });
+            try {
+              localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+            } catch (e) {}
+            return next;
+          });
+        }
         setHighlightedOrderIds((prev) => {
           const next = new Set(prev);
           next.delete(orderId);
@@ -769,12 +858,12 @@ export default function OrdersClient() {
                 {displayedOrders.map((order) => {
                   const uniqueId = formatOrderId(order);
                   const isNewlyArrived = highlightedOrderIds.has(order._id);
-                  const elapsedInfo = getOrderElapsedInfo(order.createdAt);
+                  const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
                   const paymentModeStr = (order.paymentMethod || "").toLowerCase();
                   const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
 
                   const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
-                  const packedCount = (order.items || []).filter((_, idx) => packedItems[`${order._id}_${idx}`]).length;
+                  const packedCount = (order.items || []).filter((_, idx) => isDishPacked(order, idx)).length;
                   const allPacked = totalItems > 0 && packedCount === (order.items || []).length;
 
                   return (
@@ -847,23 +936,34 @@ export default function OrdersClient() {
                         <div className="space-y-1 pt-1 border-t border-stone-100 dark:border-white/5">
                           <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider pb-0.5">
                             <span>Dishes ({order.items?.length || 0})</span>
-                            {allPacked && (
+                            {allPacked ? (
                               <span className="text-emerald-500 font-extrabold flex items-center gap-0.5">
                                 <Check size={11} /> All Packed
                               </span>
-                            )}
+                            ) : order.status === "preparing" ? (
+                              <button
+                                type="button"
+                                onClick={() => packAllDishes(order)}
+                                className="text-[10px] text-orange-600 dark:text-orange-400 hover:underline font-bold"
+                              >
+                                Pack All
+                              </button>
+                            ) : null}
                           </div>
 
                           <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
                             {(order.items || []).map((item, idx) => {
-                              const isPacked = packedItems[`${order._id}_${idx}`];
+                              const isPacked = isDishPacked(order, idx);
+                              const canPack = !isPacked && (order.status === "preparing" || order.status === "pending");
                               return (
                                 <div
                                   key={idx}
-                                  onClick={() => toggleItemPacked(order._id, idx)}
-                                  className={`flex items-center justify-between p-1.5 rounded-lg border text-xs cursor-pointer select-none transition ${
+                                  onClick={() => canPack && toggleItemPacked(order, idx)}
+                                  className={`flex items-center justify-between p-1.5 rounded-lg border text-xs select-none transition ${
+                                    canPack ? "cursor-pointer" : "cursor-default"
+                                  } ${
                                     isPacked
-                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-400 line-through"
+                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-600 dark:text-stone-300 font-medium"
                                       : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
@@ -961,12 +1061,12 @@ export default function OrdersClient() {
                 {displayedOrders.map((order) => {
                   const uniqueId = formatOrderId(order);
                   const isNewlyArrived = highlightedOrderIds.has(order._id);
-                  const elapsedInfo = getOrderElapsedInfo(order.createdAt);
+                  const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
                   const paymentModeStr = (order.paymentMethod || "").toLowerCase();
                   const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
 
                   const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
-                  const packedCount = (order.items || []).filter((_, idx) => packedItems[`${order._id}_${idx}`]).length;
+                  const packedCount = (order.items || []).filter((_, idx) => isDishPacked(order, idx)).length;
                   const allPacked = totalItems > 0 && packedCount === (order.items || []).length;
 
                   return (
@@ -1077,21 +1177,41 @@ export default function OrdersClient() {
                             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
                               Dish Checklist ({order.items?.length || 0} items)
                             </span>
-                            <span className="text-[11px] font-semibold text-stone-400">
-                              Tap to pack {allPacked && "• All Packed ✓"}
-                            </span>
+                            <div className="text-[11px] font-semibold text-stone-400 flex items-center gap-2">
+                              {allPacked ? (
+                                <span className="text-emerald-500 font-bold flex items-center gap-1">
+                                  <Check size={12} /> All Items Packed ✓
+                                </span>
+                              ) : order.status === "preparing" ? (
+                                <>
+                                  <span className="text-orange-500 font-medium">Tap dish to mark packed</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => packAllDishes(order)}
+                                    className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500 hover:text-white border border-orange-500/20 text-[10px] font-bold transition"
+                                  >
+                                    Pack All
+                                  </button>
+                                </>
+                              ) : (
+                                <span>Awaiting Kitchen Acceptance</span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                             {(order.items || []).map((item, idx) => {
-                              const isPacked = packedItems[`${order._id}_${idx}`];
+                              const isPacked = isDishPacked(order, idx);
+                              const canPack = !isPacked && (order.status === "preparing" || order.status === "pending");
                               return (
                                 <div
                                   key={idx}
-                                  onClick={() => toggleItemPacked(order._id, idx)}
-                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer select-none transition ${
+                                  onClick={() => canPack && toggleItemPacked(order, idx)}
+                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs select-none transition ${
+                                    canPack ? "cursor-pointer" : "cursor-default"
+                                  } ${
                                     isPacked
-                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-400 line-through"
+                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-700 dark:text-stone-300 font-medium"
                                       : "bg-white dark:bg-white/[0.03] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >

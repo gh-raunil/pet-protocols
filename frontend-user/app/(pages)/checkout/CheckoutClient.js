@@ -732,9 +732,9 @@ export default function CheckoutClient() {
                       : "border-white/10 bg-[#141414] hover:border-white/20"
                   }`}
                 >
-                  {/* Top-Right Corner TESTING Ribbon */}
-                  <div className="absolute top-0 right-0 overflow-hidden w-20 h-20 pointer-events-none z-10">
-                    <div className="bg-amber-400 text-stone-950 font-black text-[8px] uppercase tracking-wider py-0.5 text-center shadow-sm transform rotate-45 translate-x-6 translate-y-3 w-28">
+                  {/* Top-Right Corner Prominent TESTING Ribbon */}
+                  <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none z-20">
+                    <div className="absolute top-[18px] -right-[32px] w-[126px] rotate-45 bg-amber-400 text-stone-950 text-center font-black text-[10px] tracking-widest uppercase py-1 shadow-md border-y border-amber-300">
                       TESTING
                     </div>
                   </div>
@@ -745,9 +745,14 @@ export default function CheckoutClient() {
                         <CreditCard size={18} />
                       </div>
                       <div>
-                        <span className="font-bold text-sm text-white block">
-                          Razorpay Gateway
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-white block">
+                            Razorpay Gateway
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-black uppercase tracking-wider">
+                            TESTING
+                          </span>
+                        </div>
                         <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">
                           Test Mode Active
                         </span>

@@ -31,6 +31,7 @@ export async function PUT(request, { params }) {
     if (body.image !== undefined) product.image = body.image;
     if (body.category !== undefined) product.category = body.category;
     if (body.type !== undefined) product.type = body.type;
+    if (body.preparationTime !== undefined) product.preparationTime = Math.max(1, Number(body.preparationTime) || 15);
     if (body.isAvailable !== undefined) product.isAvailable = Boolean(body.isAvailable);
     if (body.isFeatured !== undefined) product.isFeatured = Boolean(body.isFeatured);
 

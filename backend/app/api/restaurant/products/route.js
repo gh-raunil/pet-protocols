@@ -46,7 +46,7 @@ export async function POST(request) {
     const { restaurantId } = auth;
     const body = await request.json();
 
-    const { name, description, price, image, category, type = "veg", isAvailable = true, isFeatured = false } = body;
+    const { name, description, price, image, category, type = "veg", isAvailable = true, isFeatured = false, preparationTime = 15 } = body;
 
     if (!name || !price || !category) {
       return NextResponse.json(
@@ -65,6 +65,7 @@ export async function POST(request) {
       image: image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
       category,
       type,
+      preparationTime: Number(preparationTime) || 15,
       isAvailable: isAvailable !== false,
       isFeatured: !!isFeatured,
     });

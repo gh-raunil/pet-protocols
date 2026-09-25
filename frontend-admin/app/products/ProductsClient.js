@@ -19,6 +19,7 @@ import {
   ToggleRight,
   Upload,
   Image as ImageIcon,
+  Clock,
 } from "lucide-react";
 
 export default function ProductsClient() {
@@ -42,6 +43,7 @@ export default function ProductsClient() {
     image: "",
     category: "Burger",
     type: "veg",
+    preparationTime: 15,
     isAvailable: true,
     isFeatured: false,
   });
@@ -93,6 +95,7 @@ export default function ProductsClient() {
       image: "",
       category: "Burger",
       type: "veg",
+      preparationTime: 15,
       isAvailable: true,
       isFeatured: false,
     });
@@ -111,6 +114,7 @@ export default function ProductsClient() {
       image: product.image,
       category: product.category,
       type: product.type || "veg",
+      preparationTime: product.preparationTime || 15,
       isAvailable: product.isAvailable !== false,
       isFeatured: !!product.isFeatured,
     });
@@ -396,6 +400,9 @@ export default function ProductsClient() {
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10">
                       {product.category}
                     </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/70 text-amber-300 backdrop-blur-md border border-white/10 flex items-center gap-1">
+                      <Clock size={10} /> {product.preparationTime || 15}m prep
+                    </span>
                   </div>
 
                   <div className="absolute top-3 right-3">
@@ -561,6 +568,45 @@ export default function ProductsClient() {
                       <option value="true">In Stock / Available</option>
                       <option value="false">Out of Stock</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                      Prep Time (Minutes) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="15"
+                        value={modalForm.preparationTime || ""}
+                        onChange={(e) =>
+                          setModalForm({ ...modalForm, preparationTime: e.target.value })
+                        }
+                        min="1"
+                        max="180"
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none font-mono pr-14"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400 pointer-events-none">
+                        mins
+                      </span>
+                    </div>
+                    {/* Quick preset chips */}
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {[10, 15, 20, 30, 45].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setModalForm({ ...modalForm, preparationTime: mins })}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition border ${
+                            Number(modalForm.preparationTime) === mins
+                              ? "bg-orange-500 text-white border-orange-500"
+                              : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 border-stone-200/60 dark:border-white/10 hover:border-orange-500/30"
+                          }`}
+                        >
+                          {mins}m
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="md:col-span-2">

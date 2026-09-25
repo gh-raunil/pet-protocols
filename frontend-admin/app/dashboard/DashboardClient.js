@@ -436,7 +436,7 @@ export default function DashboardClient() {
               {displayedRecentOrders.map((order) => {
                 const uniqueId = formatOrderId(order);
                 const isCod = (order.paymentMethod || "").toLowerCase().includes("cod") || (order.paymentMethod || "").toLowerCase().includes("cash") || order.paymentStatus === "pending";
-                const elapsedInfo = getOrderElapsedInfo(order.createdAt);
+                const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
 
                 return (
                   <div

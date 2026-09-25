@@ -2,7 +2,7 @@
 
 import toast from "react-hot-toast";
 import useCartStore from "@/lib/cartStore";
-import { ShoppingCart, Star, Building } from "lucide-react";
+import { ShoppingCart, Star, Building, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -149,6 +149,16 @@ export default function ProductCard({ product }) {
               />
               {product.type === "veg" ? "Veg" : "Non-Veg"}
             </span>
+
+            {product.preparationTime && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-300">
+                  <Clock size={10} className="text-orange-400" />
+                  {product.preparationTime}m
+                </span>
+              </>
+            )}
           </div>
 
           {/* Product Name */}

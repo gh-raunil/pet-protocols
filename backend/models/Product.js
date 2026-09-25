@@ -43,6 +43,12 @@ const ProductSchema = new mongoose.Schema(
       enum: ["veg", "non-veg"],
       default: "veg",
     },
+    preparationTime: {
+      type: Number,
+      default: 15,
+      min: 1,
+      max: 180,
+    },
   },
   { timestamps: true }
 );

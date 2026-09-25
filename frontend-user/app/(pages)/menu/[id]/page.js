@@ -118,7 +118,9 @@ export default async function ProductPage({ params }) {
           <div className="grid grid-cols-3 gap-3 mb-8">
             <div className="bg-[#111] rounded-2xl p-4 text-center border border-white/5">
               <p className="text-white/40 text-xs mb-1">Prep Time</p>
-              <p className="text-white font-bold text-sm">15–20 min</p>
+              <p className="text-white font-bold text-sm">
+                {product.preparationTime ? `${product.preparationTime} mins` : "15–20 min"}
+              </p>
             </div>
             <div className="bg-[#111] rounded-2xl p-4 text-center border border-white/5">
               <p className="text-white/40 text-xs mb-1">Category</p>
