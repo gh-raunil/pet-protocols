@@ -246,6 +246,11 @@ export default function RestaurantAdminNav() {
 
           {/* Right Controls */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Desktop Light/Dark Toggle */}
+            <div className="hidden md:flex items-center">
+              <ThemeToggle />
+            </div>
+
             {isRestaurantAdmin ? (
               <div className="flex items-center gap-2">
                 <Link
@@ -362,8 +367,16 @@ export default function RestaurantAdminNav() {
                 </div>
               )}
 
+              {/* Display Mode / Theme Switcher in Mobile Drawer */}
+              <div className="flex items-center justify-between p-3 my-2.5 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/5">
+                <span className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                  Display Mode
+                </span>
+                <ThemeToggle />
+              </div>
+
               {/* Navigation Links List */}
-              <nav className="flex flex-col gap-1 mt-2">
+              <nav className="flex flex-col gap-1 mt-1">
                 {isRestaurantAdmin
                   ? mobileNavLinks.map(({ href, label, icon: Icon }) => {
                       const isActive = pathname === href;

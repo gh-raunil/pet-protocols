@@ -32,16 +32,44 @@ export async function GET(request) {
     }
 
     if (searchQuery) {
-      filter.$or = [
-        { orderId: { $regex: searchQuery, $options: "i" } },
-        { "address.fullName": { $regex: searchQuery, $options: "i" } },
-        { "address.phone": { $regex: searchQuery, $options: "i" } },
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const stripped = searchQuery.replace(/^#/, "").trim();
+      const cleanId = stripped.replace(/^PET-/i, "").replace(/^ORD_/i, "").trim();
+
+      const orConditions = [
+        { "address.fullName": { $regex: escapeRegex(searchQuery), $options: "i" } },
+        { "address.phone": { $regex: escapeRegex(stripped), $options: "i" } },
+        { orderId: { $regex: escapeRegex(stripped), $options: "i" } },
       ];
+
+      if (cleanId) {
+        orConditions.push({ orderId: { $regex: escapeRegex(cleanId), $options: "i" } });
+        orConditions.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: "$_id" },
+              regex: escapeRegex(cleanId),
+              options: "i",
+            },
+          },
+        });
+      }
+
+      filter.$or = orConditions;
     }
 
-    const orders = await Order.find(filter)
+    let orders = await Order.find(filter)
       .populate("user", "name email phone")
       .sort({ createdAt: -1 });
+
+    // Fallback: If searching by orderId or customer and 0 results found in filtered date range, search across all dates
+    if (orders.length === 0 && searchQuery && filter.createdAt) {
+      const fallbackFilter = { ...filter };
+      delete fallbackFilter.createdAt;
+      orders = await Order.find(fallbackFilter)
+        .populate("user", "name email phone")
+        .sort({ createdAt: -1 });
+    }
 
     return NextResponse.json({
       success: true,

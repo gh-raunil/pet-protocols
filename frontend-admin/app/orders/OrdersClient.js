@@ -204,9 +204,39 @@ export default function OrdersClient() {
     }
   }
 
-  // Export orders to CSV
+  // Filter orders client-side for instantaneous feedback across orderId, #PET-xxx, mongo _id, customer name & phone
+  const displayedOrders = useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return orders;
+    const q = searchQuery.trim().toLowerCase().replace(/^#/, "");
+    const cleanQ = q.replace(/^pet-/i, "").replace(/^ord_/i, "");
+    return orders.filter((order) => {
+      const formatted = formatOrderId(order).toLowerCase().replace(/^#/, "");
+      const rawId = (order.orderId || "").toLowerCase();
+      const mongoId = (order._id || "").toString().toLowerCase();
+      const customer = (order.address?.fullName || order.user?.name || "").toLowerCase();
+      const phone = (order.address?.phone || order.user?.phone || "").toLowerCase();
+      return (
+        formatted.includes(q) ||
+        formatted.includes(cleanQ) ||
+        rawId.includes(q) ||
+        rawId.includes(cleanQ) ||
+        mongoId.includes(q) ||
+        mongoId.includes(cleanQ) ||
+        customer.includes(q) ||
+        phone.includes(q)
+      );
+    });
+  }, [orders, searchQuery]);
+
+  function handleSearch(e) {
+    if (e) e.preventDefault();
+    fetchOrders(true);
+  }
+
+  // Export orders to CSV using Blob with BOM (prevents truncation on # fragments and supports Excel)
   function downloadOrdersReport() {
-    if (!orders || orders.length === 0) {
+    const exportTarget = displayedOrders.length > 0 ? displayedOrders : orders;
+    if (!exportTarget || exportTarget.length === 0) {
       alert("No orders to download for this selection.");
       return;
     }
@@ -225,24 +255,26 @@ export default function OrdersClient() {
       "Delivery Address",
     ];
 
-    const rows = orders.map((o) => {
+    const rows = exportTarget.map((o) => {
       const orderDate = new Date(o.createdAt);
-      const formattedDate = orderDate.toISOString().split("T")[0];
-      const formattedTime = orderDate.toLocaleTimeString();
+      const formattedDate = !isNaN(orderDate) ? orderDate.toISOString().split("T")[0] : "";
+      const formattedTime = !isNaN(orderDate) ? orderDate.toLocaleTimeString() : "";
       const uniqueId = formatOrderId(o);
       const itemsCount = o.items?.reduce((acc, it) => acc + (it.quantity || 1), 0) || 0;
-      const itemsSummary = o.items
-        ?.map((it) => `${it.quantity}x ${it.name}`)
+      const itemsSummary = (o.items || [])
+        .map((it) => `${it.quantity || 1}x ${it.name || "Dish"}`)
         .join(" | ")
-        .replace(/,/g, " ");
-      const address = `${o.address?.street || ""}, ${o.address?.city || ""}`.replace(/,/g, " ");
+        .replace(/"/g, '""');
+      const address = `${o.address?.street || ""}, ${o.address?.city || ""}`.replace(/"/g, '""');
+      const customerName = (o.address?.fullName || o.user?.name || "Customer").replace(/"/g, '""');
+      const phone = (o.address?.phone || o.user?.phone || "").replace(/"/g, '""');
 
       return [
         `"${uniqueId}"`,
         `"${formattedDate}"`,
         `"${formattedTime}"`,
-        `"${(o.address?.fullName || o.user?.name || "").replace(/"/g, '""')}"`,
-        `"${o.address?.phone || ""}"`,
+        `"${customerName}"`,
+        `"${phone}"`,
         itemsCount,
         `"${itemsSummary}"`,
         o.totalAmount || 0,
@@ -252,20 +284,16 @@ export default function OrdersClient() {
       ];
     });
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `pet_protocols_orders_${selectedDate || "all"}.csv`
-    );
+    link.href = url;
+    link.setAttribute("download", `pet_protocols_orders_${selectedDate || "all"}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   // Min selectable date: restaurant createdAt date
@@ -418,7 +446,7 @@ export default function OrdersClient() {
           </div>
 
           {/* Search by Order ID or Customer Name */}
-          <div className="flex items-center gap-2 flex-1 max-w-md">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 max-w-md">
             <div className="flex items-center flex-1 bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 focus-within:border-orange-500 transition">
               <Search className="w-4 h-4 text-stone-400 shrink-0 mr-2" />
               <input
@@ -431,14 +459,24 @@ export default function OrdersClient() {
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => {
+                    setSearchQuery("");
+                    fetchOrders(true);
+                  }}
                   className="text-stone-400 hover:text-stone-700 text-xs px-1"
                 >
                   ✕
                 </button>
               )}
             </div>
-          </div>
+
+            <button
+              type="submit"
+              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs shrink-0 active:scale-95"
+            >
+              Search
+            </button>
+          </form>
         </div>
 
         {/* ── NEW ORDER VISUAL NOTIFICATION BANNER ─────────────────── */}
@@ -514,7 +552,7 @@ export default function OrdersClient() {
             <RefreshCw className="animate-spin w-8 h-8" />
             <p className="text-xs text-stone-500 font-semibold">Loading live kitchen orders...</p>
           </div>
-        ) : orders.length === 0 ? (
+        ) : displayedOrders.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-stone-200 dark:border-stone-800 rounded-3xl bg-white/50 dark:bg-[#10141f]/50 p-8">
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 text-stone-400" />
             <h3 className="text-base font-bold text-stone-900 dark:text-white">
@@ -534,7 +572,7 @@ export default function OrdersClient() {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => {
+            {displayedOrders.map((order) => {
               const uniqueId = formatOrderId(order);
               const isNewlyArrived = highlightedOrderIds.has(order._id);
 

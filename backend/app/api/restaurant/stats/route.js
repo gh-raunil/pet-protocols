@@ -75,21 +75,55 @@ export async function GET(request) {
     // Fetch recent orders for selected date (or today)
     let recentQuery = {
       restaurant: restaurantId,
-      createdAt: { $gte: selectedStart, $lte: selectedEnd },
     };
 
-    if (searchQuery) {
-      recentQuery.$or = [
-        { orderId: { $regex: searchQuery, $options: "i" } },
-        { "address.fullName": { $regex: searchQuery, $options: "i" } },
-        { "address.phone": { $regex: searchQuery, $options: "i" } },
+    if (!searchQuery) {
+      recentQuery.createdAt = { $gte: selectedStart, $lte: selectedEnd };
+    } else {
+      // If searching, check selected date first or search broadly
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const stripped = searchQuery.replace(/^#/, "").trim();
+      const cleanId = stripped.replace(/^PET-/i, "").replace(/^ORD_/i, "").trim();
+
+      const orConditions = [
+        { "address.fullName": { $regex: escapeRegex(searchQuery), $options: "i" } },
+        { "address.phone": { $regex: escapeRegex(stripped), $options: "i" } },
+        { orderId: { $regex: escapeRegex(stripped), $options: "i" } },
       ];
+
+      if (cleanId) {
+        orConditions.push({ orderId: { $regex: escapeRegex(cleanId), $options: "i" } });
+        orConditions.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: "$_id" },
+              regex: escapeRegex(cleanId),
+              options: "i",
+            },
+          },
+        });
+      }
+
+      recentQuery.$or = orConditions;
+      if (isCustomDate) {
+        recentQuery.createdAt = { $gte: selectedStart, $lte: selectedEnd };
+      }
     }
 
     let recentOrders = await Order.find(recentQuery)
       .populate("user", "name email phone")
       .sort({ createdAt: -1 })
       .lean();
+
+    // Fallback: If searching by orderId or customer and 0 results found in filtered date, search across all dates
+    if (recentOrders.length === 0 && searchQuery && recentQuery.createdAt) {
+      const fallbackQuery = { ...recentQuery };
+      delete fallbackQuery.createdAt;
+      recentOrders = await Order.find(fallbackQuery)
+        .populate("user", "name email phone")
+        .sort({ createdAt: -1 })
+        .lean();
+    }
 
     // Fallback: If no orders exist on today yet, and it's not a custom date filter, show the 5 most recent orders
     if (recentOrders.length === 0 && !isCustomDate && !searchQuery) {

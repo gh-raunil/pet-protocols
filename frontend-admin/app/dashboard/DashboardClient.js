@@ -102,6 +102,30 @@ export default function DashboardClient() {
 
   const isTodaySelected = selectedDate === todayStr;
 
+  // Filter recent orders client-side for instantaneous feedback across orderId, #PET-xxx, mongo _id, customer name & phone
+  const displayedRecentOrders = useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return recentOrders;
+    const q = searchQuery.trim().toLowerCase().replace(/^#/, "");
+    const cleanQ = q.replace(/^pet-/i, "").replace(/^ord_/i, "");
+    return recentOrders.filter((order) => {
+      const formatted = formatOrderId(order).toLowerCase().replace(/^#/, "");
+      const rawId = (order.orderId || "").toLowerCase();
+      const mongoId = (order._id || "").toString().toLowerCase();
+      const customer = (order.address?.fullName || order.user?.name || "").toLowerCase();
+      const phone = (order.address?.phone || order.user?.phone || "").toLowerCase();
+      return (
+        formatted.includes(q) ||
+        formatted.includes(cleanQ) ||
+        rawId.includes(q) ||
+        rawId.includes(cleanQ) ||
+        mongoId.includes(q) ||
+        mongoId.includes(cleanQ) ||
+        customer.includes(q) ||
+        phone.includes(q)
+      );
+    });
+  }, [recentOrders, searchQuery]);
+
   const statusStyles = {
     pending: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30",
     preparing: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30",
@@ -313,6 +337,18 @@ export default function DashboardClient() {
             >
               Search
             </button>
+
+            {/* Refresh Button after search button */}
+            <button
+              type="button"
+              onClick={() => fetchDashboard(selectedDate, searchQuery)}
+              disabled={loading}
+              className="px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 font-bold text-xs transition shadow-xs shrink-0 active:scale-95 flex items-center gap-1.5"
+              title="Refresh Dashboard data"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin text-orange-500" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </form>
         </div>
 
@@ -325,7 +361,7 @@ export default function DashboardClient() {
                 {isTodaySelected ? "Today's Live Orders" : `Orders for ${selectedDate}`}
               </h2>
               <span className="text-xs font-mono text-stone-400 bg-stone-100 dark:bg-white/5 px-2 py-0.5 rounded-md">
-                {recentOrders.length} {recentOrders.length === 1 ? "ticket" : "tickets"}
+                {displayedRecentOrders.length} {displayedRecentOrders.length === 1 ? "ticket" : "tickets"}
               </span>
             </div>
 
@@ -343,7 +379,7 @@ export default function DashboardClient() {
               <RefreshCw className="animate-spin w-6 h-6" />
               <p className="text-xs text-stone-500">Loading orders...</p>
             </div>
-          ) : recentOrders.length === 0 ? (
+          ) : displayedRecentOrders.length === 0 ? (
             <div className="text-center py-10 border border-dashed border-stone-200 dark:border-stone-800 rounded-2xl bg-stone-50/50 dark:bg-transparent">
               <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-stone-400" />
               <p className="text-xs font-bold text-stone-700 dark:text-stone-300">
@@ -355,7 +391,7 @@ export default function DashboardClient() {
             </div>
           ) : (
             <div className="space-y-3">
-              {recentOrders.map((order) => {
+              {displayedRecentOrders.map((order) => {
                 const uniqueId = formatOrderId(order);
 
                 return (
