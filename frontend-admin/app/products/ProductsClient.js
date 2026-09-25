@@ -262,26 +262,31 @@ export default function ProductsClient() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-white font-jakarta">
+    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
+      {/* Soft warm ambient background glow for light mode */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
+      </div>
+
       <RestaurantAdminNav />
       <main className="pt-28 pb-20 px-4 sm:px-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 border-b border-stone-200/80 dark:border-white/10 pb-6">
           <div>
             <span className="text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wider">
               Menu Catalog
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white mt-1">
               Restaurant <span className="text-orange-500">Dishes</span>
             </h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">
               Add dishes, update pricing, and toggle instant availability for customers.
             </p>
           </div>
 
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20"
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95"
           >
             <PlusCircle size={18} /> Add Dish
           </button>
@@ -290,7 +295,7 @@ export default function ProductsClient() {
         {/* Feedback Alert */}
         {feedback.message && (
           <div
-            className={`mb-6 p-4 rounded-xl flex items-center justify-between border ${
+            className={`mb-6 p-4 rounded-2xl flex items-center justify-between border ${
               feedback.type === "success"
                 ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
                 : "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-300"
@@ -298,9 +303,9 @@ export default function ProductsClient() {
           >
             <div className="flex items-center gap-3">
               {feedback.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
               ) : (
-                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
               )}
               <p className="text-sm font-medium">{feedback.message}</p>
             </div>
@@ -314,16 +319,16 @@ export default function ProductsClient() {
         )}
 
         {/* Filters and Search */}
-        <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-4 mb-8 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
+        <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 mb-8 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm shadow-stone-200/40 dark:shadow-none">
           {/* Search */}
           <div className="relative w-full md:w-80">
-            <Search className="absolute left-3.5 top-3 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3.5 top-3 text-stone-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search dishes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-orange-500 outline-none"
+              className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
             />
           </div>
 
@@ -333,10 +338,10 @@ export default function ProductsClient() {
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                   categoryFilter === cat
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/5"
+                    ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25"
+                    : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/70 dark:border-white/5"
                 }`}
               >
                 {cat}
@@ -351,10 +356,10 @@ export default function ProductsClient() {
             <RefreshCw className="animate-spin w-8 h-8" />
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-20 bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm">
-            <UtensilsCrossed className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-            <p className="text-base font-bold text-slate-800 dark:text-white">No dishes found</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <div className="text-center py-20 bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl shadow-sm shadow-stone-200/40 dark:shadow-none">
+            <UtensilsCrossed className="w-12 h-12 mx-auto mb-3 text-stone-300 dark:text-stone-600" />
+            <p className="text-base font-bold text-stone-800 dark:text-white">No dishes found</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
               Click &quot;Add Dish&quot; to add menu items.
             </p>
           </div>
@@ -363,14 +368,14 @@ export default function ProductsClient() {
             {filteredProducts.map((product) => (
               <div
                 key={product._id}
-                className={`bg-white dark:bg-[#10141f] border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between ${
+                className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border rounded-2xl overflow-hidden shadow-sm shadow-stone-200/40 dark:shadow-none hover:shadow-md transition flex flex-col justify-between ${
                   product.isAvailable
-                    ? "border-slate-200 dark:border-white/10 hover:border-orange-500/40"
+                    ? "border-stone-200/90 dark:border-white/10 hover:border-orange-500/40"
                     : "border-red-200 dark:border-red-500/20 opacity-75"
                 }`}
               >
                 {/* Image and badges */}
-                <div className="relative h-48 w-full bg-slate-100 dark:bg-white/5 overflow-hidden">
+                <div className="relative h-48 w-full bg-stone-100 dark:bg-white/5 overflow-hidden">
                   <NextImage
                     src={product.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500"}
                     alt={product.name}
@@ -396,10 +401,10 @@ export default function ProductsClient() {
                   <div className="absolute top-3 right-3">
                     <button
                       onClick={() => handleToggleAvailability(product)}
-                      className={`text-xs font-bold px-3 py-1 rounded-full shadow-sm transition flex items-center gap-1 ${
+                      className={`text-xs font-bold px-3 py-1 rounded-full shadow-xs transition flex items-center gap-1 active:scale-95 ${
                         product.isAvailable
                           ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                          : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                          : "bg-stone-800 text-stone-200 hover:bg-stone-700"
                       }`}
                       title="Click to toggle availability"
                     >
@@ -412,26 +417,26 @@ export default function ProductsClient() {
                 <div className="p-5 flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start gap-2 mb-1.5">
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white">{product.name}</h3>
-                      <span className="text-base font-extrabold text-orange-600 dark:text-orange-400 shrink-0">
+                      <h3 className="font-bold text-base text-stone-900 dark:text-white">{product.name}</h3>
+                      <span className="text-base font-extrabold text-orange-600 dark:text-orange-400 shrink-0 font-mono">
                         ₹{product.price}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mb-4">
+                    <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 leading-relaxed mb-4">
                       {product.description}
                     </p>
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2">
+                  <div className="pt-4 border-t border-stone-100 dark:border-white/5 flex items-center justify-between gap-2">
                     <button
                       onClick={() => handleToggleAvailability(product)}
-                      className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition font-medium"
+                      className="text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white flex items-center gap-1.5 bg-stone-100/80 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 px-2.5 py-1.5 rounded-xl transition font-medium active:scale-95"
                     >
                       {product.isAvailable ? (
                         <ToggleRight className="text-emerald-500 w-4 h-4" />
                       ) : (
-                        <ToggleLeft className="text-slate-400 w-4 h-4" />
+                        <ToggleLeft className="text-stone-400 w-4 h-4" />
                       )}
                       <span>{product.isAvailable ? "In Stock" : "Unavailable"}</span>
                     </button>
@@ -439,14 +444,14 @@ export default function ProductsClient() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEditModal(product)}
-                        className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-orange-50 dark:hover:bg-orange-500/20 hover:text-orange-600 dark:hover:text-orange-400 text-slate-600 dark:text-slate-300 transition"
+                        className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-orange-50 dark:hover:bg-orange-500/20 hover:text-orange-600 dark:hover:text-orange-400 text-stone-600 dark:text-stone-300 transition active:scale-95"
                         title="Edit Dish"
                       >
                         <Edit2 size={15} />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(product)}
-                        className="p-2 rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition"
+                        className="p-2 rounded-xl bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition active:scale-95"
                         title="Delete Dish"
                       >
                         <Trash2 size={15} />
@@ -462,19 +467,19 @@ export default function ProductsClient() {
         {/* ── ADD / EDIT MODAL ────────────────────────────────────── */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-[#12141c] border border-slate-200 dark:border-white/15 rounded-3xl w-full max-w-xl p-6 md:p-8 shadow-2xl relative my-8 text-slate-900 dark:text-white">
+            <div className="bg-white dark:bg-[#12141c] border border-stone-200 dark:border-white/15 rounded-3xl w-full max-w-xl p-6 md:p-8 shadow-2xl relative my-8 text-stone-900 dark:text-white">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
                     {isEditing ? "Edit Dish" : "New Catalog Dish"}
                   </span>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                  <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white">
                     {isEditing ? "Update Dish" : "Add Dish to Menu"}
                   </h2>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+                  className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition"
                 >
                   <X size={20} />
                 </button>
@@ -483,7 +488,7 @@ export default function ProductsClient() {
               <form onSubmit={handleSaveProduct} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Product Name *
                     </label>
                     <input
@@ -492,12 +497,12 @@ export default function ProductsClient() {
                       value={modalForm.name}
                       onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
                       required
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Price (₹) *
                     </label>
                     <input
@@ -507,18 +512,18 @@ export default function ProductsClient() {
                       onChange={(e) => setModalForm({ ...modalForm, price: e.target.value })}
                       required
                       min="1"
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Category *
                     </label>
                     <select
                       value={modalForm.category}
                       onChange={(e) => setModalForm({ ...modalForm, category: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
                     >
                       {categories.filter((c) => c !== "All").map((c) => (
                         <option key={c} value={c}>
@@ -529,13 +534,13 @@ export default function ProductsClient() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Food Type
                     </label>
                     <select
                       value={modalForm.type}
                       onChange={(e) => setModalForm({ ...modalForm, type: e.target.value })}
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
                     >
                       <option value="veg">Veg</option>
                       <option value="non-veg">Non-Veg</option>
@@ -543,7 +548,7 @@ export default function ProductsClient() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Availability
                     </label>
                     <select
@@ -551,7 +556,7 @@ export default function ProductsClient() {
                       onChange={(e) =>
                         setModalForm({ ...modalForm, isAvailable: e.target.value === "true" })
                       }
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
                     >
                       <option value="true">In Stock / Available</option>
                       <option value="false">Out of Stock</option>
@@ -560,17 +565,17 @@ export default function ProductsClient() {
 
                   <div className="md:col-span-2">
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">
+                      <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase">
                         Dish Image *
                       </label>
-                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 p-0.5 rounded-lg text-[11px] font-semibold">
+                      <div className="flex items-center gap-1 bg-stone-100 dark:bg-white/5 p-0.5 rounded-lg text-[11px] font-semibold">
                         <button
                           type="button"
                           onClick={() => setImageMode("file")}
                           className={`px-2.5 py-1 rounded-md transition ${
                             imageMode === "file"
-                              ? "bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
-                              : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                              ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
+                              : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
                           }`}
                         >
                           From Device
@@ -580,8 +585,8 @@ export default function ProductsClient() {
                           onClick={() => setImageMode("url")}
                           className={`px-2.5 py-1 rounded-md transition ${
                             imageMode === "url"
-                              ? "bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
-                              : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                              ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
+                              : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
                           }`}
                         >
                           Paste URL
@@ -604,7 +609,7 @@ export default function ProductsClient() {
                           className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition ${
                             modalForm.image
                               ? "border-orange-500/40 bg-orange-50/20 dark:bg-orange-950/10 hover:border-orange-500"
-                              : "border-slate-300 dark:border-white/15 hover:border-orange-500 hover:bg-slate-50 dark:hover:bg-white/5"
+                              : "border-stone-300 dark:border-white/15 hover:border-orange-500 hover:bg-stone-50 dark:hover:bg-white/5"
                           }`}
                         >
                           {uploadingImage ? (
@@ -614,7 +619,7 @@ export default function ProductsClient() {
                             </div>
                           ) : modalForm.image ? (
                             <div className="flex items-center gap-3.5 w-full">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 shrink-0">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 shrink-0">
                                 <img
                                   src={modalForm.image}
                                   alt="Dish Preview"
@@ -622,10 +627,10 @@ export default function ProductsClient() {
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                <p className="text-xs font-bold text-stone-900 dark:text-white truncate">
                                   Image ready for menu
                                 </p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
                                   Click here to change or choose a different photo
                                 </p>
                               </div>
@@ -635,7 +640,7 @@ export default function ProductsClient() {
                                   e.stopPropagation();
                                   setModalForm((prev) => ({ ...prev, image: "" }));
                                 }}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition shrink-0"
+                                className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition shrink-0"
                                 title="Remove Image"
                               >
                                 <X size={16} />
@@ -646,10 +651,10 @@ export default function ProductsClient() {
                               <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
                                 <Upload size={18} />
                               </div>
-                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              <p className="text-xs font-bold text-stone-800 dark:text-stone-200">
                                 Choose image from device
                               </p>
-                              <p className="text-[11px] text-slate-400">
+                              <p className="text-[11px] text-stone-400">
                                 PNG, JPG, or WEBP photo
                               </p>
                             </div>
@@ -663,10 +668,10 @@ export default function ProductsClient() {
                           placeholder="https://images.unsplash.com/..."
                           value={modalForm.image}
                           onChange={(e) => setModalForm({ ...modalForm, image: e.target.value })}
-                          className="flex-1 bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-orange-500 outline-none"
+                          className="flex-1 bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
                         />
                         {modalForm.image && (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 shrink-0">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-stone-200 dark:border-white/10 shrink-0">
                             <img src={modalForm.image} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                         )}
@@ -675,7 +680,7 @@ export default function ProductsClient() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-1">
+                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
                       Description *
                     </label>
                     <textarea
@@ -684,23 +689,23 @@ export default function ProductsClient() {
                       value={modalForm.description}
                       onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
                       required
-                      className="w-full bg-slate-50 dark:bg-[#181b26] border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-orange-500 outline-none"
+                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-white/10">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-100 dark:border-white/10">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 transition"
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-stone-100 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 transition active:scale-95"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-6 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition shadow-md shadow-orange-500/20"
+                    className="px-6 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition shadow-md shadow-orange-500/20 active:scale-95"
                   >
                     {submitting ? "Saving..." : isEditing ? "Update Dish" : "Create Dish"}
                   </button>

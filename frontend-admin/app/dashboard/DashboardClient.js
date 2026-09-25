@@ -63,22 +63,27 @@ export default function DashboardClient() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-white font-jakarta transition-colors">
+    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
+      {/* Soft warm ambient background glow for light mode */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
+      </div>
+
       <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-6">
         
         {/* ── TOP HEADER / KITCHEN CONTROL PANEL ──────────────────────── */}
-        <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
+        <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm shadow-stone-200/40 dark:shadow-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-stone-900 dark:text-white tracking-tight">
                   {restaurantName}
                 </h1>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-stone-200/60 dark:border-white/5">
                   #{session?.user?.restaurantId?.slice(-6) || "TENANT"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-stone-500 dark:text-stone-400">
                 Kitchen operations overview and live orders summary.
               </p>
             </div>
@@ -99,7 +104,7 @@ export default function DashboardClient() {
 
               <Link
                 href="/products"
-                className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3.5 py-1.5 rounded-xl text-xs transition shadow-sm"
+                className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3.5 py-1.5 rounded-xl text-xs transition shadow-sm shadow-orange-500/20 active:scale-95"
               >
                 <PlusCircle size={14} />
                 <span>Add Dish</span>
@@ -107,7 +112,7 @@ export default function DashboardClient() {
 
               <Link
                 href="/orders"
-                className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/10 font-semibold px-3.5 py-1.5 rounded-xl text-xs transition"
+                className="inline-flex items-center gap-1.5 bg-stone-100 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-white/10 font-semibold px-3.5 py-1.5 rounded-xl text-xs transition active:scale-95"
               >
                 <ShoppingBag size={14} />
                 <span>Orders</span>
@@ -118,49 +123,49 @@ export default function DashboardClient() {
 
         {/* ── 3 CLEAN KPI CARDS ─────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Revenue</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 shadow-sm shadow-stone-200/40 dark:shadow-none transition hover:border-orange-500/30">
+            <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Revenue</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/30 flex items-center justify-center">
                 <IndianRupee size={16} />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-mono">
+            <p className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white font-mono">
               ₹{stats?.totalRevenue || 0}
             </p>
           </div>
 
-          <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Orders</span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+          <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 shadow-sm shadow-stone-200/40 dark:shadow-none transition hover:border-orange-500/30">
+            <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Orders</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-500/30 flex items-center justify-center">
                 <ShoppingBag size={16} />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-mono">
+            <p className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white font-mono">
               {stats?.totalOrders || 0}
             </p>
           </div>
 
-          <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Menu Dishes</span>
-              <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+          <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 shadow-sm shadow-stone-200/40 dark:shadow-none transition hover:border-orange-500/30">
+            <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">Menu Dishes</span>
+              <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/60 dark:border-orange-500/30 flex items-center justify-center">
                 <UtensilsCrossed size={16} />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-mono">
+            <p className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white font-mono">
               {stats?.totalProducts || 0}
             </p>
           </div>
         </div>
 
         {/* ── RECENT ORDERS ────────────────────────────── */}
-        <div className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
+        <div className="bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm shadow-stone-200/40 dark:shadow-none">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              <h2 className="text-base font-bold text-stone-900 dark:text-white">
                 Recent Orders
               </h2>
             </div>
@@ -177,51 +182,51 @@ export default function DashboardClient() {
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2 text-orange-500">
               <RefreshCw className="animate-spin w-6 h-6" />
-              <p className="text-xs text-slate-500">Loading orders...</p>
+              <p className="text-xs text-stone-500">Loading orders...</p>
             </div>
           ) : recentOrders.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-              <ShoppingBag className="w-8 h-8 mx-auto mb-1.5 text-slate-400" />
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No active orders</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Incoming customer orders will appear here automatically.</p>
+            <div className="text-center py-10 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl bg-stone-50/50 dark:bg-transparent">
+              <ShoppingBag className="w-8 h-8 mx-auto mb-1.5 text-stone-400" />
+              <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">No active orders</p>
+              <p className="text-[11px] text-stone-400 mt-0.5">Incoming customer orders will appear here automatically.</p>
             </div>
           ) : (
             <div className="space-y-2.5">
               {recentOrders.map((order) => (
                 <div
                   key={order._id}
-                  className="p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-orange-500/30 transition"
+                  className="p-3.5 sm:p-4 rounded-xl bg-stone-50/70 dark:bg-white/[0.02] border border-stone-200/80 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-orange-500/30 transition"
                 >
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-orange-500">
                         #{order.orderId || order._id.slice(-6)}
                       </span>
-                      <span className="text-slate-300 dark:text-slate-700">•</span>
-                      <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                      <span className="text-stone-300 dark:text-stone-700">•</span>
+                      <span className="text-[11px] text-stone-400 font-mono flex items-center gap-1">
                         <Clock size={11} />
                         {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
-                      <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase ${statusStyles[order.status] || "bg-slate-200 text-slate-700"}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${statusStyles[order.status] || "bg-stone-200 text-stone-700"}`}>
                         {order.status}
                       </span>
                     </div>
 
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    <p className="text-xs font-bold text-stone-900 dark:text-white">
                       {order.address?.fullName || "Customer"}
                     </p>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="text-xs text-stone-500 truncate">
                       {order.items?.map((item) => `${item.quantity}x ${item.name}`).join(", ")}
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-white/5">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-200/60 dark:border-white/5">
+                    <span className="text-sm font-bold text-stone-900 dark:text-white font-mono">
                       ₹{order.totalAmount}
                     </span>
                     <Link
                       href="/orders"
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/5 hover:bg-orange-500 hover:text-white transition text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/5 hover:bg-orange-500 hover:text-white transition text-xs font-semibold text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-white/10 shadow-xs"
                     >
                       Manage
                     </Link>

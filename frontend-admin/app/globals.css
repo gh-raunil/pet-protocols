@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-orange: #f97316;
   --color-brand-dark: var(--bg-main);
@@ -27,16 +29,17 @@
 }
 
 .light {
-  --bg-main: #f8fafc;
-  --bg-sub: #f1f5f9;
+  --bg-main: #fafaf9;
+  --bg-sub: #f5f5f4;
   --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --border-color: #e2e8f0;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
+  --bg-card-hover: #fcfcfc;
+  --border-color: #e7e5e4;
+  --text-main: #1c1917;
+  --text-muted: #78716c;
   --accent-orange: #f97316;
   --accent-orange-hover: #ea580c;
 }
+
 
 * {
   box-sizing: border-box;

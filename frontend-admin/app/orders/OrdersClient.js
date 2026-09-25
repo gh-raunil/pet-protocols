@@ -309,21 +309,26 @@ export default function OrdersClient() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-white font-jakarta transition-colors">
+    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
+      {/* Soft warm ambient background glow for light mode */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
+      </div>
+
       <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                Kitchen Display System (KDS)
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 dark:text-white">
+                Kitchen Display <span className="text-orange-500">System</span>
               </h1>
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live 10s Poll
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
               Live orders received for your kitchen with automatic incoming chime alerts.
             </p>
           </div>
@@ -339,10 +344,10 @@ export default function OrdersClient() {
                 }
               }}
               title={soundEnabled ? "Mute order chime" : "Unmute order chime"}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition shadow-sm ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition shadow-xs active:scale-95 ${
                 soundEnabled && !audioBlocked
                   ? "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"
-                  : "bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10"
+                  : "bg-white dark:bg-white/5 text-stone-500 border-stone-200 dark:border-white/10"
               }`}
             >
               {soundEnabled && !audioBlocked ? <Volume2 size={14} /> : <VolumeX size={14} />}
@@ -353,7 +358,7 @@ export default function OrdersClient() {
             <button
               onClick={() => fetchOrders(true)}
               disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white transition shadow-xs active:scale-95"
             >
               <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
               <span>Refresh</span>
@@ -363,17 +368,17 @@ export default function OrdersClient() {
 
         {/* Autoplay Restriction Warning & Fallback Banner */}
         {audioBlocked && (
-          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 p-3.5 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300 p-3.5 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-2.5">
-              <VolumeX className="w-4 h-4 text-amber-400 shrink-0" />
+              <VolumeX className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <div>
-                <span className="font-bold block text-white text-xs">Audio chime is paused by browser autoplay policy</span>
-                <span className="text-[11px] text-amber-200/80">Visual alerts are active. Tap below to enable kitchen chime.</span>
+                <span className="font-bold block text-stone-900 dark:text-white text-xs">Audio chime is paused by browser autoplay policy</span>
+                <span className="text-[11px] text-stone-600 dark:text-amber-200/80">Visual alerts are active. Tap below to enable kitchen chime.</span>
               </div>
             </div>
             <button
               onClick={handleEnableAudio}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shrink-0 cursor-pointer shadow-sm"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition shrink-0 cursor-pointer shadow-sm active:scale-95"
             >
               Enable Sound Alerts 🔊
             </button>
@@ -436,10 +441,10 @@ export default function OrdersClient() {
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                 filterStatus === tab.id
-                  ? "bg-orange-500 text-white shadow-sm"
-                  : "bg-white dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/10"
+                  ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25"
+                  : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10"
               }`}
             >
               {tab.label}
@@ -451,13 +456,13 @@ export default function OrdersClient() {
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-2 text-orange-500">
             <RefreshCw className="animate-spin w-7 h-7" />
-            <p className="text-xs text-slate-500">Connecting to Kitchen Feed...</p>
+            <p className="text-xs text-stone-500">Connecting to Kitchen Feed...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-16 bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm">
-            <ShoppingBag className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-600" />
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No orders found</p>
-            <p className="text-xs text-slate-500 mt-0.5">Orders with status "{filterStatus}" will appear here.</p>
+          <div className="text-center py-16 bg-white/90 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl shadow-sm shadow-stone-200/40 dark:shadow-none">
+            <ShoppingBag className="w-10 h-10 mx-auto mb-2 text-stone-400 dark:text-stone-600" />
+            <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">No orders found</p>
+            <p className="text-xs text-stone-500 mt-0.5">Orders with status &quot;{filterStatus}&quot; will appear here.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -466,16 +471,16 @@ export default function OrdersClient() {
               return (
                 <div
                   key={order._id}
-                  className={`bg-white dark:bg-[#10141f] border rounded-2xl p-5 sm:p-6 shadow-sm transition duration-300 relative ${
+                  className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border rounded-2xl p-5 sm:p-6 shadow-sm shadow-stone-200/40 dark:shadow-none transition duration-300 relative ${
                     isNewlyArrived
-                      ? "border-orange-500 ring-2 ring-orange-500/30 bg-orange-500/[0.02]"
-                      : "border-slate-200 dark:border-white/10 hover:border-orange-500/40"
+                      ? "border-orange-500 ring-2 ring-orange-500/30 bg-orange-500/[0.03]"
+                      : "border-stone-200/90 dark:border-white/10 hover:border-orange-500/40"
                   }`}
                 >
                   {/* Top Info Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-white/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100 dark:border-white/5">
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-950/40 px-2.5 py-1 rounded-lg border border-orange-200 dark:border-orange-500/20">
+                      <span className="font-mono text-xs font-bold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-950/40 px-2.5 py-1 rounded-lg border border-orange-200 dark:border-orange-500/20">
                         #{order.orderId || order._id.slice(-6)}
                       </span>
                       {isNewlyArrived && (
@@ -483,7 +488,7 @@ export default function OrdersClient() {
                           NEW
                         </span>
                       )}
-                      <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                      <span className="text-xs text-stone-400 flex items-center gap-1 font-mono">
                         <Clock size={12} />
                         {new Date(order.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -495,12 +500,12 @@ export default function OrdersClient() {
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                          statusBadgeStyles[order.status] || "bg-slate-100 text-slate-700"
+                          statusBadgeStyles[order.status] || "bg-stone-100 text-stone-700"
                         }`}
                       >
                         ● {order.status}
                       </span>
-                      <span className="text-sm font-extrabold text-slate-900 dark:text-white font-mono ml-2">
+                      <span className="text-sm font-extrabold text-stone-900 dark:text-white font-mono ml-2">
                         ₹{order.totalAmount}
                       </span>
                     </div>
@@ -509,35 +514,35 @@ export default function OrdersClient() {
                   {/* Items & Customer Info */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                     {/* Customer */}
-                    <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                    <div className="space-y-1.5 text-xs text-stone-600 dark:text-stone-400 bg-stone-50/80 dark:bg-white/[0.02] p-3 rounded-xl border border-stone-200/70 dark:border-white/5">
+                      <span className="text-[10px] font-bold uppercase text-stone-400 dark:text-stone-500 tracking-wider block">
                         Customer Details
                       </span>
-                      <p className="font-bold text-slate-900 dark:text-white text-xs">
+                      <p className="font-bold text-stone-900 dark:text-white text-xs">
                         {order.address?.fullName || "Customer"}
                       </p>
-                      <p className="flex items-center gap-1.5">
+                      <p className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400">
                         <Phone size={12} className="text-orange-500" />{" "}
                         {order.address?.phone || "No phone"}
                       </p>
-                      <p className="flex items-start gap-1.5">
+                      <p className="flex items-start gap-1.5 text-stone-600 dark:text-stone-400">
                         <MapPin size={12} className="text-orange-500 shrink-0 mt-0.5" />{" "}
                         {order.address?.street}, {order.address?.city}
                       </p>
                     </div>
 
                     {/* Items List */}
-                    <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                    <div className="space-y-1.5 text-xs text-stone-600 dark:text-stone-400 bg-stone-50/80 dark:bg-white/[0.02] p-3 rounded-xl border border-stone-200/70 dark:border-white/5">
+                      <span className="text-[10px] font-bold uppercase text-stone-400 dark:text-stone-500 tracking-wider block">
                         Ordered Items
                       </span>
-                      <div className="divide-y divide-slate-100 dark:divide-white/5">
+                      <div className="divide-y divide-stone-100 dark:divide-white/5">
                         {order.items?.map((item, i) => (
                           <div key={i} className="py-1 flex items-center justify-between text-xs">
-                            <span className="font-medium text-slate-900 dark:text-slate-200">
+                            <span className="font-medium text-stone-900 dark:text-stone-200">
                               {item.quantity}x {item.name}
                             </span>
-                            <span className="font-mono text-slate-500">
+                            <span className="font-mono text-stone-500">
                               ₹{(item.price || 0) * (item.quantity || 1)}
                             </span>
                           </div>
@@ -547,12 +552,12 @@ export default function OrdersClient() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex flex-wrap items-center justify-end gap-2">
+                  <div className="pt-3 border-t border-stone-100 dark:border-white/5 flex flex-wrap items-center justify-end gap-2">
                     {order.status === "pending" && (
                       <button
                         onClick={() => handleUpdateStatus(order._id, "preparing")}
                         disabled={updatingOrderId === order._id}
-                        className="px-3.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                        className="px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm shadow-orange-500/20 active:scale-95"
                       >
                         <ChefHat size={13} />
                         <span>Start Preparing</span>
@@ -563,7 +568,7 @@ export default function OrdersClient() {
                       <button
                         onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
                         disabled={updatingOrderId === order._id}
-                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                        className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm shadow-purple-600/20 active:scale-95"
                       >
                         <Truck size={13} />
                         <span>Dispatch Order</span>
@@ -574,7 +579,7 @@ export default function OrdersClient() {
                       <button
                         onClick={() => handleUpdateStatus(order._id, "delivered")}
                         disabled={updatingOrderId === order._id}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 active:scale-95"
                       >
                         <CheckCircle2 size={13} />
                         <span>Mark Delivered</span>
@@ -585,7 +590,7 @@ export default function OrdersClient() {
                       <button
                         onClick={() => handleUpdateStatus(order._id, "cancelled")}
                         disabled={updatingOrderId === order._id}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-600 hover:text-rose-600 dark:text-slate-400 text-xs font-semibold transition border border-slate-200 dark:border-white/10"
+                        className="px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-stone-600 hover:text-rose-600 dark:text-stone-400 text-xs font-semibold transition border border-stone-200 dark:border-white/10 active:scale-95"
                       >
                         Cancel
                       </button>

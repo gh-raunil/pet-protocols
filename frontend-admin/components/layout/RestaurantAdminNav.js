@@ -123,13 +123,13 @@ export default function RestaurantAdminNav() {
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-md border-b border-slate-200 dark:border-white/10 shadow-sm transition-transform duration-300 ease-in-out font-jakarta ${
+      className={`fixed top-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#07090e]/95 backdrop-blur-md border-b border-stone-200/80 dark:border-white/10 shadow-xs dark:shadow-none transition-transform duration-300 ease-in-out font-jakarta ${
         hidden ? "-translate-y-full" : "translate-y-0"
       }`}
     >
       {/* ── LIVE SUPERADMIN NOTICE TICKER (ONLY FOR LOGGED-IN RESTAURANT ADMIN) ── */}
       {isRestaurantAdmin && !noticeDismissed && activeNotice && (
-        <div className="bg-orange-500 text-white text-xs font-semibold py-1.5 px-4 shadow-sm transition-all duration-300">
+        <div className="bg-[#F97316] text-white text-xs font-semibold py-1.5 px-4 shadow-sm transition-all duration-300">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 overflow-hidden">
             <div className="flex items-center gap-2 truncate">
               <span className="bg-black/25 text-white uppercase px-2 py-0.5 rounded text-[9px] tracking-wider shrink-0 font-bold flex items-center gap-1">
@@ -171,15 +171,15 @@ export default function RestaurantAdminNav() {
               <Image src="/images/logo1.png" alt="Logo" width={32} height={32} className="w-full h-full object-cover rounded-full" />
             </div>
             <span className="text-lg sm:text-xl font-extrabold tracking-tight flex items-center gap-1">
-              <span className="text-orange-500 font-extrabold text-2xl leading-none">पेट</span>
-              <span className="text-slate-900 dark:text-white">Protocols</span>
+              <span className="text-[#F97316] font-extrabold text-2xl leading-none">पेट</span>
+              <span className="text-[#111827] dark:text-white">Protocols</span>
             </span>
           </Link>
 
           {isRestaurantAdmin && session?.user?.restaurantName && (
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2.5 py-0.5 rounded-full">
-              <Building className="w-3.5 h-3.5 text-orange-500" />
-              <span className="font-semibold text-slate-900 dark:text-slate-200">{session.user.restaurantName}</span>
+            <div className="hidden lg:flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 px-2.5 py-0.5 rounded-full">
+              <Building className="w-3.5 h-3.5 text-[#F97316]" />
+              <span className="font-semibold text-stone-900 dark:text-stone-200">{session.user.restaurantName}</span>
             </div>
           )}
         </div>
@@ -195,8 +195,8 @@ export default function RestaurantAdminNav() {
                     href={href}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap outline-none ${
                       isActive
-                        ? "bg-orange-500 text-white shadow-sm font-bold"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                        ? "bg-[#F97316] text-white shadow-sm font-bold"
+                        : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-white/5"
                     }`}
                   >
                     <Icon size={14} />
@@ -215,8 +215,8 @@ export default function RestaurantAdminNav() {
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap outline-none ${
                       isActive
-                        ? "bg-orange-500 text-white shadow-sm font-bold"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                        ? "bg-[#F97316] text-white shadow-sm font-bold"
+                        : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-white/5"
                     }`}
                   >
                     {label}
@@ -233,16 +233,16 @@ export default function RestaurantAdminNav() {
             <div className="flex items-center gap-2">
               <Link
                 href="/profile"
-                className="hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 transition"
+                className="hidden sm:flex items-center gap-2 bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 px-3 py-1.5 rounded-xl text-xs font-medium text-stone-800 dark:text-stone-200 transition"
               >
-                <div className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-500 font-bold flex items-center justify-center text-[10px]">
+                <div className="w-5 h-5 rounded-full bg-orange-500/20 text-[#F97316] font-bold flex items-center justify-center text-[10px]">
                   {session?.user?.name?.charAt(0) || "M"}
                 </div>
-                <span className="truncate max-w-[80px]">{session?.user?.name?.split(" ")[0] || "Manager"}</span>
+                <span className="truncate max-w-[80px] font-semibold">{session?.user?.name?.split(" ")[0] || "Manager"}</span>
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
+                className="flex items-center gap-1.5 bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-400 hover:text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
                 title="Sign out"
               >
                 <LogOut size={13} />
@@ -252,7 +252,7 @@ export default function RestaurantAdminNav() {
           ) : (
             <Link
               href="/login"
-              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-1.5 rounded-xl text-xs transition shadow-sm"
+              className="bg-[#F97316] hover:bg-[#EA580C] text-white font-bold px-4 py-1.5 rounded-xl text-xs transition shadow-sm"
             >
               Sign In
             </Link>
@@ -262,3 +262,4 @@ export default function RestaurantAdminNav() {
     </div>
   );
 }
+
