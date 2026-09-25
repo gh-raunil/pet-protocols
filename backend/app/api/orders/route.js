@@ -152,6 +152,9 @@ export async function POST(request) {
           : 0;
       const restTotal = restSubtotal + restDeliveryFee;
 
+      const isCod = paymentMethod?.toLowerCase().includes("cash on delivery") || paymentMethod?.toLowerCase().includes("cod");
+      const paymentStatus = isCod ? "pending" : "test_paid";
+
       const newOrder = await Order.create({
         user: userId,
         restaurant: targetRestId,
@@ -160,8 +163,8 @@ export async function POST(request) {
         subtotal: restSubtotal,
         deliveryFee: restDeliveryFee,
         totalAmount: restTotal,
-        paymentStatus: "test_paid",
-        paymentMethod,
+        paymentStatus,
+        paymentMethod: isCod ? "Cash on Delivery (COD)" : paymentMethod,
         status: "pending",
         notes,
       });
@@ -173,10 +176,14 @@ export async function POST(request) {
       createdOrders.push(populatedOrder);
     }
 
+    const hasCod = createdOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
+
     return NextResponse.json(
       {
         success: true,
-        message: "Order placed successfully with Test Payment!",
+        message: hasCod
+          ? "Order placed successfully with Cash on Delivery!"
+          : "Order placed successfully with Test Payment!",
         order: createdOrders[0],
         orders: createdOrders,
       },

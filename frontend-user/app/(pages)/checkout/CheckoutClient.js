@@ -22,6 +22,7 @@ import {
   Briefcase,
   Plus,
   Check,
+  Banknote,
 } from "lucide-react";
 
 // Dynamically load Razorpay standard checkout script
@@ -50,7 +51,7 @@ export default function CheckoutClient() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState("");
-  const [paymentMode, setPaymentMode] = useState("razorpay"); // "razorpay" | "simulator"
+  const [paymentMode, setPaymentMode] = useState("cod"); // "cod" | "razorpay" | "simulator"
   const [showTestCards, setShowTestCards] = useState(false);
 
   // Address and Saved Addresses states
@@ -365,10 +366,50 @@ export default function CheckoutClient() {
     }
   };
 
+  // 3. Cash on Delivery (COD) Checkout Flow
+  const handleCodCheckout = async () => {
+    if (!validateDeliveryDetails()) return;
+
+    setLoading(true);
+    setLoadingStep("Confirming Cash on Delivery order...");
+    setError("");
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          address,
+          notes,
+          paymentMethod: "Cash on Delivery (COD)",
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.message || "Failed to place COD order.");
+        setLoading(false);
+        return;
+      }
+
+      await saveAddressIfRequested();
+      await clearCart();
+      const targetOrderId = data.order?._id || data.orderId || "";
+      router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
+    } catch (err) {
+      console.error("COD checkout error:", err);
+      setError("An unexpected error occurred while placing Cash on Delivery order.");
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (paymentMode === "razorpay") {
       handleRazorpayCheckout();
+    } else if (paymentMode === "cod") {
+      handleCodCheckout();
     } else {
       handleSimulatorCheckout();
     }
@@ -633,32 +674,87 @@ export default function CheckoutClient() {
                 💳 Choose Payment Option
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Option 1: Razorpay Payment Gateway */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {/* Option 1: Cash on Delivery (COD) */}
                 <div
-                  onClick={() => setPaymentMode("razorpay")}
-                  className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMode === "razorpay"
-                      ? "border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/10"
+                  onClick={() => setPaymentMode("cod")}
+                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMode === "cod"
+                      ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40"
                       : "border-white/10 bg-[#141414] hover:border-white/20"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                        <Banknote size={18} />
+                      </div>
+                      <div>
+                        <span className="font-bold text-sm text-white block">
+                          Cash on Delivery
+                        </span>
+                        <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
+                          Pay at Doorstep
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                        paymentMode === "cod"
+                          ? "border-emerald-500 bg-emerald-500 text-white"
+                          : "border-white/30"
+                      }`}
+                    >
+                      {paymentMode === "cod" && (
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Pay in cash or delivery-scan UPI directly to the delivery rider upon arrival.
+                  </p>
+                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px]">
+                    <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-semibold">
+                      💵 Cash / UPI
+                    </span>
+                    <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-gray-300">
+                      Zero Risk
+                    </span>
+                  </div>
+                </div>
+
+                {/* Option 2: Razorpay Payment Gateway (WITH TOP-RIGHT TESTING RIBBON) */}
+                <div
+                  onClick={() => setPaymentMode("razorpay")}
+                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMode === "razorpay"
+                      ? "border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/40"
+                      : "border-white/10 bg-[#141414] hover:border-white/20"
+                  }`}
+                >
+                  {/* Top-Right Corner TESTING Ribbon */}
+                  <div className="absolute top-0 right-0 overflow-hidden w-20 h-20 pointer-events-none z-10">
+                    <div className="bg-amber-400 text-stone-950 font-black text-[8px] uppercase tracking-wider py-0.5 text-center shadow-sm transform rotate-45 translate-x-6 translate-y-3 w-28">
+                      TESTING
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold shrink-0">
                         <CreditCard size={18} />
                       </div>
                       <div>
                         <span className="font-bold text-sm text-white block">
                           Razorpay Gateway
                         </span>
-                        <span className="text-[10px] text-orange-400 font-semibold uppercase tracking-wider">
+                        <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">
                           Test Mode Active
                         </span>
                       </div>
                     </div>
                     <div
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                         paymentMode === "razorpay"
                           ? "border-orange-500 bg-orange-500 text-white"
                           : "border-white/30"
@@ -670,42 +766,42 @@ export default function CheckoutClient() {
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    UPI, Credit/Debit Cards, NetBanking, and Wallets simulated via Razorpay test interface.
+                    Online cards, UPI, and NetBanking tested via Razorpay sandbox environment.
                   </p>
-                  <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-gray-300">
+                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px] text-gray-300">
                     <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">UPI</span>
-                    <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">Visa / MC</span>
+                    <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">Cards</span>
                     <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">NetBanking</span>
                   </div>
                 </div>
 
-                {/* Option 2: Instant Simulator */}
+                {/* Option 3: Instant Simulator */}
                 <div
                   onClick={() => setPaymentMode("simulator")}
-                  className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === "simulator"
-                      ? "border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/10"
+                      ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
                       : "border-white/10 bg-[#141414] hover:border-white/20"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                      <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">
                         <Zap size={18} />
                       </div>
                       <div>
                         <span className="font-bold text-sm text-white block">
-                          Instant Simulator
+                          Dev Simulator
                         </span>
                         <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">
-                          Bypass Modal
+                          Instant Placement
                         </span>
                       </div>
                     </div>
                     <div
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                         paymentMode === "simulator"
-                          ? "border-orange-500 bg-orange-500 text-white"
+                          ? "border-blue-500 bg-blue-500 text-white"
                           : "border-white/30"
                       }`}
                     >
@@ -715,8 +811,16 @@ export default function CheckoutClient() {
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    One-click order placement simulator without triggering the external payment popup.
+                    One-click mock order checkout bypass for testing kitchen display and notifications.
                   </p>
+                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px] text-gray-300">
+                    <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-semibold">
+                      Fastest
+                    </span>
+                    <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
+                      Demo Only
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -762,7 +866,11 @@ export default function CheckoutClient() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-base transition shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer"
+              className={`w-full font-bold py-4 rounded-2xl text-base transition shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
+                paymentMode === "cod"
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
+                  : "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
+              }`}
             >
               {loading ? (
                 <>
@@ -771,11 +879,13 @@ export default function CheckoutClient() {
                 </>
               ) : (
                 <>
-                  <Lock size={18} />
+                  {paymentMode === "cod" ? <Banknote size={18} /> : <Lock size={18} />}
                   <span>
-                    {paymentMode === "razorpay"
-                      ? `Pay ₹${total} with Razorpay`
-                      : `Place Order via Simulator (₹${total})`}
+                    {paymentMode === "cod"
+                      ? `Place Order (Cash on Delivery) • ₹${total}`
+                      : paymentMode === "razorpay"
+                      ? `Pay ₹${total} with Razorpay (Test)`
+                      : `Place Order via Dev Simulator (₹${total})`}
                   </span>
                   <ArrowRight size={18} />
                 </>

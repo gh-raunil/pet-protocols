@@ -25,11 +25,137 @@ import {
   FileSpreadsheet,
   ArrowRight,
   Radio,
+  Printer,
+  LayoutGrid,
+  Check,
+  Banknote,
+  Zap,
 } from "lucide-react";
 import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
 
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
+
+// Live elapsed kitchen timer helper with progressive urgency colors
+export function getOrderElapsedInfo(createdAt) {
+  if (!createdAt) {
+    return {
+      text: "Just now",
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
+      urgent: false,
+    };
+  }
+  const elapsedMs = Date.now() - new Date(createdAt).getTime();
+  const elapsedMins = Math.max(0, Math.floor(elapsedMs / (1000 * 60)));
+  if (elapsedMins < 1) {
+    return {
+      text: "Just now",
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
+      urgent: false,
+    };
+  }
+  if (elapsedMins < 10) {
+    return {
+      text: `${elapsedMins}m ago`,
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
+      urgent: false,
+    };
+  }
+  if (elapsedMins < 20) {
+    return {
+      text: `${elapsedMins}m ago • Cooking`,
+      color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30",
+      urgent: false,
+    };
+  }
+  return {
+    text: `🚨 ${elapsedMins}m ago • Delayed!`,
+    color: "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-500/40 animate-pulse font-black",
+    urgent: true,
+  };
+}
+
+// 80mm Kitchen Order Ticket (KOT) Thermal Receipt Printer
+export function handlePrintKOT(order) {
+  const uniqueId = formatOrderId(order);
+  const dateStr = new Date(order.createdAt).toLocaleString();
+  const customer = order.address?.fullName || order.user?.name || "Customer";
+  const phone = order.address?.phone || "N/A";
+  const address = `${order.address?.street || ""}, ${order.address?.city || ""}`.trim();
+  const paymentMode = order.paymentMethod || (order.paymentStatus === "pending" ? "Cash on Delivery (COD)" : "Paid Online");
+  const isCod = paymentMode.toLowerCase().includes("cod") || paymentMode.toLowerCase().includes("cash") || order.paymentStatus === "pending";
+
+  const itemsHtml = (order.items || []).map((it) => `
+    <tr style="border-bottom: 1px dashed #bbb;">
+      <td style="padding: 5px 0; font-weight: bold; font-size: 13px;">${it.quantity}x</td>
+      <td style="padding: 5px 4px; font-size: 13px;">${it.name}</td>
+      <td style="padding: 5px 0; text-align: right; font-size: 13px;">₹${(it.price || 0) * (it.quantity || 1)}</td>
+    </tr>
+  `).join("");
+
+  const printWindow = window.open("", "_blank", "width=380,height=600");
+  if (!printWindow) {
+    alert("Please allow popups in your browser to print Kitchen Order Tickets.");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>KOT - ${uniqueId}</title>
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          body { font-family: monospace, -apple-system, sans-serif; width: 72mm; margin: 0 auto; color: #000; font-size: 12px; line-height: 1.3; }
+          .center { text-align: center; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .tag { display: inline-block; padding: 3px 8px; border: 2px solid #000; font-weight: bold; font-size: 15px; margin: 4px 0; }
+          table { width: 100%; border-collapse: collapse; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <h2 style="margin: 0; font-size: 16px;">पेट Protocols</h2>
+          <p style="margin: 1px 0; font-size: 10px; text-transform: uppercase;">Kitchen Order Ticket (KOT)</p>
+          <div class="tag">${uniqueId}</div>
+          <p style="margin: 1px 0; font-size: 10px;">${dateStr}</p>
+        </div>
+        <div class="divider"></div>
+        <p style="margin: 2px 0;"><strong>Customer:</strong> ${customer}</p>
+        <p style="margin: 2px 0;"><strong>Phone:</strong> ${phone}</p>
+        ${address ? `<p style="margin: 2px 0; font-size: 10px;"><strong>Address:</strong> ${address}</p>` : ""}
+        ${order.notes ? `<p style="margin: 4px 0; background: #e5e5e5; padding: 4px; border-left: 3px solid #000;"><strong>NOTE:</strong> ${order.notes}</p>` : ""}
+        <div class="divider"></div>
+        <table>
+          <thead>
+            <tr style="border-bottom: 1px solid #000; text-align: left; font-size: 11px;">
+              <th>QTY</th>
+              <th>ITEM</th>
+              <th style="text-align: right;">AMT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+        <div class="divider"></div>
+        <table style="font-weight: bold; font-size: 13px;">
+          <tr><td>Total:</td><td style="text-align: right; font-size: 15px;">₹${order.totalAmount}</td></tr>
+          <tr><td>Payment:</td><td style="text-align: right; font-size: 11px;">${isCod ? "COLLECT CASH (COD)" : "PAID ONLINE"}</td></tr>
+        </table>
+        <div class="divider"></div>
+        <p class="center" style="font-size: 9px; margin-top: 8px;">• Check all dish seals before dispatch •</p>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
 
 export default function OrdersClient() {
   const { data: session, status } = useSession();
@@ -49,10 +175,33 @@ export default function OrdersClient() {
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
 
-  // Kitchen Alert & Audio States
+  // Kitchen Alert, Audio & Operational States
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [newOrderAlert, setNewOrderAlert] = useState(null);
   const [highlightedOrderIds, setHighlightedOrderIds] = useState(new Set());
+  const [rushMode, setRushMode] = useState(false);
+  const [packedItems, setPackedItems] = useState({});
+  const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
+  const [kitchenActive, setKitchenActive] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("restaurant_kitchen_active") !== "false";
+    }
+    return true;
+  });
+
+  // Ticking timer clock every 30 seconds for live order urgency badges
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTimeTick(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggleItemPacked = (orderId, idx) => {
+    const key = `${orderId}_${idx}`;
+    setPackedItems((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   // Refs for polling and concurrency management
   const isFetchingRef = useRef(false);
@@ -339,6 +488,34 @@ export default function OrdersClient() {
 
       <main className="pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-6">
         
+        {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
+        {!kitchenActive && (
+          <div className="bg-rose-500/15 border-2 border-rose-500/40 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">⚠️</span>
+              <div>
+                <h4 className="font-extrabold text-sm text-rose-900 dark:text-rose-100">
+                  Kitchen is currently PAUSED
+                </h4>
+                <p className="text-xs text-rose-700/90 dark:text-rose-300">
+                  Your storefront is temporarily not accepting incoming customer orders.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setKitchenActive(true);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("restaurant_kitchen_active", "true");
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm transition active:scale-95 shrink-0 cursor-pointer"
+            >
+              Resume Orders Now
+            </button>
+          </div>
+        )}
+
         {/* ── HEADER & LIVE STATUS CHIP ───────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6">
           <div>
@@ -365,6 +542,20 @@ export default function OrdersClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Rush Mode Toggle */}
+            <button
+              onClick={() => setRushMode(!rushMode)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+                rushMode
+                  ? "bg-orange-500 text-white border-orange-500 shadow-orange-500/20 shadow-sm"
+                  : "bg-stone-100 dark:bg-white/5 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 hover:bg-stone-200 dark:hover:bg-white/10"
+              }`}
+              title="Toggle Rush Hour compact ticket grid"
+            >
+              <LayoutGrid size={13} />
+              <span>{rushMode ? "Rush Mode ON" : "Rush Mode"}</span>
+            </button>
+
             {/* Chime sound test / toggle */}
             <button
               onClick={() => {
@@ -571,181 +762,447 @@ export default function OrdersClient() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {displayedOrders.map((order) => {
-              const uniqueId = formatOrderId(order);
-              const isNewlyArrived = highlightedOrderIds.has(order._id);
+          <div>
+            {rushMode ? (
+              /* ── RUSH MODE: COMPACT KITCHEN TICKET GRID ─────────────────────── */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {displayedOrders.map((order) => {
+                  const uniqueId = formatOrderId(order);
+                  const isNewlyArrived = highlightedOrderIds.has(order._id);
+                  const elapsedInfo = getOrderElapsedInfo(order.createdAt);
+                  const paymentModeStr = (order.paymentMethod || "").toLowerCase();
+                  const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
 
-              return (
-                <div
-                  key={order._id}
-                  className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md rounded-3xl p-5 sm:p-6 transition-all duration-200 border ${
-                    isNewlyArrived
-                      ? "border-orange-500 shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20"
-                      : "border-stone-200/90 dark:border-white/10 shadow-xs hover:border-orange-500/40"
-                  }`}
-                >
-                  {/* Top Bar: Order ID, Timestamp, Status & Total */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-stone-100 dark:border-white/10">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-mono text-sm font-extrabold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2.5 py-1 rounded-xl border border-orange-200 dark:border-orange-500/20">
-                        {uniqueId}
-                      </span>
-                      <span className="text-xs text-stone-500 dark:text-stone-400 font-mono flex items-center gap-1">
-                        <Clock size={12} />
-                        {new Date(order.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}{" "}
-                        • {new Date(order.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
+                  const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
+                  const packedCount = (order.items || []).filter((_, idx) => packedItems[`${order._id}_${idx}`]).length;
+                  const allPacked = totalItems > 0 && packedCount === (order.items || []).length;
 
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                          statusBadgeStyles[order.status] || "bg-stone-200 text-stone-700"
-                        }`}
-                      >
-                        ● {order.status.replace("_", " ")}
-                      </span>
-                      <span className="text-lg font-black text-stone-900 dark:text-white font-mono">
-                        ₹{order.totalAmount}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Order Details Body */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-4">
-                    {/* Customer & Address Details */}
-                    <div className="space-y-2 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 block">
-                        Customer Details
-                      </span>
-                      <div className="text-sm font-bold text-stone-900 dark:text-white">
-                        {order.address?.fullName || order.user?.name || "Customer"}
-                      </div>
-                      {order.address?.phone && (
-                        <div className="text-xs text-stone-600 dark:text-stone-300 flex items-center gap-2">
-                          <Phone size={13} className="text-stone-400" />
-                          <a
-                            href={`tel:${order.address.phone}`}
-                            className="font-mono hover:text-orange-500 underline"
-                          >
-                            {order.address.phone}
-                          </a>
-                        </div>
-                      )}
-                      {order.address?.street && (
-                        <div className="text-xs text-stone-500 dark:text-stone-400 flex items-start gap-2">
-                          <MapPin size={13} className="text-stone-400 shrink-0 mt-0.5" />
-                          <span>
-                            {order.address.street}, {order.address.city || ""}{" "}
-                            {order.address.pincode ? `(${order.address.pincode})` : ""}
-                          </span>
-                        </div>
-                      )}
-                      {order.notes && (
-                        <div className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-2 rounded-xl mt-2 border border-amber-200 dark:border-amber-500/20">
-                          <strong>Note:</strong> {order.notes}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Ordered Items List */}
-                    <div className="space-y-2 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 block">
-                        Ordered Items ({order.items?.length || 0})
-                      </span>
-                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                        {order.items?.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between text-xs py-0.5 border-b border-stone-200/40 dark:border-white/5 last:border-0"
-                          >
-                            <span className="font-semibold text-stone-800 dark:text-stone-200">
-                              <span className="text-orange-500 font-bold">{item.quantity}x</span>{" "}
-                              {item.name}
+                  return (
+                    <div
+                      key={order._id}
+                      className={`bg-white/95 dark:bg-[#10141f]/95 backdrop-blur-md rounded-2xl p-4 border transition flex flex-col justify-between gap-3 shadow-xs ${
+                        isNewlyArrived
+                          ? "border-orange-500 shadow-md ring-2 ring-orange-500/20"
+                          : "border-stone-200/90 dark:border-white/10 hover:border-orange-500/40"
+                      }`}
+                    >
+                      <div className="space-y-2.5">
+                        {/* Compact Header: ID, Live Timer, Price */}
+                        <div className="flex items-center justify-between gap-2 border-b border-stone-100 dark:border-white/10 pb-2.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-200 dark:border-orange-500/20">
+                              {uniqueId}
                             </span>
-                            <span className="font-mono text-stone-600 dark:text-stone-400">
-                              ₹{(item.price || 0) * (item.quantity || 1)}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${elapsedInfo.color}`}>
+                              <Clock size={10} />
+                              <span>{elapsedInfo.text}</span>
                             </span>
                           </div>
-                        ))}
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handlePrintKOT(order)}
+                              title="Print Kitchen Ticket (KOT)"
+                              className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition"
+                            >
+                              <Printer size={13} />
+                            </button>
+                            <span className="font-mono font-black text-sm text-stone-900 dark:text-white">
+                              ₹{order.totalAmount}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Customer & Payment Chip */}
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <div className="truncate font-bold text-stone-800 dark:text-stone-200">
+                            {order.address?.fullName || order.user?.name || "Customer"}
+                            {order.address?.phone && (
+                              <span className="font-normal font-mono text-[11px] text-stone-500 ml-1.5">
+                                • {order.address.phone}
+                              </span>
+                            )}
+                          </div>
+
+                          {isCod ? (
+                            <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
+                              💵 COD ₹{order.totalAmount}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
+                              💳 Paid
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Special Note if any */}
+                        {order.notes && (
+                          <div className="text-[11px] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
+                            <strong>Note:</strong> {order.notes}
+                          </div>
+                        )}
+
+                        {/* Checklist of Dishes */}
+                        <div className="space-y-1 pt-1 border-t border-stone-100 dark:border-white/5">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider pb-0.5">
+                            <span>Dishes ({order.items?.length || 0})</span>
+                            {allPacked && (
+                              <span className="text-emerald-500 font-extrabold flex items-center gap-0.5">
+                                <Check size={11} /> All Packed
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                            {(order.items || []).map((item, idx) => {
+                              const isPacked = packedItems[`${order._id}_${idx}`];
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => toggleItemPacked(order._id, idx)}
+                                  className={`flex items-center justify-between p-1.5 rounded-lg border text-xs cursor-pointer select-none transition ${
+                                    isPacked
+                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-400 line-through"
+                                      : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                                      isPacked ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300 dark:border-stone-600"
+                                    }`}>
+                                      {isPacked && <Check size={9} />}
+                                    </div>
+                                    <span className="font-semibold truncate">
+                                      <strong className="text-orange-500">{item.quantity}x</strong> {item.name}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-[11px] text-stone-400 shrink-0 ml-1">
+                                    ₹{(item.price || 0) * (item.quantity || 1)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="pt-2 flex items-center justify-between text-xs text-stone-500 border-t border-stone-200/60 dark:border-white/5">
-                        <span>Payment: {order.paymentMethod || "Test Payment"}</span>
-                        <span className="font-bold text-emerald-600 uppercase text-[10px]">
-                          {order.paymentStatus || "Paid"}
-                        </span>
+                      {/* Primary Action Button Stepper */}
+                      <div className="pt-2 border-t border-stone-100 dark:border-white/10 flex items-center gap-2">
+                        {order.status === "pending" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "preparing")}
+                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <ChefHat size={13} />
+                              <span>Accept & Cook</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => {
+                                if (confirm(`Cancel order ${uniqueId}?`)) {
+                                  handleUpdateStatus(order._id, "cancelled");
+                                }
+                              }}
+                              className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        )}
+
+                        {order.status === "preparing" && (
+                          <button
+                            type="button"
+                            disabled={updatingOrderId === order._id}
+                            onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                            className="w-full py-2 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Zap size={13} />
+                            <span>Mark Ready (Dispatch)</span>
+                          </button>
+                        )}
+
+                        {order.status === "out_for_delivery" && (
+                          <button
+                            type="button"
+                            disabled={updatingOrderId === order._id}
+                            onClick={() => handleUpdateStatus(order._id, "delivered")}
+                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Truck size={13} />
+                            <span>Confirm Delivered</span>
+                          </button>
+                        )}
+
+                        {order.status === "delivered" && (
+                          <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                            ✓ Fulfilled
+                          </div>
+                        )}
+
+                        {order.status === "cancelled" && (
+                          <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-500/20">
+                            ✕ Cancelled
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ── DETAILED CARDS VIEW ─────────────────────────────────────────── */
+              <div className="space-y-4">
+                {displayedOrders.map((order) => {
+                  const uniqueId = formatOrderId(order);
+                  const isNewlyArrived = highlightedOrderIds.has(order._id);
+                  const elapsedInfo = getOrderElapsedInfo(order.createdAt);
+                  const paymentModeStr = (order.paymentMethod || "").toLowerCase();
+                  const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
 
-                  {/* Action Controls for Status Advancement */}
-                  <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-wrap items-center justify-end gap-2.5">
-                    {order.status === "pending" && (
-                      <>
+                  const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
+                  const packedCount = (order.items || []).filter((_, idx) => packedItems[`${order._id}_${idx}`]).length;
+                  const allPacked = totalItems > 0 && packedCount === (order.items || []).length;
+
+                  return (
+                    <div
+                      key={order._id}
+                      className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md rounded-3xl p-5 sm:p-6 transition-all duration-200 border ${
+                        isNewlyArrived
+                          ? "border-orange-500 shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20"
+                          : "border-stone-200/90 dark:border-white/10 shadow-xs hover:border-orange-500/40"
+                      }`}
+                    >
+                      {/* Top Bar: Order ID, Live Kitchen Timer, Status & Total */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-stone-100 dark:border-white/10">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-mono text-sm font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-3 py-1 rounded-xl border border-orange-200 dark:border-orange-500/20">
+                            {uniqueId}
+                          </span>
+
+                          {/* Live Kitchen Elapsed Timer */}
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-xl border flex items-center gap-1.5 shadow-xs ${elapsedInfo.color}`}>
+                            <Clock size={12} />
+                            <span>{elapsedInfo.text}</span>
+                          </span>
+
+                          <span className="text-xs text-stone-500 dark:text-stone-400 font-mono">
+                            {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {new Date(order.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Payment Badge (COD vs Online) */}
+                          {isCod ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
+                              <Banknote size={14} className="text-amber-600 dark:text-amber-400" />
+                              <span>💵 Collect Cash: ₹{order.totalAmount}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
+                              <CheckCircle2 size={13} className="text-emerald-500" />
+                              <span>💳 Paid Online</span>
+                            </span>
+                          )}
+
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                              statusBadgeStyles[order.status] || "bg-stone-200 text-stone-700"
+                            }`}
+                          >
+                            ● {order.status.replace("_", " ")}
+                          </span>
+
+                          <span className="text-lg font-black text-stone-900 dark:text-white font-mono">
+                            ₹{order.totalAmount}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Order Details Body */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-4">
+                        {/* Customer & Delivery Address Details */}
+                        <div className="space-y-2.5 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 block">
+                              Customer & Delivery Details
+                            </span>
+                            <div className="text-sm font-bold text-stone-900 dark:text-white">
+                              {order.address?.fullName || order.user?.name || "Customer"}
+                            </div>
+                            {order.address?.phone && (
+                              <div className="text-xs text-stone-600 dark:text-stone-300 flex items-center gap-2">
+                                <Phone size={13} className="text-stone-400" />
+                                <a
+                                  href={`tel:${order.address.phone}`}
+                                  className="font-mono hover:text-orange-500 underline font-semibold"
+                                >
+                                  {order.address.phone}
+                                </a>
+                              </div>
+                            )}
+                            {order.address?.street && (
+                              <div className="text-xs text-stone-500 dark:text-stone-400 flex items-start gap-2">
+                                <MapPin size={13} className="text-stone-400 shrink-0 mt-0.5" />
+                                <span>
+                                  {order.address.street}, {order.address.city || ""}{" "}
+                                  {order.address.pincode ? `(${order.address.pincode})` : ""}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Highlighted Special Cooking Instructions */}
+                          {order.notes && (
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                              <span className="text-base leading-none">🏷️</span>
+                              <div>
+                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-600 dark:text-amber-400">
+                                  Customer Request:
+                                </span>
+                                <span className="font-semibold">{order.notes}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Dish Checklist */}
+                        <div className="space-y-2.5 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
+                              Dish Checklist ({order.items?.length || 0} items)
+                            </span>
+                            <span className="text-[11px] font-semibold text-stone-400">
+                              Tap to pack {allPacked && "• All Packed ✓"}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                            {(order.items || []).map((item, idx) => {
+                              const isPacked = packedItems[`${order._id}_${idx}`];
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => toggleItemPacked(order._id, idx)}
+                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer select-none transition ${
+                                    isPacked
+                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-400 line-through"
+                                      : "bg-white dark:bg-white/[0.03] border-stone-200/70 dark:border-white/5 hover:border-orange-500/30 text-stone-800 dark:text-stone-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                      isPacked ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300 dark:border-stone-600"
+                                    }`}>
+                                      {isPacked && <Check size={11} />}
+                                    </div>
+                                    <span className="font-bold">
+                                      <span className="text-orange-500 font-extrabold">{item.quantity}x</span> {item.name}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-stone-500 dark:text-stone-400">
+                                    ₹{(item.price || 0) * (item.quantity || 1)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="pt-2 flex items-center justify-between text-xs text-stone-500 border-t border-stone-200/60 dark:border-white/5">
+                            <span>Payment Mode: <strong>{order.paymentMethod || "Direct"}</strong></span>
+                            <span className={`font-bold uppercase text-[10px] ${isCod ? "text-amber-600" : "text-emerald-600"}`}>
+                              {order.paymentStatus === "pending" ? "Pending at Doorstep" : (order.paymentStatus || "Paid")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Primary One-Click Action Stepper Bar */}
+                      <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-wrap items-center justify-between gap-3">
+                        {/* Print KOT Button */}
                         <button
                           type="button"
-                          disabled={updatingOrderId === order._id}
-                          onClick={() => handleUpdateStatus(order._id, "preparing")}
-                          className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center gap-1.5"
+                          onClick={() => handlePrintKOT(order)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
                         >
-                          <ChefHat size={14} />
-                          <span>Start Preparing</span>
+                          <Printer size={14} className="text-stone-500" />
+                          <span>Print KOT Slip</span>
                         </button>
-                        <button
-                          type="button"
-                          disabled={updatingOrderId === order._id}
-                          onClick={() => handleUpdateStatus(order._id, "cancelled")}
-                          className="px-3 py-2 rounded-xl border border-rose-500/20 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
 
-                    {order.status === "preparing" && (
-                      <button
-                        type="button"
-                        disabled={updatingOrderId === order._id}
-                        onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center gap-1.5"
-                      >
-                        <Truck size={14} />
-                        <span>Dispatch (Out for Delivery)</span>
-                      </button>
-                    )}
+                        <div className="flex items-center gap-2">
+                          {order.status === "pending" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "preparing")}
+                                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm shadow-emerald-600/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                              >
+                                <ChefHat size={15} />
+                                <span>Accept & Start Cooking</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => {
+                                  if (confirm(`Cancel order ${uniqueId}?`)) {
+                                    handleUpdateStatus(order._id, "cancelled");
+                                  }
+                                }}
+                                className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
 
-                    {order.status === "out_for_delivery" && (
-                      <button
-                        type="button"
-                        disabled={updatingOrderId === order._id}
-                        onClick={() => handleUpdateStatus(order._id, "delivered")}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center gap-1.5"
-                      >
-                        <CheckCircle size={14} />
-                        <span>Mark Delivered</span>
-                      </button>
-                    )}
+                          {order.status === "preparing" && (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                              className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-sm shadow-orange-500/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                            >
+                              <Zap size={15} />
+                              <span>Mark Food Ready (Dispatch)</span>
+                            </button>
+                          )}
 
-                    {order.status === "delivered" && (
-                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 size={14} /> Order Fulfilled
-                      </span>
-                    )}
+                          {order.status === "out_for_delivery" && (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "delivered")}
+                              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm shadow-purple-600/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                            >
+                              <Truck size={15} />
+                              <span>Confirm Order Delivered</span>
+                            </button>
+                          )}
 
-                    {order.status === "cancelled" && (
-                      <span className="text-xs font-bold text-rose-500 flex items-center gap-1">
-                        <XCircle size={14} /> Order Cancelled
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                          {order.status === "delivered" && (
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                              <CheckCircle2 size={15} /> Order Fulfilled
+                            </span>
+                          )}
+
+                          {order.status === "cancelled" && (
+                            <span className="text-xs font-bold text-rose-500 flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-500/20">
+                              <XCircle size={15} /> Cancelled
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

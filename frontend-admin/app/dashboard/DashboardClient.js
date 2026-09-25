@@ -18,7 +18,10 @@ import {
   CalendarDays,
   Sparkles,
   TrendingUp,
+  Printer,
+  Banknote,
 } from "lucide-react";
+import { getOrderElapsedInfo, handlePrintKOT } from "../orders/OrdersClient";
 
 export function formatOrderId(order) {
   if (!order) return "#PET-0000";
@@ -38,7 +41,12 @@ export default function DashboardClient() {
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [kitchenActive, setKitchenActive] = useState(true);
+  const [kitchenActive, setKitchenActive] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("restaurant_kitchen_active") !== "false";
+    }
+    return true;
+  });
 
   // Today's date in YYYY-MM-DD
   const todayStr = useMemo(() => {
@@ -143,6 +151,34 @@ export default function DashboardClient() {
 
       <main className="pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-6">
         
+        {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
+        {!kitchenActive && (
+          <div className="bg-rose-500/15 border-2 border-rose-500/40 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl shrink-0">⚠️</span>
+              <div>
+                <h4 className="font-extrabold text-sm text-rose-900 dark:text-rose-100">
+                  Kitchen is currently PAUSED
+                </h4>
+                <p className="text-xs text-rose-700/90 dark:text-rose-300">
+                  Your storefront is temporarily not accepting incoming customer orders.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setKitchenActive(true);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("restaurant_kitchen_active", "true");
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm transition active:scale-95 shrink-0 cursor-pointer"
+            >
+              Resume Orders Now
+            </button>
+          </div>
+        )}
+
         {/* ── TOP HEADER / KITCHEN CONTROL PANEL ──────────────────────── */}
         <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-sm shadow-stone-200/40 dark:shadow-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -163,8 +199,14 @@ export default function DashboardClient() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setKitchenActive(!kitchenActive)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border active:scale-95 ${
+                onClick={() => {
+                  const nextState = !kitchenActive;
+                  setKitchenActive(nextState);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("restaurant_kitchen_active", String(nextState));
+                  }
+                }}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border active:scale-95 cursor-pointer ${
                   kitchenActive
                     ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
                     : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30"
@@ -393,25 +435,40 @@ export default function DashboardClient() {
             <div className="space-y-3">
               {displayedRecentOrders.map((order) => {
                 const uniqueId = formatOrderId(order);
+                const isCod = (order.paymentMethod || "").toLowerCase().includes("cod") || (order.paymentMethod || "").toLowerCase().includes("cash") || order.paymentStatus === "pending";
+                const elapsedInfo = getOrderElapsedInfo(order.createdAt);
 
                 return (
                   <div
                     key={order._id}
                     className="p-4 rounded-2xl bg-stone-50/70 dark:bg-white/[0.02] border border-stone-200/80 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-orange-500/40 transition"
                   >
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-extrabold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-200 dark:border-orange-500/20">
+                        <span className="font-mono text-xs font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-200 dark:border-orange-500/20">
                           {uniqueId}
                         </span>
-                        <span className="text-stone-300 dark:text-stone-700">•</span>
-                        <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono flex items-center gap-1">
-                          <Clock size={11} />
-                          {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+
+                        {/* Live Kitchen Elapsed Timer */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${elapsedInfo.color}`}>
+                          <Clock size={10} />
+                          <span>{elapsedInfo.text}</span>
                         </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${statusStyles[order.status] || "bg-stone-200 text-stone-700"}`}>
+
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${statusStyles[order.status] || "bg-stone-200 text-stone-700"}`}>
                           {order.status}
                         </span>
+
+                        {/* Payment Chip */}
+                        {isCod ? (
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
+                            💵 COD ₹{order.totalAmount}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
+                            💳 Paid
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs font-bold text-stone-900 dark:text-white flex items-center gap-2">
@@ -427,7 +484,15 @@ export default function DashboardClient() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-200/60 dark:border-white/5">
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-200/60 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintKOT(order)}
+                        title="Print KOT Slip"
+                        className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 transition text-xs font-bold cursor-pointer"
+                      >
+                        <Printer size={13} />
+                      </button>
                       <span className="text-sm font-black text-stone-900 dark:text-white font-mono">
                         ₹{order.totalAmount}
                       </span>
