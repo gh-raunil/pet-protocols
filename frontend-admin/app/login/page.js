@@ -71,7 +71,11 @@ function LoginForm({ defaultRole = "admin" }) {
       router.push(callbackUrl || "/dashboard");
     } catch (err) {
       console.error(err);
-      setAdminError("An unexpected error occurred during login.");
+      const errorMsg =
+        err?.message && !err.message.includes("is not valid JSON")
+          ? err.message
+          : "Invalid email or password, or temporary connection issue.";
+      setAdminError(errorMsg);
     } finally {
       setAdminLoading(false);
     }
@@ -98,7 +102,11 @@ function LoginForm({ defaultRole = "admin" }) {
       router.push(callbackUrl || "/");
     } catch (err) {
       console.error(err);
-      setStaffError("An unexpected error occurred during login.");
+      const errorMsg =
+        err?.message && !err.message.includes("is not valid JSON")
+          ? err.message
+          : "Invalid email or password, or temporary connection issue.";
+      setStaffError(errorMsg);
     } finally {
       setStaffLoading(false);
     }

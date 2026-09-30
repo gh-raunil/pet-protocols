@@ -9,6 +9,15 @@ import bcrypt from "bcryptjs";
 const Google = GoogleProvider?.default || GoogleProvider;
 const Credentials = CredentialsProvider?.default || CredentialsProvider;
 
+// Prevent large data URIs (e.g. 1.8MB base64 images) from bloating JWT cookies and causing HPE_HEADER_OVERFLOW
+function sanitizeTokenImage(img) {
+  if (!img || typeof img !== "string") return null;
+  if (img.startsWith("data:") || img.length > 512) {
+    return null;
+  }
+  return img;
+}
+
 const providers = [
   Credentials({
     name: "credentials",
@@ -83,7 +92,7 @@ const providers = [
             restaurantId: user.restaurant ? user.restaurant._id.toString() : null,
             restaurantName: user.restaurant ? user.restaurant.name : null,
             enabledFeatures: user.restaurant ? (user.restaurant.enabledFeatures || []) : [],
-            image: user.image,
+            image: sanitizeTokenImage(user.image),
             staffRole: user.staffRole || "Staff",
             staffRoles: user.staffRoles?.length ? user.staffRoles : [user.staffRole || "Staff"],
             permissions: user.permissions || [],
@@ -117,7 +126,7 @@ export const authOptions = {
         token.restaurantId = user.restaurantId;
         token.restaurantName = user.restaurantName;
         token.enabledFeatures = user.enabledFeatures;
-        token.image = user.image;
+        token.image = sanitizeTokenImage(user.image);
         token.staffRole = user.staffRole;
         token.staffRoles = user.staffRoles;
         token.permissions = user.permissions;
@@ -150,7 +159,7 @@ export const authOptions = {
           token.restaurantId = dbUser.restaurant ? dbUser.restaurant._id.toString() : null;
           token.restaurantName = dbUser.restaurant ? dbUser.restaurant.name : null;
           token.enabledFeatures = dbUser.restaurant ? (dbUser.restaurant.enabledFeatures || []) : [];
-          token.image = dbUser.image || token.image;
+          token.image = sanitizeTokenImage(dbUser.image) || sanitizeTokenImage(token.image);
           token.staffRole = dbUser.staffRole || "Staff";
           token.staffRoles = dbUser.staffRoles?.length ? dbUser.staffRoles : [dbUser.staffRole || "Staff"];
           token.permissions = dbUser.permissions || [];
@@ -168,7 +177,7 @@ export const authOptions = {
         session.user.restaurantId = token.restaurantId;
         session.user.restaurantName = token.restaurantName;
         session.user.enabledFeatures = token.enabledFeatures;
-        session.user.image = token.image;
+        session.user.image = sanitizeTokenImage(token.image);
         session.user.staffRole = token.staffRole;
         session.user.staffRoles = token.staffRoles;
         session.user.permissions = token.permissions;
