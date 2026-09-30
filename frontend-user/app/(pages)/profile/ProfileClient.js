@@ -579,9 +579,9 @@ export default function CustomerProfileClient() {
 
       {/* ── ADD / EDIT ADDRESS MODAL ──────────────────────────────── */}
       {isAddressModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#121216] light:bg-white border border-neutral-800 light:border-stone-200 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-800/80 light:border-stone-200 mb-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="bg-[#121216] light:bg-white border border-neutral-800 light:border-stone-200 rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl relative max-h-[90vh] flex flex-col overflow-hidden my-auto">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-neutral-800/80 light:border-stone-200 shrink-0 bg-[#121216] light:bg-white">
               <div className="flex items-center gap-2">
                 <MapPin size={18} className="text-orange-500" />
                 <h3 className="text-base font-bold text-white light:text-stone-900">
@@ -597,134 +597,136 @@ export default function CustomerProfileClient() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddress} className="space-y-4">
-              {/* Address Tag Selector */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1.5">
-                  Location Type / Tag
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Home", "Work", "Other"].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setAddressForm({ ...addressForm, label: tag })}
-                      className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
-                        addressForm.label === tag
-                          ? "bg-orange-500 text-white border-orange-500 shadow-sm"
-                          : "bg-neutral-900 light:bg-stone-50 text-neutral-400 light:text-stone-600 border-neutral-800 light:border-stone-200 hover:border-neutral-700"
-                      }`}
-                    >
-                      {tag === "Home" && <Home size={13} />}
-                      {tag === "Work" && <Briefcase size={13} />}
-                      {tag === "Other" && <MapPin size={13} />}
-                      {tag}
-                    </button>
-                  ))}
+            <form onSubmit={handleSaveAddress} className="flex flex-col flex-1 min-h-0">
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                {/* Address Tag Selector */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1.5">
+                    Location Type / Tag
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Home", "Work", "Other"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setAddressForm({ ...addressForm, label: tag })}
+                        className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                          addressForm.label === tag
+                            ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                            : "bg-neutral-900 light:bg-stone-50 text-neutral-400 light:text-stone-600 border-neutral-800 light:border-stone-200 hover:border-neutral-700"
+                        }`}
+                      >
+                        {tag === "Home" && <Home size={13} />}
+                        {tag === "Work" && <Briefcase size={13} />}
+                        {tag === "Other" && <MapPin size={13} />}
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul Roy"
+                      value={addressForm.fullName}
+                      onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 9876543210"
+                      value={addressForm.phone}
+                      onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition font-mono"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      Street Address / House / Flat *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Flat 402, Royal Palms, 12th Main Road, Indiranagar"
+                      value={addressForm.street}
+                      onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="New Delhi"
+                      value={addressForm.city}
+                      onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      State *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Delhi"
+                      value={addressForm.state}
+                      onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
+                      Pincode *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="110001"
+                      value={addressForm.pincode}
+                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addressForm.isDefault}
+                      onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
+                      className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500"
+                    />
+                    <span className="text-xs text-neutral-300 light:text-stone-700 font-medium">
+                      Set this as my default delivery address
+                    </span>
+                  </label>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rahul Roy"
-                    value={addressForm.fullName}
-                    onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. 9876543210"
-                    value={addressForm.phone}
-                    onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition font-mono"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    Street Address / House / Flat *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Flat 402, Royal Palms, 12th Main Road, Indiranagar"
-                    value={addressForm.street}
-                    onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="New Delhi"
-                    value={addressForm.city}
-                    onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    State *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Delhi"
-                    value={addressForm.state}
-                    onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-400 light:text-stone-500 mb-1">
-                    Pincode *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="110001"
-                    value={addressForm.pincode}
-                    onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-900 light:bg-stone-50 border border-neutral-800 light:border-stone-200 text-xs text-white light:text-stone-900 outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={addressForm.isDefault}
-                    onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
-                    className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500"
-                  />
-                  <span className="text-xs text-neutral-300 light:text-stone-700 font-medium">
-                    Set this as my default delivery address
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-800/80 light:border-stone-200">
+              <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-3.5 border-t border-neutral-800/80 light:border-stone-200 shrink-0 bg-neutral-950/90 light:bg-stone-50/90 backdrop-blur-md">
                 <button
                   type="button"
                   onClick={() => setIsAddressModalOpen(false)}

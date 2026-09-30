@@ -6,6 +6,7 @@ import Restaurant from '@/models/Restaurant';
 import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { deductStockForOrder } from '@/lib/inventoryService';
 
 // GET — Fetch customer's orders (with optional ?orderId= filter)
 export async function GET(request) {
@@ -168,6 +169,9 @@ export async function POST(request) {
         status: "pending",
         notes,
       });
+
+      // Deduct ingredient stock safely based on dish recipes
+      await deductStockForOrder(newOrder);
 
       const populatedOrder = await Order.findById(newOrder._id)
         .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers")

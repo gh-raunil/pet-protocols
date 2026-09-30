@@ -51,7 +51,7 @@ export default function SuperadminLoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-12 bg-[#080c14] text-slate-200">
+    <main className="dark dark-scope min-h-screen flex items-center justify-center px-6 py-12 bg-[#080c14] text-slate-200">
       <div className="w-full max-w-md bg-[#0b0f17] border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
         {/* Glow accent */}
         <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -78,7 +78,7 @@ export default function SuperadminLoginPage() {
             <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
               Superadmin Email
             </label>
-            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 transition">
+            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
               <Mail className="text-slate-400 w-4 h-4 mr-2.5 shrink-0" />
               <input
                 type="email"
@@ -87,7 +87,9 @@ export default function SuperadminLoginPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full bg-transparent text-slate-100 placeholder-slate-600 text-sm outline-none"
+                autoComplete="email"
+                style={{ colorScheme: "dark", backgroundColor: "transparent" }}
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input"
               />
             </div>
           </div>
@@ -96,7 +98,7 @@ export default function SuperadminLoginPage() {
             <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
               Security Password
             </label>
-            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 transition">
+            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
               <Lock className="text-slate-400 w-4 h-4 mr-2.5 shrink-0" />
               <input
                 type={showPass ? "text" : "password"}
@@ -105,12 +107,14 @@ export default function SuperadminLoginPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="w-full bg-transparent text-slate-100 placeholder-slate-600 text-sm outline-none"
+                autoComplete="current-password"
+                style={{ colorScheme: "dark", backgroundColor: "transparent" }}
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input"
               />
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
-                className="text-slate-400 hover:text-white transition ml-2"
+                className="text-slate-400 hover:text-white transition ml-2 cursor-pointer"
               >
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -123,22 +127,20 @@ export default function SuperadminLoginPage() {
             </div>
           )}
 
-          {/* Quick Fill Demo Credentials (development only - never exposed in production) */}
-          {process.env.NODE_ENV !== "production" && (
-            <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-lg p-3 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-indigo-300 font-semibold block text-xs">Demo Credentials:</span>
-                <span className="text-slate-400 font-mono text-[11px]">superadmin@petprotocols.com / rounak</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ email: "superadmin@petprotocols.com", password: "rounak" })}
-                className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded text-xs font-medium transition shrink-0 ml-2 cursor-pointer"
-              >
-                Fill Demo Credentials
-              </button>
+          {/* Quick Fill Demo Credentials */}
+          <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-lg p-3 flex items-center justify-between text-xs">
+            <div>
+              <span className="text-indigo-300 font-semibold block text-xs">Demo Credentials:</span>
+              <span className="text-slate-400 font-mono text-[11px]">superadmin@petprotocols.com / rounak</span>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setFormData({ email: "superadmin@petprotocols.com", password: "rounak" })}
+              className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded text-xs font-medium transition shrink-0 ml-2 cursor-pointer"
+            >
+              Fill Demo Credentials
+            </button>
+          </div>
 
           <button
             type="submit"

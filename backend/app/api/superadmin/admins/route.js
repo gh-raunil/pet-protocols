@@ -19,7 +19,8 @@ export async function GET() {
     })
       .populate("restaurant", "name slug status")
       .select("-password")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ success: true, admins });
   } catch (error) {
@@ -61,8 +62,16 @@ export async function POST(request) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const configuredSuperadminEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
-    if (configuredSuperadminEmail && normalizedEmail === configuredSuperadminEmail) {
+    const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (
+      configuredSuperadminEmails.includes(normalizedEmail) ||
+      normalizedEmail === "superadmin.petprotocols@gmail.com" ||
+      normalizedEmail === "superadmin@petprotocols.com"
+    ) {
       return NextResponse.json(
         { success: false, message: "Cannot create restaurant admin with the dedicated Super Admin email." },
         { status: 400 }
@@ -74,6 +83,7 @@ export async function POST(request) {
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
+      visiblePassword: password,
       role: "restaurant_admin",
       restaurant: restaurant._id,
       status: "active",
@@ -87,6 +97,7 @@ export async function POST(request) {
           _id: newAdmin._id,
           name: newAdmin.name,
           email: newAdmin.email,
+          visiblePassword: newAdmin.visiblePassword,
           role: newAdmin.role,
           status: newAdmin.status,
           restaurant: {

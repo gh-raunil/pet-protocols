@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import CustomSpinner from "@/components/ui/CustomSpinner";
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 import {
   ShieldCheck,
@@ -30,9 +31,29 @@ import {
   Upload,
   Image as ImageIcon,
   X,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Layers,
+  Table as TableIcon,
+  ChevronDown,
+  ChevronUp,
+  Store,
+  SlidersHorizontal,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import MessagesManager from "@/components/messages/MessagesManager";
+
+const ALL_AVAILABLE_FEATURES = [
+  { id: "inventory", name: "Inventory Control", desc: "Stock, Ingredients, Recipes, Waste, Suppliers & Purchases", badge: "📦" },
+  { id: "cashier", name: "Cashier / POS System", desc: "Front counter billing, payment processing & receipt generation", badge: "💵" },
+  { id: "kitchen", name: "Kitchen Display (KDS)", desc: "Real-time kitchen order queue & preparation management", badge: "👨‍🍳" },
+  { id: "delivery", name: "Delivery Dispatch", desc: "Delivery staff assignment & order dispatch tracking", badge: "🚚" },
+  { id: "standards", name: "Standards & Protocols", desc: "Kitchen hygiene & quality assurance checklists", badge: "📋" },
+  { id: "offers", name: "Offers & Promotions", desc: "Discounts, promo codes & targeted marketing deals", badge: "🏷️" },
+  { id: "support", name: "Support & Helpdesk", desc: "Customer inquiry handling & manager help tickets", badge: "💬" },
+  { id: "analytics", name: "Advanced Analytics", desc: "Revenue reports, sales analytics & performance metrics", badge: "📊" },
+];
 
 export default function SuperadminClient() {
   const { data: session, status } = useSession();
@@ -53,6 +74,23 @@ export default function SuperadminClient() {
   const [editingLogoRestaurant, setEditingLogoRestaurant] = useState(null);
   const [logoModalImage, setLogoModalImage] = useState("");
   const [savingLogo, setSavingLogo] = useState(false);
+
+  // Manage Restaurant Feature Flags Modal
+  const [managingFeaturesRestaurant, setManagingFeaturesRestaurant] = useState(null);
+  const [restaurantFeaturesInput, setRestaurantFeaturesInput] = useState([]);
+  const [savingFeatures, setSavingFeatures] = useState(false);
+
+  // Reset admin password states
+  const [resetPasswordAdmin, setResetPasswordAdmin] = useState(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  // Admin password reveal & restaurant grouping states
+  const [revealedPasswords, setRevealedPasswords] = useState({});
+  const [copiedPasswordId, setCopiedPasswordId] = useState("");
+  const [adminViewMode, setAdminViewMode] = useState("grouped"); // 'grouped' | 'table'
+  const [adminSearchQuery, setAdminSearchQuery] = useState("");
+  const [collapsedRestaurants, setCollapsedRestaurants] = useState({});
 
   // Form states
   const [newRestaurant, setNewRestaurant] = useState({
@@ -76,12 +114,12 @@ export default function SuperadminClient() {
   });
   const [creatingAdmin, setCreatingAdmin] = useState(false);
 
-  // Route protection
+  // Route protection: immediately redirect unauthenticated users to /login
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login");
+      window.location.replace("/login");
     }
-  }, [status, router]);
+  }, [status]);
 
   // Fetch all superadmin data
   async function loadData() {
@@ -115,10 +153,16 @@ export default function SuperadminClient() {
   }
 
   useEffect(() => {
-    if (session?.user?.role === "superadmin") {
-      loadData();
+    if (status === "authenticated") {
+      if (session?.user?.role === "superadmin") {
+        loadData();
+      } else {
+        setLoading(false);
+      }
+    } else if (status === "unauthenticated") {
+      setLoading(false);
     }
-  }, [session]);
+  }, [status, session]);
 
   const customerBaseUrl = process.env.NEXT_PUBLIC_CUSTOMER_URL || "http://localhost:3000";
 
@@ -142,6 +186,131 @@ export default function SuperadminClient() {
     }
     return name.slice(0, 2).toUpperCase();
   }
+
+  // Toggle Password Reveal for an Admin
+  function togglePasswordReveal(adminId) {
+    setRevealedPasswords((prev) => ({
+      ...prev,
+      [adminId]: !prev[adminId],
+    }));
+  }
+
+  // Copy Admin Password to Clipboard
+  function handleCopyPassword(password, adminId) {
+    if (!password) {
+      toast.error("No password set to copy. Please reset password to assign a new one.");
+      return;
+    }
+    navigator.clipboard.writeText(password);
+    setCopiedPasswordId(adminId);
+    toast.success("Admin password copied to clipboard!");
+    setTimeout(() => {
+      setCopiedPasswordId("");
+    }, 2000);
+  }
+
+  // Toggle Collapse/Expand Restaurant Group
+  function toggleCollapseRestaurant(restId) {
+    setCollapsedRestaurants((prev) => ({
+      ...prev,
+      [restId]: !prev[restId],
+    }));
+  }
+
+  // Quick shortcut to pre-select a restaurant in the Add Admin form and scroll down
+  function handleQuickAddAdmin(restaurantId) {
+    setNewAdmin((prev) => ({ ...prev, restaurantId }));
+    const formElement = document.getElementById("add-admin-form");
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      const nameInput = document.getElementById("new-admin-name");
+      if (nameInput) nameInput.focus();
+    }
+  }
+
+  // Group Admins by Restaurant with filter support
+  const groupedAdmins = useMemo(() => {
+    const q = adminSearchQuery.trim().toLowerCase();
+
+    // Map: restaurantId -> { restaurant, admins }
+    const groupMap = new Map();
+
+    // Pre-populate with all known restaurants so every branch is visible
+    restaurants.forEach((r) => {
+      groupMap.set(String(r._id), {
+        restaurant: r,
+        admins: [],
+      });
+    });
+
+    const unassignedAdmins = [];
+
+    admins.forEach((adm) => {
+      const restId = adm.restaurant?._id ? String(adm.restaurant._id) : null;
+      if (restId && groupMap.has(restId)) {
+        groupMap.get(restId).admins.push(adm);
+      } else if (restId) {
+        groupMap.set(restId, {
+          restaurant: adm.restaurant,
+          admins: [adm],
+        });
+      } else {
+        unassignedAdmins.push(adm);
+      }
+    });
+
+    let groups = Array.from(groupMap.values());
+
+    if (unassignedAdmins.length > 0) {
+      groups.push({
+        restaurant: {
+          _id: "unassigned",
+          name: "Unassigned / General Admins",
+          status: "active",
+          cuisineType: ["Management"],
+        },
+        admins: unassignedAdmins,
+      });
+    }
+
+    if (q) {
+      groups = groups
+        .map((grp) => {
+          const matchRest =
+            grp.restaurant?.name?.toLowerCase().includes(q) ||
+            grp.restaurant?.slug?.toLowerCase().includes(q);
+          const filteredAdminList = grp.admins.filter(
+            (a) =>
+              a.name?.toLowerCase().includes(q) ||
+              a.email?.toLowerCase().includes(q) ||
+              a.visiblePassword?.toLowerCase().includes(q)
+          );
+          if (matchRest) {
+            return grp;
+          }
+          if (filteredAdminList.length > 0) {
+            return { ...grp, admins: filteredAdminList };
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
+
+    return groups;
+  }, [restaurants, admins, adminSearchQuery]);
+
+  // Filtered Admins for Flat Table View
+  const filteredAdmins = useMemo(() => {
+    if (!adminSearchQuery.trim()) return admins;
+    const q = adminSearchQuery.trim().toLowerCase();
+    return admins.filter(
+      (a) =>
+        a.name?.toLowerCase().includes(q) ||
+        a.email?.toLowerCase().includes(q) ||
+        a.restaurant?.name?.toLowerCase().includes(q) ||
+        a.visiblePassword?.toLowerCase().includes(q)
+    );
+  }, [admins, adminSearchQuery]);
 
   // Handle Create Restaurant + First Admin
   async function handleCreateRestaurant(e) {
@@ -225,6 +394,39 @@ export default function SuperadminClient() {
       toast.error("Failed to update logo.");
     } finally {
       setSavingLogo(false);
+    }
+  }
+
+  // Handle Save Restaurant Feature Access (Superadmin Feature Flags)
+  async function handleSaveRestaurantFeatures(e) {
+    e.preventDefault();
+    if (!managingFeaturesRestaurant) return;
+    try {
+      setSavingFeatures(true);
+      const res = await fetch(`/api/superadmin/restaurants/${managingFeaturesRestaurant._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabledFeatures: restaurantFeaturesInput }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Feature access updated for ${managingFeaturesRestaurant.name}!`);
+        setRestaurants((prev) =>
+          prev.map((r) =>
+            r._id === managingFeaturesRestaurant._id
+              ? { ...r, enabledFeatures: restaurantFeaturesInput }
+              : r
+          )
+        );
+        setManagingFeaturesRestaurant(null);
+      } else {
+        toast.error(data.message || "Failed to update feature access.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update feature access.");
+    } finally {
+      setSavingFeatures(false);
     }
   }
 
@@ -358,6 +560,50 @@ export default function SuperadminClient() {
     }
   }
 
+  // Handle Reset Admin Password (Super Admin Reset - never exposes current password)
+  async function handleResetAdminPassword(e) {
+    e.preventDefault();
+    if (!resetPasswordAdmin) return;
+    if (!newPasswordInput || newPasswordInput.trim().length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+    try {
+      setResettingPassword(true);
+      const res = await fetch(`/api/superadmin/admins/${resetPasswordAdmin._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: newPasswordInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Password reset successfully for ${resetPasswordAdmin.name}!`);
+        const updatedPass = newPasswordInput.trim();
+        setAdmins((prev) =>
+          prev.map((a) =>
+            a._id === resetPasswordAdmin._id
+              ? { ...a, visiblePassword: updatedPass }
+              : a
+          )
+        );
+        setRevealedPasswords((prev) => ({
+          ...prev,
+          [resetPasswordAdmin._id]: true,
+        }));
+        setResetPasswordAdmin(null);
+        setNewPasswordInput("");
+        await loadData();
+      } else {
+        toast.error(data.message || "Failed to reset password.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to reset password.");
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
   // Filter restaurants by search query
   const filteredRestaurants = restaurants.filter((r) => {
     if (!searchQuery.trim()) return true;
@@ -369,19 +615,26 @@ export default function SuperadminClient() {
     );
   });
 
-  if (loading || status === "loading") {
+  // 1. Initial auth state resolving
+  if (status === "loading") {
     return (
       <main className="min-h-screen pt-24 pb-16 px-6 max-w-7xl mx-auto flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-indigo-600 dark:text-indigo-400">
-          <RefreshCw className="w-9 h-9 animate-spin text-indigo-600 dark:text-indigo-500" />
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Loading Platform Management...</p>
-        </div>
+        <CustomSpinner size="lg" label="Checking platform authorization..." />
       </main>
     );
   }
 
-  // If user is authenticated with a non-superadmin account
-  if (session && session.user.role !== "superadmin") {
+  // 2. Unauthenticated: show redirecting indicator while browser navigates to /login
+  if (status === "unauthenticated" || !session) {
+    return (
+      <main className="min-h-screen pt-24 pb-16 px-6 max-w-7xl mx-auto flex items-center justify-center">
+        <CustomSpinner size="lg" label="Redirecting to Super Admin Login..." />
+      </main>
+    );
+  }
+
+  // 3. User is authenticated with a non-superadmin account (e.g. restaurant_admin, staff, customer)
+  if (session.user.role !== "superadmin") {
     return (
       <main className="min-h-screen pt-28 pb-16 px-6 max-w-lg mx-auto flex items-center justify-center">
         <div className="w-full bg-white dark:bg-[#0b0f17] border border-rose-200 dark:border-rose-500/30 rounded-2xl p-8 text-center shadow-xl space-y-6">
@@ -399,20 +652,32 @@ export default function SuperadminClient() {
           </div>
 
           <div className="space-y-3 pt-2">
-            <Link
-              href="/login"
-              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-wider transition block shadow-sm shadow-indigo-200"
+            <button
+              onClick={async () => {
+                await signOut({ redirect: false });
+                window.location.href = "/login";
+              }}
+              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-wider transition block shadow-sm shadow-indigo-200 cursor-pointer"
             >
               Sign In to Super Admin Portal →
-            </Link>
-            <Link
-              href="/"
+            </button>
+            <a
+              href="http://localhost:3000"
               className="w-full py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs transition block border border-slate-200 dark:border-slate-800"
             >
               Return to Food Ordering App
-            </Link>
+            </a>
           </div>
         </div>
+      </main>
+    );
+  }
+
+  // 4. Authenticated superadmin still fetching dashboard data
+  if (loading) {
+    return (
+      <main className="min-h-screen pt-24 pb-16 px-6 max-w-7xl mx-auto flex items-center justify-center">
+        <CustomSpinner size="lg" label="Loading Platform Management..." />
       </main>
     );
   }
@@ -704,34 +969,29 @@ export default function SuperadminClient() {
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/75 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-6" scope="col">Restaurant Name</th>
-                  <th className="py-3 px-6" scope="col">Menu Slug</th>
-                  <th className="py-3 px-6" scope="col">Admins</th>
-                  <th className="py-3 px-6" scope="col">Products</th>
-                  <th className="py-3 px-6" scope="col">Status</th>
-                  <th className="py-3 px-6 text-right whitespace-nowrap min-w-[140px]" scope="col">Action</th>
+                  <th className="py-3.5 px-6" scope="col">Restaurant Name</th>
+                  <th className="py-3.5 px-6" scope="col">Status</th>
+                  <th className="py-3.5 px-6 text-right whitespace-nowrap" scope="col">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300 font-normal">
                 {filteredRestaurants.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 text-xs">
+                    <td colSpan={3} className="py-8 text-center text-slate-500 text-xs">
                       No matching restaurants found.
                     </td>
                   </tr>
                 ) : (
                   filteredRestaurants.map((rest) => (
-                    <tr key={rest._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={rest._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors group">
                       {/* Name & thumbnail */}
                       <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
+                        <Link
+                          href={`/restaurant/${rest._id}`}
+                          className="flex items-center gap-3.5 group-hover:opacity-95 transition"
+                        >
                           <div
-                            onClick={() => {
-                              setEditingLogoRestaurant(rest);
-                              setLogoModalImage(rest.image || "");
-                            }}
-                            className="relative group w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer shadow-xs hover:border-indigo-500 transition"
-                            title="Click to change restaurant logo / photo"
+                            className="relative w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0 flex items-center justify-center shadow-xs group-hover:border-indigo-500 transition"
                           >
                             <img
                               alt={rest.name}
@@ -741,68 +1001,30 @@ export default function SuperadminClient() {
                                 "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=120"
                               }
                             />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
-                              <Camera size={14} />
-                            </div>
                           </div>
                           <div>
-                            <span className="font-semibold text-slate-900 dark:text-white block">
+                            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition block text-base">
                               {rest.name}
                             </span>
-                            {rest.address?.city ? (
-                              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                                <MapPin className="w-3 h-3 text-slate-400" />
-                                <span>{rest.address.city}</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {rest.address?.city ? (
+                                <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-slate-400" />
+                                  <span>{rest.address.city}</span>
+                                </span>
+                              ) : null}
+                              <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                                View details & features →
                               </span>
-                            ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-
-                      {/* Menu Slug */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="font-mono text-xs px-2.5 py-1 bg-slate-100 dark:bg-indigo-950/40 rounded-md text-amber-700 dark:text-indigo-300 border border-slate-200/80 dark:border-indigo-800/40 max-w-[260px] inline-block truncate"
-                            title={`${customerBaseUrl}/menu?restaurant=${rest._id}`}
-                          >
-                            /menu?restaurant={rest._id}
-                          </span>
-                          <button
-                            onClick={() => handleCopySlug(`${customerBaseUrl}/menu?restaurant=${rest._id}`, rest._id)}
-                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition p-1"
-                            title="Copy customer storefront link"
-                            type="button"
-                          >
-                            {copiedSlug === rest._id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Admins Count */}
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          <Users className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                          <span>{rest.adminCount || 0} Admins</span>
-                        </span>
-                      </td>
-
-                      {/* Products Count */}
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 dark:bg-slate-800/90 text-indigo-700 dark:text-slate-300 border border-indigo-100 dark:border-slate-700">
-                          <UtensilsCrossed className="w-3.5 h-3.5 text-indigo-500 dark:text-slate-400" />
-                          <span>{rest.productCount || 0} Items</span>
-                        </span>
+                        </Link>
                       </td>
 
                       {/* Status */}
                       <td className="py-4 px-6">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                             rest.status === "active"
                               ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
                               : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
@@ -819,31 +1041,18 @@ export default function SuperadminClient() {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingLogoRestaurant(rest);
-                              setLogoModalImage(rest.image || "");
-                            }}
-                            className="px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition border border-indigo-200/80 dark:border-indigo-800/40 inline-flex items-center gap-1.5"
-                            title="Change restaurant logo / picture"
+                        <div className="inline-flex items-center justify-end gap-2.5">
+                          <Link
+                            href={`/restaurant/${rest._id}`}
+                            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 rounded-lg transition shadow-xs inline-flex items-center gap-1.5"
+                            title="Manage features, logo, admins & link for this restaurant"
                           >
-                            <Camera size={13} />
-                            <span>Logo</span>
-                          </button>
-                          <a
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                            href={`${customerBaseUrl}/menu?restaurant=${rest._id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Open customer storefront menu"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                            <span>Manage Branch</span>
+                            <span className="text-indigo-200">→</span>
+                          </Link>
                           <button
                             onClick={() => handleToggleRestaurantStatus(rest)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition inline-flex items-center shadow-sm border ${
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition inline-flex items-center shadow-xs border ${
                               rest.status === "active"
                                 ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
                                 : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
@@ -1022,130 +1231,544 @@ export default function SuperadminClient() {
           data-purpose="admin-accounts-management"
         >
           {/* Section Header */}
-          <div className="p-5 sm:px-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-950/40">
+          <div className="p-5 sm:px-6 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-950/40">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-slate-800 text-sky-600 dark:text-indigo-400 flex items-center justify-center border border-sky-100 dark:border-slate-700/50">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Admin Accounts</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-white">Admin Accounts</h2>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                    {admins.length} Total
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Privileged accounts authorized to manage individual branch menus & orders
+                  Manage restaurant branch admins, reveal passwords, and assign branch access
                 </p>
               </div>
             </div>
-            <div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                {admins.length} Total Admins
-              </span>
+
+            {/* Controls: Search & Group/Table View Mode */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Search filter input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Filter admins or restaurants..."
+                  value={adminSearchQuery}
+                  onChange={(e) => setAdminSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-indigo-500 transition w-48 sm:w-60 shadow-xs"
+                />
+              </div>
+
+              {/* View Switcher: Grouped vs Table */}
+              <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-lg border border-slate-200 dark:border-slate-700/80">
+                <button
+                  type="button"
+                  onClick={() => setAdminViewMode("grouped")}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+                    adminViewMode === "grouped"
+                      ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                  title="Group admins by restaurant"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>By Restaurant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminViewMode("table")}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+                    adminViewMode === "table"
+                      ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                  title="Flat table view"
+                >
+                  <TableIcon className="w-3.5 h-3.5" />
+                  <span>All Admins</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Admins Table View */}
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-50/75 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-6" scope="col">Restaurant</th>
-                  <th className="py-3 px-6" scope="col">Name</th>
-                  <th className="py-3 px-6" scope="col">Email</th>
-                  <th className="py-3 px-6" scope="col">Role</th>
-                  <th className="py-3 px-6" scope="col">Status</th>
-                  <th className="py-3 px-6 text-right whitespace-nowrap min-w-[150px]" scope="col">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300 font-normal">
-                {admins.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 text-xs">
-                      No admin accounts registered yet.
-                    </td>
-                  </tr>
-                ) : (
-                  admins.map((adm) => (
-                    <tr key={adm._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
-                      {/* Restaurant */}
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer">
-                          {adm.restaurant?.name || "Unassigned"}
-                        </span>
-                      </td>
+          {/* ── VIEW 1: GROUPED BY RESTAURANT ── */}
+          {adminViewMode === "grouped" && (
+            <div className="p-4 sm:p-6 space-y-4">
+              {groupedAdmins.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-950/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                  <Users className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                    No restaurant admin accounts match your filter.
+                  </p>
+                </div>
+              ) : (
+                groupedAdmins.map((group) => {
+                  const rest = group.restaurant;
+                  const restId = String(rest?._id || "unassigned");
+                  const isCollapsed = !!collapsedRestaurants[restId];
+                  const hasAdmins = group.admins.length > 0;
 
-                      {/* Name & title */}
-                      <td className="py-4 px-6 text-slate-900 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
-                            {getInitials(adm.name)}
+                  return (
+                    <div
+                      key={restId}
+                      className="border border-slate-200/90 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900/40 shadow-xs overflow-hidden transition-all"
+                    >
+                      {/* Restaurant Header */}
+                      <div className="px-4 sm:px-5 py-3.5 bg-slate-50/80 dark:bg-slate-950/60 border-b border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                            {rest.image ? (
+                              <img
+                                src={rest.image}
+                                alt={rest.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Store className="w-4 h-4" />
+                            )}
                           </div>
-                          <span className="font-medium">
-                            {adm.name ? adm.name.replace(/\s*\(\s*Branch\s+Manager\s*\)/gi, "").trim() : "Admin"}
-                          </span>
+
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                {rest.name}
+                              </h3>
+                              {rest.slug && (
+                                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                  @{rest.slug}
+                                </span>
+                              )}
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  rest.status === "active"
+                                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                                    : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full mr-1 ${
+                                    rest.status === "active" ? "bg-emerald-500" : "bg-rose-500"
+                                  }`}
+                                />
+                                {rest.status || "active"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {Array.isArray(rest.cuisineType)
+                                ? rest.cuisineType.join(", ")
+                                : rest.cuisineType || "Restaurant branch"}
+                            </p>
+                          </div>
                         </div>
-                      </td>
 
-                      {/* Email */}
-                      <td className="py-4 px-6 text-slate-600 dark:text-slate-400 font-mono text-xs">
-                        {adm.email}
-                      </td>
-
-                      {/* Role */}
-                      <td className="py-4 px-6">
-                        <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 rounded-md border border-slate-200 dark:border-slate-700">
-                          {adm.role}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            adm.status === "active"
-                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
-                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
-                          }`}
-                        >
+                        {/* Right header actions */}
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
                           <span
-                            className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                              adm.status === "active" ? "bg-emerald-500" : "bg-rose-500"
+                            className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                              hasAdmins
+                                ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/50"
+                                : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700/40"
                             }`}
-                          />
-                          <span className="capitalize">{adm.status || "active"}</span>
-                        </span>
-                      </td>
+                          >
+                            {group.admins.length} {group.admins.length === 1 ? "Admin" : "Admins"}
+                          </span>
 
-                      {/* Actions */}
-                      <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-2">
+                          {rest._id !== "unassigned" && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAddAdmin(rest._id)}
+                              className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800/80 rounded-lg hover:bg-indigo-50 dark:hover:bg-slate-800 transition shadow-xs inline-flex items-center gap-1"
+                            >
+                              <PlusCircle className="w-3.5 h-3.5" />
+                              <span>Add Admin</span>
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => handleToggleAdminStatus(adm)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition shadow-sm border ${
-                              adm.status === "active"
-                                ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
-                                : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
-                            }`}
                             type="button"
+                            onClick={() => toggleCollapseRestaurant(restId)}
+                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800 transition"
+                            title={isCollapsed ? "Expand" : "Collapse"}
                           >
-                            {adm.status === "active" ? "Suspend" : "Reactivate"}
-                          </button>
-                          <button
-                            onClick={() => handleRemoveAdmin(adm)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
-                            title="Delete Admin"
-                            type="button"
-                          >
-                            <Trash2 className="w-4 h-4" />
+                            {isCollapsed ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronUp className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
+                      </div>
+
+                      {/* Restaurant Admins List */}
+                      {!isCollapsed && (
+                        <div>
+                          {!hasAdmins ? (
+                            <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-1.5">
+                              <p>No admin accounts currently assigned to this restaurant branch.</p>
+                              {rest._id !== "unassigned" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickAddAdmin(rest._id)}
+                                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold mt-1"
+                                >
+                                  + Assign First Admin to {rest.name}
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto custom-scrollbar">
+                              <table className="w-full text-left border-collapse text-sm">
+                                <thead>
+                                  <tr className="bg-slate-50/40 dark:bg-slate-950/20 border-b border-slate-100 dark:border-slate-800/60 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    <th className="py-2.5 px-5" scope="col">Admin User</th>
+                                    <th className="py-2.5 px-5" scope="col">Email</th>
+                                    <th className="py-2.5 px-5" scope="col">Password (Superadmin Only)</th>
+                                    <th className="py-2.5 px-5" scope="col">Role</th>
+                                    <th className="py-2.5 px-5" scope="col">Status</th>
+                                    <th className="py-2.5 px-5 text-right whitespace-nowrap min-w-[150px]" scope="col">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-700 dark:text-slate-300">
+                                  {group.admins.map((adm) => (
+                                    <tr
+                                      key={adm._id}
+                                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/25 transition-colors"
+                                    >
+                                      {/* Admin Name & initials */}
+                                      <td className="py-3 px-5 text-slate-900 dark:text-white">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 text-white text-xs font-semibold flex items-center justify-center shrink-0 shadow-xs">
+                                            {getInitials(adm.name)}
+                                          </div>
+                                          <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">
+                                            {adm.name ? adm.name.replace(/\s*\(\s*Branch\s+Manager\s*\)/gi, "").trim() : "Admin"}
+                                          </span>
+                                        </div>
+                                      </td>
+
+                                      {/* Email */}
+                                      <td className="py-3 px-5 text-slate-600 dark:text-slate-400 font-mono text-xs">
+                                        {adm.email}
+                                      </td>
+
+                                      {/* Password (Visible to Superadmin) */}
+                                      <td className="py-3 px-5">
+                                        <div className="flex items-center gap-1.5">
+                                          {adm.visiblePassword ? (
+                                            <>
+                                              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs min-w-[90px]">
+                                                {revealedPasswords[adm._id] ? (
+                                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400 select-all tracking-wide">
+                                                    {adm.visiblePassword}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-slate-400 dark:text-slate-500 tracking-widest select-none font-bold">
+                                                    ••••••••
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => togglePasswordReveal(adm._id)}
+                                                className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                                title={revealedPasswords[adm._id] ? "Hide password" : "Reveal password"}
+                                              >
+                                                {revealedPasswords[adm._id] ? (
+                                                  <EyeOff className="w-3.5 h-3.5 text-indigo-500" />
+                                                ) : (
+                                                  <Eye className="w-3.5 h-3.5" />
+                                                )}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleCopyPassword(adm.visiblePassword, adm._id)}
+                                                className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                                title="Copy password"
+                                              >
+                                                {copiedPasswordId === adm._id ? (
+                                                  <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
+                                                ) : (
+                                                  <Copy className="w-3.5 h-3.5" />
+                                                )}
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-xs text-slate-400 italic">Encrypted</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setResetPasswordAdmin(adm);
+                                                  setNewPasswordInput("");
+                                                }}
+                                                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
+                                              >
+                                                Reset to reveal
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+
+                                      {/* Role */}
+                                      <td className="py-3 px-5">
+                                        <span className="font-mono text-[11px] px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700">
+                                          {adm.role}
+                                        </span>
+                                      </td>
+
+                                      {/* Status */}
+                                      <td className="py-3 px-5">
+                                        <span
+                                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                            adm.status === "active"
+                                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
+                                          }`}
+                                        >
+                                          <span
+                                            className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                              adm.status === "active" ? "bg-emerald-500" : "bg-rose-500"
+                                            }`}
+                                          />
+                                          <span className="capitalize">{adm.status || "active"}</span>
+                                        </span>
+                                      </td>
+
+                                      {/* Actions */}
+                                      <td className="py-3 px-5 text-right whitespace-nowrap">
+                                        <div className="inline-flex items-center justify-end gap-1.5">
+                                          <button
+                                            onClick={() => {
+                                              setResetPasswordAdmin(adm);
+                                              setNewPasswordInput("");
+                                            }}
+                                            className="px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
+                                            type="button"
+                                            title="Reset Password"
+                                          >
+                                            <KeyRound className="w-3 h-3" />
+                                            <span>Reset</span>
+                                          </button>
+                                          <button
+                                            onClick={() => handleToggleAdminStatus(adm)}
+                                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border ${
+                                              adm.status === "active"
+                                                ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
+                                                : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
+                                            }`}
+                                            type="button"
+                                          >
+                                            {adm.status === "active" ? "Suspend" : "Reactivate"}
+                                          </button>
+                                          <button
+                                            onClick={() => handleRemoveAdmin(adm)}
+                                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
+                                            title="Delete Admin"
+                                            type="button"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* ── VIEW 2: FLAT TABLE VIEW ── */}
+          {adminViewMode === "table" && (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-50/75 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-6" scope="col">Restaurant</th>
+                    <th className="py-3 px-6" scope="col">Name</th>
+                    <th className="py-3 px-6" scope="col">Email</th>
+                    <th className="py-3 px-6" scope="col">Password (Superadmin Only)</th>
+                    <th className="py-3 px-6" scope="col">Role</th>
+                    <th className="py-3 px-6" scope="col">Status</th>
+                    <th className="py-3 px-6 text-right whitespace-nowrap min-w-[150px]" scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300 font-normal">
+                  {filteredAdmins.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
+                        No admin accounts found matching your query.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filteredAdmins.map((adm) => (
+                      <tr key={adm._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                        {/* Restaurant */}
+                        <td className="py-4 px-6">
+                          <span className="font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                            {adm.restaurant?.name || "Unassigned"}
+                          </span>
+                        </td>
+
+                        {/* Name & title */}
+                        <td className="py-4 px-6 text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                              {getInitials(adm.name)}
+                            </div>
+                            <span className="font-medium">
+                              {adm.name ? adm.name.replace(/\s*\(\s*Branch\s+Manager\s*\)/gi, "").trim() : "Admin"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Email */}
+                        <td className="py-4 px-6 text-slate-600 dark:text-slate-400 font-mono text-xs">
+                          {adm.email}
+                        </td>
+
+                        {/* Password */}
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-1.5">
+                            {adm.visiblePassword ? (
+                              <>
+                                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs min-w-[90px]">
+                                  {revealedPasswords[adm._id] ? (
+                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400 select-all tracking-wide">
+                                      {adm.visiblePassword}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-slate-500 tracking-widest select-none font-bold">
+                                      ••••••••
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePasswordReveal(adm._id)}
+                                  className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                  title={revealedPasswords[adm._id] ? "Hide password" : "Reveal password"}
+                                >
+                                  {revealedPasswords[adm._id] ? (
+                                    <EyeOff className="w-3.5 h-3.5 text-indigo-500" />
+                                  ) : (
+                                    <Eye className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyPassword(adm.visiblePassword, adm._id)}
+                                  className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                  title="Copy password"
+                                >
+                                  {copiedPasswordId === adm._id ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-slate-400 italic">Encrypted</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setResetPasswordAdmin(adm);
+                                    setNewPasswordInput("");
+                                  }}
+                                  className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
+                                >
+                                  Reset to reveal
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Role */}
+                        <td className="py-4 px-6">
+                          <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 rounded-md border border-slate-200 dark:border-slate-700">
+                            {adm.role}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-4 px-6">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              adm.status === "active"
+                                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                adm.status === "active" ? "bg-emerald-500" : "bg-rose-500"
+                              }`}
+                            />
+                            <span className="capitalize">{adm.status || "active"}</span>
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setResetPasswordAdmin(adm);
+                                setNewPasswordInput("");
+                              }}
+                              className="px-2.5 py-1.5 text-xs font-medium rounded-md transition shadow-sm border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
+                              type="button"
+                              title="Reset Password"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                              <span>Reset</span>
+                            </button>
+                            <button
+                              onClick={() => handleToggleAdminStatus(adm)}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-md transition shadow-sm border ${
+                                adm.status === "active"
+                                  ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
+                                  : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
+                              }`}
+                              type="button"
+                            >
+                              {adm.status === "active" ? "Suspend" : "Reactivate"}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveAdmin(adm)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
+                              title="Delete Admin"
+                              type="button"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Add Admin Form Container */}
-          <div className="p-6 bg-slate-50/50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80">
+          <div id="add-admin-form" className="p-6 bg-slate-50/50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center">
                 <PlusCircle className="w-3.5 h-3.5" />
@@ -1189,6 +1812,7 @@ export default function SuperadminClient() {
                   Admin Full Name <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="new-admin-name"
                   type="text"
                   required
                   placeholder="e.g. John Doe"
@@ -1344,6 +1968,216 @@ export default function SuperadminClient() {
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95"
                 >
                   {savingLogo ? "Saving..." : "Save Restaurant Logo"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Admin Password Modal */}
+      {resetPasswordAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+              <div className="flex items-center gap-2">
+                <KeyRound size={18} className="text-amber-600 dark:text-amber-400" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Reset Admin Password
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetPasswordAdmin(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetAdminPassword} className="space-y-4">
+              <div>
+                <p className="text-xs text-slate-700 dark:text-slate-200 mb-1 font-semibold">
+                  Reset this admin&apos;s password?
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  This will create a new password for <strong className="text-slate-900 dark:text-white">{resetPasswordAdmin.name}</strong> ({resetPasswordAdmin.email}).
+                </p>
+
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  New Password
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    placeholder="Enter new password"
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    className="w-full text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$";
+                      let pass = "";
+                      for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+                      setNewPasswordInput(pass);
+                    }}
+                    className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition"
+                    title="Generate Secure Password"
+                  >
+                    Generate
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5">Minimum 6 characters. Passwords are securely hashed with bcrypt.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordAdmin(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword || !newPasswordInput}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition active:scale-95"
+                >
+                  {resettingPassword ? "Resetting..." : "Confirm Reset Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MANAGE RESTAURANT FEATURE ACCESS MODAL ── */}
+      {managingFeaturesRestaurant && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <SlidersHorizontal size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Feature Access Control
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    {managingFeaturesRestaurant.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManagingFeaturesRestaurant(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Quick Actions Header: Enable All / Disable All */}
+            <div className="flex items-center justify-between mb-4 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+              <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                {restaurantFeaturesInput.length} of {ALL_AVAILABLE_FEATURES.length} Modules Enabled
+              </span>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRestaurantFeaturesInput(ALL_AVAILABLE_FEATURES.map((f) => f.id))
+                  }
+                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Enable All
+                </button>
+                <span className="text-slate-300 dark:text-slate-700">|</span>
+                <button
+                  type="button"
+                  onClick={() => setRestaurantFeaturesInput([])}
+                  className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                >
+                  Disable All
+                </button>
+              </div>
+            </div>
+
+            {/* Feature List Toggles */}
+            <form onSubmit={handleSaveRestaurantFeatures} className="space-y-3">
+              <div className="space-y-2.5">
+                {ALL_AVAILABLE_FEATURES.map((feat) => {
+                  const isEnabled = restaurantFeaturesInput.includes(feat.id);
+                  return (
+                    <div
+                      key={feat.id}
+                      onClick={() => {
+                        setRestaurantFeaturesInput((prev) =>
+                          isEnabled
+                            ? prev.filter((id) => id !== feat.id)
+                            : [...prev, feat.id]
+                        );
+                      }}
+                      className={`flex items-start justify-between p-3.5 rounded-2xl border transition cursor-pointer select-none ${
+                        isEnabled
+                          ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60 shadow-xs"
+                          : "bg-slate-50/40 dark:bg-slate-950/20 border-slate-200/80 dark:border-slate-800/80 opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 pr-2">
+                        <span className="text-xl leading-none mt-0.5">{feat.badge}</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{feat.name}</span>
+                            {isEnabled ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                Enabled
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-500 border border-slate-300 dark:border-slate-700">
+                                Disabled
+                              </span>
+                            )}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                            {feat.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Checkbox Switch UI */}
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => {}} // Container onClick toggles
+                        className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer shrink-0"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setManagingFeaturesRestaurant(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFeatures}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95"
+                >
+                  {savingFeatures ? "Saving..." : "Save Feature Permissions"}
                 </button>
               </div>
             </form>

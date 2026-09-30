@@ -29,8 +29,16 @@ export async function POST(request) {
     }
 
     // Do not permit public signup using the dedicated superadmin email
-    const configuredSuperadminEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
-    if (configuredSuperadminEmail && normalizedEmail === configuredSuperadminEmail) {
+    const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (
+      configuredSuperadminEmails.includes(normalizedEmail) ||
+      normalizedEmail === "superadmin.petprotocols@gmail.com" ||
+      normalizedEmail === "superadmin@petprotocols.com"
+    ) {
       return NextResponse.json(
         {
           success: false,

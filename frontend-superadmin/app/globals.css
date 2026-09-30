@@ -78,7 +78,7 @@ select:focus {
   outline: none !important;
 }
 
-/* Eliminate WebKit/Chrome autofill white background block and preserve theme text */
+/* Default dark-safe autofill: prevents jarring browser white background */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus, 
@@ -87,22 +87,119 @@ textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,
 textarea:-webkit-autofill:focus,
 select:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #0b0f17 inset !important;
   -webkit-text-fill-color: #f1f5f9 !important;
   caret-color: #f1f5f9 !important;
   transition: background-color 5000000s ease-in-out 0s;
 }
 
-.light input:-webkit-autofill,
-.light input:-webkit-autofill:hover, 
-.light input:-webkit-autofill:focus, 
-.light input:-webkit-autofill:active,
-.light textarea:-webkit-autofill,
-.light textarea:-webkit-autofill:hover,
-.light textarea:-webkit-autofill:focus,
-.light select:-webkit-autofill {
+/* Explicit dark inputs and dark surfaces always get dark autofill */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover, 
+.dark input:-webkit-autofill:focus, 
+.dark input:-webkit-autofill:active,
+.dark-scope input:-webkit-autofill,
+.dark-scope input:-webkit-autofill:hover,
+.dark-scope input:-webkit-autofill:focus,
+.dark-scope input:-webkit-autofill:active,
+input.dark-input:-webkit-autofill,
+input.dark-input:-webkit-autofill:hover,
+input.dark-input:-webkit-autofill:focus,
+input.dark-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0b0f17 inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  color-scheme: dark !important;
+  transition: background-color 5000000s ease-in-out 0s;
+}
+
+/* Light mode autofill ONLY when element is strictly in a light scope and NOT marked dark */
+html.light:not(.dark) :not(.dark):not(.dark-scope) input:not(.dark-input):-webkit-autofill,
+html.light:not(.dark) :not(.dark):not(.dark-scope) input:not(.dark-input):-webkit-autofill:hover, 
+html.light:not(.dark) :not(.dark):not(.dark-scope) input:not(.dark-input):-webkit-autofill:focus, 
+html.light:not(.dark) :not(.dark):not(.dark-scope) input:not(.dark-input):-webkit-autofill:active,
+html.light:not(.dark) :not(.dark):not(.dark-scope) textarea:not(.dark-input):-webkit-autofill,
+html.light:not(.dark) :not(.dark):not(.dark-scope) select:not(.dark-input):-webkit-autofill {
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
   -webkit-text-fill-color: #1e293b !important;
   caret-color: #1e293b !important;
+  color-scheme: light !important;
   transition: background-color 5000000s ease-in-out 0s;
+}
+
+/* ── Programmer Cloud Inspired Glowing Dual-Ring Loader ── */
+@keyframes spin-cw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes spin-ccw {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes pulse-glow-core {
+  0%, 100% {
+    transform: scale(0.65);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.loader-glow-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loader-glow-ring-outer {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #6366f1;
+  border-right-color: #a855f7;
+  animation: spin-cw 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.6));
+}
+
+.dark .loader-glow-ring-outer {
+  border-top-color: #818cf8;
+  border-right-color: #c084fc;
+  filter: drop-shadow(0 0 14px rgba(129, 140, 248, 0.8));
+}
+
+.loader-glow-ring-inner {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-bottom-color: #f59e0b;
+  border-left-color: #ec4899;
+  animation: spin-ccw 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.5));
+}
+
+.dark .loader-glow-ring-inner {
+  border-bottom-color: #fbbf24;
+  border-left-color: #f472b6;
+  filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.7));
+}
+
+.loader-glow-core {
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  animation: pulse-glow-core 1.4s ease-in-out infinite;
+  box-shadow: 0 0 15px #6366f1;
+}
+
+.dark .loader-glow-core {
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  box-shadow: 0 0 20px #818cf8;
 }

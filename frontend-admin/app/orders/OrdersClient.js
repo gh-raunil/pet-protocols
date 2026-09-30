@@ -594,13 +594,13 @@ export default function OrdersClient() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
       </div>
 
-      <main className="pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-6">
+      <main className="pt-20 sm:pt-28 pb-28 sm:pb-24 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-5">
         
         {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
         {!kitchenActive && (
-          <div className="bg-rose-500/15 border-2 border-rose-500/40 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-in fade-in">
+          <div className="bg-rose-500/15 border border-rose-500/30 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm animate-in fade-in">
             <div className="flex items-center gap-3">
-              <span className="text-2xl shrink-0">⚠️</span>
+              <span className="text-xl shrink-0">⚠️</span>
               <div>
                 <h4 className="font-extrabold text-sm text-rose-900 dark:text-rose-100">
                   Kitchen is currently PAUSED
@@ -625,23 +625,23 @@ export default function OrdersClient() {
         )}
 
         {/* ── HEADER & LIVE STATUS CHIP ───────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-5">
           <div>
             <div className="flex items-center gap-2.5 mb-1 flex-wrap">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 dark:text-white">
-                Kitchen Display <span className="text-orange-500">System</span>
+                Kitchen Display <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">System</span>
               </h1>
               
               {/* Professional Live Status Indicator */}
               <div
-                className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shadow-xs"
                 title="Live connection active: Kitchen orders poll every 10 seconds automatically"
               >
-                <span className="relative flex h-2.5 w-2.5">
+                <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span className="tracking-wide">Live Kitchen Sync</span>
+                <span className="tracking-wide text-[11px]">Live Kitchen Sync</span>
               </div>
             </div>
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
@@ -649,18 +649,18 @@ export default function OrdersClient() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Rush Mode Toggle */}
             <button
               onClick={() => setRushMode(!rushMode)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
                 rushMode
-                  ? "bg-orange-500 text-white border-orange-500 shadow-orange-500/20 shadow-sm"
-                  : "bg-stone-100 dark:bg-white/5 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 hover:bg-stone-200 dark:hover:bg-white/10"
+                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 shadow-xs"
+                  : "bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
               }`}
               title="Toggle Rush Hour compact ticket grid"
             >
-              <LayoutGrid size={13} />
+              <LayoutGrid size={13} className={rushMode ? "text-amber-600 dark:text-amber-400" : "text-stone-400"} />
               <span>{rushMode ? "Rush Mode ON" : "Rush Mode"}</span>
             </button>
 
@@ -670,23 +670,23 @@ export default function OrdersClient() {
                 setSoundEnabled(!soundEnabled);
                 if (!soundEnabled) playChime(null, 1.0);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 ${
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
                 soundEnabled
-                  ? "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"
-                  : "bg-white dark:bg-white/5 text-stone-500 border-stone-200 dark:border-white/10"
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                  : "bg-white dark:bg-white/5 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
               }`}
             >
-              {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-              <span>{soundEnabled ? "Chime On 🔊" : "Chime Muted"}</span>
+              {soundEnabled ? <Volume2 size={13} className="text-emerald-600 dark:text-emerald-400" /> : <VolumeX size={13} className="text-stone-400" />}
+              <span>{soundEnabled ? "Chime On" : "Chime Muted"}</span>
             </button>
 
             {/* Download Report Button */}
             <button
               onClick={downloadOrdersReport}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-white/10 text-xs font-bold transition shadow-xs active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 hover:bg-stone-100 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
               title="Download Orders CSV Report"
             >
-              <Download size={13} className="text-orange-500" />
+              <Download size={13} className="text-stone-500 dark:text-stone-400" />
               <span>Export CSV</span>
             </button>
 
@@ -694,7 +694,7 @@ export default function OrdersClient() {
             <button
               onClick={() => fetchOrders(true)}
               disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition shadow-xs active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
               <span>Refresh</span>
@@ -703,79 +703,82 @@ export default function OrdersClient() {
         </div>
 
         {/* ── DATE FILTER BAR & SEARCH BAR ────────────────────────── */}
-        <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Date Picker bounded between restaurant creation date and today */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs">
-              <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
-              <span className="font-bold text-stone-700 dark:text-stone-300 shrink-0">Order Date:</span>
-              <input
-                type="date"
-                value={selectedDate}
-                min={minSelectableDate}
-                max={todayStr}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent text-stone-900 dark:text-white font-mono font-bold outline-none cursor-pointer text-xs"
-              />
-            </div>
+        <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-4 shadow-xs">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Date Controls */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs flex-1 sm:flex-initial">
+                <Calendar className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                <span className="font-semibold text-stone-500 dark:text-stone-400 shrink-0">Date:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={minSelectableDate}
+                  max={todayStr}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-transparent text-stone-900 dark:text-white font-mono font-bold outline-none cursor-pointer text-xs w-full sm:w-auto"
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition shrink-0 ${
-                isTodaySelected
-                  ? "bg-orange-500 text-white shadow-xs"
-                  : "bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300"
-              }`}
-            >
-              Today
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedDate("all")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition shrink-0 ${
-                selectedDate === "all"
-                  ? "bg-orange-500 text-white shadow-xs"
-                  : "bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300"
-              }`}
-            >
-              All Dates
-            </button>
-          </div>
-
-          {/* Search by Order ID or Customer Name */}
-          <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 max-w-md">
-            <div className="flex items-center flex-1 bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 focus-within:border-orange-500 transition">
-              <Search className="w-4 h-4 text-stone-400 shrink-0 mr-2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by order ID (#PET-...) or customer name..."
-                className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 text-xs outline-none"
-              />
-              {searchQuery && (
+              <div className="inline-flex rounded-xl bg-stone-100 dark:bg-white/5 p-1 border border-stone-200/60 dark:border-white/10 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    fetchOrders(true);
-                  }}
-                  className="text-stone-400 hover:text-stone-700 text-xs px-1"
+                  onClick={() => setSelectedDate(todayStr)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    isTodaySelected
+                      ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  }`}
                 >
-                  ✕
+                  Today
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedDate === "all"
+                      ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  }`}
+                >
+                  All Dates
+                </button>
+              </div>
             </div>
 
-            <button
-              type="submit"
-              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs shrink-0 active:scale-95"
-            >
-              Search
-            </button>
-          </form>
+            {/* Search Input */}
+            <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 md:max-w-sm">
+              <div className="flex items-center flex-1 bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-xl px-3 py-2 focus-within:border-stone-400 dark:focus-within:border-stone-600 transition">
+                <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Order ID (#PET-...) or customer..."
+                  className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 text-xs outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      fetchOrders(true);
+                    }}
+                    className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 text-xs px-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-xs shrink-0 active:scale-95 cursor-pointer"
+              >
+                Search
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* ── NEW ORDER VISUAL NOTIFICATION BANNER ─────────────────── */}
@@ -802,7 +805,7 @@ export default function OrdersClient() {
             </div>
             <button
               onClick={() => setNewOrderAlert(null)}
-              className="text-xs bg-black/30 hover:bg-black/40 text-white px-3 py-1.5 rounded-lg font-bold transition shrink-0"
+              className="text-xs bg-black/30 hover:bg-black/40 text-white px-3 py-1.5 rounded-lg font-bold transition shrink-0 cursor-pointer"
             >
               Acknowledge ✓
             </button>
@@ -821,7 +824,7 @@ export default function OrdersClient() {
             <span>{feedback.message}</span>
             <button
               onClick={() => setFeedback({ type: "", message: "" })}
-              className="opacity-70 hover:opacity-100 ml-4 font-bold"
+              className="opacity-70 hover:opacity-100 ml-4 font-bold cursor-pointer"
             >
               ✕
             </button>
@@ -829,15 +832,15 @@ export default function OrdersClient() {
         )}
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
           {statusTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer ${
                 filterStatus === tab.id
-                  ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25"
-                  : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10"
+                  ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-sm"
+                  : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10 hover:bg-stone-100/60 dark:hover:bg-white/10"
               }`}
             >
               {tab.label}
@@ -891,17 +894,17 @@ export default function OrdersClient() {
                       className={`bg-white/95 dark:bg-[#10141f]/95 backdrop-blur-md rounded-2xl p-4 border transition flex flex-col justify-between gap-3 shadow-xs ${
                         isNewlyArrived
                           ? "border-orange-500 shadow-md ring-2 ring-orange-500/20"
-                          : "border-stone-200/90 dark:border-white/10 hover:border-orange-500/40"
+                          : "border-stone-200/90 dark:border-white/10 hover:border-stone-300 dark:hover:border-white/20"
                       }`}
                     >
                       <div className="space-y-2.5">
                         {/* Compact Header: ID, Live Timer, Price */}
                         <div className="flex items-center justify-between gap-2 border-b border-stone-100 dark:border-white/10 pb-2.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-xs font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-200 dark:border-orange-500/20">
+                            <span className="font-mono text-xs font-bold text-stone-900 dark:text-white bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded-md border border-stone-200/80 dark:border-white/10">
                               {uniqueId}
                             </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${elapsedInfo.color}`}>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${elapsedInfo.color}`}>
                               <Clock size={10} />
                               <span>{elapsedInfo.text}</span>
                             </span>
@@ -912,7 +915,7 @@ export default function OrdersClient() {
                               type="button"
                               onClick={() => handlePrintKOT(order)}
                               title="Print Kitchen Ticket (KOT)"
-                              className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition"
+                              className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition cursor-pointer"
                             >
                               <Printer size={13} />
                             </button>
@@ -934,19 +937,19 @@ export default function OrdersClient() {
                           </div>
 
                           {isCod ? (
-                            <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
-                              💵 COD ₹{order.totalAmount}
+                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                              COD ₹{order.totalAmount}
                             </span>
                           ) : (
-                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
-                              💳 Paid
+                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
+                              Paid Online
                             </span>
                           )}
                         </div>
 
                         {/* Special Note if any */}
                         {order.notes && (
-                          <div className="text-[11px] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
+                          <div className="text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
                             <strong>Note:</strong> {order.notes}
                           </div>
                         )}
@@ -956,18 +959,18 @@ export default function OrdersClient() {
                           <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider pb-0.5">
                             <span>Dishes ({order.items?.length || 0})</span>
                             {allPacked ? (
-                              <span className="text-emerald-500 font-extrabold flex items-center gap-0.5">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
                                 <Check size={11} /> All Packed
                               </span>
                             ) : order.status === "preparing" ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-orange-500 font-bold">
+                                <span className="text-[10px] text-stone-400">
                                   Locked 🔒
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => packAllDishes(order)}
-                                  className="text-[10px] text-orange-600 dark:text-orange-400 hover:underline font-bold"
+                                  className="text-[10px] text-stone-600 dark:text-stone-300 hover:underline font-bold cursor-pointer"
                                 >
                                   Pack All
                                 </button>
@@ -999,11 +1002,11 @@ export default function OrdersClient() {
                                   onClick={() => canClick && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-1.5 rounded-lg border text-xs select-none transition ${
                                     canClick
-                                      ? "cursor-pointer hover:border-orange-500/40"
+                                      ? "cursor-pointer hover:border-stone-400 dark:hover:border-white/20"
                                       : "cursor-default"
                                   } ${
                                     isPacked
-                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-700 dark:text-stone-300 font-medium"
+                                      ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/25 text-stone-700 dark:text-stone-300 font-medium"
                                       : "bg-stone-50/80 dark:bg-white/[0.02] border-stone-200/70 dark:border-white/5 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
@@ -1013,8 +1016,11 @@ export default function OrdersClient() {
                                     }`}>
                                       {isPacked && <Check size={9} />}
                                     </div>
+                                    <span className="inline-flex items-center justify-center px-1 rounded text-[10px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
+                                      {item.quantity}×
+                                    </span>
                                     <span className="font-semibold truncate">
-                                      <strong className="text-orange-500">{item.quantity}x</strong> {item.name}
+                                      {item.name}
                                     </span>
                                   </div>
                                   <span className="font-mono text-[11px] text-stone-400 shrink-0 ml-1">
@@ -1035,7 +1041,7 @@ export default function OrdersClient() {
                               type="button"
                               disabled={updatingOrderId === order._id}
                               onClick={() => handleUpdateStatus(order._id, "preparing")}
-                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
                               <ChefHat size={13} />
                               <span>Accept & Cook</span>
@@ -1048,7 +1054,7 @@ export default function OrdersClient() {
                                   handleUpdateStatus(order._id, "cancelled");
                                 }
                               }}
-                              className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold"
+                              className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold cursor-pointer disabled:opacity-50"
                             >
                               ✕
                             </button>
@@ -1060,7 +1066,7 @@ export default function OrdersClient() {
                             type="button"
                             disabled={updatingOrderId === order._id}
                             onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                            className="w-full py-2 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Zap size={13} />
                             <span>Mark Ready (Dispatch)</span>
@@ -1072,7 +1078,7 @@ export default function OrdersClient() {
                             type="button"
                             disabled={updatingOrderId === order._id}
                             onClick={() => handleUpdateStatus(order._id, "delivered")}
-                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Truck size={13} />
                             <span>Confirm Delivered</span>
@@ -1080,13 +1086,13 @@ export default function OrdersClient() {
                         )}
 
                         {order.status === "delivered" && (
-                          <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                          <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                             ✓ Fulfilled
                           </div>
                         )}
 
                         {order.status === "cancelled" && (
-                          <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-500/20">
+                          <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20">
                             ✕ Cancelled
                           </div>
                         )}
@@ -1112,62 +1118,66 @@ export default function OrdersClient() {
                   return (
                     <div
                       key={order._id}
-                      className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md rounded-3xl p-5 sm:p-6 transition-all duration-200 border ${
+                      className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 transition-all duration-200 border ${
                         isNewlyArrived
                           ? "border-orange-500 shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20"
-                          : "border-stone-200/90 dark:border-white/10 shadow-xs hover:border-orange-500/40"
+                          : "border-stone-200/90 dark:border-white/10 shadow-xs hover:border-stone-300 dark:hover:border-white/20"
                       }`}
                     >
                       {/* Top Bar: Order ID, Live Kitchen Timer, Status & Total */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-stone-100 dark:border-white/10">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="font-mono text-sm font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-3 py-1 rounded-xl border border-orange-200 dark:border-orange-500/20">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-stone-100 dark:border-white/10">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Sleek Monospace POS ID Badge */}
+                          <span className="font-mono text-xs sm:text-sm font-extrabold tracking-tight bg-stone-900 text-white dark:bg-white dark:text-stone-950 px-2.5 py-1 rounded-lg shadow-xs">
                             {uniqueId}
                           </span>
 
                           {/* Live Kitchen Elapsed Timer */}
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-xl border flex items-center gap-1.5 shadow-xs ${elapsedInfo.color}`}>
-                            <Clock size={12} />
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 shadow-xs ${elapsedInfo.color}`}>
+                            <Clock size={11} />
                             <span>{elapsedInfo.text}</span>
                           </span>
 
-                          <span className="text-xs text-stone-500 dark:text-stone-400 font-mono">
+                          <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
                             {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {new Date(order.createdAt).toLocaleDateString()}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
                           {/* Payment Badge (COD vs Online) */}
                           {isCod ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30">
-                              <Banknote size={14} className="text-amber-600 dark:text-amber-400" />
-                              <span>💵 Collect Cash: ₹{order.totalAmount}</span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                              <Banknote size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>COD</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
-                              <CheckCircle2 size={13} className="text-emerald-500" />
-                              <span>💳 Paid Online</span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
+                              <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>Paid Online</span>
                             </span>
                           )}
 
+                          {/* Status Badge */}
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                              statusBadgeStyles[order.status] || "bg-stone-200 text-stone-700"
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
+                              statusBadgeStyles[order.status] || "bg-stone-100 text-stone-700 border-stone-200"
                             }`}
                           >
-                            ● {order.status.replace("_", " ")}
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                            <span>{order.status.replace("_", " ")}</span>
                           </span>
 
-                          <span className="text-lg font-black text-stone-900 dark:text-white font-mono">
+                          {/* Order Total */}
+                          <span className="text-base sm:text-lg font-black text-stone-900 dark:text-white font-mono ml-1">
                             ₹{order.totalAmount}
                           </span>
                         </div>
                       </div>
 
                       {/* Order Details Body */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                         {/* Customer & Delivery Address Details */}
-                        <div className="space-y-2.5 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5 flex flex-col justify-between">
+                        <div className="space-y-2.5 bg-stone-50/80 dark:bg-white/[0.02] p-3.5 sm:p-4 rounded-2xl border border-stone-200/70 dark:border-white/5 flex flex-col justify-between gap-3">
                           <div className="space-y-2">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 block">
                               Customer & Delivery Details
@@ -1176,19 +1186,19 @@ export default function OrdersClient() {
                               {order.address?.fullName || order.user?.name || "Customer"}
                             </div>
                             {order.address?.phone && (
-                              <div className="text-xs text-stone-600 dark:text-stone-300 flex items-center gap-2">
-                                <Phone size={13} className="text-stone-400" />
+                              <div className="text-xs text-stone-600 dark:text-stone-300 flex items-center gap-1.5">
+                                <Phone size={12} className="text-stone-400 shrink-0" />
                                 <a
                                   href={`tel:${order.address.phone}`}
-                                  className="font-mono hover:text-orange-500 underline font-semibold"
+                                  className="font-mono font-semibold text-stone-700 dark:text-stone-200 hover:text-orange-500 transition"
                                 >
                                   {order.address.phone}
                                 </a>
                               </div>
                             )}
                             {order.address?.street && (
-                              <div className="text-xs text-stone-500 dark:text-stone-400 flex items-start gap-2">
-                                <MapPin size={13} className="text-stone-400 shrink-0 mt-0.5" />
+                              <div className="text-xs text-stone-500 dark:text-stone-400 flex items-start gap-1.5 leading-relaxed">
+                                <MapPin size={12} className="text-stone-400 shrink-0 mt-0.5" />
                                 <span>
                                   {order.address.street}, {order.address.city || ""}{" "}
                                   {order.address.pincode ? `(${order.address.pincode})` : ""}
@@ -1199,46 +1209,46 @@ export default function OrdersClient() {
 
                           {/* Highlighted Special Cooking Instructions */}
                           {order.notes && (
-                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
-                              <span className="text-base leading-none">🏷️</span>
+                            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                              <span className="text-sm leading-none shrink-0">🏷️</span>
                               <div>
-                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-600 dark:text-amber-400">
+                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-700 dark:text-amber-400">
                                   Customer Request:
                                 </span>
-                                <span className="font-semibold">{order.notes}</span>
+                                <span className="font-medium">{order.notes}</span>
                               </div>
                             </div>
                           )}
                         </div>
 
                         {/* Interactive Dish Checklist */}
-                        <div className="space-y-2.5 bg-stone-50/70 dark:bg-white/[0.02] p-4 rounded-2xl border border-stone-200/60 dark:border-white/5">
+                        <div className="space-y-2.5 bg-stone-50/80 dark:bg-white/[0.02] p-3.5 sm:p-4 rounded-2xl border border-stone-200/70 dark:border-white/5">
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                              Dish Checklist ({order.items?.length || 0} items)
+                              Dish Checklist ({order.items?.length || 0} {order.items?.length === 1 ? "item" : "items"})
                             </span>
                             <div className="text-[11px] font-semibold text-stone-400 flex items-center gap-2">
                               {allPacked ? (
-                                <span className="text-emerald-500 font-bold flex items-center gap-1">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                                   <Check size={12} /> All Items Packed ✓
                                 </span>
                               ) : order.status === "preparing" ? (
-                                <>
-                                  <span className="text-orange-500 font-medium">Checked items locked 🔒</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-stone-400 text-[10px]">Locked 🔒</span>
                                   <button
                                     type="button"
                                     onClick={() => packAllDishes(order)}
-                                    className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500 hover:text-white border border-orange-500/20 text-[10px] font-bold transition"
+                                    className="px-2 py-0.5 rounded-md bg-stone-200/70 hover:bg-stone-300 dark:bg-white/10 dark:hover:bg-white/20 text-stone-800 dark:text-stone-200 text-[10px] font-bold transition cursor-pointer"
                                   >
                                     Pack All
                                   </button>
-                                </>
+                                </div>
                               ) : order.status === "pending" ? (
-                                <span className="text-stone-500 dark:text-stone-400 text-xs font-semibold">
-                                  Select dishes to verify • Locks once accepted
+                                <span className="text-stone-500 dark:text-stone-400 text-[10px] font-medium">
+                                  Verify before accepting
                                 </span>
                               ) : (
-                                <span>Awaiting Kitchen Acceptance</span>
+                                <span>Awaiting Acceptance</span>
                               )}
                             </div>
                           </div>
@@ -1263,25 +1273,30 @@ export default function OrdersClient() {
                                   onClick={() => canClick && toggleItemPacked(order, idx)}
                                   className={`flex items-center justify-between p-2 rounded-xl border text-xs select-none transition ${
                                     canClick
-                                      ? "cursor-pointer hover:border-orange-500/40"
+                                      ? "cursor-pointer hover:border-stone-400 dark:hover:border-white/20"
                                       : "cursor-default"
                                   } ${
                                     isPacked
-                                      ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-stone-700 dark:text-stone-300 font-medium"
-                                      : "bg-white dark:bg-white/[0.03] border-stone-200/70 dark:border-white/5 text-stone-800 dark:text-stone-200"
+                                      ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/25 text-stone-700 dark:text-stone-300 font-medium"
+                                      : "bg-white dark:bg-white/[0.03] border-stone-200/80 dark:border-white/5 text-stone-800 dark:text-stone-200"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                      isPacked ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300 dark:border-stone-600"
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${
+                                      isPacked
+                                        ? "bg-emerald-500 border-emerald-500 text-white"
+                                        : "border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-white/5"
                                     }`}>
-                                      {isPacked && <Check size={11} />}
+                                      {isPacked && <Check size={11} strokeWidth={3} />}
                                     </div>
-                                    <span className="font-bold">
-                                      <span className="text-orange-500 font-extrabold">{item.quantity}x</span> {item.name}
+                                    <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
+                                      {item.quantity}×
+                                    </span>
+                                    <span className={`font-semibold truncate ${isPacked ? "text-stone-500 dark:text-stone-400 line-through" : "text-stone-900 dark:text-white"}`}>
+                                      {item.name}
                                     </span>
                                   </div>
-                                  <span className="font-mono text-stone-500 dark:text-stone-400">
+                                  <span className="font-mono text-stone-500 dark:text-stone-400 text-xs shrink-0 ml-2">
                                     ₹{(item.price || 0) * (item.quantity || 1)}
                                   </span>
                                 </div>
@@ -1289,9 +1304,9 @@ export default function OrdersClient() {
                             })}
                           </div>
 
-                          <div className="pt-2 flex items-center justify-between text-xs text-stone-500 border-t border-stone-200/60 dark:border-white/5">
-                            <span>Payment Mode: <strong>{order.paymentMethod || "Direct"}</strong></span>
-                            <span className={`font-bold uppercase text-[10px] ${isCod ? "text-amber-600" : "text-emerald-600"}`}>
+                          <div className="pt-2 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 border-t border-stone-200/60 dark:border-white/5">
+                            <span>Payment: <strong className="text-stone-700 dark:text-stone-300">{order.paymentMethod || "Direct"}</strong></span>
+                            <span className={`font-bold uppercase text-[10px] tracking-wide ${isCod ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                               {order.paymentStatus === "pending" ? "Pending at Doorstep" : (order.paymentStatus || "Paid")}
                             </span>
                           </div>
@@ -1299,27 +1314,27 @@ export default function OrdersClient() {
                       </div>
 
                       {/* Primary One-Click Action Stepper Bar */}
-                      <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-wrap items-center justify-between gap-3">
+                      <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                         {/* Print KOT Button */}
                         <button
                           type="button"
                           onClick={() => handlePrintKOT(order)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
                         >
-                          <Printer size={14} className="text-stone-500" />
+                          <Printer size={13} className="text-stone-500" />
                           <span>Print KOT Slip</span>
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 justify-end">
                           {order.status === "pending" && (
                             <>
                               <button
                                 type="button"
                                 disabled={updatingOrderId === order._id}
                                 onClick={() => handleUpdateStatus(order._id, "preparing")}
-                                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm shadow-emerald-600/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                               >
-                                <ChefHat size={15} />
+                                <ChefHat size={14} />
                                 <span>Accept & Start Cooking</span>
                               </button>
                               <button
@@ -1330,7 +1345,7 @@ export default function OrdersClient() {
                                     handleUpdateStatus(order._id, "cancelled");
                                   }
                                 }}
-                                className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer"
+                                className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
                               >
                                 Cancel
                               </button>
@@ -1342,9 +1357,9 @@ export default function OrdersClient() {
                               type="button"
                               disabled={updatingOrderId === order._id}
                               onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                              className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-sm shadow-orange-500/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
-                              <Zap size={15} />
+                              <Zap size={14} />
                               <span>Mark Food Ready (Dispatch)</span>
                             </button>
                           )}
@@ -1354,22 +1369,22 @@ export default function OrdersClient() {
                               type="button"
                               disabled={updatingOrderId === order._id}
                               onClick={() => handleUpdateStatus(order._id, "delivered")}
-                              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm shadow-purple-600/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
-                              <Truck size={15} />
+                              <Truck size={14} />
                               <span>Confirm Order Delivered</span>
                             </button>
                           )}
 
                           {order.status === "delivered" && (
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
-                              <CheckCircle2 size={15} /> Order Fulfilled
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-xl border border-emerald-500/25 text-xs font-bold">
+                              <CheckCircle2 size={14} /> Order Fulfilled
                             </span>
                           )}
 
                           {order.status === "cancelled" && (
-                            <span className="text-xs font-bold text-rose-500 flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-500/20">
-                              <XCircle size={15} /> Cancelled
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/25 text-xs font-bold">
+                              <XCircle size={14} /> Cancelled
                             </span>
                           )}
                         </div>

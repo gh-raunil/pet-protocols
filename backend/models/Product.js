@@ -28,7 +28,7 @@ const ProductSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ["Pizza", "Burger", "Fries", "Momos", "Cold Drinks", "Desserts", "Sides"],
+      trim: true,
     },
     isAvailable: {
       type: Boolean,
@@ -48,6 +48,16 @@ const ProductSchema = new mongoose.Schema(
       default: 15,
       min: 1,
       max: 180,
+    },
+    rating: {
+      type: Number,
+      default: 4.8,
+      min: 1,
+      max: 5,
+    },
+    numRatings: {
+      type: Number,
+      default: 12,
     },
   },
   { timestamps: true }

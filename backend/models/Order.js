@@ -98,6 +98,28 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    stockDeducted: {
+      type: Boolean,
+      default: false,
+    },
+    stockRestored: {
+      type: Boolean,
+      default: false,
+    },
+    assignedDeliveryStaff: {
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      name: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      email: { type: String, default: "" },
+      assignedAt: { type: Date },
+    },
+    codPaymentHandler: {
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      name: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      collected: { type: Boolean, default: false },
+      collectedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

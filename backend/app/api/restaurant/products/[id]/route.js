@@ -5,7 +5,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 
 export async function PUT(request, { params }) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_manage" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -45,7 +45,7 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_manage" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }

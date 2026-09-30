@@ -59,9 +59,13 @@ function getStoredTheme() {
   return "dark";
 }
 
+const ACCENT_STORAGE_KEY = "pet_protocols_accent";
+
 const ThemeContext = createContext({
   theme: "dark",
+  accentColor: "#f97316",
   toggleTheme: () => {},
+  setAccentColor: () => {},
   mounted: false,
 });
 
@@ -87,6 +91,13 @@ export function ThemeScript() {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
     }
+
+    var accent = getCookie("${ACCENT_STORAGE_KEY}") ||
+                 localStorage.getItem("${ACCENT_STORAGE_KEY}") ||
+                 "#f97316";
+    if (accent) {
+      document.documentElement.style.setProperty("--brand-accent", accent);
+    }
   } catch (e) {}
 })();
   `;
@@ -100,7 +111,20 @@ export function ThemeScript() {
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState("dark");
+  const [accentColor, setAccent] = useState("#f97316");
   const [mounted, setMounted] = useState(false);
+
+  const applyAccentColor = (color) => {
+    if (!color) return;
+    setAccent(color);
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--brand-accent", color);
+    }
+    setCookie(ACCENT_STORAGE_KEY, color);
+    try {
+      localStorage.setItem(ACCENT_STORAGE_KEY, color);
+    } catch (e) {}
+  };
 
   useEffect(() => {
     const savedTheme = getStoredTheme();
@@ -112,7 +136,26 @@ export function ThemeProvider({ children }) {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
     }
+
+    let savedAccent = "#f97316";
+    try {
+      const accentCookie = getCookie(ACCENT_STORAGE_KEY);
+      const localAccent = localStorage.getItem(ACCENT_STORAGE_KEY);
+      savedAccent = accentCookie || localAccent || "#f97316";
+    } catch (e) {}
+    applyAccentColor(savedAccent);
     setMounted(true);
+
+    // Sync active restaurant appearance if available
+    fetch("/api/restaurants")
+      .then((res) => res.json())
+      .then((data) => {
+        const rest = Array.isArray(data) ? data[0] : (data?.restaurants?.[0] || data?.restaurant);
+        if (rest?.appearance?.primaryColor) {
+          applyAccentColor(rest.appearance.primaryColor);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const toggleTheme = () => {
@@ -140,7 +183,7 @@ export function ThemeProvider({ children }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
+    <ThemeContext.Provider value={{ theme, accentColor, toggleTheme, setAccentColor: applyAccentColor, mounted }}>
       {children}
     </ThemeContext.Provider>
   );

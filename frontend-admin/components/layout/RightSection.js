@@ -41,9 +41,12 @@ const RightSection = () => {
 
   const totalItems = getTotalItems();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     clearCartLocal();
-    signOut({ callbackUrl: "/" });
+    try {
+      await signOut({ redirect: false });
+    } catch (e) {}
+    window.location.href = "/login";
   };
 
   const role = session?.user?.role;

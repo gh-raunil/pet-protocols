@@ -9,9 +9,12 @@ function AuthHandler() {
 
   const resetTimer = () => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
+    timer.current = setTimeout(async () => {
       if (session) {
-        signOut({ callbackUrl: "/login" });
+        try {
+          await signOut({ redirect: false });
+        } catch (e) {}
+        window.location.href = "/login";
       }
     }, TIMEOUT);
   };

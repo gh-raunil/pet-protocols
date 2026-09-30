@@ -62,10 +62,37 @@ const UserSchema = new mongoose.Schema(
     password: {
       type: String,
     },
+    visiblePassword: {
+      type: String,
+      default: null,
+    },
     role: {
       type: String,
-      enum: ['superadmin', 'restaurant_admin', 'customer', 'admin', 'user'],
+      enum: ['superadmin', 'restaurant_admin', 'customer', 'admin', 'user', 'staff'],
       default: 'customer',
+    },
+    staffRole: {
+      type: String,
+      default: 'Staff',
+      trim: true,
+    },
+    staffRoles: {
+      type: [String],
+      default: ['Kitchen'],
+    },
+    roleTitle: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    permissions: {
+      type: [String],
+      default: [
+        'orders_view',
+        'orders_update',
+        'products_view',
+        'customers_view',
+      ],
     },
     restaurant: {
       type: mongoose.Schema.Types.ObjectId,
@@ -74,7 +101,7 @@ const UserSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'suspended'],
+      enum: ['active', 'suspended', 'inactive'],
       default: 'active',
     },
     image: {

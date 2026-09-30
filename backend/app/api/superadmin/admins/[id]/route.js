@@ -3,6 +3,8 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
 
+import bcrypt from "bcryptjs";
+
 export async function PUT(request, { params }) {
   try {
     const auth = await requireSuperAdmin();
@@ -38,15 +40,27 @@ export async function PUT(request, { params }) {
     if (body.status !== undefined) admin.status = body.status;
     if (body.name !== undefined) admin.name = body.name;
 
+    if (body.newPassword !== undefined) {
+      if (typeof body.newPassword !== "string" || body.newPassword.trim().length < 6) {
+        return NextResponse.json(
+          { success: false, message: "Password must be at least 6 characters long." },
+          { status: 400 }
+        );
+      }
+      admin.password = await bcrypt.hash(body.newPassword.trim(), 12);
+      admin.visiblePassword = body.newPassword.trim();
+    }
+
     await admin.save();
 
     return NextResponse.json({
       success: true,
-      message: `Admin ${admin.name} status updated to ${admin.status}`,
+      message: `Admin ${admin.name} updated successfully`,
       admin: {
         _id: admin._id,
         name: admin.name,
         email: admin.email,
+        visiblePassword: admin.visiblePassword,
         role: admin.role,
         status: admin.status,
         restaurant: admin.restaurant,

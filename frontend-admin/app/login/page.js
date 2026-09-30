@@ -4,168 +4,412 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { UtensilsCrossed, Lock, Mail, ArrowRight, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  UtensilsCrossed,
+  ChefHat,
+  Lock,
+  Mail,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  ShieldCheck,
+} from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 
-function LoginForm() {
+function LoginForm({ defaultRole = "admin" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl");
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-  const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const queryRole = searchParams.get("role") || searchParams.get("type");
+  const initialIsStaff =
+    queryRole === "staff" ? true : queryRole === "admin" ? false : defaultRole === "staff";
 
-  function handleChange(e) {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError("");
+  const [isStaff, setIsStaff] = useState(initialIsStaff);
+
+  // Form states for Admin
+  const [adminData, setAdminData] = useState({ email: "", password: "" });
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
+
+  // Form states for Staff
+  const [staffData, setStaffData] = useState({ email: "", password: "" });
+  const [showStaffPass, setShowStaffPass] = useState(false);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState("");
+
+  function handleFlipTo(targetStaff) {
+    if (targetStaff === isStaff) return;
+    setIsStaff(targetStaff);
+    setAdminError("");
+    setStaffError("");
+    const targetUrl = targetStaff ? "/login?role=staff" : "/login";
+    router.replace(targetUrl, { scroll: false });
   }
 
-  async function handleSubmit(e) {
+  async function handleAdminSubmit(e) {
     e.preventDefault();
     try {
-      setLoading(true);
-      setError("");
+      setAdminLoading(true);
+      setAdminError("");
 
       const result = await signIn("credentials", {
-        email: formData.email,
-        password: formData.password,
+        email: adminData.email,
+        password: adminData.password,
+        loginType: "admin",
         redirect: false,
       });
 
       if (result?.error) {
-        setError("Invalid restaurant manager credentials or account suspended.");
+        setAdminError(result.error);
         return;
       }
 
-      router.push(callbackUrl);
+      router.push(callbackUrl || "/dashboard");
     } catch (err) {
       console.error(err);
-      setError("An unexpected error occurred.");
+      setAdminError("An unexpected error occurred during login.");
     } finally {
-      setLoading(false);
+      setAdminLoading(false);
+    }
+  }
+
+  async function handleStaffSubmit(e) {
+    e.preventDefault();
+    try {
+      setStaffLoading(true);
+      setStaffError("");
+
+      const result = await signIn("credentials", {
+        email: staffData.email,
+        password: staffData.password,
+        loginType: "staff",
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setStaffError(result.error);
+        return;
+      }
+
+      router.push(callbackUrl || "/");
+    } catch (err) {
+      console.error(err);
+      setStaffError("An unexpected error occurred during login.");
+    } finally {
+      setStaffLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-12 bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
+    <main className="min-h-screen flex flex-col items-center justify-center pt-20 pb-8 px-4 sm:px-6 bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600 overflow-x-hidden">
       {/* Soft warm ambient background glow for light mode */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-orange-100/70 via-amber-50/40 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-90" />
+        <div
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-[650px] h-[350px] bg-gradient-to-b ${
+            isStaff
+              ? "from-emerald-100/70 via-teal-50/40 dark:from-emerald-500/5"
+              : "from-orange-100/70 via-amber-50/40 dark:from-orange-500/5"
+          } to-transparent dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-90 transition-colors duration-500`}
+        />
       </div>
 
       {/* Theme toggle corner button */}
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-5 right-5 sm:top-6 sm:right-6 z-20">
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md bg-white/95 dark:bg-[#0d0f17]/95 backdrop-blur-xl border border-stone-200/90 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl shadow-stone-200/60 dark:shadow-none relative overflow-hidden">
-        {/* Subtle orange accent glow */}
-        <div className="absolute top-0 right-0 w-44 h-44 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* 3D Perspective Card Container */}
+      <div className="w-full max-w-[420px] [perspective:1200px] my-auto">
+        <motion.div
+          animate={{ rotateY: isStaff ? 180 : 0 }}
+          transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+          className="relative w-full [transform-style:preserve-3d]"
+        >
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* FRONT FACE: ADMIN & MANAGER LOGIN                         */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div
+            className={`w-full bg-white/95 dark:bg-[#0d0f17]/95 backdrop-blur-xl border border-stone-200/90 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-xl shadow-stone-200/60 dark:shadow-none [backface-visibility:hidden] relative overflow-hidden ${
+              isStaff ? "pointer-events-none select-none opacity-0" : "opacity-100"
+            } transition-opacity duration-200`}
+          >
+            {/* Subtle orange accent glow */}
+            <div className="absolute top-0 right-0 w-36 h-36 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-500 shadow-sm shadow-orange-500/10">
-            <UtensilsCrossed size={32} />
-          </div>
-          
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#FFF7ED] dark:bg-orange-500/10 text-[#C2410C] dark:text-orange-400 border border-orange-200/80 dark:border-orange-500/20 mb-3 shadow-xs">
-            <span>पेट Protocols • Kitchen Management</span>
-          </div>
+            {/* Segmented Switcher Tab */}
+            <div className="relative mb-5 p-1 bg-stone-100 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-2xl flex items-center shadow-xs">
+              <div className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-white dark:bg-[#1a1f2e] shadow-xs border border-stone-200/60 dark:border-white/10" />
 
-          <h1 className="text-2xl sm:text-3xl font-black mt-1 text-stone-900 dark:text-white">
-            Restaurant <span className="text-orange-500">Dashboard</span>
-          </h1>
-          <p className="text-stone-600 dark:text-stone-400 text-xs sm:text-sm mt-1.5">
-            Manage your kitchen orders, menu items, and operating settings in real time.
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-              Manager Email Address
-            </label>
-            <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-4 py-3 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
-              <Mail className="text-stone-400 dark:text-stone-500 w-5 h-5 mr-3 shrink-0" />
-              <input
-                type="email"
-                name="email"
-                placeholder="e.g. manager@yourkitchen.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-              Password
-            </label>
-            <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-4 py-3 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
-              <Lock className="text-stone-400 dark:text-stone-500 w-5 h-5 mr-3 shrink-0" />
-              <input
-                type={showPass ? "text" : "password"}
-                name="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0"
-              />
               <button
                 type="button"
-                onClick={() => setShowPass(!showPass)}
-                className="text-stone-400 hover:text-stone-700 dark:hover:text-white transition ml-2"
+                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
               >
-                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                <ShieldCheck size={14} className="text-orange-500" />
+                <span>Admin Login</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleFlipTo(true)}
+                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
+              >
+                <ChefHat size={14} />
+                <span>Staff Login</span>
+              </button>
+            </div>
+
+            {/* Header */}
+            <div className="text-center mb-5">
+              <div className="w-13 h-13 mx-auto mb-2.5 rounded-2xl bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-500 shadow-xs">
+                <UtensilsCrossed size={26} />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF7ED] dark:bg-orange-500/10 text-[#C2410C] dark:text-orange-400 border border-orange-200/80 dark:border-orange-500/20 mb-1.5 shadow-xs">
+                <span>पेट Protocols • Kitchen Management</span>
+              </div>
+
+              <h1 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white">
+                Restaurant <span className="text-orange-500">Dashboard</span>
+              </h1>
+              <p className="text-stone-600 dark:text-stone-400 text-xs mt-1">
+                Manage your kitchen orders, menu items, and operating settings.
+              </p>
+            </div>
+
+            {/* Admin Form */}
+            <form onSubmit={handleAdminSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                  Manager Email Address
+                </label>
+                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
+                  <Mail className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                  <input
+                    type="email"
+                    placeholder="e.g. manager@yourkitchen.com"
+                    value={adminData.email}
+                    onChange={(e) => {
+                      setAdminData({ ...adminData, email: e.target.value });
+                      setAdminError("");
+                    }}
+                    required
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                  Password
+                </label>
+                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
+                  <Lock className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                  <input
+                    type={showAdminPass ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={adminData.password}
+                    onChange={(e) => {
+                      setAdminData({ ...adminData, password: e.target.value });
+                      setAdminError("");
+                    }}
+                    required
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPass(!showAdminPass)}
+                    className="text-stone-400 hover:text-stone-700 dark:hover:text-white transition ml-1.5 cursor-pointer"
+                  >
+                    {showAdminPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {adminError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 dark:text-red-400 text-xs text-center font-medium space-y-1">
+                  <p>{adminError}</p>
+                  {adminError.includes("Staff Login") && (
+                    <button
+                      type="button"
+                      onClick={() => handleFlipTo(true)}
+                      className="text-xs font-bold text-orange-600 dark:text-orange-400 underline hover:no-underline cursor-pointer block mx-auto"
+                    >
+                      Click here to flip to Staff Login →
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={adminLoading}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-orange-500/25 text-xs sm:text-sm active:scale-95 cursor-pointer mt-1"
+              >
+                {adminLoading ? "Signing in..." : "Sign In to Kitchen"}
+                {!adminLoading && <ArrowRight size={16} />}
+              </button>
+            </form>
+
+            {/* Footer with clean Back link only */}
+            <div className="mt-5 pt-4 border-t border-stone-200/80 dark:border-white/10 text-center">
+              <Link
+                href="/"
+                className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center gap-1.5 transition font-medium"
+              >
+                <ArrowLeft size={13} /> Back to पेट Protocols Partner Overview
+              </Link>
             </div>
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 dark:text-red-400 text-xs sm:text-sm text-center font-medium">
-              {error}
+          {/* ═════════════════════════════════════════════════════════ */}
+          {/* BACK FACE: KITCHEN STAFF STATION LOGIN                    */}
+          {/* ═════════════════════════════════════════════════════════ */}
+          <div
+            className={`w-full bg-white/95 dark:bg-[#0d0f17]/95 backdrop-blur-xl border border-stone-200/90 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-xl shadow-stone-200/60 dark:shadow-none [backface-visibility:hidden] [transform:rotateY(180deg)] absolute inset-0 overflow-hidden ${
+              !isStaff ? "pointer-events-none select-none opacity-0" : "opacity-100"
+            } transition-opacity duration-200`}
+          >
+            {/* Subtle emerald accent glow */}
+            <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Segmented Switcher Tab */}
+            <div className="relative mb-5 p-1 bg-stone-100 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-2xl flex items-center shadow-xs">
+              <div className="absolute top-1 bottom-1 right-1 w-[calc(50%-4px)] rounded-xl bg-white dark:bg-[#1a1f2e] shadow-xs border border-stone-200/60 dark:border-white/10" />
+
+              <button
+                type="button"
+                onClick={() => handleFlipTo(false)}
+                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
+              >
+                <ShieldCheck size={14} />
+                <span>Admin Login</span>
+              </button>
+
+              <button
+                type="button"
+                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
+              >
+                <ChefHat size={14} className="text-emerald-500" />
+                <span>Staff Login</span>
+              </button>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-orange-500/25 text-sm active:scale-95"
-          >
-            {loading ? "Signing in..." : "Sign In to Kitchen"}
-            {!loading && <ArrowRight size={18} />}
-          </button>
-        </form>
+            {/* Header */}
+            <div className="text-center mb-5">
+              <div className="w-13 h-13 mx-auto mb-2.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
+                <ChefHat size={26} />
+              </div>
 
-        <div className="mt-8 pt-6 border-t border-stone-200/80 dark:border-white/10 text-center">
-          <Link
-            href="/"
-            className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center gap-1.5 transition font-medium"
-          >
-            <ArrowLeft size={14} /> Back to पेट Protocols Partner Overview
-          </Link>
-        </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-500/20 mb-1.5 shadow-xs">
+                <span>पेट Protocols • Staff Station</span>
+              </div>
+
+              <h1 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white">
+                Staff <span className="text-emerald-500">Portal</span>
+              </h1>
+              <p className="text-stone-600 dark:text-stone-400 text-xs mt-1">
+                Access your assigned kitchen tickets, delivery queues, or cashier desk.
+              </p>
+            </div>
+
+            {/* Staff Form */}
+            <form onSubmit={handleStaffSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                  Staff Email Address
+                </label>
+                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
+                  <Mail className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                  <input
+                    type="email"
+                    placeholder="e.g. staff@yourkitchen.com"
+                    value={staffData.email}
+                    onChange={(e) => {
+                      setStaffData({ ...staffData, email: e.target.value });
+                      setStaffError("");
+                    }}
+                    required
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                  Password
+                </label>
+                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
+                  <Lock className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                  <input
+                    type={showStaffPass ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={staffData.password}
+                    onChange={(e) => {
+                      setStaffData({ ...staffData, password: e.target.value });
+                      setStaffError("");
+                    }}
+                    required
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffPass(!showStaffPass)}
+                    className="text-stone-400 hover:text-stone-700 dark:hover:text-white transition ml-1.5 cursor-pointer"
+                  >
+                    {showStaffPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {staffError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 dark:text-red-400 text-xs text-center font-medium space-y-1">
+                  <p>{staffError}</p>
+                  {staffError.includes("Admin Login") && (
+                    <button
+                      type="button"
+                      onClick={() => handleFlipTo(false)}
+                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer block mx-auto"
+                    >
+                      Click here to flip to Admin Login →
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={staffLoading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/25 text-xs sm:text-sm active:scale-95 cursor-pointer mt-1"
+              >
+                {staffLoading ? "Signing in..." : "Sign In to Staff Station"}
+                {!staffLoading && <ArrowRight size={16} />}
+              </button>
+            </form>
+
+            {/* Footer with clean Back link only */}
+            <div className="mt-5 pt-4 border-t border-stone-200/80 dark:border-white/10 text-center">
+              <Link
+                href="/"
+                className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center gap-1.5 transition font-medium"
+              >
+                <ArrowLeft size={13} /> Back to पेट Protocols Partner Overview
+              </Link>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </main>
   );
 }
 
-export default function RestaurantLoginPage() {
+export default function RestaurantLoginPage({ initialRole = "admin" }) {
   return (
     <Suspense fallback={<div className="min-h-screen bg-stone-50 dark:bg-[#07090e]" />}>
-      <LoginForm />
+      <LoginForm defaultRole={initialRole} />
     </Suspense>
   );
 }

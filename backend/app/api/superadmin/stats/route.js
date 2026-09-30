@@ -32,7 +32,7 @@ export async function GET() {
       User.countDocuments({ role: { $in: ["customer", "user"] } }),
       Product.countDocuments(),
       Order.countDocuments(),
-      Order.find({ status: { $ne: "cancelled" } }).select("totalAmount status createdAt"),
+      Order.find({ status: { $ne: "cancelled" } }).select("totalAmount status createdAt").lean(),
     ]);
 
     const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);

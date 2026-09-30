@@ -73,6 +73,11 @@ export default function RestaurantAdminProfileClient() {
   // Fetch persisted profile from backend
   useEffect(() => {
     async function loadBackendProfile() {
+      const isStaffUser = session?.user?.role === "staff";
+      const storageKey = isStaffUser
+        ? `pet_protocols_staff_profile_${session?.user?.id || session?.user?.email || "staff"}`
+        : "pet_protocols_manager_profile";
+
       try {
         const res = await fetch("/api/restaurant/profile");
         if (res.ok) {
@@ -80,10 +85,10 @@ export default function RestaurantAdminProfileClient() {
           if (data.success && data.user) {
             setProfileData((prev) => ({
               ...prev,
-              name: data.user.name || prev.name,
+              name: data.user.name || prev.name || session?.user?.name || (isStaffUser ? "Staff Member" : "Kitchen Admin"),
               phone: data.user.phone || prev.phone,
-              roleTitle: data.user.roleTitle || prev.roleTitle,
-              image: data.user.image || prev.image,
+              roleTitle: data.user.roleTitle || (isStaffUser ? (session?.user?.staffRoles?.[0] || session?.user?.staffRole || "Staff") : prev.roleTitle),
+              image: data.user.image || "",
             }));
             return;
           }
@@ -93,7 +98,7 @@ export default function RestaurantAdminProfileClient() {
       }
 
       if (session?.user) {
-        const stored = localStorage.getItem("pet_protocols_manager_profile");
+        const stored = localStorage.getItem(storageKey);
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
@@ -102,8 +107,9 @@ export default function RestaurantAdminProfileClient() {
         } else {
           setProfileData((prev) => ({
             ...prev,
-            name: session.user.name || "Kitchen Admin",
+            name: session.user.name || (isStaffUser ? "Staff Member" : "Kitchen Admin"),
             image: session.user.image || "",
+            roleTitle: isStaffUser ? (session.user.staffRoles?.[0] || session.user.staffRole || "Staff") : "Branch Operations Lead",
           }));
         }
       }
@@ -147,9 +153,51 @@ export default function RestaurantAdminProfileClient() {
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64 = reader.result;
       setProfileData((prev) => ({ ...prev, image: base64 }));
+
+      // Immediately persist to backend & localStorage
+      try {
+        await fetch("/api/restaurant/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: profileData.name || session?.user?.name,
+            phone: profileData.phone,
+            roleTitle: profileData.roleTitle,
+            image: base64,
+          }),
+        });
+
+        const isStaffUser = session?.user?.role === "staff";
+        const storageKey = isStaffUser
+          ? `pet_protocols_staff_profile_${session?.user?.id || session?.user?.email || "staff"}`
+          : "pet_protocols_manager_profile";
+
+        const currentLocal = JSON.parse(localStorage.getItem(storageKey) || "{}");
+        const updated = { ...currentLocal, ...profileData, image: base64, email: session?.user?.email };
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("pet_protocols_profile_updated", {
+              detail: {
+                image: base64,
+                isStaff: isStaffUser,
+                email: session?.user?.email,
+                userId: session?.user?.id,
+              },
+            })
+          );
+        }
+
+        setToastMessage("Profile photo updated successfully!");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } catch (err) {
+        console.error("Failed to auto-save profile photo:", err);
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -171,15 +219,33 @@ export default function RestaurantAdminProfileClient() {
       });
 
       // 2. Persist to local storage for quick offline sync
-      localStorage.setItem("pet_protocols_manager_profile", JSON.stringify(profileData));
+      const isStaffUser = session?.user?.role === "staff";
+      const storageKey = isStaffUser
+        ? `pet_protocols_staff_profile_${session?.user?.id || session?.user?.email || "staff"}`
+        : "pet_protocols_manager_profile";
+
+      localStorage.setItem(storageKey, JSON.stringify({ ...profileData, email: session?.user?.email }));
       localStorage.setItem("pet_kitchen_sound_alerts", profileData.soundAlerts ? "true" : "false");
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("pet_protocols_profile_updated", {
+            detail: {
+              image: profileData.image,
+              isStaff: isStaffUser,
+              email: session?.user?.email,
+              userId: session?.user?.id,
+            },
+          })
+        );
+      }
 
       // 3. Update session if supported
       if (typeof update === "function") {
         update();
       }
 
-      setToastMessage("Manager profile saved successfully!");
+      setToastMessage(isStaffUser ? "Staff profile saved successfully!" : "Manager profile saved successfully!");
       setIsEditModalOpen(false);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
@@ -193,9 +259,11 @@ export default function RestaurantAdminProfileClient() {
     }
   }
 
+  const isStaff = session?.user?.role === "staff";
   const restaurantName = session?.user?.restaurantName || "Partner Kitchen";
-  const managerName = profileData.name || session?.user?.name || "Kitchen Admin";
-  const managerEmail = session?.user?.email || "manager@yourkitchen.com";
+  const managerName = profileData.name || session?.user?.name || (isStaff ? "Staff Member" : "Kitchen Admin");
+  const managerEmail = session?.user?.email || (isStaff ? "staff@yourkitchen.com" : "manager@yourkitchen.com");
+  const userInitial = (managerName?.trim()?.charAt(0) || (isStaff ? "S" : "M")).toUpperCase();
 
   return (
     <main className="min-h-screen pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto font-jakarta text-stone-900 dark:text-white transition-colors">
@@ -206,14 +274,20 @@ export default function RestaurantAdminProfileClient() {
         </div>
       )}
 
-      {/* ── PROFESSIONAL MANAGER HERO CARD ─────────────────────────────── */}
+      {/* ── PROFESSIONAL PROFILE HERO CARD ─────────────────────────────── */}
       <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-sm dark:shadow-xl mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          {/* Manager Identity & Avatar */}
+          {/* User Identity & Avatar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             {/* Avatar with Camera upload trigger */}
             <div className="relative group shrink-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-orange-500/10 border-2 border-orange-500/30 flex items-center justify-center text-3xl font-black text-[#F97316] overflow-hidden shadow-inner bg-stone-100 dark:bg-stone-800">
+              <div
+                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center text-3xl font-black overflow-hidden shadow-inner bg-stone-100 dark:bg-stone-800 border-2 ${
+                  isStaff
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    : "bg-orange-500/10 border-orange-500/30 text-orange-500"
+                }`}
+              >
                 {profileData.image ? (
                   <img
                     src={profileData.image}
@@ -221,8 +295,8 @@ export default function RestaurantAdminProfileClient() {
                     className="w-full h-full object-cover rounded-2xl"
                   />
                 ) : (
-                  <span className="font-extrabold text-2xl text-orange-500">
-                    {managerName.charAt(0) || "M"}
+                  <span className={`font-extrabold text-2xl ${isStaff ? "text-emerald-500" : "text-orange-500"}`}>
+                    {userInitial}
                   </span>
                 )}
               </div>
@@ -231,7 +305,9 @@ export default function RestaurantAdminProfileClient() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-1.5 -right-1.5 p-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all duration-200 hover:scale-110 active:scale-95 border-2 border-white dark:border-[#10141f]"
+                className={`absolute -bottom-1.5 -right-1.5 p-2 rounded-xl text-white shadow-md transition-all duration-200 hover:scale-110 active:scale-95 border-2 border-white dark:border-[#10141f] ${
+                  isStaff ? "bg-emerald-600 hover:bg-emerald-700" : "bg-orange-500 hover:bg-orange-600"
+                }`}
                 title="Change Profile Photo"
               >
                 <Camera size={13} />
@@ -248,14 +324,18 @@ export default function RestaurantAdminProfileClient() {
 
             {/* Manager Details */}
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-500/30 text-xs font-bold uppercase tracking-wider">
-                <Store size={12} /> {profileData.roleTitle}
+              <div className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                isStaff
+                  ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
+                  : "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"
+              }`}>
+                {isStaff ? <UtensilsCrossed size={12} /> : <Store size={12} />} {profileData.roleTitle || (isStaff ? "Kitchen Staff" : "Branch Operations Lead")}
               </div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-stone-900 dark:text-white">
                 {managerName}
               </h1>
               <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm font-medium">
-                {managerEmail} • <span className="text-[#F97316] font-bold">{restaurantName}</span>
+                {managerEmail} • <span className="text-orange-500 font-bold">{restaurantName}</span>
               </p>
               <p className="text-stone-500 dark:text-stone-400 text-xs flex items-center gap-1.5 pt-0.5">
                 <Phone size={12} className="text-stone-400" /> {profileData.phone}
@@ -270,7 +350,7 @@ export default function RestaurantAdminProfileClient() {
               onClick={() => setIsEditModalOpen(true)}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-200 dark:border-white/10 hover:border-orange-500 bg-stone-50 dark:bg-white/5 text-stone-700 dark:text-stone-200 text-xs font-bold transition shadow-xs active:scale-95"
             >
-              <Edit3 size={14} className="text-[#F97316]" />
+              <Edit3 size={14} className="text-orange-500" />
               <span>Edit Profile</span>
             </button>
 
@@ -288,7 +368,12 @@ export default function RestaurantAdminProfileClient() {
             </button>
 
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={async () => {
+                try {
+                  await signOut({ redirect: false });
+                } catch (e) {}
+                window.location.href = "/login";
+              }}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider transition active:scale-95"
               title="End session"
             >
@@ -339,7 +424,7 @@ export default function RestaurantAdminProfileClient() {
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === tab.id
-                ? "bg-[#F97316] text-white shadow-md shadow-orange-500/25"
+                ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
                 : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10"
             }`}
           >
@@ -353,7 +438,7 @@ export default function RestaurantAdminProfileClient() {
         <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-white flex items-center gap-2">
-              <Users size={16} className="text-[#F97316]" /> Kitchen Station Delegation
+              <Users size={16} className="text-orange-500" /> Kitchen Station Delegation
             </h3>
             <span className="text-xs text-stone-500 dark:text-stone-400 font-mono">
               3 Stations Active
@@ -427,7 +512,7 @@ export default function RestaurantAdminProfileClient() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-white flex items-center gap-2">
-                <Volume2 size={16} className="text-[#F97316]" /> Kitchen Order Sound Chimes
+                <Volume2 size={16} className="text-orange-500" /> Kitchen Order Sound Chimes
               </h3>
               <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
                 Customize the high-priority chime alert that rings across all pages when a customer places an order.
@@ -450,7 +535,7 @@ export default function RestaurantAdminProfileClient() {
                   <div className="text-xs font-bold flex items-center gap-2">
                     {c.label}
                     {selectedChime === c.id && (
-                      <span className="w-2 h-2 rounded-full bg-[#F97316]" />
+                      <span className="w-2 h-2 rounded-full bg-orange-500" />
                     )}
                   </div>
                   <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
@@ -464,7 +549,7 @@ export default function RestaurantAdminProfileClient() {
                     e.stopPropagation();
                     handleChimeChange(c.id);
                   }}
-                  className="px-2.5 py-1.5 rounded-lg bg-orange-500/20 text-[#F97316] font-bold text-xs hover:bg-orange-500/30 transition shrink-0 ml-2"
+                  className="px-2.5 py-1.5 rounded-lg bg-orange-500/20 text-orange-500 font-bold text-xs hover:bg-orange-500/30 transition shrink-0 ml-2"
                 >
                   🔊 Play
                 </button>
@@ -483,11 +568,11 @@ export default function RestaurantAdminProfileClient() {
           >
             <div>
               <span className="text-xs text-orange-600 dark:text-orange-400 font-bold uppercase block mb-1">Kitchen Overview</span>
-              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-[#F97316] transition">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-orange-500 transition">
                 Branch Dashboard & KPI Stats
               </h4>
             </div>
-            <ArrowRight size={16} className="text-stone-400 group-hover:text-[#F97316] transition" />
+            <ArrowRight size={16} className="text-stone-400 group-hover:text-orange-500 transition" />
           </Link>
 
           <Link
@@ -496,11 +581,11 @@ export default function RestaurantAdminProfileClient() {
           >
             <div>
               <span className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase block mb-1">Live KDS Terminal</span>
-              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-[#F97316] transition">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-orange-500 transition">
                 Manage Incoming Kitchen Orders
               </h4>
             </div>
-            <ArrowRight size={16} className="text-stone-400 group-hover:text-[#F97316] transition" />
+            <ArrowRight size={16} className="text-stone-400 group-hover:text-orange-500 transition" />
           </Link>
 
           <Link
@@ -509,11 +594,11 @@ export default function RestaurantAdminProfileClient() {
           >
             <div>
               <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase block mb-1">Menu Management</span>
-              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-[#F97316] transition">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-orange-500 transition">
                 Edit Dishes, Prices & Stock
               </h4>
             </div>
-            <ArrowRight size={16} className="text-stone-400 group-hover:text-[#F97316] transition" />
+            <ArrowRight size={16} className="text-stone-400 group-hover:text-orange-500 transition" />
           </Link>
 
           <Link
@@ -522,23 +607,23 @@ export default function RestaurantAdminProfileClient() {
           >
             <div>
               <span className="text-xs text-stone-600 dark:text-stone-400 font-bold uppercase block mb-1">Branch Settings</span>
-              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-[#F97316] transition">
+              <h4 className="text-sm font-bold text-stone-900 dark:text-white group-hover:text-orange-500 transition">
                 Configure Contact & Appearance
               </h4>
             </div>
-            <ArrowRight size={16} className="text-stone-400 group-hover:text-[#F97316] transition" />
+            <ArrowRight size={16} className="text-stone-400 group-hover:text-orange-500 transition" />
           </Link>
         </div>
       )}
 
       {/* ── EDIT MANAGER PROFILE MODAL ────────────────────────────── */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-[#10141f] border border-stone-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-stone-100 dark:border-white/10 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className="bg-white dark:bg-[#10141f] border border-stone-200 dark:border-white/10 rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl relative max-h-[90vh] flex flex-col overflow-hidden my-auto">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-stone-100 dark:border-white/10 shrink-0 bg-white dark:bg-[#10141f]">
               <div className="flex items-center gap-2">
-                <Edit3 size={18} className="text-[#F97316]" />
-                <h3 className="text-lg font-bold text-stone-900 dark:text-white">
+                <Edit3 size={18} className="text-orange-500" />
+                <h3 className="text-base sm:text-lg font-bold text-stone-900 dark:text-white">
                   Edit Manager Profile
                 </h3>
               </div>
@@ -551,128 +636,130 @@ export default function RestaurantAdminProfileClient() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              {/* Profile Picture Upload Section */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-2">
-                  Admin Profile Picture
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border-2 border-orange-500/30 overflow-hidden flex items-center justify-center shrink-0">
-                    {profileData.image ? (
-                      <img
-                        src={profileData.image}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="font-extrabold text-xl text-orange-500">
-                        {profileData.name?.charAt(0) || "M"}
-                      </span>
-                    )}
-                  </div>
+            <form onSubmit={handleSaveProfile} className="flex flex-col flex-1 min-h-0">
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                {/* Profile Picture Upload Section */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-2">
+                    Admin Profile Picture
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border-2 border-orange-500/30 overflow-hidden flex items-center justify-center shrink-0">
+                      {profileData.image ? (
+                        <img
+                          src={profileData.image}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-extrabold text-xl text-orange-500">
+                          {profileData.name?.charAt(0) || "M"}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="flex-1 space-y-1.5">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-[#F97316] font-bold text-xs cursor-pointer transition">
-                      <Upload size={13} /> Upload Photo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                    <p className="text-[11px] text-stone-400">
-                      Recommended: square JPG or PNG, max 2MB
-                    </p>
+                    <div className="flex-1 space-y-1.5">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-bold text-xs cursor-pointer transition">
+                        <Upload size={13} /> Upload Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-[11px] text-stone-400">
+                        Recommended: square JPG or PNG, max 2MB
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={profileData.name}
-                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                  placeholder="e.g. Shivam"
-                  className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
-                  Contact Phone Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={profileData.phone}
-                  onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
-                  className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
-                  Operational Role / Station Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={profileData.roleTitle}
-                  onChange={(e) => setProfileData({ ...profileData, roleTitle: e.target.value })}
-                  placeholder="e.g. Branch Operations Lead"
-                  className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition"
-                />
-              </div>
-
-              {/* Chime selector in modal */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
-                  Order Chime Alert Sound
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedChime}
-                    onChange={(e) => handleChimeChange(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-800 dark:text-stone-200 outline-none focus:border-orange-500"
-                  >
-                    {CHIME_OPTIONS.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-white dark:bg-[#11141f] text-stone-900 dark:text-white">
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => playChime(selectedChime, 1.0)}
-                    className="px-3 py-2 rounded-xl bg-orange-500/10 text-[#F97316] font-bold text-xs hover:bg-orange-500/20 transition shrink-0"
-                  >
-                    🔊 Test
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <label className="flex items-center gap-3 cursor-pointer">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
+                    Full Name
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={profileData.soundAlerts}
-                    onChange={(e) => setProfileData({ ...profileData, soundAlerts: e.target.checked })}
-                    className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 focus:ring-offset-0 bg-stone-100 dark:bg-stone-800 border-stone-300 dark:border-stone-700"
+                    type="text"
+                    required
+                    value={profileData.name}
+                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                    placeholder="e.g. Shivam"
+                    className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition"
                   />
-                  <span className="text-xs text-stone-700 dark:text-stone-300 font-medium">
-                    Play audio chime on incoming pending orders
-                  </span>
-                </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
+                    Contact Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={profileData.phone}
+                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
+                    Operational Role / Station Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={profileData.roleTitle}
+                    onChange={(e) => setProfileData({ ...profileData, roleTitle: e.target.value })}
+                    placeholder="e.g. Branch Operations Lead"
+                    className="w-full px-4 py-2.5 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-sm text-stone-900 dark:text-white outline-none focus:border-orange-500 transition"
+                  />
+                </div>
+
+                {/* Chime selector in modal */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300 mb-1.5">
+                    Order Chime Alert Sound
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedChime}
+                      onChange={(e) => handleChimeChange(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-stone-50 dark:bg-black/50 border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-800 dark:text-stone-200 outline-none focus:border-orange-500"
+                    >
+                      {CHIME_OPTIONS.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-white dark:bg-[#11141f] text-stone-900 dark:text-white">
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => playChime(selectedChime, 1.0)}
+                      className="px-3 py-2 rounded-xl bg-orange-500/10 text-orange-500 font-bold text-xs hover:bg-orange-500/20 transition shrink-0"
+                    >
+                      🔊 Test
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={profileData.soundAlerts}
+                      onChange={(e) => setProfileData({ ...profileData, soundAlerts: e.target.checked })}
+                      className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 focus:ring-offset-0 bg-stone-100 dark:bg-stone-800 border-stone-300 dark:border-stone-700"
+                    />
+                    <span className="text-xs text-stone-700 dark:text-stone-300 font-medium">
+                      Play audio chime on incoming pending orders
+                    </span>
+                  </label>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-100 dark:border-white/10">
+              <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-3.5 border-t border-stone-100 dark:border-white/10 shrink-0 bg-stone-50/90 dark:bg-[#0c0e17]/90 backdrop-blur-md">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
@@ -683,7 +770,7 @@ export default function RestaurantAdminProfileClient() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] disabled:opacity-50 text-white text-xs font-bold transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5"
                 >
                   <Save size={14} /> {saving ? "Saving..." : "Save Profile Changes"}
                 </button>

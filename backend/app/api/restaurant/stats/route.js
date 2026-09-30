@@ -6,7 +6,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 
 export async function GET(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "dashboard_view" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -47,12 +47,12 @@ export async function GET(request) {
     ] = await Promise.all([
       Product.countDocuments({ restaurant: restaurantId }),
       Order.countDocuments({ restaurant: restaurantId }),
-      Order.find({ restaurant: restaurantId, status: { $ne: "cancelled" } }).select("totalAmount"),
+      Order.find({ restaurant: restaurantId, status: { $ne: "cancelled" } }).select("totalAmount").lean(),
       Order.find({
         restaurant: restaurantId,
         status: { $ne: "cancelled" },
         createdAt: { $gte: todayStart, $lte: todayEnd },
-      }).select("totalAmount"),
+      }).select("totalAmount").lean(),
       Order.countDocuments({
         restaurant: restaurantId,
         createdAt: { $gte: todayStart, $lte: todayEnd },
@@ -61,7 +61,7 @@ export async function GET(request) {
         restaurant: restaurantId,
         status: { $ne: "cancelled" },
         createdAt: { $gte: selectedStart, $lte: selectedEnd },
-      }).select("totalAmount"),
+      }).select("totalAmount").lean(),
       Order.countDocuments({
         restaurant: restaurantId,
         createdAt: { $gte: selectedStart, $lte: selectedEnd },

@@ -6,7 +6,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 // GET — List products belonging to this restaurant
 export async function GET(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_view" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -38,7 +38,7 @@ export async function GET(request) {
 // POST — Create a product for this restaurant
 export async function POST(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_manage" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }

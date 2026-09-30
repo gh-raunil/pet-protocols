@@ -4,6 +4,45 @@ import Restaurant from "@/models/Restaurant";
 import User from "@/models/User";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
 
+export async function GET(request, { params }) {
+  try {
+    const auth = await requireSuperAdmin();
+    if (auth.error) {
+      return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
+    }
+
+    const { id } = await params;
+    await connectDB();
+
+    const restaurant = await Restaurant.findById(id).lean();
+    if (!restaurant) {
+      return NextResponse.json({ success: false, message: "Restaurant not found" }, { status: 404 });
+    }
+
+    const Product = (await import("@/models/Product")).default;
+    const [adminCount, productCount, branchAdmins] = await Promise.all([
+      User.countDocuments({ restaurant: id, role: { $in: ["restaurant_admin", "admin"] } }),
+      Product.countDocuments({ restaurant: id }),
+      User.find({ restaurant: id, role: { $in: ["restaurant_admin", "admin"] } })
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      restaurant: {
+        ...restaurant,
+        adminCount,
+        productCount,
+        admins: branchAdmins,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 export async function PUT(request, { params }) {
   try {
     const auth = await requireSuperAdmin();
@@ -31,7 +70,9 @@ export async function PUT(request, { params }) {
     if (body.cuisineType !== undefined) restaurant.cuisineType = body.cuisineType;
     if (body.rating !== undefined) restaurant.rating = body.rating;
     if (body.image !== undefined) restaurant.image = body.image;
-    if (body.bannerImage !== undefined) restaurant.bannerImage = body.bannerImage;
+    if (body.enabledFeatures !== undefined && Array.isArray(body.enabledFeatures)) {
+      restaurant.enabledFeatures = body.enabledFeatures;
+    }
 
     await restaurant.save();
 

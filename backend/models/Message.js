@@ -77,6 +77,11 @@ const MessageSchema = new mongoose.Schema(
   }
 );
 
+// Compound indexes for query performance
+MessageSchema.index({ status: 1, recipientType: 1, createdAt: -1 });
+MessageSchema.index({ recipients: 1, status: 1 });
+MessageSchema.index({ createdBy: 1, createdAt: -1 });
+
 // Ensure fresh model schema in Next.js development HMR
 if (mongoose.models.Message) {
   delete mongoose.models.Message;

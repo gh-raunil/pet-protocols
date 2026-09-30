@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import SettingsClient from "./SettingsClient";
 
 export const metadata = {
@@ -6,5 +7,15 @@ export const metadata = {
 };
 
 export default function RestaurantSettingsPage() {
-  return <SettingsClient />;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-zinc-400">
+          Loading Settings Center...
+        </div>
+      }
+    >
+      <SettingsClient />
+    </Suspense>
+  );
 }

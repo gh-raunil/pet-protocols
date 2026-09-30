@@ -6,13 +6,13 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 
 export async function GET() {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
     await connectDB();
-    const user = await User.findOne({ email: auth.session.user.email }).select("-password");
+    const user = await User.findOne({ email: auth.user.email }).select("-password");
     if (!user) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 });
     }
@@ -28,7 +28,8 @@ export async function GET() {
         phone: user.phone || "",
         image: user.image || "",
         role: user.role,
-        roleTitle: user.roleTitle || "Branch Operations Lead",
+        roleTitle: user.roleTitle || (user.role === "restaurant_admin" ? "Branch Operations Lead" : (user.staffRoles?.join(" • ") || user.staffRole || "Staff")),
+        staffRoles: user.staffRoles || [user.staffRole || "Staff"],
         restaurantName: restaurant?.name || "",
         restaurantSlug: restaurant?.slug || "",
       },
@@ -40,7 +41,7 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -49,7 +50,7 @@ export async function PUT(request) {
     const { name, phone, image, roleTitle } = body;
 
     await connectDB();
-    const user = await User.findOne({ email: auth.session.user.email });
+    const user = await User.findOne({ email: auth.user.email });
     if (!user) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 });
     }

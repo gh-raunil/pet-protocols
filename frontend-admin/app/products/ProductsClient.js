@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import NextImage from "next/image";
-import RestaurantAdminNav from "@/components/layout/RestaurantAdminNav";
 import {
   UtensilsCrossed,
   PlusCircle,
@@ -32,6 +32,17 @@ export default function ProductsClient() {
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [feedback, setFeedback] = useState({ type: "", message: "" });
 
+  const STANDARD_CATEGORIES = ["Burger", "Pizza", "Fries", "Momos", "Cold Drinks", "Desserts", "Sides"];
+  const MODAL_CATEGORIES = [...STANDARD_CATEGORIES, "Other"];
+
+  // Dynamically include any custom categories in the filter bar
+  const allCategories = useMemo(() => {
+    const customCats = products
+      .map((p) => p.category)
+      .filter((c) => c && !STANDARD_CATEGORIES.includes(c));
+    return ["All", ...STANDARD_CATEGORIES, ...Array.from(new Set(customCats))];
+  }, [products]);
+
   // Modal State for Add / Edit Product
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -42,6 +53,7 @@ export default function ProductsClient() {
     price: "",
     image: "",
     category: "Burger",
+    customCategory: "",
     type: "veg",
     preparationTime: 15,
     isAvailable: true,
@@ -51,8 +63,6 @@ export default function ProductsClient() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageMode, setImageMode] = useState("file"); // "file" | "url"
   const fileInputRef = useRef(null);
-
-  const categories = ["All", "Burger", "Pizza", "Fries", "Momos", "Cold Drinks", "Desserts", "Sides"];
 
   // Route protection
   useEffect(() => {
@@ -94,6 +104,7 @@ export default function ProductsClient() {
       price: "",
       image: "",
       category: "Burger",
+      customCategory: "",
       type: "veg",
       preparationTime: 15,
       isAvailable: true,
@@ -106,13 +117,15 @@ export default function ProductsClient() {
   function openEditModal(product) {
     setIsEditing(true);
     setImageMode(product.image?.startsWith("http") ? "url" : "file");
+    const isStandard = STANDARD_CATEGORIES.includes(product.category);
     setModalForm({
       _id: product._id,
       name: product.name,
-      description: product.description,
+      description: product.description || "",
       price: product.price,
       image: product.image,
-      category: product.category,
+      category: isStandard ? product.category : "Other",
+      customCategory: isStandard ? "" : (product.category || ""),
       type: product.type || "veg",
       preparationTime: product.preparationTime || 15,
       isAvailable: product.isAvailable !== false,
@@ -173,6 +186,28 @@ export default function ProductsClient() {
       setSubmitting(true);
       setFeedback({ type: "", message: "" });
 
+      const finalCategory = modalForm.category === "Other"
+        ? modalForm.customCategory.trim()
+        : modalForm.category;
+
+      if (modalForm.category === "Other" && !finalCategory) {
+        setFeedback({ type: "error", message: "Please specify the custom category name." });
+        setSubmitting(false);
+        return;
+      }
+
+      const payload = {
+        name: modalForm.name.trim(),
+        description: modalForm.description?.trim() || "",
+        price: Number(modalForm.price),
+        image: modalForm.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
+        category: finalCategory,
+        type: modalForm.type,
+        preparationTime: Number(modalForm.preparationTime) || 15,
+        isAvailable: modalForm.isAvailable !== false,
+        isFeatured: Boolean(modalForm.isFeatured),
+      };
+
       const url = isEditing
         ? `/api/restaurant/products/${modalForm._id}`
         : "/api/restaurant/products";
@@ -181,7 +216,7 @@ export default function ProductsClient() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(modalForm),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -193,8 +228,8 @@ export default function ProductsClient() {
       setFeedback({
         type: "success",
         message: isEditing
-          ? `Product "${modalForm.name}" updated successfully!`
-          : `Product "${modalForm.name}" created and added to your menu!`,
+          ? `Product "${payload.name}" updated successfully!`
+          : `Product "${payload.name}" created and added to your menu!`,
       });
 
       setIsModalOpen(false);
@@ -272,7 +307,6 @@ export default function ProductsClient() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
       </div>
 
-      <RestaurantAdminNav />
       <main className="pt-28 pb-20 px-4 sm:px-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 border-b border-stone-200/80 dark:border-white/10 pb-6">
@@ -288,12 +322,20 @@ export default function ProductsClient() {
             </p>
           </div>
 
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95"
-          >
-            <PlusCircle size={18} /> Add Dish
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/products/availability"
+              className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 transition text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl text-sm font-semibold border border-stone-200 dark:border-white/10 active:scale-95"
+            >
+              <CheckCircle2 size={16} className="text-emerald-500" /> Menu Availability
+            </Link>
+            <button
+              onClick={openAddModal}
+              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95"
+            >
+              <PlusCircle size={18} /> Add Dish
+            </button>
+          </div>
         </div>
 
         {/* Feedback Alert */}
@@ -337,14 +379,14 @@ export default function ProductsClient() {
           </div>
 
           {/* Category Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-            {categories.map((cat) => (
+          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
+            {allCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer ${
                   categoryFilter === cat
-                    ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25"
+                    ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-sm"
                     : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/70 dark:border-white/5"
                 }`}
               >
@@ -473,285 +515,326 @@ export default function ProductsClient() {
 
         {/* ── ADD / EDIT MODAL ────────────────────────────────────── */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-[#12141c] border border-stone-200 dark:border-white/15 rounded-3xl w-full max-w-xl p-6 md:p-8 shadow-2xl relative my-8 text-stone-900 dark:text-white">
-              <div className="flex justify-between items-center mb-6">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-[#12141c] border border-stone-200 dark:border-white/15 rounded-3xl w-full max-w-xl shadow-2xl relative my-auto max-h-[92vh] flex flex-col overflow-hidden text-stone-900 dark:text-white animate-in fade-in zoom-in-95 duration-200">
+              
+              {/* Sticky Header */}
+              <div className="px-5 sm:px-6 py-4 border-b border-stone-100 dark:border-white/10 flex justify-between items-center shrink-0 bg-white/95 dark:bg-[#12141c]/95 backdrop-blur-md">
                 <div>
-                  <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
                     {isEditing ? "Edit Dish" : "New Catalog Dish"}
                   </span>
-                  <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white">
+                  <h2 className="text-lg sm:text-xl font-black text-stone-900 dark:text-white">
                     {isEditing ? "Update Dish" : "Add Dish to Menu"}
                   </h2>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition"
+                  className="p-1.5 sm:p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition cursor-pointer"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveProduct} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Product Name *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Truffle Paneer Burger"
-                      value={modalForm.name}
-                      onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                      required
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
-                    />
-                  </div>
+              {/* Scrollable Form Body */}
+              <form onSubmit={handleSaveProduct} className="flex-1 flex flex-col min-h-0">
+                <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    
+                    {/* Product Name */}
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Product Name <span className="text-orange-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Truffle Paneer Burger"
+                        value={modalForm.name}
+                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                        required
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-stone-400 dark:focus:border-stone-600 outline-none transition"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Price (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="199"
-                      value={modalForm.price}
-                      onChange={(e) => setModalForm({ ...modalForm, price: e.target.value })}
-                      required
-                      min="1"
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Category *
-                    </label>
-                    <select
-                      value={modalForm.category}
-                      onChange={(e) => setModalForm({ ...modalForm, category: e.target.value })}
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
-                    >
-                      {categories.filter((c) => c !== "All").map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Food Type
-                    </label>
-                    <select
-                      value={modalForm.type}
-                      onChange={(e) => setModalForm({ ...modalForm, type: e.target.value })}
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
-                    >
-                      <option value="veg">Veg</option>
-                      <option value="non-veg">Non-Veg</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Availability
-                    </label>
-                    <select
-                      value={modalForm.isAvailable ? "true" : "false"}
-                      onChange={(e) =>
-                        setModalForm({ ...modalForm, isAvailable: e.target.value === "true" })
-                      }
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white focus:border-orange-500 outline-none"
-                    >
-                      <option value="true">In Stock / Available</option>
-                      <option value="false">Out of Stock</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Prep Time (Minutes) *
-                    </label>
-                    <div className="relative">
+                    {/* Price */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Price (₹) <span className="text-orange-500">*</span>
+                      </label>
                       <input
                         type="number"
-                        placeholder="15"
-                        value={modalForm.preparationTime || ""}
-                        onChange={(e) =>
-                          setModalForm({ ...modalForm, preparationTime: e.target.value })
-                        }
+                        placeholder="199"
+                        value={modalForm.price}
+                        onChange={(e) => setModalForm({ ...modalForm, price: e.target.value })}
+                        required
                         min="1"
-                        max="180"
-                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none font-mono pr-14"
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-stone-400 dark:focus:border-stone-600 outline-none font-mono transition"
                       />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400 pointer-events-none">
-                        mins
-                      </span>
                     </div>
-                    {/* Quick preset chips */}
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {[10, 15, 20, 30, 45].map((mins) => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => setModalForm({ ...modalForm, preparationTime: mins })}
-                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition border ${
-                            Number(modalForm.preparationTime) === mins
-                              ? "bg-orange-500 text-white border-orange-500"
-                              : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 border-stone-200/60 dark:border-white/10 hover:border-orange-500/30"
-                          }`}
-                        >
-                          {mins}m
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="md:col-span-2">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase">
-                        Dish Image *
+                    {/* Category Selector */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Category <span className="text-orange-500">*</span>
                       </label>
-                      <div className="flex items-center gap-1 bg-stone-100 dark:bg-white/5 p-0.5 rounded-lg text-[11px] font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => setImageMode("file")}
-                          className={`px-2.5 py-1 rounded-md transition ${
-                            imageMode === "file"
-                              ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
-                              : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
-                          }`}
-                        >
-                          From Device
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setImageMode("url")}
-                          className={`px-2.5 py-1 rounded-md transition ${
-                            imageMode === "url"
-                              ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs font-bold"
-                              : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
-                          }`}
-                        >
-                          Paste URL
-                        </button>
+                      <select
+                        value={modalForm.category}
+                        onChange={(e) => setModalForm({ ...modalForm, category: e.target.value })}
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white focus:border-stone-400 dark:focus:border-stone-600 outline-none transition cursor-pointer"
+                      >
+                        {MODAL_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c === "Other" ? "Other (Custom...)" : c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Custom Category Input if 'Other' is chosen */}
+                    {modalForm.category === "Other" && (
+                      <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/25 rounded-2xl p-3 animate-in fade-in duration-200">
+                        <label className="block text-[11px] font-extrabold text-amber-800 dark:text-amber-300 uppercase mb-1">
+                          Custom Category Name <span className="text-orange-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Biryani, Rolls, Beverages, Shakes..."
+                          value={modalForm.customCategory}
+                          onChange={(e) =>
+                            setModalForm({ ...modalForm, customCategory: e.target.value })
+                          }
+                          required
+                          className="w-full bg-white dark:bg-[#181b26] border border-amber-300 dark:border-amber-500/40 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-amber-500 outline-none font-semibold transition"
+                        />
+                        <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1">
+                          This custom category will be assigned to this dish and appear in your menu filters.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Food Type */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Food Type
+                      </label>
+                      <select
+                        value={modalForm.type}
+                        onChange={(e) => setModalForm({ ...modalForm, type: e.target.value })}
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white focus:border-stone-400 dark:focus:border-stone-600 outline-none transition cursor-pointer"
+                      >
+                        <option value="veg">Veg</option>
+                        <option value="non-veg">Non-Veg</option>
+                      </select>
+                    </div>
+
+                    {/* Availability */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Availability
+                      </label>
+                      <select
+                        value={modalForm.isAvailable ? "true" : "false"}
+                        onChange={(e) =>
+                          setModalForm({ ...modalForm, isAvailable: e.target.value === "true" })
+                        }
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white focus:border-stone-400 dark:focus:border-stone-600 outline-none transition cursor-pointer"
+                      >
+                        <option value="true">In Stock / Available</option>
+                        <option value="false">Out of Stock</option>
+                      </select>
+                    </div>
+
+                    {/* Prep Time */}
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase mb-1">
+                        Prep Time (Minutes) <span className="text-orange-500">*</span>
+                      </label>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            placeholder="15"
+                            value={modalForm.preparationTime || ""}
+                            onChange={(e) =>
+                              setModalForm({ ...modalForm, preparationTime: e.target.value })
+                            }
+                            min="1"
+                            max="180"
+                            className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-stone-400 dark:focus:border-stone-600 outline-none font-mono pr-14 transition"
+                          />
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-400 pointer-events-none">
+                            mins
+                          </span>
+                        </div>
+                        {/* Quick preset chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[10, 15, 20, 30, 45].map((mins) => (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => setModalForm({ ...modalForm, preparationTime: mins })}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer ${
+                                Number(modalForm.preparationTime) === mins
+                                  ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 border-stone-900 dark:border-white shadow-xs"
+                                  : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 border-stone-200/80 dark:border-white/10 hover:bg-stone-200/60"
+                              }`}
+                            >
+                              {mins}m
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                    />
+                    {/* Dish Image */}
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase">
+                          Dish Image <span className="text-orange-500">*</span>
+                        </label>
+                        <div className="flex items-center gap-1 bg-stone-100 dark:bg-white/5 p-0.5 rounded-lg text-[11px] font-semibold border border-stone-200/60 dark:border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => setImageMode("file")}
+                            className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              imageMode === "file"
+                                ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs font-bold"
+                                : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
+                            }`}
+                          >
+                            From Device
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageMode("url")}
+                            className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              imageMode === "url"
+                                ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs font-bold"
+                                : "text-stone-500 hover:text-stone-900 dark:hover:text-white"
+                            }`}
+                          >
+                            Paste URL
+                          </button>
+                        </div>
+                      </div>
 
-                    {imageMode === "file" ? (
-                      <div>
-                        <div
-                          onClick={() => !uploadingImage && fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition ${
-                            modalForm.image
-                              ? "border-orange-500/40 bg-orange-50/20 dark:bg-orange-950/10 hover:border-orange-500"
-                              : "border-stone-300 dark:border-white/15 hover:border-orange-500 hover:bg-stone-50 dark:hover:bg-white/5"
-                          }`}
-                        >
-                          {uploadingImage ? (
-                            <div className="py-4 flex flex-col items-center gap-2 text-orange-500">
-                              <RefreshCw className="w-6 h-6 animate-spin" />
-                              <span className="text-xs font-semibold">Uploading photo from device...</span>
-                            </div>
-                          ) : modalForm.image ? (
-                            <div className="flex items-center gap-3.5 w-full">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 shrink-0">
-                                <img
-                                  src={modalForm.image}
-                                  alt="Dish Preview"
-                                  className="w-full h-full object-cover"
-                                />
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                      />
+
+                      {imageMode === "file" ? (
+                        <div>
+                          <div
+                            onClick={() => !uploadingImage && fileInputRef.current?.click()}
+                            className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition ${
+                              modalForm.image
+                                ? "border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500"
+                                : "border-stone-300 dark:border-white/15 hover:border-stone-400 hover:bg-stone-50 dark:hover:bg-white/5"
+                            }`}
+                          >
+                            {uploadingImage ? (
+                              <div className="py-3 flex flex-col items-center gap-2 text-stone-700 dark:text-stone-300">
+                                <RefreshCw className="w-5 h-5 animate-spin text-orange-500" />
+                                <span className="text-xs font-semibold">Uploading photo from device...</span>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-stone-900 dark:text-white truncate">
-                                  Image ready for menu
+                            ) : modalForm.image ? (
+                              <div className="flex items-center gap-3.5 w-full">
+                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 shrink-0">
+                                  <img
+                                    src={modalForm.image}
+                                    alt="Dish Preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-stone-900 dark:text-white truncate">
+                                    Image selected
+                                  </p>
+                                  <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
+                                    Click here to choose a different photo
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setModalForm((prev) => ({ ...prev, image: "" }));
+                                  }}
+                                  className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition shrink-0 cursor-pointer"
+                                  title="Remove Image"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="py-2.5 flex flex-col items-center gap-1 text-center">
+                                <div className="w-9 h-9 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300 flex items-center justify-center">
+                                  <Upload size={16} />
+                                </div>
+                                <p className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                                  Choose image from device
                                 </p>
-                                <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate mt-0.5">
-                                  Click here to change or choose a different photo
+                                <p className="text-[11px] text-stone-400">
+                                  PNG, JPG, or WEBP photo
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setModalForm((prev) => ({ ...prev, image: "" }));
-                                }}
-                                className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition shrink-0"
-                                title="Remove Image"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="py-3 flex flex-col items-center gap-1.5 text-center">
-                              <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
-                                <Upload size={18} />
-                              </div>
-                              <p className="text-xs font-bold text-stone-800 dark:text-stone-200">
-                                Choose image from device
-                              </p>
-                              <p className="text-[11px] text-stone-400">
-                                PNG, JPG, or WEBP photo
-                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="url"
+                            placeholder="https://images.unsplash.com/..."
+                            value={modalForm.image}
+                            onChange={(e) => setModalForm({ ...modalForm, image: e.target.value })}
+                            className="flex-1 bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-stone-400 dark:focus:border-stone-600 outline-none transition"
+                          />
+                          {modalForm.image && (
+                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 shrink-0">
+                              <img src={modalForm.image} alt="Preview" className="w-full h-full object-cover" />
                             </div>
                           )}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="url"
-                          placeholder="https://images.unsplash.com/..."
-                          value={modalForm.image}
-                          onChange={(e) => setModalForm({ ...modalForm, image: e.target.value })}
-                          className="flex-1 bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
-                        />
-                        {modalForm.image && (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-stone-200 dark:border-white/10 shrink-0">
-                            <img src={modalForm.image} alt="Preview" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase mb-1">
-                      Description *
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Delicious ingredients, preparation method, taste description..."
-                      value={modalForm.description}
-                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
-                      required
-                      className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 focus:border-orange-500 outline-none"
-                    />
+                    {/* Description (OPTIONAL) */}
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase">
+                          Description <span className="text-[10px] text-stone-400 font-normal lowercase tracking-normal">(optional)</span>
+                        </label>
+                      </div>
+                      <textarea
+                        rows={2}
+                        placeholder="Optional ingredients, preparation notes, or taste description..."
+                        value={modalForm.description}
+                        onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                        className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-stone-400 dark:focus:border-stone-600 outline-none transition resize-none"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-100 dark:border-white/10">
+                {/* Sticky Footer Action Bar */}
+                <div className="px-5 sm:px-6 py-3.5 border-t border-stone-100 dark:border-white/10 flex items-center justify-end gap-2.5 shrink-0 bg-stone-50/90 dark:bg-[#0f1118]/90 backdrop-blur-md">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-stone-100 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 transition active:scale-95"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-200/70 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition active:scale-95 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-6 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition shadow-md shadow-orange-500/20 active:scale-95"
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 disabled:opacity-50 transition shadow-sm active:scale-95 cursor-pointer"
                   >
                     {submitting ? "Saving..." : isEditing ? "Update Dish" : "Create Dish"}
                   </button>

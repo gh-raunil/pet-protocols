@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
+import { restoreStockForOrder } from "@/lib/inventoryService";
 
 // GET — List orders for this restaurant
 export async function GET(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "orders_view" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -60,7 +61,8 @@ export async function GET(request) {
 
     let orders = await Order.find(filter)
       .populate("user", "name email phone")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Fallback: If searching by orderId or customer and 0 results found in filtered date range, search across all dates
     if (orders.length === 0 && searchQuery && filter.createdAt) {
@@ -68,7 +70,8 @@ export async function GET(request) {
       delete fallbackFilter.createdAt;
       orders = await Order.find(fallbackFilter)
         .populate("user", "name email phone")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
     }
 
     return NextResponse.json({
@@ -85,17 +88,21 @@ export async function GET(request) {
 // PUT — Update order status (scoped to restaurant)
 export async function PUT(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "orders_update" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
     const { restaurantId } = auth;
     const body = await request.json();
-    const { orderId, status } = body;
+    const { orderId, status, paymentStatus, notes, assignedDeliveryStaff, codPaymentHandler } = body;
 
-    if (!orderId || !status) {
-      return NextResponse.json({ success: false, message: "Order ID and status are required." }, { status: 400 });
+    if (!orderId) {
+      return NextResponse.json({ success: false, message: "Order ID is required." }, { status: 400 });
+    }
+
+    if (!status && !paymentStatus && notes === undefined && !assignedDeliveryStaff && !codPaymentHandler) {
+      return NextResponse.json({ success: false, message: "At least one field must be provided." }, { status: 400 });
     }
 
     await connectDB();
@@ -108,10 +115,42 @@ export async function PUT(request) {
       );
     }
 
-    order.status = status;
+    if (status) {
+      order.status = status;
+      if (status === "cancelled") {
+        await restoreStockForOrder(order);
+      }
+    }
+    if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (typeof notes === "string") order.notes = notes;
+    if (assignedDeliveryStaff) {
+      order.assignedDeliveryStaff = {
+        id: assignedDeliveryStaff.id || auth.user?._id,
+        name: assignedDeliveryStaff.name || auth.user?.name || "Delivery Staff",
+        phone: assignedDeliveryStaff.phone || auth.user?.phone || "",
+        email: assignedDeliveryStaff.email || auth.user?.email || "",
+        assignedAt: new Date(),
+      };
+    }
+    if (codPaymentHandler) {
+      order.codPaymentHandler = {
+        id: codPaymentHandler.id || auth.user?._id,
+        name: codPaymentHandler.name || auth.user?.name || "Staff",
+        phone: codPaymentHandler.phone || auth.user?.phone || "",
+        collected: codPaymentHandler.collected !== undefined ? codPaymentHandler.collected : true,
+        collectedAt: new Date(),
+      };
+      if (codPaymentHandler.collected) {
+        order.paymentStatus = "paid";
+      }
+    }
     await order.save();
 
-    return NextResponse.json({ success: true, message: `Order status updated to ${status}`, order });
+    return NextResponse.json({
+      success: true,
+      message: `Order updated successfully`,
+      order,
+    });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
