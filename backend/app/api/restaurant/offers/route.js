@@ -6,7 +6,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 // GET — List offers for the logged-in restaurant
 export async function GET() {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ requiredFeature: "offers" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -27,7 +27,7 @@ export async function GET() {
 // POST — Create a new offer for the logged-in restaurant only
 export async function POST(request) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ requiredFeature: "offers" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }

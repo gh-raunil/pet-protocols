@@ -127,20 +127,6 @@ export default function SuperadminLoginPage() {
             </div>
           )}
 
-          {/* Quick Fill Demo Credentials */}
-          <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-lg p-3 flex items-center justify-between text-xs">
-            <div>
-              <span className="text-indigo-300 font-semibold block text-xs">Demo Credentials:</span>
-              <span className="text-slate-400 font-mono text-[11px]">superadmin@petprotocols.com / rounak</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFormData({ email: "superadmin@petprotocols.com", password: "rounak" })}
-              className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded text-xs font-medium transition shrink-0 ml-2 cursor-pointer"
-            >
-              Fill Demo Credentials
-            </button>
-          </div>
 
           <button
             type="submit"

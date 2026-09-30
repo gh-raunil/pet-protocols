@@ -48,7 +48,7 @@ export async function requireSuperAdmin() {
   return { user: dbUser };
 }
 
-export async function requireRestaurantAdmin({ allowStaff = false, requiredPermission = null } = {}) {
+export async function requireRestaurantAdmin({ allowStaff = false, requiredPermission = null, requiredFeature = null } = {}) {
   const session = await getAuthSession();
   if (!session || !session.user) {
     return { error: "Authentication required", status: 401 };

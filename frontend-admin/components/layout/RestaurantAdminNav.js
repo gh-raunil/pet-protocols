@@ -24,6 +24,8 @@ import {
   Receipt,
   Package,
   Headphones,
+  Tag,
+  BarChart3,
 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import { useTheme } from "../ui/ThemeProvider";
@@ -262,7 +264,9 @@ export default function RestaurantAdminNav() {
   }, [session?.user?.enabledFeatures]);
 
   useEffect(() => {
-    if (isRestaurantAdmin) {
+    if (!isRestaurantAdmin) return;
+
+    function refreshFeatures() {
       fetch("/api/restaurant/settings")
         .then((res) => res.json())
         .then((data) => {
@@ -272,6 +276,14 @@ export default function RestaurantAdminNav() {
         })
         .catch(() => {});
     }
+
+    refreshFeatures();
+    window.addEventListener("focus", refreshFeatures);
+    window.addEventListener("pet_protocols_features_updated", refreshFeatures);
+    return () => {
+      window.removeEventListener("focus", refreshFeatures);
+      window.removeEventListener("pet_protocols_features_updated", refreshFeatures);
+    };
   }, [isRestaurantAdmin]);
 
   // Logged-in navigation tabs dynamically tailored to role & Superadmin feature permissions
@@ -286,7 +298,11 @@ export default function RestaurantAdminNav() {
         { href: "/delivery", label: "Delivery", icon: Truck },
         { href: "/cashier", label: "Cashier", icon: Receipt },
         { href: "/inventory", label: "Inventory", icon: Package },
+        { href: "/standards", label: "Standards", icon: ShieldCheck },
+        { href: "/offers", label: "Offers", icon: Tag },
         { href: "/support", label: "Support", icon: Headphones },
+        { href: "/analytics", label: "Analytics", icon: BarChart3 },
+        { href: "/updates", label: "Messages", icon: Bell },
         { href: "/settings", label: "Settings", icon: Settings },
       ];
     } else if (isStaff) {
@@ -311,6 +327,14 @@ export default function RestaurantAdminNav() {
       if (staffRoles.includes("Manager")) {
         rawLinks.push({ href: "/orders", label: "Orders", icon: ShoppingBag });
         rawLinks.push({ href: "/products", label: "Menu", icon: UtensilsCrossed });
+        rawLinks.push({ href: "/kitchen", label: "Kitchen KDS", icon: ChefHat });
+        rawLinks.push({ href: "/delivery", label: "Delivery", icon: Truck });
+        rawLinks.push({ href: "/cashier", label: "Cashier", icon: Receipt });
+        rawLinks.push({ href: "/inventory", label: "Inventory", icon: Package });
+        rawLinks.push({ href: "/standards", label: "Standards", icon: ShieldCheck });
+        rawLinks.push({ href: "/offers", label: "Offers", icon: Tag });
+        rawLinks.push({ href: "/support", label: "Support", icon: Headphones });
+        rawLinks.push({ href: "/analytics", label: "Analytics", icon: BarChart3 });
         rawLinks.push({ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard });
       }
     }
@@ -320,9 +344,9 @@ export default function RestaurantAdminNav() {
       "/kitchen": "kitchen",
       "/delivery": "delivery",
       "/cashier": "cashier",
-      "/support": "support",
       "/standards": "standards",
       "/offers": "offers",
+      "/support": "support",
       "/analytics": "analytics",
     };
 

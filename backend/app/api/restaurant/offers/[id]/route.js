@@ -6,7 +6,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 // PUT — Update an offer owned by the logged-in restaurant
 export async function PUT(request, { params }) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ requiredFeature: "offers" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -50,7 +50,7 @@ export async function PUT(request, { params }) {
 // DELETE — Remove an offer owned by the logged-in restaurant
 export async function DELETE(request, { params }) {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ requiredFeature: "offers" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ArrowRight,
 } from "lucide-react";
+import FeatureGuard from "@/components/auth/FeatureGuard";
 
 export default function StandardsClient() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function StandardsClient() {
       </div>
 
       <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+        <FeatureGuard featureKey="standards" featureName="Standards & Protocols">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6 mb-8">
           <div>
@@ -117,6 +119,7 @@ export default function StandardsClient() {
             );
           })}
         </div>
+        </FeatureGuard>
       </main>
     </div>
   );
