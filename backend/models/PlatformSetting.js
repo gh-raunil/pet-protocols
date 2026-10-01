@@ -40,6 +40,10 @@ const PlatformSettingSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    timezone: {
+      type: String,
+      default: "Asia/Kolkata",
+    },
   },
   { timestamps: true }
 );

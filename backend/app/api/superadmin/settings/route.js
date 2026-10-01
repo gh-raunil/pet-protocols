@@ -47,6 +47,7 @@ export async function PUT(request) {
     if (body.supportEmail !== undefined) settings.supportEmail = String(body.supportEmail).trim();
     if (body.supportPhone !== undefined) settings.supportPhone = String(body.supportPhone).trim();
     if (body.autoApproveRestaurants !== undefined) settings.autoApproveRestaurants = Boolean(body.autoApproveRestaurants);
+    if (body.timezone !== undefined) settings.timezone = String(body.timezone).trim();
 
     await settings.save();
 

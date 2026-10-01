@@ -25,9 +25,10 @@ import {
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
+import { formatDateInTimeZone } from "@/lib/timeZone";
 
 const formatDate = (dateStr) => {
-  return new Date(dateStr).toLocaleDateString("en-IN", {
+  return formatDateInTimeZone(dateStr, undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",

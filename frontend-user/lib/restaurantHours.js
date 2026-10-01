@@ -1,5 +1,8 @@
+import { getZonedDateParts } from "@/lib/timeZone";
+
 /**
  * Helper utility to determine whether a restaurant is currently open and accepting orders.
+ * Evaluates in India Standard Time (Asia/Kolkata) or configured restaurant timezone.
  * Checks:
  * - isTemporarilyClosed flag and closure reason
  * - isOpen business operational flag
@@ -40,19 +43,11 @@ export function getRestaurantOperationalStatus(restaurant) {
     };
   }
 
-  // 4. Weekly schedule checking
-  const days = [
-    "sunday",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-  ];
-  const now = new Date();
-  const currentDay = days[now.getDay()];
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // 4. Timezone-aware Weekly schedule checking (India Standard Time / Asia/Kolkata by default)
+  const tz = restaurant.regionalSettings?.timezone || "Asia/Kolkata";
+  const zoned = getZonedDateParts(new Date(), tz);
+  const currentDay = zoned.weekday;
+  const currentMinutes = zoned.minutes;
 
   if (restaurant.weeklyHours && typeof restaurant.weeklyHours === "object") {
     const todaySchedule = restaurant.weeklyHours[currentDay];

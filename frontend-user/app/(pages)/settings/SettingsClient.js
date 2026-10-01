@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
 import { useWebPush } from "@/hooks/useWebPush";
+import TimezoneSelector from "@/components/ui/TimezoneSelector";
 
 export default function SettingsClient() {
   const { theme, setTheme, palette, setPalette, palettes, mounted } = useTheme();
@@ -433,7 +434,12 @@ export default function SettingsClient() {
           </div>
         </section>
 
-        {/* ── SECTION D: APP & INSTALLATION ──────────────────────────── */}
+        {/* ── SECTION D: TIME ZONE & REGIONAL SETTINGS ────────────────── */}
+        <section>
+          <TimezoneSelector />
+        </section>
+
+        {/* ── SECTION E: APP & INSTALLATION ──────────────────────────── */}
         <section className="p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl space-y-6">
           <div>
             <h2 className="text-lg font-extrabold text-[var(--text-main)] flex items-center gap-2">

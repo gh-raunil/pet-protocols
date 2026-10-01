@@ -23,6 +23,7 @@ export default function SettingsManager() {
     supportEmail: "support@petprotocols.in",
     supportPhone: "+91 98765 43210",
     autoApproveRestaurants: false,
+    timezone: "Asia/Kolkata",
   });
 
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,7 @@ export default function SettingsManager() {
           supportEmail: data.settings.supportEmail ?? "support@petprotocols.in",
           supportPhone: data.settings.supportPhone ?? "+91 98765 43210",
           autoApproveRestaurants: Boolean(data.settings.autoApproveRestaurants),
+          timezone: data.settings.timezone ?? "Asia/Kolkata",
         });
       }
     } catch (err) {
@@ -157,6 +159,28 @@ export default function SettingsManager() {
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">Applicable GST calculated at checkout.</p>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
+                  Primary Platform Time Zone
+                </label>
+                <select
+                  value={settings.timezone || "Asia/Kolkata"}
+                  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="Asia/Kolkata">India Standard Time (IST, UTC+5:30) [Default] 🇮🇳</option>
+                  <option value="Asia/Dubai">Gulf Standard Time (GST, UTC+4:00) 🇦🇪</option>
+                  <option value="Asia/Singapore">Singapore Standard Time (SGT, UTC+8:00) 🇸🇬</option>
+                  <option value="Europe/London">Greenwich Mean Time (GMT/BST, UTC+0:00 / +1:00) 🇬🇧</option>
+                  <option value="America/New_York">Eastern Time (EST/EDT, UTC-5:00 / -4:00) 🇺🇸</option>
+                  <option value="America/Los_Angeles">Pacific Time (PST/PDT, UTC-8:00 / -7:00) 🇺🇸</option>
+                  <option value="UTC">Coordinated Universal Time (UTC) 🌐</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Used across all partner kitchens to synchronize opening schedules and order processing.
+                </p>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import React from "react";
 import Logo from "./Logo";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import TimezoneSelector from "@/components/ui/TimezoneSelector";
 
 const Footer = () => {
   return (
@@ -68,9 +69,12 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-[var(--border-color)] mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-muted)]">
+        {/* Bottom Bar with Timezone Indicator */}
+        <div className="border-t border-[var(--border-color)] mt-12 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[var(--text-muted)]">
           <p>© {new Date().getFullYear()} Pet Protocols. All rights reserved.</p>
+          <div className="flex items-center gap-3">
+            <TimezoneSelector variant="compact" />
+          </div>
           <p className="flex items-center gap-1.5">
             Designed for food lovers • Zero compromises.
           </p>
