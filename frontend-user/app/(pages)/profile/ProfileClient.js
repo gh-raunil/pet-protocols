@@ -71,8 +71,15 @@ export default function CustomerProfileClient() {
     isDefault: false,
   });
 
-  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
-  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || "http://localhost:3002";
+  const defaultAdminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-restaurant.vercel.app"
+    : "http://localhost:3001";
+  const defaultSuperadminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-superadmin.vercel.app"
+    : "http://localhost:3002";
+
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || defaultAdminUrl;
+  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl;
 
   useEffect(() => {
     if (status === "unauthenticated") {

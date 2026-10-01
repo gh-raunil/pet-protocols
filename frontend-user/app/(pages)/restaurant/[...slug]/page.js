@@ -6,7 +6,10 @@ import { useParams } from "next/navigation";
 export default function RestaurantRedirectPage() {
   const params = useParams();
   const slug = params?.slug ? (Array.isArray(params.slug) ? params.slug.join("/") : params.slug) : "dashboard";
-  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+  const defaultAdminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-restaurant.vercel.app"
+    : "http://localhost:3001";
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || defaultAdminUrl;
 
   useEffect(() => {
     const target = `${adminUrl}/${slug}`;

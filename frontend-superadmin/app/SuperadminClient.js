@@ -172,7 +172,10 @@ export default function SuperadminClient() {
     }
   }, [status, session]);
 
-  const customerBaseUrl = process.env.NEXT_PUBLIC_CUSTOMER_URL || "http://localhost:3000";
+  const defaultCustomerUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols.vercel.app"
+    : "http://localhost:3000";
+  const customerBaseUrl = process.env.NEXT_PUBLIC_CUSTOMER_URL || defaultCustomerUrl;
 
   // Copy Slug
   function handleCopySlug(slug, restId) {

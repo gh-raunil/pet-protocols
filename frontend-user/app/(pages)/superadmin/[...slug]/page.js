@@ -6,7 +6,10 @@ import { useParams } from "next/navigation";
 export default function SuperadminCatchAllRedirectPage() {
   const params = useParams();
   const slug = params?.slug ? (Array.isArray(params.slug) ? params.slug.join("/") : params.slug) : "";
-  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || "http://localhost:3002";
+  const defaultSuperadminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-superadmin.vercel.app"
+    : "http://localhost:3002";
+  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl;
 
   useEffect(() => {
     const target = slug ? `${superadminUrl}/${slug}` : `${superadminUrl}/`;

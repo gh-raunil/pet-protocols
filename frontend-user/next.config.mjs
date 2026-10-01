@@ -8,9 +8,14 @@ function normalizeUrl(url, fallback) {
   return val.replace(/\/+$/, '')
 }
 
-const backendUrl = normalizeUrl(process.env.BACKEND_INTERNAL_URL, 'http://127.0.0.1:4000')
-const adminUrl = normalizeUrl(process.env.NEXT_PUBLIC_ADMIN_URL, 'http://localhost:3001')
-const superadminUrl = normalizeUrl(process.env.NEXT_PUBLIC_SUPERADMIN_URL, 'http://localhost:3002')
+const isDev = process.env.NODE_ENV === 'development'
+const defaultBackend = isDev ? 'http://127.0.0.1:4000' : 'https://pet-protocols-backend.vercel.app'
+const defaultAdmin = isDev ? 'http://localhost:3001' : 'https://pet-protocols-restaurant.vercel.app'
+const defaultSuperadmin = isDev ? 'http://localhost:3002' : 'https://pet-protocols-superadmin.vercel.app'
+
+const backendUrl = normalizeUrl(process.env.BACKEND_INTERNAL_URL, defaultBackend)
+const adminUrl = normalizeUrl(process.env.NEXT_PUBLIC_ADMIN_URL, defaultAdmin)
+const superadminUrl = normalizeUrl(process.env.NEXT_PUBLIC_SUPERADMIN_URL, defaultSuperadmin)
 
 const nextConfig = {
   images: {

@@ -3,7 +3,10 @@
 import { useEffect } from "react";
 
 export default function RestaurantRootRedirectPage() {
-  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+  const defaultAdminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-restaurant.vercel.app"
+    : "http://localhost:3001";
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || defaultAdminUrl;
 
   useEffect(() => {
     window.location.replace(`${adminUrl}/dashboard`);

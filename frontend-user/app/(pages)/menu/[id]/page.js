@@ -4,7 +4,10 @@ import ProductDetailClient from "./ProductDetailClient";
 export async function generateMetadata({ params }) {
   const { id } = await params;
   try {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || "http://localhost:4000";
+    const defaultBackendUrl = process.env.NODE_ENV === "development"
+      ? "http://localhost:4000"
+      : "https://pet-protocols-backend.vercel.app";
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || defaultBackendUrl;
     const res = await fetch(`${backendUrl}/api/products/${id}`, { cache: "no-store" });
     if (!res.ok) return { title: "Dish Details | Pet Protocols" };
     const data = await res.json();
@@ -20,7 +23,10 @@ export async function generateMetadata({ params }) {
 export default async function ProductPage({ params }) {
   const { id } = await params;
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || "http://localhost:4000";
+  const defaultBackendUrl = process.env.NODE_ENV === "development"
+    ? "http://localhost:4000"
+    : "https://pet-protocols-backend.vercel.app";
+  const backendUrl = process.env.BACKEND_INTERNAL_URL || defaultBackendUrl;
   const response = await fetch(`${backendUrl}/api/products/${id}`, {
     cache: "no-store",
   });

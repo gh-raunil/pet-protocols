@@ -3,7 +3,10 @@
 import { useEffect } from "react";
 
 export default function SuperadminRootRedirectPage() {
-  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || "http://localhost:3002";
+  const defaultSuperadminUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
+    ? "https://pet-protocols-superadmin.vercel.app"
+    : "http://localhost:3002";
+  const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl;
 
   useEffect(() => {
     window.location.replace(`${superadminUrl}/`);

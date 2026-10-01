@@ -18,6 +18,10 @@ export function proxy(request) {
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
     'http://127.0.0.1:3002',
+    'https://pet-protocols.vercel.app',
+    'https://pet-protocols-restaurant.vercel.app',
+    'https://pet-protocols-superadmin.vercel.app',
+    'https://pet-protocols-backend.vercel.app',
   ]
 
   if (origin && allowedOrigins.includes(origin)) {
