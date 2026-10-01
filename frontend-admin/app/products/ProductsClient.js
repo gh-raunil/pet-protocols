@@ -20,6 +20,7 @@ import {
   Upload,
   Image as ImageIcon,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 export default function ProductsClient() {
@@ -32,16 +33,24 @@ export default function ProductsClient() {
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [feedback, setFeedback] = useState({ type: "", message: "" });
 
-  const STANDARD_CATEGORIES = ["Burger", "Pizza", "Fries", "Momos", "Cold Drinks", "Desserts", "Sides"];
-  const MODAL_CATEGORIES = [...STANDARD_CATEGORIES, "Other"];
+  // Dynamic restaurant-launched categories
+  const [launchedCategories, setLaunchedCategories] = useState([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryForm, setNewCategoryForm] = useState({ name: "", icon: "🍽️", description: "" });
+  const [launchingCategory, setLaunchingCategory] = useState(false);
 
-  // Dynamically include any custom categories in the filter bar
+  // Dynamically compute all categories from restaurant launches and products
   const allCategories = useMemo(() => {
-    const customCats = products
-      .map((p) => p.category)
-      .filter((c) => c && !STANDARD_CATEGORIES.includes(c));
-    return ["All", ...STANDARD_CATEGORIES, ...Array.from(new Set(customCats))];
-  }, [products]);
+    const fromLaunches = launchedCategories.map((c) => c.name?.trim()).filter(Boolean);
+    const fromProducts = products.map((p) => p.category?.trim()).filter(Boolean);
+    const combined = Array.from(new Set([...fromLaunches, ...fromProducts]));
+    return ["All", ...combined];
+  }, [launchedCategories, products]);
+
+  const selectableCategories = useMemo(() => {
+    const list = allCategories.filter((c) => c !== "All");
+    return [...list, "Other"];
+  }, [allCategories]);
 
   // Modal State for Add / Edit Product
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,7 +61,7 @@ export default function ProductsClient() {
     description: "",
     price: "",
     image: "",
-    category: "Burger",
+    category: "Other",
     customCategory: "",
     type: "veg",
     preparationTime: 15,
@@ -87,23 +96,78 @@ export default function ProductsClient() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.categories)) {
+        setLaunchedCategories(data.categories);
+      }
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  }
+
   useEffect(() => {
     if (session?.user) {
       loadProducts();
+      loadCategories();
     }
   }, [session]);
+
+  // Launch new category handler
+  async function handleLaunchCategory(e) {
+    e.preventDefault();
+    const catName = newCategoryForm.name.trim();
+    if (!catName) {
+      setFeedback({ type: "error", message: "Category name is required." });
+      return;
+    }
+
+    try {
+      setLaunchingCategory(true);
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: catName,
+          icon: newCategoryForm.icon || "🍽️",
+          description: newCategoryForm.description || "",
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({
+          type: "success",
+          message: `Category "${catName}" launched successfully! Live on menu & category filters.`,
+        });
+        setNewCategoryForm({ name: "", icon: "🍽️", description: "" });
+        setIsCategoryModalOpen(false);
+        await loadCategories();
+      } else {
+        setFeedback({ type: "error", message: data.message || "Failed to launch category." });
+      }
+    } catch (err) {
+      console.error(err);
+      setFeedback({ type: "error", message: "Network error launching category." });
+    } finally {
+      setLaunchingCategory(false);
+    }
+  }
 
   // Open modal for new product
   function openAddModal() {
     setIsEditing(false);
     setImageMode("file");
+    const initialCat = selectableCategories.length > 1 ? selectableCategories[0] : "Other";
     setModalForm({
       _id: "",
       name: "",
       description: "",
       price: "",
       image: "",
-      category: "Burger",
+      category: initialCat,
       customCategory: "",
       type: "veg",
       preparationTime: 15,
@@ -117,15 +181,15 @@ export default function ProductsClient() {
   function openEditModal(product) {
     setIsEditing(true);
     setImageMode(product.image?.startsWith("http") ? "url" : "file");
-    const isStandard = STANDARD_CATEGORIES.includes(product.category);
+    const isExisting = selectableCategories.filter((c) => c !== "Other").includes(product.category);
     setModalForm({
       _id: product._id,
       name: product.name,
       description: product.description || "",
       price: product.price,
       image: product.image,
-      category: isStandard ? product.category : "Other",
-      customCategory: isStandard ? "" : (product.category || ""),
+      category: isExisting ? product.category : "Other",
+      customCategory: isExisting ? "" : (product.category || ""),
       type: product.type || "veg",
       preparationTime: product.preparationTime || 15,
       isAvailable: product.isAvailable !== false,
@@ -234,6 +298,7 @@ export default function ProductsClient() {
 
       setIsModalOpen(false);
       await loadProducts();
+      await loadCategories();
     } catch (err) {
       console.error(err);
       setFeedback({ type: "error", message: "Error saving product." });
@@ -322,7 +387,15 @@ export default function ProductsClient() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
+            >
+              <Sparkles size={16} className="text-stone-950" />
+              <span>Launch Category</span>
+            </button>
             <Link
               href="/products/availability"
               className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 transition text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl text-sm font-semibold border border-stone-200 dark:border-white/10 active:scale-95"
@@ -331,7 +404,7 @@ export default function ProductsClient() {
             </Link>
             <button
               onClick={openAddModal}
-              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95"
+              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
             >
               <PlusCircle size={18} /> Add Dish
             </button>
@@ -583,9 +656,9 @@ export default function ProductsClient() {
                         onChange={(e) => setModalForm({ ...modalForm, category: e.target.value })}
                         className="w-full bg-stone-50/80 dark:bg-[#181b26] border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white focus:border-stone-400 dark:focus:border-stone-600 outline-none transition cursor-pointer"
                       >
-                        {MODAL_CATEGORIES.map((c) => (
+                        {selectableCategories.map((c) => (
                           <option key={c} value={c}>
-                            {c === "Other" ? "Other (Custom...)" : c}
+                            {c === "Other" ? "+ Launch New Category..." : c}
                           </option>
                         ))}
                       </select>
@@ -837,6 +910,127 @@ export default function ProductsClient() {
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 disabled:opacity-50 transition shadow-sm active:scale-95 cursor-pointer"
                   >
                     {submitting ? "Saving..." : isEditing ? "Update Dish" : "Create Dish"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Launch New Category Modal */}
+        {isCategoryModalOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          >
+            <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="px-6 py-5 border-b border-stone-100 dark:border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-stone-900 dark:text-white">
+                      Launch New Category
+                    </h2>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      Instantly live on customer menus &amp; dish catalog
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleLaunchCategory} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                    Category Name <span className="text-orange-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Biryani, Rolls, Beverages, Shakes, Desserts..."
+                    value={newCategoryForm.name}
+                    onChange={(e) =>
+                      setNewCategoryForm((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-amber-500 outline-none transition font-medium"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                    Category Emoji / Icon
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={newCategoryForm.icon}
+                      onChange={(e) =>
+                        setNewCategoryForm((prev) => ({ ...prev, icon: e.target.value }))
+                      }
+                      className="w-14 text-center text-xl bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl py-2 text-stone-900 dark:text-white focus:border-amber-500 outline-none"
+                    />
+                    <div className="flex gap-1.5 flex-wrap">
+                      {["🍔", "🍕", "🍟", "🥟", "🥤", "🍛", "🌯", "🍜", "🍰", "🥗"].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() =>
+                            setNewCategoryForm((prev) => ({ ...prev, icon: emoji }))
+                          }
+                          className={`w-8 h-8 rounded-lg text-sm border flex items-center justify-center transition cursor-pointer ${
+                            newCategoryForm.icon === emoji
+                              ? "border-amber-500 bg-amber-500/10"
+                              : "border-stone-200/80 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/5"
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                    Description <span className="text-[10px] text-stone-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Short description for customer menu..."
+                    value={newCategoryForm.description}
+                    onChange={(e) =>
+                      setNewCategoryForm((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-amber-500 outline-none transition resize-none"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-100 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={launchingCategory || !newCategoryForm.name.trim()}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-stone-950 disabled:opacity-50 transition shadow-sm active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles size={14} />
+                    <span>{launchingCategory ? "Launching..." : "Launch Category"}</span>
                   </button>
                 </div>
               </form>

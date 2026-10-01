@@ -16,7 +16,6 @@ import {
   ArrowRight,
   Award,
   Bell,
-  Search,
 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import NotificationBell from "../notifications/NotificationBell";
@@ -24,11 +23,7 @@ import useNotificationStore from "@/lib/notificationStore";
 import Link from "next/link";
 import Image from "next/image";
 
-const RightSection = ({
-  onOpenMobileSearch,
-  mobileSearchButtonRef,
-  isMobileSearchOpen,
-}) => {
+const RightSection = () => {
   const { getTotalItems, openCart, clearCartLocal } = useCartStore();
   const { openNotifications, unreadCount } = useNotificationStore();
   const { data: session } = useSession();
@@ -72,20 +67,6 @@ const RightSection = ({
         <div className="hidden sm:block">
           <NotificationBell />
         </div>
-      )}
-
-      {/* Mobile Search Button (visible only below md breakpoint) */}
-      {onOpenMobileSearch && (
-        <button
-          ref={mobileSearchButtonRef}
-          type="button"
-          onClick={onOpenMobileSearch}
-          aria-label="Search dishes and menu"
-          aria-expanded={Boolean(isMobileSearchOpen)}
-          className="lg:hidden relative hover:text-[var(--brand-accent)] transition p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px] shrink-0"
-        >
-          <Search size={19} />
-        </button>
       )}
 
       {/* Cart Icon Button */}

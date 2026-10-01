@@ -32,6 +32,7 @@ export default function MenuClient() {
   const [searchTerm, setSearchTerm] = useState(searchFromUrl);
   const [sortBy, setSortBy] = useState("default");
   const [onlyInStock, setOnlyInStock] = useState(false);
+  const [dynamicCategories, setDynamicCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -48,20 +49,25 @@ export default function MenuClient() {
     if (searchFromUrl) setSearchTerm(searchFromUrl);
   }, [searchFromUrl]);
 
-  // Load Restaurants list
+  // Load Categories & Restaurants dynamically
   useEffect(() => {
-    async function loadRestaurants() {
+    async function loadMeta() {
       try {
-        const res = await fetch("/api/restaurants");
-        const data = await res.json();
-        if (data.success) {
-          setRestaurants(data.restaurants || []);
+        const [restRes, catRes] = await Promise.allSettled([
+          fetch("/api/restaurants").then((r) => r.json()),
+          fetch("/api/categories").then((r) => r.json()),
+        ]);
+        if (restRes.status === "fulfilled" && restRes.value?.success) {
+          setRestaurants(restRes.value.restaurants || []);
+        }
+        if (catRes.status === "fulfilled" && catRes.value?.success) {
+          setDynamicCategories(catRes.value.categories || []);
         }
       } catch (err) {
-        console.error("Failed to load restaurants:", err);
+        console.error("Failed to load menu metadata:", err);
       }
     }
-    loadRestaurants();
+    loadMeta();
   }, []);
 
   // Fetch Products with filters
@@ -113,14 +119,17 @@ export default function MenuClient() {
     return result;
   }, [products, onlyInStock, sortBy]);
 
-  const categories = [
-    { id: "All", label: "All Items" },
-    { id: "Burger", label: "🍔 Burgers" },
-    { id: "Pizza", label: "🍕 Pizza" },
-    { id: "Fries", label: "🍟 Fries" },
-    { id: "Momos", label: "🥟 Momos" },
-    { id: "Cold Drinks", label: "🥤 Cold Drinks" },
-  ];
+  const categories = useMemo(() => {
+    const list = [{ id: "All", label: "All Items", icon: "✨" }];
+    dynamicCategories.forEach((cat) => {
+      list.push({
+        id: cat.name,
+        label: `${cat.icon || "🍽️"} ${cat.name}`,
+        icon: cat.icon || "🍽️",
+      });
+    });
+    return list;
+  }, [dynamicCategories]);
 
   const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
@@ -205,7 +214,7 @@ export default function MenuClient() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by dish name or ingredient..."
+              placeholder="Search by dish name, ingredient, or restaurant..."
               className="w-full pl-11 pr-10 py-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] transition shadow-sm"
             />
             {searchTerm && (

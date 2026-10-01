@@ -70,6 +70,29 @@ export async function POST(request) {
       isFeatured: !!isFeatured,
     });
 
+    // Auto-register category in Category model
+    if (category && typeof category === "string") {
+      const cleanCat = category.trim();
+      try {
+        const Category = (await import("@/models/Category")).default;
+        const existingCat = await Category.findOne({
+          name: { $regex: `^${cleanCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: "i" },
+        });
+        if (!existingCat) {
+          await Category.create({
+            name: cleanCat,
+            slug: cleanCat.toLowerCase().replace(/[\s\W-]+/g, "-"),
+            icon: "🍽️",
+            description: `Fresh dishes in ${cleanCat}`,
+            restaurant: restaurantId,
+            isActive: true,
+          });
+        }
+      } catch (catErr) {
+        console.warn("Could not auto-register category:", catErr.message);
+      }
+    }
+
     return NextResponse.json({ success: true, message: "Product created successfully!", product }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

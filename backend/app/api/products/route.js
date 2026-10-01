@@ -5,6 +5,18 @@ import connectDB from '@/lib/db';
 import Product from '@/models/Product';
 import Restaurant from '@/models/Restaurant';
 
+import Category from '@/models/Category';
+
+// Helper function to slugify text
+function slugify(text) {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[\s\W-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // GET all products (multi-tenant aware)
 export async function GET(request) {
   try {
@@ -47,11 +59,28 @@ export async function GET(request) {
       filter.isFeatured = true;
     }
 
-    if (search) {
+    if (search && search.trim()) {
+      const q = search.trim();
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+
+      // Find any active restaurants matching the search query by name, slug, or cuisine
+      const matchingRestaurants = await Restaurant.find({
+        status: 'active',
+        $or: [
+          { name: { $regex: searchRegex } },
+          { slug: { $regex: searchRegex } },
+          { cuisineType: { $in: [searchRegex] } },
+        ]
+      }).select('_id');
+      const matchingRestaurantIds = matchingRestaurants.map(r => r._id);
+
+      // Search matches dishes by name, description, category OR brings all dishes of any matching restaurant
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { name: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } },
+        { category: { $regex: searchRegex } },
+        ...(matchingRestaurantIds.length > 0 ? [{ restaurant: { $in: matchingRestaurantIds } }] : [])
       ];
     }
 
@@ -87,6 +116,29 @@ export async function POST(request) {
     }
 
     const product = await Product.create(body);
+
+    // Auto-register newly launched category in Category model if not already present
+    if (body.category && typeof body.category === 'string') {
+      const cleanCat = body.category.trim();
+      try {
+        const existingCat = await Category.findOne({
+          name: { $regex: `^${cleanCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+        });
+        if (!existingCat) {
+          await Category.create({
+            name: cleanCat,
+            slug: slugify(cleanCat),
+            icon: '🍽️',
+            description: `Fresh dishes in ${cleanCat}`,
+            restaurant: body.restaurant,
+            isActive: true
+          });
+        }
+      } catch (catErr) {
+        console.warn('Could not auto-register category:', catErr.message);
+      }
+    }
+
     return NextResponse.json({ success: true, product }, { status: 201 });
 
   } catch (error) {

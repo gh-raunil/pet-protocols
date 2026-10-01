@@ -22,14 +22,6 @@ import {
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 
-const CATEGORIES = [
-  { name: "Burger", label: "Gourmet Burgers", icon: "🍔", query: "Burger" },
-  { name: "Pizza", label: "Stone-Baked Pizza", icon: "🍕", query: "Pizza" },
-  { name: "Fries", label: "Crispy Loaded Fries", icon: "🍟", query: "Fries" },
-  { name: "Momos", label: "Steamed & Fried Momos", icon: "🥟", query: "Momos" },
-  { name: "Cold Drinks", label: "Chilled Drinks", icon: "🥤", query: "Cold Drinks" },
-];
-
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,17 +29,19 @@ export default function HomePage() {
   const [restaurants, setRestaurants] = useState([]);
   const [offers, setOffers] = useState([]);
   const [ratings, setRatings] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadHomeData() {
       try {
         setLoading(true);
-        const [prodRes, restRes, offRes, rateRes] = await Promise.allSettled([
+        const [prodRes, restRes, offRes, rateRes, catRes] = await Promise.allSettled([
           fetch("/api/products").then((r) => r.json()),
           fetch("/api/restaurants").then((r) => r.json()),
           fetch("/api/offers").then((r) => r.json()),
           fetch("/api/ratings").then((r) => r.json()),
+          fetch("/api/categories").then((r) => r.json()),
         ]);
 
         if (prodRes.status === "fulfilled" && prodRes.value?.success) {
@@ -61,6 +55,9 @@ export default function HomePage() {
         }
         if (rateRes.status === "fulfilled" && rateRes.value?.ratings) {
           setRatings(rateRes.value.ratings || []);
+        }
+        if (catRes.status === "fulfilled" && catRes.value?.success) {
+          setCategories(catRes.value.categories || []);
         }
       } catch (err) {
         console.error("Error loading home data:", err);
@@ -165,23 +162,33 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 sm:gap-4">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.name}
-              href={`/menu?category=${encodeURIComponent(cat.query)}`}
-              className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-1 transition-all group flex flex-col items-center text-center shadow-sm"
-            >
-              <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">
-                {cat.icon}
-              </span>
-              <span className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
-                {cat.label}
-              </span>
-              <span className="text-[11px] text-[var(--text-muted)] mt-1">Explore menu</span>
-            </Link>
-          ))}
-        </div>
+        {categories.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4">
+            {categories.map((cat) => (
+              <Link
+                key={cat._id || cat.name}
+                href={`/menu?category=${encodeURIComponent(cat.name)}`}
+                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-1 transition-all group flex flex-col items-center text-center shadow-sm"
+              >
+                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">
+                  {cat.icon || "🍽️"}
+                </span>
+                <span className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition line-clamp-1">
+                  {cat.name}
+                </span>
+                <span className="text-[11px] text-[var(--text-muted)] mt-1">
+                  {cat.dishCount > 0 ? `${cat.dishCount} ${cat.dishCount === 1 ? "dish" : "dishes"}` : "Explore menu"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 sm:gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-28 rounded-2xl bg-[var(--bg-card)] animate-pulse border border-[var(--border-color)]" />
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {/* ── SECTION D: POPULAR DISHES ───────────────────────────────── */}
