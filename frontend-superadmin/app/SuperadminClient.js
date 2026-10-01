@@ -40,9 +40,17 @@ import {
   ChevronUp,
   Store,
   SlidersHorizontal,
+  Tag,
+  Headphones,
+  Sliders,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import MessagesManager from "@/components/messages/MessagesManager";
+import CustomersManager from "@/components/customers/CustomersManager";
+import OrdersManager from "@/components/orders/OrdersManager";
+import OffersManager from "@/components/offers/OffersManager";
+import SupportManager from "@/components/support/SupportManager";
+import SettingsManager from "@/components/settings/SettingsManager";
 
 const ALL_AVAILABLE_FEATURES = [
   { id: "inventory", name: "Inventory Control", desc: "Stock, Ingredients, Recipes, Waste, Suppliers & Purchases", badge: "📦" },
@@ -781,31 +789,91 @@ export default function SuperadminClient() {
             </div>
 
             {/* Navigation Switcher Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/80 text-xs font-semibold shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/80 text-xs font-semibold shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveSection("overview")}
-                className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                   activeSection === "overview"
                     ? "bg-indigo-600 text-white shadow"
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
               >
-                <Building2 size={14} />
+                <Building2 size={13} />
                 <span>Tenants & Admins</span>
               </button>
               <button
                 type="button"
+                onClick={() => setActiveSection("customers")}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  activeSection === "customers"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <Users size={13} />
+                <span>Customers</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("orders")}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  activeSection === "orders"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <ShoppingBag size={13} />
+                <span>Orders</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("offers")}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  activeSection === "offers"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <Tag size={13} />
+                <span>Offers</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("support")}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  activeSection === "support"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <Headphones size={13} />
+                <span>Support</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveSection("messages")}
-                className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                   activeSection === "messages"
                     ? "bg-indigo-600 text-white shadow"
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
               >
-                <Bell size={14} />
-                <span>Messages & Bulletins</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <Bell size={13} />
+                <span>Bulletins</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection("settings")}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  activeSection === "settings"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <Sliders size={13} />
+                <span>Settings</span>
               </button>
             </div>
           </div>
@@ -838,9 +906,14 @@ export default function SuperadminClient() {
         )}
 
         {/* Conditional rendering based on activeSection */}
-        {activeSection === "messages" ? (
-          <MessagesManager restaurants={restaurants} />
-        ) : (
+        {activeSection === "messages" && <MessagesManager restaurants={restaurants} />}
+        {activeSection === "customers" && <CustomersManager />}
+        {activeSection === "orders" && <OrdersManager restaurants={restaurants} />}
+        {activeSection === "offers" && <OffersManager restaurants={restaurants} />}
+        {activeSection === "support" && <SupportManager />}
+        {activeSection === "settings" && <SettingsManager />}
+
+        {activeSection === "overview" && (
           <>
             {/* ── METRIC CARDS GRID ───────────────────────────────────── */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-purpose="platform-metrics">
