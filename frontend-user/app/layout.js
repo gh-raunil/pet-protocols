@@ -46,6 +46,27 @@ export default function RootLayout({ children }) {
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <ThemeScript />
+        <script
+          id="pwa-service-worker-init"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(function(reg) {
+                      console.log('[PWA] Service Worker registered with scope:', reg.scope);
+                    })
+                    .catch(function(err) {
+                      console.warn('[PWA] Service Worker registration failed:', err);
+                    });
+                });
+                if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+                }
+              }
+            `,
+          }}
+        />
       </head>
       <body className="min-h-screen antialiased bg-[var(--bg-main)] text-[var(--text-main)]" suppressHydrationWarning>
         <ThemeProvider>

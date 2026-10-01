@@ -38,12 +38,8 @@ export default function ServiceWorkerRegister() {
       }
     };
 
-    if (document.readyState === "complete") {
-      registerSW();
-    } else {
-      window.addEventListener("load", registerSW);
-      return () => window.removeEventListener("load", registerSW);
-    }
+    // Register immediately on component mount without blocking
+    registerSW();
   }, []);
 
   return null;
