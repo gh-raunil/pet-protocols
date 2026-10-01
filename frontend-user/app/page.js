@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
+import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 
 export default function HomePage() {
   const router = useRouter();
@@ -272,53 +273,78 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {restaurants.map((rest) => (
-              <Link
-                key={rest._id}
-                href={`/menu?restaurant=${rest._id}`}
-                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                      <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
-                        {rest.name}
-                      </h3>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                        {typeof rest.address === "string" && rest.address
-                          ? rest.address
-                          : rest.address && typeof rest.address === "object"
-                          ? [rest.address.street, rest.address.city].filter(Boolean).join(", ") || rest.city || "Verified Kitchen"
-                          : rest.city || "Verified Kitchen"}
-                      </p>
+            {restaurants.map((rest) => {
+              const opStatus = getRestaurantOperationalStatus(rest);
+              const flatFee = rest.chargeSettings?.flatDeliveryFee ?? 40;
+              const freeThreshold = rest.chargeSettings?.freeDeliveryThreshold ?? 500;
+              const radiusKm = rest.deliverySettings?.deliveryRadiusKm ?? 10;
+              const minOrder = rest.orderLimits?.minOrderAmount ?? 0;
+
+              return (
+                <Link
+                  key={rest._id}
+                  href={`/menu?restaurant=${rest._id}`}
+                  className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition flex items-center gap-1.5">
+                          {rest.name}
+                        </h3>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {typeof rest.address === "string" && rest.address
+                            ? rest.address
+                            : rest.address && typeof rest.address === "object"
+                            ? [rest.address.street, rest.address.city].filter(Boolean).join(", ") || rest.city || "Verified Kitchen"
+                            : rest.city || "Verified Kitchen"}
+                        </p>
+                      </div>
+                      {opStatus.isOpen ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 whitespace-nowrap">
+                          Open Now
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30 whitespace-nowrap" title={opStatus.reason}>
+                          Closed
+                        </span>
+                      )}
                     </div>
-                    {rest.status === "active" ? (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                        Open Now
+
+                    {/* Operational Hours & Delivery Badge Row */}
+                    <div className="flex items-center gap-2 flex-wrap mb-3 text-[11px] text-[var(--text-muted)]">
+                      <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)]">
+                        <Clock size={11} className="text-[var(--brand-accent)]" />
+                        {rest.openingHours || opStatus.hoursText || "10 AM - 11 PM"}
                       </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                        Resting
+                      <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)]">
+                        📍 {radiusKm} km radius
                       </span>
+                      {minOrder > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] text-amber-500">
+                          Min ₹{minOrder}
+                        </span>
+                      )}
+                    </div>
+
+                    {rest.description && (
+                      <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-4">
+                        {rest.description}
+                      </p>
                     )}
                   </div>
-                  {rest.description && (
-                    <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-4">
-                      {rest.description}
-                    </p>
-                  )}
-                </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
-                  <span className="flex items-center gap-1 font-medium">
-                    <Clock size={13} className="text-[var(--brand-accent)]" /> Fresh delivery
-                  </span>
-                  <span className="font-bold text-[var(--brand-accent)] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                    View Menu <ChevronRight size={14} />
-                  </span>
-                </div>
-              </Link>
-            ))}
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
+                    <span className="flex items-center gap-1 font-medium">
+                      Delivery: ₹{flatFee} {freeThreshold > 0 ? `(Free > ₹${freeThreshold})` : ""}
+                    </span>
+                    <span className="font-bold text-[var(--brand-accent)] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                      View Menu <ChevronRight size={14} />
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

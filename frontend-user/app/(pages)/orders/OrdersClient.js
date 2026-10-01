@@ -16,6 +16,11 @@ import {
   RotateCcw,
   CheckCircle2,
   Phone,
+  XCircle,
+  AlertTriangle,
+  ShoppingBag,
+  Truck,
+  Tag,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import useCartStore from "@/lib/cartStore";
@@ -39,12 +44,24 @@ export default function OrdersClient() {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Customer Cancellation Modal/State
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [submittingCancel, setSubmittingCancel] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/login?callbackUrl=/orders");
     }
   }, [status, router]);
+
+  // Live timer for cancellation window countdown
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -69,10 +86,9 @@ export default function OrdersClient() {
 
     let addedCount = 0;
     order.items.forEach((item) => {
-      // Re-add to cart using current item specifications
       for (let i = 0; i < (item.quantity || 1); i++) {
         addItem({
-          _id: item.productId || item._id,
+          _id: item.productId || item.product || item._id,
           name: item.name,
           price: item.price,
           image: item.image,
@@ -85,6 +101,40 @@ export default function OrdersClient() {
 
     toast.success(`Reordered ${addedCount} dishes into your cart!`);
     openCart();
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!orderId) return;
+
+    setSubmittingCancel(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          reason: cancelReason.trim() || "Cancelled by customer",
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.message || "Failed to cancel order.");
+        return;
+      }
+
+      toast.success("Order cancelled successfully.");
+      setOrders((prev) =>
+        prev.map((o) => (o._id === orderId ? { ...o, status: "cancelled" } : o))
+      );
+      setCancellingOrderId(null);
+      setCancelReason("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error while cancelling order.");
+    } finally {
+      setSubmittingCancel(false);
+    }
   };
 
   if (loading || status === "loading") {
@@ -111,7 +161,7 @@ export default function OrdersClient() {
         </div>
         <h2 className="text-2xl sm:text-3xl font-black">No orders yet</h2>
         <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed">
-          Explore delicious offerings from our verified partner kitchens and place your first feast.
+          Explore delicious offerings from our partner kitchens and place your first feast.
         </p>
         <Link
           href="/menu"
@@ -143,6 +193,22 @@ export default function OrdersClient() {
         {orders.map((order) => {
           const isDelivered = order.status === "delivered";
           const isCancelled = order.status === "cancelled";
+          const isPending = order.status === "pending";
+          const isPickup =
+            order.notes?.includes("[PICKUP]") ||
+            order.paymentMethod?.toLowerCase().includes("pickup") ||
+            order.deliveryFee === 0;
+
+          // Cancellation window calculations
+          const cancelSettings = order.restaurant?.cancellationSettings || {};
+          const allowCancel = cancelSettings.allowCustomerCancel !== false;
+          const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 5;
+          const createdAtMs = new Date(order.createdAt).getTime();
+          const remainingMs = createdAtMs + windowMinutes * 60 * 1000 - currentTime;
+          const canCancel = isPending && allowCancel && remainingMs > 0;
+          const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+          const remainingMinDisplay = Math.floor(remainingSeconds / 60);
+          const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
 
           return (
             <div
@@ -156,12 +222,26 @@ export default function OrdersClient() {
                     <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-md border border-[var(--brand-accent)]/20">
                       #{order.orderId || order._id.slice(-8)}
                     </span>
+
+                    {/* Fulfillment badge */}
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
+                        isPickup
+                          ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
+                          : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                      }`}
+                    >
+                      {isPickup ? <ShoppingBag size={11} /> : <Truck size={11} />}
+                      {isPickup ? "Self Pickup" : "Doorstep Delivery"}
+                    </span>
+
                     {order.restaurant?.name && (
                       <span className="flex items-center gap-1 text-xs text-[var(--text-main)] font-semibold bg-[var(--bg-sub)] px-2.5 py-0.5 rounded-md border border-[var(--border-color)]">
                         <Building size={12} className="text-[var(--brand-accent)]" />
                         {order.restaurant.name}
                       </span>
                     )}
+
                     {order.restaurant?.phone && (
                       <a
                         href={`tel:${order.restaurant.phone.replace(/\s+/g, "")}`}
@@ -231,16 +311,68 @@ export default function OrdersClient() {
                 />
               </div>
 
+              {/* Customer Cancellation Inline Form (if active) */}
+              {cancellingOrderId === order._id && (
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-rose-500 flex items-center gap-1.5">
+                      <AlertTriangle size={15} /> Confirm Order Cancellation
+                    </p>
+                    <span className="text-[11px] font-mono text-rose-500 font-bold">
+                      {remainingMinDisplay}:{remainingSecDisplay} left
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Reason for cancellation (optional)"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
+                  />
+                  <div className="flex justify-end items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCancellingOrderId(null)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer"
+                    >
+                      Keep Order
+                    </button>
+                    <button
+                      type="button"
+                      disabled={submittingCancel}
+                      onClick={() => handleCancelOrder(order._id)}
+                      className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {submittingCancel ? (
+                        <span>Cancelling...</span>
+                      ) : (
+                        <>
+                          <XCircle size={13} /> Cancel Order
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Footer Actions, Delivery Info, and Total */}
               <div className="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="text-xs text-[var(--text-muted)] space-y-1">
                   <p className="font-semibold text-[var(--text-main)]">
-                    Delivery to: {order.address?.fullName}
+                    {isPickup ? "Pickup Customer: " : "Delivery to: "}
+                    {order.address?.fullName}
                   </p>
-                  <p className="flex items-center gap-1">
-                    <MapPin size={12} className="text-[var(--brand-accent)] shrink-0" />
-                    {order.address?.street}, {order.address?.city}
-                  </p>
+                  {!isPickup && (
+                    <p className="flex items-center gap-1">
+                      <MapPin size={12} className="text-[var(--brand-accent)] shrink-0" />
+                      {order.address?.street}, {order.address?.city}
+                    </p>
+                  )}
+                  {order.discount > 0 && (
+                    <p className="text-emerald-500 font-semibold flex items-center gap-1">
+                      <Tag size={12} /> Promo discount applied: -₹{order.discount}
+                    </p>
+                  )}
                   <div className="pt-1 flex items-center gap-3">
                     <Link
                       href={`/order-confirmation?orderId=${order._id}`}
@@ -259,14 +391,32 @@ export default function OrdersClient() {
                     </span>
                   </div>
 
-                  {/* Reorder Button (Section 15.C) */}
-                  <button
-                    type="button"
-                    onClick={() => handleReorder(order)}
-                    className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition"
-                  >
-                    <RotateCcw size={13} /> Reorder
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Customer Cancellation Button */}
+                    {canCancel && cancellingOrderId !== order._id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCancellingOrderId(order._id);
+                          setCancelReason("");
+                        }}
+                        className="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                        title="Cancel order within cancellation grace period"
+                      >
+                        <XCircle size={13} />
+                        <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
+                      </button>
+                    )}
+
+                    {/* Reorder Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleReorder(order)}
+                      className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer"
+                    >
+                      <RotateCcw size={13} /> Reorder
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

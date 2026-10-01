@@ -21,6 +21,7 @@ import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import useRecentStore from "@/lib/recentStore";
 import { toast } from "@/components/ui/ToastProvider";
+import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600";
 
@@ -33,6 +34,7 @@ export default function ProductDetailClient({ product }) {
 
   const isFav = isFavorite(product._id);
   const imageSrc = product.image || FALLBACK_IMAGE;
+  const restStatus = getRestaurantOperationalStatus(product.restaurant);
 
   // Add to recently viewed dishes on visit
   useEffect(() => {
@@ -43,6 +45,12 @@ export default function ProductDetailClient({ product }) {
 
   const handleAddToCart = () => {
     if (!product.isAvailable) return;
+    if (!restStatus.isOpen) {
+      toast.error(
+        `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}. Ordering is unavailable right now.`
+      );
+      return;
+    }
     for (let i = 0; i < quantity; i++) {
       addItem({ ...product, _id: product._id.toString() });
     }
@@ -210,18 +218,34 @@ export default function ProductDetailClient({ product }) {
               </span>
             </div>
             <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-center">
-              <span className="text-[11px] text-[var(--text-muted)] block">Cuisine Type</span>
+              <span className="text-[11px] text-[var(--text-muted)] block">Delivery Radius</span>
               <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] mt-0.5 block">
-                {product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
+                Up to {product.restaurant?.deliverySettings?.deliveryRadiusKm ?? 10} km
               </span>
             </div>
             <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-center">
               <span className="text-[11px] text-[var(--text-muted)] block">Delivery Fee</span>
               <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] mt-0.5 block">
-                ₹40 Flat
+                ₹{product.restaurant?.chargeSettings?.flatDeliveryFee ?? 40}
               </span>
             </div>
           </div>
+
+          {/* Closed Restaurant Alert */}
+          {!restStatus.isOpen && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 flex items-start gap-3">
+              <Clock size={18} className="shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-bold text-sm text-[var(--text-main)]">
+                  {product.restaurant?.name || "Kitchen"} is {restStatus.reason || "currently closed"}
+                </p>
+                <p className="text-[var(--text-muted)] mt-0.5">
+                  Dishes are currently unavailable to order. Regular operating hours:{" "}
+                  <strong className="text-[var(--text-main)]">{restStatus.hoursText || "10:00 AM - 11:00 PM"}</strong>
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Quantity Controls & Add to Cart Card */}
           <div className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-4 shadow-sm">
@@ -231,7 +255,7 @@ export default function ProductDetailClient({ product }) {
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  disabled={quantity <= 1 || !product.isAvailable}
+                  disabled={quantity <= 1 || !product.isAvailable || !restStatus.isOpen}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] disabled:opacity-30 transition"
                   aria-label="Decrease quantity"
                 >
@@ -243,7 +267,7 @@ export default function ProductDetailClient({ product }) {
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.min(20, q + 1))}
-                  disabled={quantity >= 20 || !product.isAvailable}
+                  disabled={quantity >= 20 || !product.isAvailable || !restStatus.isOpen}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] disabled:opacity-30 transition"
                   aria-label="Increase quantity"
                 >
@@ -256,18 +280,22 @@ export default function ProductDetailClient({ product }) {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={!product.isAvailable}
+                disabled={!product.isAvailable || !restStatus.isOpen}
                 className={`w-full py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                  product.isAvailable
-                    ? "bg-[var(--brand-accent)] hover:opacity-95 text-white shadow-[var(--brand-accent)]/25 active:scale-98 cursor-pointer"
-                    : "bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] cursor-not-allowed"
+                  !product.isAvailable
+                    ? "bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] cursor-not-allowed"
+                    : !restStatus.isOpen
+                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/30 cursor-not-allowed"
+                    : "bg-[var(--brand-accent)] hover:opacity-95 text-white shadow-[var(--brand-accent)]/25 active:scale-98 cursor-pointer"
                 }`}
               >
                 <ShoppingBag size={18} />
                 <span>
-                  {product.isAvailable
-                    ? `Add to Cart • ₹${product.price * quantity}`
-                    : "Currently Unavailable"}
+                  {!product.isAvailable
+                    ? "Currently Unavailable"
+                    : !restStatus.isOpen
+                    ? `Kitchen Closed (${restStatus.reason || "Not accepting orders"})`
+                    : `Add to Cart • ₹${product.price * quantity}`}
                 </span>
               </button>
             </div>

@@ -123,18 +123,22 @@ export async function POST(request) {
     let cumulativeSubtotal = 0;
 
     for (const [targetRestId, restSnapshotItems] of itemsByRestaurant.entries()) {
+      const restDoc = await Restaurant.findById(targetRestId).lean();
       const restSubtotal = restSnapshotItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
       cumulativeSubtotal += restSubtotal;
 
-      const restDeliveryFee =
-        itemsByRestaurant.size === 1
-          ? restSubtotal > 499
-            ? 0
-            : 40
-          : createdOrders.length === 0 && cumulativeSubtotal <= 499
-          ? 40
-          : 0;
-      const restTotal = restSubtotal + restDeliveryFee;
+      const isPickup = body.orderType === "pickup";
+      const flatFee = restDoc?.chargeSettings?.flatDeliveryFee ?? 40;
+      const freeThreshold = restDoc?.chargeSettings?.freeDeliveryThreshold ?? 500;
+
+      const restDeliveryFee = isPickup
+        ? 0
+        : restSubtotal >= freeThreshold
+        ? 0
+        : flatFee;
+
+      const discount = Number(body.discount) || 0;
+      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discount);
 
       const newOrder = await Order.create({
         user: userId,
@@ -143,13 +147,14 @@ export async function POST(request) {
         address,
         subtotal: restSubtotal,
         deliveryFee: restDeliveryFee,
+        discount,
         totalAmount: restTotal,
         paymentId: razorpay_payment_id,
         orderId: razorpay_order_id,
         paymentStatus: "paid",
-        paymentMethod: "Razorpay (Test Mode)",
+        paymentMethod: "Razorpay (Online Payment)",
         status: "pending",
-        notes,
+        notes: isPickup ? `[PICKUP] ${notes}` : notes,
       });
 
       // Deduct stock based on recipe

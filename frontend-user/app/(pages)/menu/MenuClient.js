@@ -13,8 +13,13 @@ import {
   X,
   Check,
   ChevronDown,
+  Clock,
+  Tag,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
+import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 
 export default function MenuClient() {
   const searchParams = useSearchParams();
@@ -26,6 +31,7 @@ export default function MenuClient() {
 
   const [products, setProducts] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl);
   const [selectedRestaurant, setSelectedRestaurant] = useState(restaurantFromUrl);
   const [selectedType, setSelectedType] = useState("all");
@@ -49,19 +55,23 @@ export default function MenuClient() {
     if (searchFromUrl) setSearchTerm(searchFromUrl);
   }, [searchFromUrl]);
 
-  // Load Categories & Restaurants dynamically
+  // Load Categories, Restaurants & Active Offers dynamically
   useEffect(() => {
     async function loadMeta() {
       try {
-        const [restRes, catRes] = await Promise.allSettled([
+        const [restRes, catRes, offRes] = await Promise.allSettled([
           fetch("/api/restaurants").then((r) => r.json()),
           fetch("/api/categories").then((r) => r.json()),
+          fetch("/api/offers").then((r) => r.json()),
         ]);
         if (restRes.status === "fulfilled" && restRes.value?.success) {
           setRestaurants(restRes.value.restaurants || []);
         }
         if (catRes.status === "fulfilled" && catRes.value?.success) {
           setDynamicCategories(catRes.value.categories || []);
+        }
+        if (offRes.status === "fulfilled" && offRes.value?.success) {
+          setOffers(offRes.value.offers || []);
         }
       } catch (err) {
         console.error("Failed to load menu metadata:", err);
@@ -184,23 +194,107 @@ export default function MenuClient() {
               All Kitchens ({restaurants.length})
             </button>
 
-            {restaurants.map((rest) => (
-              <button
-                key={rest._id}
-                onClick={() => handleRestaurantSelect(rest._id)}
-                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
-                  selectedRestaurant === rest._id
-                    ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25"
-                    : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-                }`}
-              >
-                <span>{rest.name}</span>
-                {rest.status === "active" && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                )}
-              </button>
-            ))}
+            {restaurants.map((rest) => {
+              const op = getRestaurantOperationalStatus(rest);
+              return (
+                <button
+                  key={rest._id}
+                  onClick={() => handleRestaurantSelect(rest._id)}
+                  className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+                    selectedRestaurant === rest._id
+                      ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25"
+                      : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
+                  }`}
+                >
+                  <span>{rest.name}</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      op.isOpen ? "bg-emerald-400" : "bg-amber-400"
+                    }`}
+                    title={op.isOpen ? "Open Now" : op.reason}
+                  />
+                </button>
+              );
+            })}
           </div>
+
+          {/* Active Kitchen Operational Banner */}
+          {selectedRestaurant !== "all" && (() => {
+            const activeKitchen = restaurants.find((r) => r._id === selectedRestaurant);
+            if (!activeKitchen) return null;
+            const op = getRestaurantOperationalStatus(activeKitchen);
+            const flatFee = activeKitchen.chargeSettings?.flatDeliveryFee ?? 40;
+            const freeAbove = activeKitchen.chargeSettings?.freeDeliveryThreshold ?? 500;
+            const radius = activeKitchen.deliverySettings?.deliveryRadiusKm ?? 10;
+            const minOrder = activeKitchen.orderLimits?.minOrderAmount ?? 0;
+            const kitchenOffers = offers.filter(
+              (o) => !o.restaurant || o.restaurant?._id === activeKitchen._id || o.restaurant === activeKitchen._id
+            );
+
+            return (
+              <div className="mt-4 pt-4 border-t border-[var(--border-color)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-extrabold text-sm text-[var(--text-main)]">
+                      {activeKitchen.name}
+                    </span>
+                    {op.isOpen ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                        ● Open Now
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        ● Closed ({op.reason})
+                      </span>
+                    )}
+                    <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                      <Clock size={12} className="text-[var(--brand-accent)]" />
+                      {activeKitchen.openingHours || op.hoursText || "10:00 AM - 11:00 PM"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] flex-wrap">
+                    <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium">
+                      🛵 Delivery: ₹{flatFee} {freeAbove > 0 ? `(Free > ₹${freeAbove})` : ""}
+                    </span>
+                    <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium">
+                      📍 Up to {radius} km
+                    </span>
+                    {minOrder > 0 && (
+                      <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium text-amber-500">
+                        Min Order ₹{minOrder}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {!op.isOpen && (
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-medium flex items-center gap-2">
+                    <Clock size={14} className="shrink-0" />
+                    <span>
+                      This kitchen is currently closed or not accepting online orders right now. Dishes are viewable but cannot be ordered until opening.
+                    </span>
+                  </div>
+                )}
+
+                {kitchenOffers.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap pt-1">
+                    <span className="text-[11px] font-bold text-[var(--brand-accent)] flex items-center gap-1 uppercase tracking-wider">
+                      <Tag size={12} /> Active Deals:
+                    </span>
+                    {kitchenOffers.slice(0, 2).map((off) => (
+                      <span
+                        key={off._id}
+                        className="px-2.5 py-0.5 rounded-lg bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold"
+                      >
+                        {off.code}: {off.discountType === "percentage" ? `${off.discountValue}% OFF` : `₹${off.discountValue} OFF`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -3,10 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Building, Heart, Check, XCircle } from "lucide-react";
+import { Plus, Building, Heart, Check, XCircle, Clock } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import { toast } from "@/components/ui/ToastProvider";
+import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -15,11 +16,18 @@ export default function ProductCard({ product }) {
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   const imageSrc = product.image || FALLBACK_IMAGE;
   const isFav = isFavorite(product._id);
+  const restStatus = getRestaurantOperationalStatus(product.restaurant);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!product.isAvailable) return;
+    if (!restStatus.isOpen) {
+      toast.error(
+        `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}. Ordering is unavailable right now.`
+      );
+      return;
+    }
 
     addItem(product);
     toast.success(`${product.name} added to cart!`);
@@ -55,32 +63,52 @@ export default function ProductCard({ product }) {
             }`}
           />
 
-          {/* Out of Stock Overlay */}
-          {!product.isAvailable && (
+          {/* Out of Stock or Closed Overlay */}
+          {!product.isAvailable ? (
             <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 text-center z-10">
               <span className="px-3 py-1 rounded-full bg-red-600/90 text-white text-[11px] font-black uppercase tracking-wider shadow">
-                Out of Stock
+                Sold Out
               </span>
             </div>
-          )}
+          ) : !restStatus.isOpen ? (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 text-center z-10">
+              <span className="px-3 py-1 rounded-full bg-amber-600/90 text-white text-[11px] font-black uppercase tracking-wider shadow flex items-center gap-1">
+                <Clock size={12} /> {restStatus.reason || "Kitchen Closed"}
+              </span>
+              {restStatus.hoursText && (
+                <span className="text-[10px] text-white/80 font-medium mt-1">
+                  Hours: {restStatus.hoursText}
+                </span>
+              )}
+            </div>
+          ) : null}
 
-          {/* Top badges: Veg/Non-Veg & Favorite button */}
+          {/* Top badges: Veg/Non-Veg, Featured & Favorite button */}
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20 pointer-events-none">
-            {/* Veg / Non-Veg badge */}
-            <span
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md shadow-sm ${
-                product.type === "veg"
-                  ? "bg-emerald-950/80 text-emerald-400 border border-emerald-500/40"
-                  : "bg-rose-950/80 text-rose-400 border border-rose-500/40"
-              }`}
-            >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Veg / Non-Veg badge */}
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  product.type === "veg" ? "bg-emerald-400" : "bg-rose-400"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md shadow-sm ${
+                  product.type === "veg"
+                    ? "bg-emerald-950/80 text-emerald-400 border border-emerald-500/40"
+                    : "bg-rose-950/80 text-rose-400 border border-rose-500/40"
                 }`}
-              />
-              {product.type === "veg" ? "Veg" : "Non-Veg"}
-            </span>
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    product.type === "veg" ? "bg-emerald-400" : "bg-rose-400"
+                  }`}
+                />
+                {product.type === "veg" ? "Veg" : "Non-Veg"}
+              </span>
+
+              {/* Featured dish badge */}
+              {product.isFeatured && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-500/90 text-black border border-amber-300 shadow-sm uppercase tracking-wider">
+                  ⭐ Featured
+                </span>
+              )}
+            </div>
 
             {/* Favorite Wishlist Button */}
             <button
@@ -130,7 +158,20 @@ export default function ProductCard({ product }) {
               </span>
             </div>
 
-            {product.isAvailable ? (
+            {!product.isAvailable ? (
+              <span className="text-[11px] font-bold text-red-500/90 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-xl flex items-center gap-1">
+                <XCircle size={12} /> Sold Out
+              </span>
+            ) : !restStatus.isOpen ? (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[11px] font-bold flex items-center gap-1 hover:bg-amber-500/20 transition cursor-pointer"
+                title={`${product.restaurant?.name || "Kitchen"} is closed right now.`}
+              >
+                <Clock size={11} /> Closed
+              </button>
+            ) : (
               <button
                 type="button"
                 onClick={handleAddToCart}
@@ -140,10 +181,6 @@ export default function ProductCard({ product }) {
                 <Plus size={14} strokeWidth={3} />
                 <span>Add</span>
               </button>
-            ) : (
-              <span className="text-[11px] font-bold text-red-500/80 flex items-center gap-1">
-                <XCircle size={13} /> Unavailable
-              </span>
             )}
           </div>
         </div>

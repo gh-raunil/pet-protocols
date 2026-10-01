@@ -9,7 +9,10 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params  // ← await params in Next.js 16
     await connectDB()
-    const product = await Product.findById(id)
+    const product = await Product.findById(id).populate(
+      'restaurant',
+      'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
+    );
     if (!product) return NextResponse.json({ success: false, message: 'Product not found' }, { status: 404 })
     return NextResponse.json({ success: true, product })
   } catch (error) {

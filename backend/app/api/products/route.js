@@ -84,9 +84,22 @@ export async function GET(request) {
       ];
     }
 
-    const products = await Product.find(filter)
-      .populate('restaurant', 'name slug status rating image')
-      .sort({ createdAt: -1 });
+    let products = await Product.find(filter)
+      .populate(
+        'restaurant',
+        'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
+      )
+      .sort({ isFeatured: -1, createdAt: -1 });
+
+    // Filter out unavailable items if restaurant configured them to be hidden
+    products = products.filter((prod) => {
+      if (prod.isAvailable) return true;
+      const menuConf = prod.restaurant?.menuSettings;
+      if (!menuConf) return true;
+      if (menuConf.showUnavailableProducts === false) return false;
+      if (menuConf.showOutOfStockItems === false || menuConf.outOfStockBehavior === 'hide') return false;
+      return true;
+    });
 
     return NextResponse.json({ success: true, products });
 
