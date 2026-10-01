@@ -1,5 +1,6 @@
 export default function manifest() {
   return {
+    id: "/",
     name: "Pet Protocols",
     short_name: "Pet Protocols",
     description: "Order your favourite food with Pet Protocols.",
@@ -38,6 +39,22 @@ export default function manifest() {
         src: "/icons/apple-touch-icon.png",
         sizes: "180x180",
         type: "image/png",
+      },
+    ],
+    screenshots: [
+      {
+        src: "/screenshots/desktop-home.png",
+        sizes: "1280x720",
+        type: "image/png",
+        form_factor: "wide",
+        label: "Pet Protocols Home Page on Desktop",
+      },
+      {
+        src: "/screenshots/mobile-home.png",
+        sizes: "750x1334",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "Pet Protocols Mobile Experience",
       },
     ],
     categories: ["food", "shopping", "lifestyle"],
