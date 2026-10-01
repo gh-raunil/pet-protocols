@@ -2,21 +2,21 @@
 import { useState, useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
 import { useSession, signOut } from "next-auth/react";
-import { 
-  ShoppingCart, 
-  ChevronDown, 
-  User, 
-  Package, 
-  LogOut, 
-  Store, 
-  ShieldCheck, 
-  UtensilsCrossed, 
-  ClipboardList, 
+import {
+  ShoppingCart,
+  ChevronDown,
+  User,
+  Package,
+  LogOut,
+  Store,
+  ShieldCheck,
+  UtensilsCrossed,
+  ClipboardList,
   Settings,
   ArrowRight,
   Award,
   Bell,
-  Search
+  Search,
 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import NotificationBell from "../notifications/NotificationBell";
@@ -64,12 +64,14 @@ const RightSection = ({
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
-      {/* Light / Dark Mode Toggle */}
+      {/* Light / Dark Mode Quick Toggle */}
       <ThemeToggle />
 
-      {/* Customer Notifications (Only relevant for normal customers/visitors) */}
+      {/* Customer Notifications (Desktop) */}
       {!isRestaurantAdmin && !isSuperadmin && (
-        <NotificationBell />
+        <div className="hidden sm:block">
+          <NotificationBell />
+        </div>
       )}
 
       {/* Mobile Search Button (visible only below md breakpoint) */}
@@ -80,36 +82,38 @@ const RightSection = ({
           onClick={onOpenMobileSearch}
           aria-label="Search dishes and menu"
           aria-expanded={Boolean(isMobileSearchOpen)}
-          className="md:hidden relative hover:text-orange-500 light:hover:text-orange-500 transition duration-200 hover:scale-105 p-1.5 rounded-xl text-gray-200 light:text-stone-700 hover:bg-white/5 light:hover:bg-stone-200 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none flex items-center justify-center min-w-[36px] min-h-[36px]"
+          className="lg:hidden relative hover:text-[var(--brand-accent)] transition p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px] shrink-0"
         >
-          <Search size={21} />
+          <Search size={19} />
         </button>
       )}
 
-      {/* Cart Icon (Only relevant for normal customers) */}
+      {/* Cart Icon Button */}
       {!isRestaurantAdmin && !isSuperadmin && (
         <button
-          className="relative hover:text-orange-500 transition duration-200 hover:scale-105 p-1.5 rounded-xl text-gray-200 light:text-stone-700 hover:bg-white/5 light:hover:bg-stone-200"
+          className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px]"
           onClick={() => openCart()}
           aria-label="Open Cart"
         >
-          <ShoppingCart size={21} />
+          <ShoppingCart size={19} />
           {isMounted && totalItems > 0 && (
-            <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-orange-500/30">
+            <span className="absolute -top-1.5 -right-1.5 bg-[var(--brand-accent)] text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-[var(--brand-accent)]/30">
               {totalItems}
             </span>
           )}
         </button>
       )}
 
-      {/* Auth State Button / Dropdown */}
+      {/* Auth Dropdown or Login Button (Visible on sm+ screens; on mobile, managed in Hamburger Drawer) */}
       {session ? (
-        <div className="relative" ref={dropdownRef}>
+        <div className="hidden sm:block relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 bg-[#121214] light:bg-[#ffffff] border border-white/10 light:border-stone-300 rounded-full pl-1 pr-3 py-1 hover:border-orange-500 transition shadow-sm"
+            aria-expanded={dropdownOpen}
+            aria-label="Account Menu"
+            className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full pl-1 pr-3 py-1 hover:border-[var(--brand-accent)] transition shadow-sm"
           >
-            <div className="w-7 h-7 rounded-full bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-xs overflow-hidden">
+            <div className="w-7 h-7 rounded-full bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] font-bold flex items-center justify-center text-xs overflow-hidden">
               {session.user.image ? (
                 <Image
                   src={session.user.image}
@@ -120,39 +124,38 @@ const RightSection = ({
                   className="rounded-full object-cover w-7 h-7"
                 />
               ) : (
-                <span>{session.user.name?.charAt(0) || "U"}</span>
+                <span>{session.user.name?.charAt(0)?.toUpperCase() || "U"}</span>
               )}
             </div>
-            <div className="flex flex-col text-left">
-              <span className="text-xs text-white light:text-stone-900 font-semibold leading-tight truncate max-w-[80px]">
+            <div className="hidden sm:flex flex-col text-left">
+              <span className="text-xs text-[var(--text-main)] font-semibold leading-tight truncate max-w-[85px]">
                 {session.user.name?.split(" ")[0]}
               </span>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-orange-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--brand-accent)]">
                 {isSuperadmin ? "Superadmin" : isRestaurantAdmin ? "Kitchen Admin" : "Foodie"}
               </span>
             </div>
             <ChevronDown
               size={13}
-              className={`text-gray-400 transition-transform duration-200 ${
+              className={`text-[var(--text-muted)] transition-transform duration-200 ${
                 dropdownOpen ? "rotate-180" : ""
               }`}
             />
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-11 w-64 bg-[#121214] light:bg-[#ffffff] border border-white/15 light:border-stone-300 rounded-2xl overflow-hidden shadow-2xl z-50 py-1">
-              
+            <div className="absolute right-0 top-11 w-64 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl z-50 py-1">
               {/* Account Header */}
-              <div className="px-4 py-3 border-b border-white/10 light:border-stone-200 bg-neutral-900/50 light:bg-stone-50">
-                <p className="text-xs font-bold text-white light:text-stone-900 truncate">{session.user.name}</p>
-                <p className="text-[11px] text-gray-400 light:text-stone-500 truncate">{session.user.email}</p>
+              <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sub)]">
+                <p className="text-xs font-bold text-[var(--text-main)] truncate">{session.user.name}</p>
+                <p className="text-[11px] text-[var(--text-muted)] truncate">{session.user.email}</p>
                 {isRestaurantAdmin && (
-                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30">
                     🏢 {session.user.restaurantName || "Partner Kitchen"}
                   </span>
                 )}
                 {isSuperadmin && (
-                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/30">
+                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/15 text-red-500 border border-red-500/30">
                     🛡️ Root Platform Owner
                   </span>
                 )}
@@ -165,7 +168,7 @@ const RightSection = ({
                     <a
                       href={`${adminUrl}/dashboard`}
                       onClick={() => setDropdownOpen(false)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-md shadow-orange-500/20"
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs transition shadow-md shadow-[var(--brand-accent)]/20"
                     >
                       <span className="flex items-center gap-2">
                         <Store size={15} /> Open Kitchen Dashboard
@@ -176,30 +179,16 @@ const RightSection = ({
                   <a
                     href={`${adminUrl}/orders`}
                     onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
+                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition"
                   >
                     <ClipboardList size={14} className="text-blue-400" /> Live Kitchen Orders (KDS)
                   </a>
                   <a
                     href={`${adminUrl}/products`}
                     onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
+                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition"
                   >
-                    <UtensilsCrossed size={14} className="text-orange-400" /> Dish Menu Catalog
-                  </a>
-                  <a
-                    href={`${adminUrl}/profile`}
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
-                  >
-                    <User size={14} className="text-emerald-400" /> Branch Manager Profile
-                  </a>
-                  <a
-                    href={`${adminUrl}/standards`}
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
-                  >
-                    <Award size={14} className="text-amber-400" /> Kitchen Standards & SOPs
+                    <UtensilsCrossed size={14} className="text-[var(--brand-accent)]" /> Dish Menu Catalog
                   </a>
                 </>
               )}
@@ -219,56 +208,56 @@ const RightSection = ({
                       <ArrowRight size={13} />
                     </a>
                   </div>
-                  <a
-                    href={`${superadminUrl}/profile`}
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
-                  >
-                    <ShieldCheck size={14} className="text-red-400" /> Root Architecture Profile
-                  </a>
                 </>
               )}
 
               {/* ── NORMAL CUSTOMER LINKS ── */}
               {!isRestaurantAdmin && !isSuperadmin && (
                 <>
-                  <button
-                    onClick={() => {
-                      setDropdownOpen(false);
-                      openNotifications();
-                    }}
-                    className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <Bell size={15} className="text-orange-400" /> Notifications & Updates
-                    </span>
-                    {unreadCount > 0 && (
-                      <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
                   <Link
                     href="/profile"
                     onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-[var(--text-main)] hover:bg-[var(--bg-sub)] hover:text-[var(--brand-accent)] transition"
                   >
-                    <User size={15} className="text-orange-400" /> My Foodie VIP Profile
+                    <User size={15} className="text-[var(--brand-accent)]" /> My Profile & Addresses
                   </Link>
                   <Link
                     href="/orders"
                     onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-300 light:text-stone-700 hover:text-white light:hover:text-stone-900 hover:bg-white/5 light:hover:bg-stone-100 transition"
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-[var(--text-main)] hover:bg-[var(--bg-sub)] hover:text-[var(--brand-accent)] transition"
                   >
-                    <Package size={15} className="text-orange-400" /> My Food Orders
+                    <Package size={15} className="text-[var(--brand-accent)]" /> My Food Orders
+                  </Link>
+                  <Link
+                    href="/notifications"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-4 py-2.5 text-xs text-[var(--text-main)] hover:bg-[var(--bg-sub)] hover:text-[var(--brand-accent)] transition"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Bell size={15} className="text-[var(--brand-accent)]" /> Notifications
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="bg-[var(--brand-accent)] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                        {unreadCount}
+                      </span>
+                    )}
                   </Link>
                 </>
               )}
 
-              <div className="border-t border-white/10 light:border-stone-200 my-1" />
+              {/* Common: Settings Link */}
+              <Link
+                href="/settings"
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-[var(--text-main)] hover:bg-[var(--bg-sub)] hover:text-[var(--brand-accent)] transition"
+              >
+                <Settings size={15} className="text-[var(--text-muted)]" /> Settings & Appearance
+              </Link>
+
+              <div className="border-t border-[var(--border-color)] my-1" />
               <button
                 onClick={handleLogout}
-                className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10 transition"
+                className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs text-red-500 hover:bg-red-500/10 transition"
               >
                 <LogOut size={14} /> Log Out
               </button>
@@ -276,12 +265,14 @@ const RightSection = ({
           )}
         </div>
       ) : (
-        <Link
-          href="/auth/login"
-          className="bg-orange-500 hover:bg-orange-600 text-white px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs font-bold transition shadow-md shadow-orange-500/20"
-        >
-          Login
-        </Link>
+        <div className="hidden sm:flex items-center gap-2">
+          <Link
+            href="/auth/login"
+            className="bg-[var(--brand-accent)] hover:opacity-90 text-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition shadow-md shadow-[var(--brand-accent)]/20"
+          >
+            Sign In
+          </Link>
+        </div>
       )}
     </div>
   );

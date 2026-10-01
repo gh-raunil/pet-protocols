@@ -1,25 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-
 @theme {
-  --color-brand-orange: var(--brand-accent, #f97316);
-  --color-brand-dark: var(--bg-main);
-  --color-brand-card: var(--bg-card);
-  --color-brand-border: var(--border-color);
-  --color-brand-muted: var(--text-muted);
-
-  --color-orange-50: var(--brand-accent-50, color-mix(in srgb, var(--brand-accent, #f97316) 10%, white));
-  --color-orange-100: var(--brand-accent-100, color-mix(in srgb, var(--brand-accent, #f97316) 20%, white));
-  --color-orange-200: var(--brand-accent-200, color-mix(in srgb, var(--brand-accent, #f97316) 40%, white));
-  --color-orange-300: var(--brand-accent-300, color-mix(in srgb, var(--brand-accent, #f97316) 60%, white));
-  --color-orange-400: var(--brand-accent-400, color-mix(in srgb, var(--brand-accent, #f97316) 80%, white));
-  --color-orange-500: var(--brand-accent, #f97316);
-  --color-orange-600: var(--brand-accent-hover, color-mix(in srgb, var(--brand-accent, #f97316) 85%, black));
-  --color-orange-700: var(--brand-accent-700, color-mix(in srgb, var(--brand-accent, #f97316) 70%, black));
-  --color-orange-800: var(--brand-accent-800, color-mix(in srgb, var(--brand-accent, #f97316) 55%, black));
-  --color-orange-900: var(--brand-accent-900, color-mix(in srgb, var(--brand-accent, #f97316) 40%, black));
-  --color-orange-950: var(--brand-accent-950, color-mix(in srgb, var(--brand-accent, #f97316) 25%, black));
+  --color-brand-orange: var(--brand-accent, #ea580c);
+  --color-brand-accent: var(--brand-accent, #ea580c);
+  --color-brand-dark: var(--bg-main, #141518);
+  --color-brand-sub: var(--bg-sub, #1b1d22);
+  --color-brand-card: var(--bg-card, #20232a);
+  --color-brand-card-hover: var(--bg-card-hover, #282c35);
+  --color-brand-border: var(--border-color, rgba(255, 255, 255, 0.1));
+  --color-brand-muted: var(--text-muted, #94a3b8);
+  --color-brand-text: var(--text-main, #f8fafc);
+  --color-brand-success: var(--color-success, #10b981);
+  --color-brand-warning: var(--color-warning, #f59e0b);
+  --color-brand-error: var(--color-error, #ef4444);
 
   --font-jakarta: "Plus Jakarta Sans", sans-serif;
   --font-outfit: "Outfit", sans-serif;
@@ -27,44 +21,33 @@
 }
 
 :root {
-  --brand-accent: #f97316;
-  --brand-accent-hover: color-mix(in srgb, var(--brand-accent) 85%, black);
-  --brand-accent-light: color-mix(in srgb, var(--brand-accent) 80%, white);
-  --brand-accent-50: color-mix(in srgb, var(--brand-accent) 10%, white);
-  --brand-accent-100: color-mix(in srgb, var(--brand-accent) 20%, white);
-  --brand-accent-200: color-mix(in srgb, var(--brand-accent) 40%, white);
-  --brand-accent-300: color-mix(in srgb, var(--brand-accent) 60%, white);
-  --brand-accent-400: color-mix(in srgb, var(--brand-accent) 80%, white);
-  --brand-accent-600: color-mix(in srgb, var(--brand-accent) 85%, black);
-  --brand-accent-700: color-mix(in srgb, var(--brand-accent) 70%, black);
-  --brand-accent-800: color-mix(in srgb, var(--brand-accent) 55%, black);
-  --brand-accent-900: color-mix(in srgb, var(--brand-accent) 40%, black);
-  --brand-accent-950: color-mix(in srgb, var(--brand-accent) 25%, black);
-}
-
-:root,
-.dark { 
-  --bg-main: #000000;
-  --bg-sub: #0a0a0a;
-  --bg-card: #0e0e11;
-  --bg-card-hover: #16161a;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --text-main: #ffffff;
-  --text-muted: #94a3b8;
-  --accent-orange: var(--brand-accent, #f97316);
-  --accent-orange-hover: var(--brand-accent-hover, #ea580c);
-}
-
-.light {
-  --bg-main: #F7F5F0;
-  --bg-sub: #EFECE6;
+  --brand-accent: #ea580c;
+  --brand-accent-hover: #c2410c;
+  --bg-main: #FAF7F2;
+  --bg-sub: #F3EFE8;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F8F6F2;
-  --border-color: #E5DFD7;
+  --bg-card-hover: #F7F3EC;
+  --border-color: rgba(44, 34, 25, 0.12);
   --text-main: #1C1917;
-  --text-muted: #6A635D;
-  --accent-orange: var(--brand-accent, #f97316);
-  --accent-orange-hover: var(--brand-accent-hover, #ea580c);
+  --text-muted: #6B645C;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+}
+
+.dark {
+  --brand-accent: #f97316;
+  --brand-accent-hover: #ea580c;
+  --bg-main: #141518;
+  --bg-sub: #1B1D22;
+  --bg-card: #20232A;
+  --bg-card-hover: #282C35;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
 }
 
 * {
@@ -77,7 +60,16 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe area padding for PWA installed mode on notch devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 /* ── Utility: Hide Scrollbars for horizontal carousels / pill bars ── */
@@ -94,13 +86,14 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-main);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-orange);
-  border-radius: 3px;
+  background: var(--brand-accent);
+  border-radius: 9999px;
 }
 
 /* ── Universal Input Focus & Autofill Overrides ── */
@@ -118,104 +111,37 @@ select:focus {
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus, 
-input:-webkit-autofill:active,
 textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,
 textarea:-webkit-autofill:focus,
-select:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0 1000px #141414 inset !important;
-  -webkit-text-fill-color: #ffffff !important;
-  caret-color: #ffffff !important;
-  transition: background-color 5000000s ease-in-out 0s;
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-main) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-sub) inset !important;
+  box-shadow: 0 0 0px 1000px var(--bg-sub) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-color: var(--brand-accent) !important;
 }
 
-.light input:-webkit-autofill,
-.light input:-webkit-autofill:hover, 
-.light input:-webkit-autofill:focus, 
-.light input:-webkit-autofill:active,
-.light textarea:-webkit-autofill,
-.light textarea:-webkit-autofill:hover,
-.light textarea:-webkit-autofill:focus,
-.light select:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
-  -webkit-text-fill-color: #1c1917 !important;
-  caret-color: #1c1917 !important;
-  transition: background-color 5000000s ease-in-out 0s;
-}
-
-/* ── Programmer Cloud Inspired Glowing Dual-Ring Loader ── */
-@keyframes spin-cw {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes spin-ccw {
-  0% { transform: rotate(360deg); }
-  100% { transform: rotate(0deg); }
-}
-
-@keyframes pulse-glow-core {
-  0%, 100% {
-    transform: scale(0.65);
-    opacity: 0.5;
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
   }
-  50% {
-    transform: scale(1.15);
+  to {
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
-.loader-glow-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loader-glow-ring-outer {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  border-top-color: var(--accent-orange, #f97316);
-  border-right-color: #a855f7;
-  animation: spin-cw 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-  filter: drop-shadow(0 0 10px var(--accent-orange, #f97316));
-}
-
-.dark .loader-glow-ring-outer {
-  border-top-color: var(--accent-orange, #f97316);
-  border-right-color: #c084fc;
-  filter: drop-shadow(0 0 14px var(--accent-orange, #f97316));
-}
-
-.loader-glow-ring-inner {
-  position: absolute;
-  inset: 18%;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  border-bottom-color: #3b82f6;
-  border-left-color: #ec4899;
-  animation: spin-ccw 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
-}
-
-.dark .loader-glow-ring-inner {
-  border-bottom-color: #60a5fa;
-  border-left-color: #f472b6;
-  filter: drop-shadow(0 0 12px rgba(96, 165, 250, 0.7));
-}
-
-.loader-glow-core {
-  width: 28%;
-  height: 28%;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-orange, #f97316), #a855f7);
-  animation: pulse-glow-core 1.4s ease-in-out infinite;
-  box-shadow: 0 0 15px var(--accent-orange, #f97316);
-}
-
-.dark .loader-glow-core {
-  background: linear-gradient(135deg, var(--accent-orange, #f97316), #c084fc);
-  box-shadow: 0 0 20px var(--accent-orange, #f97316);
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.94);
+  }
 }

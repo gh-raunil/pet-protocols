@@ -11,9 +11,9 @@ export default function OrderConfirmationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-black text-orange-500">
-          <RefreshCw className="animate-spin w-8 h-8" />
-          <p className="text-xs text-white/50 font-semibold">Loading your order confirmation...</p>
+        <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
+          <RefreshCw className="animate-spin w-8 h-8 text-[var(--brand-accent)]" />
+          <p className="text-xs text-[var(--text-muted)] font-semibold">Loading your order confirmation...</p>
         </div>
       }
     >

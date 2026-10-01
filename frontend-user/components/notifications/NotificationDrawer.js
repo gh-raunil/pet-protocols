@@ -100,14 +100,14 @@ export default function NotificationDrawer() {
       {/* Backdrop */}
       <div
         onClick={closeNotifications}
-        className={`fixed inset-0 bg-black/65 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/65 backdrop-blur-sm z-[80] transition-opacity duration-300 ${
           isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         }`}
       />
 
       {/* Drawer Panel */}
       <div
-        className={`fixed top-0 right-0 h-screen w-full sm:w-[440px] bg-[#0c0d0e] border-l border-white/10 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out font-jakarta ${
+        className={`fixed top-0 right-0 h-[100dvh] w-full sm:w-[440px] bg-[var(--bg-main)] border-l border-[var(--border-color)] z-[90] flex flex-col shadow-2xl transition-transform duration-300 ease-in-out font-jakarta ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

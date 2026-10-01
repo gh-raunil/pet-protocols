@@ -1,34 +1,31 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import { Hamburger, Menu, X } from 'lucide-react'
-import NavLinks from './NavLinks'
+import React, { useState } from "react";
+import { Menu } from "lucide-react";
+import MobileNavDrawer from "./MobileNavDrawer";
+import useNotificationStore from "@/lib/notificationStore";
 
 const HamburgerIcon = () => {
-
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
+  const { unreadCount } = useNotificationStore();
 
   return (
-    <div className='md:hidden'>
-
-      {/* Button */}
-      <button onClick={() => setIsOpen(!isOpen)}>
-
-        {isOpen ? <X size={30} /> : <Hamburger size={30} />}
-
+    <div className="lg:hidden shrink-0">
+      <button
+        onClick={() => setIsOpen(true)}
+        aria-label="Open mobile menu"
+        aria-expanded={isOpen}
+        className="relative p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition flex items-center justify-center min-w-[38px] min-h-[38px]"
+      >
+        <Menu size={20} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--brand-accent)] ring-2 ring-[var(--bg-main)]" />
+        )}
       </button>
 
-      {/* Mobile Menu */}
-      {isOpen && (
-        <div className='absolute top-20 right-0 w-full h-30 bg-brand-dark flex flex-col items-center gap-5 p-5 border-t border-brand-border'>
-
-          <NavLinks />
-
-        </div>
-      )}
-
+      <MobileNavDrawer isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </div>
-  )
-}
+  );
+};
 
-export default HamburgerIcon
+export default HamburgerIcon;

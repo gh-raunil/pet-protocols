@@ -17,28 +17,32 @@ export const ORDER_STEPS = [
     id: "pending",
     label: "Order Placed",
     shortLabel: "Placed",
-    description: "Kitchen confirmed receipt",
+    description: "Kitchen accepted order",
+    statusMessage: "Your order is confirmed and waiting in the kitchen queue.",
     icon: PackageCheck,
   },
   {
     id: "preparing",
     label: "Preparing",
     shortLabel: "Cooking",
-    description: "Chef is crafting your feast",
+    description: "Chef is crafting your meal",
+    statusMessage: "The culinary team is preparing your fresh dishes right now.",
     icon: ChefHat,
   },
   {
     id: "out_for_delivery",
     label: "Out for Delivery",
     shortLabel: "On the way",
-    description: "Rider dispatched to your address",
+    description: "Dispatched to your address",
+    statusMessage: "Your meal is packaged and on its way to your doorstep.",
     icon: Truck,
   },
   {
     id: "delivered",
     label: "Delivered",
     shortLabel: "Delivered",
-    description: "Feast arrived at your doorstep",
+    description: "Order reached your location",
+    statusMessage: "Enjoy your fresh meal! Rate your experience anytime.",
     icon: CheckCircle2,
   },
 ];
@@ -50,6 +54,7 @@ export function getActiveStepIndex(status) {
     case "preparing":
       return 1;
     case "out_for_delivery":
+    case "ready":
       return 2;
     case "delivered":
       return 3;
@@ -62,25 +67,27 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
   const isCancelled = status?.toLowerCase() === "cancelled";
   const isFailed = paymentStatus?.toLowerCase() === "failed";
   const activeIndex = getActiveStepIndex(status);
+  const currentStep = ORDER_STEPS[activeIndex] || ORDER_STEPS[0];
 
   // 1. Cancelled or Failed Order State
   if (isCancelled || isFailed) {
     return (
-      <div className="w-full bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 text-rose-300">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-400">
-            {isCancelled ? <XCircle size={22} /> : <AlertTriangle size={22} />}
+      <div className="w-full bg-red-500/10 border border-red-500/25 rounded-3xl p-6 text-red-500 shadow-lg">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
+            {isCancelled ? <XCircle size={24} /> : <AlertTriangle size={24} />}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 px-2.5 py-0.5 rounded-full border border-rose-500/30">
-                {isCancelled ? "Order Cancelled" : "Payment Failed"}
-              </span>
-            </div>
-            <p className="text-xs text-rose-200/80 mt-1.5 leading-relaxed">
+            <span className="inline-block text-xs font-black uppercase tracking-wider bg-red-500/20 text-red-500 px-3 py-1 rounded-full border border-red-500/30 mb-2">
+              {isCancelled ? "Order Cancelled" : "Payment Declined"}
+            </span>
+            <h4 className="text-base font-bold text-[var(--text-main)]">
+              {isCancelled ? "This order will not be fulfilled" : "Payment could not be processed"}
+            </h4>
+            <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
               {isCancelled
-                ? "This order was cancelled by the kitchen or user. Any captured payments are automatically refunded within 3–5 business days."
-                : "The transaction was declined by the bank or payment gateway. Please verify your payment details and place a new order."}
+                ? "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method."
+                : "The payment transaction failed. Please retry your order using Cash on Delivery or another digital payment method."}
             </p>
           </div>
         </div>
@@ -88,34 +95,48 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
     );
   }
 
+  // Calculate percentage for progress line
+  const progressPercent = (activeIndex / (ORDER_STEPS.length - 1)) * 100;
+
   // 2. Normal Active Order Progress Tracker
   return (
-    <div className="w-full bg-[#111114] border border-white/10 rounded-3xl p-5 sm:p-7 shadow-xl">
+    <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden transition-all">
       {/* Tracker Header */}
-      <div className="flex items-center justify-between gap-3 mb-6 pb-4 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-          <span className="text-xs font-bold text-white/70 uppercase tracking-widest">
-            Live Order Status
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-[var(--border-color)]">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--brand-accent)] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--brand-accent)]" />
+            </span>
+            <span className="text-xs font-black uppercase tracking-widest text-[var(--brand-accent)]">
+              Kitchen Live Tracker
+            </span>
+          </div>
+          <p className="text-sm sm:text-base font-bold text-[var(--text-main)] mt-1">
+            {currentStep.statusMessage}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25">
+            <Sparkles size={12} />
+            {currentStep.label}
           </span>
         </div>
-        <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-orange-500/10 text-orange-400 border border-orange-500/20">
-          {ORDER_STEPS[activeIndex]?.label || "Order Placed"}
-        </span>
       </div>
 
-      {/* Desktop / Tablet Stepper (sm and above) */}
-      <div className="hidden sm:block">
+      {/* Desktop & Tablet Stepper */}
+      <div className="hidden sm:block pt-8 pb-2">
         <div className="relative flex items-center justify-between">
-          {/* Connecting Line Background */}
-          <div className="absolute top-5 left-8 right-8 h-1 bg-white/10 -z-0 rounded-full" />
+          {/* Background Connecting Track */}
+          <div className="absolute top-6 left-10 right-10 h-1.5 bg-[var(--bg-sub)] rounded-full z-0" />
 
-          {/* Active Connector Progress Line */}
+          {/* Active Filled Progress Bar */}
           <div
-            className="absolute top-5 left-8 h-1 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 -z-0 rounded-full transition-all duration-700 ease-out"
+            className="absolute top-6 left-10 h-1.5 bg-gradient-to-r from-emerald-500 via-[var(--brand-accent)] to-[var(--brand-accent)] rounded-full z-0 transition-all duration-700 ease-out"
             style={{
-              width: `${(activeIndex / (ORDER_STEPS.length - 1)) * 100}%`,
-              maxWidth: "calc(100% - 4rem)",
+              width: `calc(${progressPercent}% * (100% - 5rem) / 100)`,
             }}
           />
 
@@ -124,37 +145,43 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
             const Icon = step.icon;
             const isCompleted = idx < activeIndex;
             const isCurrent = idx === activeIndex;
-            const isPending = idx > activeIndex;
 
             return (
-              <div key={step.id} className="flex flex-col items-center text-center z-10 w-28">
-                {/* Node Circle */}
+              <div
+                key={step.id}
+                className="flex flex-col items-center text-center z-10 w-32 relative"
+              >
+                {/* Node Pill / Circle */}
                 <div
-                  className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                     isCurrent
-                      ? "bg-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.6)] ring-4 ring-orange-500/20 scale-110"
+                      ? "bg-[var(--brand-accent)] text-white shadow-xl shadow-[var(--brand-accent)]/40 ring-4 ring-[var(--brand-accent)]/20 scale-110"
                       : isCompleted
-                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-                      : "bg-[#18181b] text-white/30 border border-white/10"
+                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
                   }`}
                 >
-                  <Icon size={18} strokeWidth={isCurrent ? 2.5 : 2} />
+                  {isCompleted ? (
+                    <CheckCircle2 size={20} strokeWidth={2.5} />
+                  ) : (
+                    <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />
+                  )}
                 </div>
 
                 {/* Step Labels */}
-                <div className="mt-3">
+                <div className="mt-3.5 space-y-0.5">
                   <p
                     className={`text-xs font-bold leading-tight ${
                       isCurrent
-                        ? "text-orange-400 font-extrabold"
+                        ? "text-[var(--brand-accent)] font-extrabold"
                         : isCompleted
-                        ? "text-white"
-                        : "text-white/40"
+                        ? "text-[var(--text-main)]"
+                        : "text-[var(--text-muted)]"
                     }`}
                   >
                     {step.label}
                   </p>
-                  <p className="text-[10px] text-white/40 mt-0.5 leading-tight">
+                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
                     {step.description}
                   </p>
                 </div>
@@ -164,64 +191,64 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
         </div>
       </div>
 
-      {/* Mobile Stepper (< sm) */}
-      <div className="sm:hidden space-y-4">
+      {/* Mobile Stepper View */}
+      <div className="sm:hidden pt-6 space-y-4">
         {ORDER_STEPS.map((step, idx) => {
           const Icon = step.icon;
           const isCompleted = idx < activeIndex;
           const isCurrent = idx === activeIndex;
-          const isPending = idx > activeIndex;
 
           return (
             <div key={step.id} className="relative flex items-start gap-3.5">
-              {/* Vertical connector line between mobile steps */}
               {idx < ORDER_STEPS.length - 1 && (
                 <div
-                  className={`absolute top-9 left-4 -ml-0.5 w-0.5 h-8 transition-colors ${
-                    isCompleted ? "bg-orange-500" : "bg-white/10"
+                  className={`absolute top-9 left-4 -ml-0.5 w-1 h-9 rounded-full transition-colors ${
+                    isCompleted ? "bg-emerald-500" : "bg-[var(--border-color)]"
                   }`}
                 />
               )}
 
-              {/* Step Circle */}
               <div
-                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 z-10 transition-all ${
                   isCurrent
-                    ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30 ring-2 ring-orange-500/30"
+                    ? "bg-[var(--brand-accent)] text-white shadow-lg shadow-[var(--brand-accent)]/30 ring-3 ring-[var(--brand-accent)]/25"
                     : isCompleted
-                    ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-                    : "bg-[#18181b] text-white/30 border border-white/10"
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
                 }`}
               >
-                <Icon size={14} strokeWidth={isCurrent ? 2.5 : 2} />
+                {isCompleted ? (
+                  <CheckCircle2 size={16} strokeWidth={2.5} />
+                ) : (
+                  <Icon size={16} strokeWidth={isCurrent ? 2.5 : 2} />
+                )}
               </div>
 
-              {/* Step Info */}
               <div className="flex-1 min-w-0 pt-0.5">
                 <div className="flex items-center justify-between gap-2">
                   <p
                     className={`text-xs font-bold ${
                       isCurrent
-                        ? "text-orange-400 font-black"
+                        ? "text-[var(--brand-accent)]"
                         : isCompleted
-                        ? "text-white"
-                        : "text-white/40"
+                        ? "text-[var(--text-main)]"
+                        : "text-[var(--text-muted)]"
                     }`}
                   >
                     {step.label}
                   </p>
                   {isCurrent && (
-                    <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-[var(--brand-accent)] bg-[var(--brand-accent)]/15 px-2 py-0.5 rounded-full border border-[var(--brand-accent)]/30">
                       In Progress
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="text-[10px] font-bold text-emerald-400">
+                    <span className="text-[10px] font-bold text-emerald-500">
                       Completed ✓
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-white/40 mt-0.5">
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                   {step.description}
                 </p>
               </div>

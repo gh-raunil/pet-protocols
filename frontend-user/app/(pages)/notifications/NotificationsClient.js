@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   Flame,
   ArrowLeft,
-  ChevronRight,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
 
@@ -64,47 +65,47 @@ export default function NotificationsClient() {
 
   const getTagColor = (type, priority) => {
     if (priority === "high") {
-      return "bg-rose-500/15 text-rose-400 border-rose-500/30";
+      return "bg-rose-500/15 text-rose-500 border-rose-500/30";
     }
     switch (type) {
       case "promotion":
-        return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+        return "bg-emerald-500/15 text-emerald-500 border-emerald-500/30";
       case "warning":
       case "important":
-        return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+        return "bg-amber-500/15 text-amber-500 border-amber-500/30";
       case "maintenance":
-        return "bg-blue-500/15 text-blue-400 border-blue-500/30";
+        return "bg-blue-500/15 text-blue-500 border-blue-500/30";
       default:
-        return "bg-orange-500/15 text-orange-400 border-orange-500/30";
+        return "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border-[var(--brand-accent)]/30";
     }
   };
 
   return (
-    <main className="min-h-screen pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto font-jakarta">
-      {/* Back button and page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6 mb-6">
+    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] transition-colors">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-color)] pb-6 mb-6">
         <div>
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition mb-3"
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition mb-3"
           >
             <ArrowLeft size={14} /> Back to Store
           </Link>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] flex items-center justify-center">
               <Bell size={20} />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] flex items-center gap-3">
                 Notification Inbox
                 {unreadCount > 0 && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-orange-500 text-white shadow-sm shadow-orange-500/30">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[var(--brand-accent)] text-white shadow-sm shadow-[var(--brand-accent)]/30">
                     {unreadCount} unread
                   </span>
                 )}
               </h1>
-              <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                Platform updates, order alerts, exclusive pet dining offers & announcements.
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+                Kitchen announcements, order alerts, and dining specials.
               </p>
             </div>
           </div>
@@ -115,7 +116,7 @@ export default function NotificationsClient() {
             <button
               onClick={handleMarkAll}
               disabled={markingAll}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-white transition text-xs font-semibold shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] hover:bg-[var(--brand-accent)] hover:text-white transition text-xs font-bold shadow-sm"
             >
               <CheckCheck size={14} />
               <span>Mark all read</span>
@@ -125,9 +126,9 @@ export default function NotificationsClient() {
           <button
             onClick={() => fetchNotifications()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin text-orange-400" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin text-[var(--brand-accent)]" : ""} />
             <span>Refresh</span>
           </button>
         </div>
@@ -145,10 +146,10 @@ export default function NotificationsClient() {
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+            className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition whitespace-nowrap ${
               activeFilter === tab.id
-                ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-                : "bg-white/5 text-gray-400 hover:text-white border border-white/5 hover:border-white/15"
+                ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/20"
+                : "bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
             }`}
           >
             {tab.label}
@@ -158,41 +159,37 @@ export default function NotificationsClient() {
 
       {/* Message Feed */}
       {loading && messages.length === 0 ? (
-        /* Loading State */
-        <div className="py-24 flex flex-col items-center justify-center gap-3 text-orange-500">
+        <div className="py-24 flex flex-col items-center justify-center gap-3 text-[var(--brand-accent)]">
           <RefreshCw className="animate-spin w-8 h-8" />
-          <p className="text-xs text-gray-400">Loading your inbox messages...</p>
+          <p className="text-xs text-[var(--text-muted)]">Loading your inbox messages...</p>
         </div>
       ) : error ? (
-        /* Error State */
-        <div className="p-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-3 my-8">
-          <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
-          <h3 className="text-sm font-bold text-rose-300">Unable to load notifications</h3>
-          <p className="text-xs text-rose-300/80 max-w-sm mx-auto">{error}</p>
+        <div className="p-8 rounded-3xl bg-red-500/10 border border-red-500/20 text-center space-y-3 my-8">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />
+          <h3 className="text-sm font-bold text-red-500">Unable to load notifications</h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">{error}</p>
           <button
             onClick={() => fetchNotifications()}
-            className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition shadow-sm"
+            className="px-4 py-2 rounded-xl bg-red-500 hover:opacity-95 text-white text-xs font-bold transition"
           >
             Try Again
           </button>
         </div>
       ) : filteredMessages.length === 0 ? (
-        /* Empty State */
-        <div className="bg-[#101216] border border-white/10 rounded-2xl p-16 text-center text-gray-400 shadow-sm">
-          <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 mx-auto mb-4">
-            <Inbox size={28} />
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-16 text-center text-[var(--text-muted)] shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] mx-auto mb-4">
+            <Inbox size={26} />
           </div>
-          <h3 className="font-bold text-base text-white">
+          <h3 className="font-bold text-base text-[var(--text-main)]">
             {activeFilter === "unread" ? "No unread messages" : "No messages in this category"}
           </h3>
-          <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-[var(--text-muted)] mt-1 max-w-sm mx-auto">
             {activeFilter === "unread"
-              ? "All your notifications have been marked as read. Check back soon for new announcements."
+              ? "All your notifications have been marked as read."
               : "Whenever our kitchen chefs or platform admins send notifications, they'll appear here."}
           </p>
         </div>
       ) : (
-        /* List of Cards */
         <div className="space-y-4">
           {filteredMessages.map((msg) => {
             const isRead = msg.isRead;
@@ -202,20 +199,20 @@ export default function NotificationsClient() {
             return (
               <div
                 key={msgId}
-                className={`bg-[#121316] border rounded-2xl p-5 sm:p-6 transition shadow-sm relative ${
+                className={`bg-[var(--bg-card)] border rounded-3xl p-5 sm:p-6 transition shadow-sm relative ${
                   isRead
-                    ? "border-white/5 opacity-85 hover:opacity-100"
-                    : "border-orange-500/40 bg-[#16181d] shadow-md shadow-orange-500/5"
+                    ? "border-[var(--border-color)] opacity-85 hover:opacity-100"
+                    : "border-[var(--brand-accent)]/50 bg-[var(--bg-sub)] shadow-md shadow-[var(--brand-accent)]/5"
                 }`}
               >
                 {!isRead && (
-                  <div className="absolute left-0 top-4 bottom-4 w-1 bg-orange-500 rounded-r" />
+                  <div className="absolute left-0 top-6 bottom-6 w-1.5 bg-[var(--brand-accent)] rounded-r-full" />
                 )}
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${getTagColor(
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${getTagColor(
                         msg.messageType,
                         msg.priority
                       )}`}
@@ -224,70 +221,61 @@ export default function NotificationsClient() {
                     </span>
 
                     {msg.priority === "high" && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
-                        <Flame size={10} /> High Priority
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-rose-500/15 text-rose-500 border border-rose-500/30 flex items-center gap-1">
+                        <Flame size={11} /> High Priority
                       </span>
                     )}
 
                     {isRead ? (
-                      <span className="text-[11px] text-emerald-400 font-medium inline-flex items-center gap-1">
+                      <span className="text-[11px] text-emerald-500 font-medium inline-flex items-center gap-1">
                         <CheckCircle2 size={12} /> Read
                       </span>
                     ) : (
-                      <span className="text-[11px] text-orange-400 font-bold flex items-center gap-1">
+                      <span className="text-[11px] text-[var(--brand-accent)] font-bold flex items-center gap-1">
                         ● Unread
                       </span>
                     )}
                   </div>
 
-                  <span className="text-xs text-gray-400 font-medium flex items-center gap-1">
+                  <span className="text-xs text-[var(--text-muted)] font-medium flex items-center gap-1">
                     <Clock size={12} /> {msg.date}
                   </span>
                 </div>
 
                 <h3
                   onClick={() => handleToggleExpand(msg)}
-                  className="text-base font-bold text-white mt-1 mb-2 cursor-pointer hover:text-orange-400 transition"
+                  className="text-base font-bold text-[var(--text-main)] mt-1 mb-2 cursor-pointer hover:text-[var(--brand-accent)] transition flex items-center justify-between"
                 >
-                  {msg.title}
+                  <span>{msg.title}</span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-[var(--text-muted)] transition-transform duration-200 ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
                 </h3>
 
                 <p
-                  className={`text-xs sm:text-sm text-gray-300 leading-relaxed ${
-                    isExpanded ? "whitespace-pre-line" : "line-clamp-2"
+                  className={`text-xs text-[var(--text-muted)] leading-relaxed transition-all ${
+                    isExpanded ? "" : "line-clamp-2"
                   }`}
                 >
                   {msg.content}
                 </p>
 
-                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                  <button
-                    onClick={() => handleToggleExpand(msg)}
-                    className="text-xs font-semibold text-orange-400 hover:text-orange-300 transition flex items-center gap-1"
-                  >
-                    <span>{isExpanded ? "Show less" : "Read full message"}</span>
-                    <ChevronRight
-                      size={13}
-                      className={`transition-transform duration-200 ${
-                        isExpanded ? "-rotate-90" : "rotate-90"
-                      }`}
-                    />
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    {!isRead ? (
+                {msg.senderName && (
+                  <div className="mt-3 pt-3 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex items-center justify-between">
+                    <span>Sent by: <strong className="text-[var(--text-main)]">{msg.senderName}</strong></span>
+                    {!isRead && (
                       <button
                         onClick={() => markAsRead(msgId)}
-                        className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition shadow-sm flex items-center gap-1.5"
+                        className="text-xs font-bold text-[var(--brand-accent)] hover:underline"
                       >
-                        <CheckCircle2 size={13} />
-                        <span>Mark as read</span>
+                        Mark as read
                       </button>
-                    ) : (
-                      <span className="text-xs text-gray-500 font-medium">Acknowledged</span>
                     )}
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

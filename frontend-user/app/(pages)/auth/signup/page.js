@@ -98,118 +98,133 @@ export default function SignupPage() {
         flex
         items-center
         justify-center
-        px-6
-        mt-10
-        bg-brand-dark
+        px-4 sm:px-6
+        py-24
+        bg-[var(--bg-main)]
+        text-[var(--text-main)]
+        transition-colors
       "
     >
-
       <div
         className="
           w-full
           max-w-md
-          bg-brand-card
+          bg-[var(--bg-card)]
           border
-          border-brand-border
+          border-[var(--border-color)]
           rounded-3xl
-          p-8
+          p-6 sm:p-8
+          shadow-xl
         "
       >
-
         {/* Heading */}
         <div className="text-center">
-
-          <h1 className="text-5xl font-bold">
-            Join The Feast 🍕
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] mb-3 text-xl font-black">
+            ✨
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
+            Join Pet Protocols
           </h1>
 
-          <p className="text-brand-muted mt-3">
-            Create your account to get started
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2">
+            Fresh food. Zero compromises.
           </p>
-
         </div>
 
         {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="mt-10 space-y-5"
-        >
-
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           {/* Name */}
-          <input
-            type="text"
-            name="name"
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className="
-              w-full
-              bg-brand-dark
-              border
-              border-brand-border
-              rounded-xl
-              px-4
-              py-3
-              text-white
-              placeholder:text-brand-muted
-              outline-none
-              focus:border-brand-orange
-            "
-          />
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              Full Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              placeholder="e.g. Jordan Smith"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              className="
+                w-full
+                bg-[var(--bg-sub)]
+                border
+                border-[var(--border-color)]
+                rounded-xl
+                px-4
+                py-2.5
+                text-sm
+                text-[var(--text-main)]
+                placeholder-[var(--text-muted)]/60
+                outline-none
+                focus:border-[var(--brand-accent)]
+                transition
+              "
+            />
+          </div>
 
           {/* Email */}
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="
-              w-full
-              bg-brand-dark
-              border
-              border-brand-border
-              rounded-xl
-              px-4
-              py-3
-              text-white
-              placeholder:text-brand-muted
-              outline-none
-              focus:border-brand-orange
-            "
-          />
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              placeholder="alex@example.com"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className="
+                w-full
+                bg-[var(--bg-sub)]
+                border
+                border-[var(--border-color)]
+                rounded-xl
+                px-4
+                py-2.5
+                text-sm
+                text-[var(--text-main)]
+                placeholder-[var(--text-muted)]/60
+                outline-none
+                focus:border-[var(--brand-accent)]
+                transition
+              "
+            />
+          </div>
 
           {/* Password */}
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            className="
-              w-full
-              bg-brand-dark
-              border
-              border-brand-border
-              rounded-xl
-              px-4
-              py-3
-              text-white
-              placeholder:text-brand-muted
-              outline-none
-              focus:border-brand-orange
-            "
-          />
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              placeholder="Create a strong password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              className="
+                w-full
+                bg-[var(--bg-sub)]
+                border
+                border-[var(--border-color)]
+                rounded-xl
+                px-4
+                py-2.5
+                text-sm
+                text-[var(--text-main)]
+                placeholder-[var(--text-muted)]/60
+                outline-none
+                focus:border-[var(--brand-accent)]
+                transition
+              "
+            />
+          </div>
 
           {/* Error Message */}
-          {error && (
-            <p className="text-red-500 text-sm text-center">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
 
           {/* Signup Button */}
           <button
@@ -217,35 +232,28 @@ export default function SignupPage() {
             disabled={loading}
             className="
               w-full
-              bg-brand-orange
-              text-black
+              bg-[var(--brand-accent)]
+              text-white
               py-3
               rounded-xl
-              font-semibold
+              text-sm
+              font-bold
               hover:opacity-90
               transition
+              shadow-lg
+              shadow-[var(--brand-accent)]/20
+              disabled:opacity-50
             "
           >
-
-            {loading
-              ? "Creating Account..."
-              : "Create Account"}
-
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
-
         </form>
 
         {/* Divider */}
-        <div className="flex items-center gap-4 my-8">
-
-          <div className="flex-1 h-[1px] bg-brand-border" />
-
-          <span className="text-brand-muted text-sm">
-            OR
-          </span>
-
-          <div className="flex-1 h-[1px] bg-brand-border" />
-
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-[1px] bg-[var(--border-color)]" />
+          <span className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider">OR</span>
+          <div className="flex-1 h-[1px] bg-[var(--border-color)]" />
         </div>
 
         {/* Google Signup */}
@@ -255,40 +263,33 @@ export default function SignupPage() {
           className="
             w-full
             border
-            border-brand-border
+            border-[var(--border-color)]
+            bg-[var(--bg-sub)]
             rounded-xl
-            py-3
+            py-2.5
+            text-sm
+            font-semibold
+            text-[var(--text-main)]
             flex
             items-center
             justify-center
             gap-3
-            hover:bg-brand-border
+            hover:border-[var(--brand-accent)]/50
             transition
           "
         >
-
           <Chrome size={18} />
-
           Continue with Google
-
         </button>
 
         {/* Login Link */}
-        <p className="text-center text-brand-muted mt-8">
-
+        <p className="text-center text-xs text-[var(--text-muted)] mt-6">
           Already have an account?{" "}
-
-          <Link
-            href="/auth/login"
-            className="text-brand-orange"
-          >
-            Login
+          <Link href="/auth/login" className="text-[var(--brand-accent)] font-semibold hover:underline">
+            Log in
           </Link>
-
         </p>
-
       </div>
-
     </main>
   );
 }

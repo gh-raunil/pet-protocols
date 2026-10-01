@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
   Zap,
   Info,
@@ -23,6 +24,8 @@ import {
   Plus,
   Check,
   Banknote,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 
 // Dynamically load Razorpay standard checkout script
@@ -73,7 +76,6 @@ export default function CheckoutClient() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Preload script
     loadRazorpayScript();
 
     if (session?.user?.name) {
@@ -122,32 +124,17 @@ export default function CheckoutClient() {
     }
   }, [session]);
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (isMounted && !session) {
-      router.push("/auth/login?callbackUrl=/checkout");
-    }
-  }, [isMounted, session, router]);
-
-  // Redirect if cart empty
-  useEffect(() => {
-    if (isMounted && items.length === 0) {
-      router.push("/menu");
-    }
-  }, [isMounted, items, router]);
-
-  const handleSelectSavedAddress = (addr) => {
-    setSelectedAddressId(addr._id);
+  const handleSelectSavedAddress = (saved) => {
+    setSelectedAddressId(saved._id);
     setAddress({
-      fullName: addr.fullName,
-      phone: addr.phone,
-      street: addr.street,
-      city: addr.city,
-      state: addr.state,
-      pincode: addr.pincode,
+      fullName: saved.fullName || session?.user?.name || "",
+      phone: saved.phone || session?.user?.phone || "",
+      street: saved.street || "",
+      city: saved.city || "New Delhi",
+      state: saved.state || "Delhi",
+      pincode: saved.pincode || "110001",
     });
     setSaveAddressToProfile(false);
-    setError("");
   };
 
   const handleSelectCustomAddress = () => {
@@ -161,7 +148,6 @@ export default function CheckoutClient() {
       pincode: "110001",
     });
     setSaveAddressToProfile(true);
-    setError("");
   };
 
   const handleChange = (e) => {
@@ -169,84 +155,84 @@ export default function CheckoutClient() {
       ...address,
       [e.target.name]: e.target.value,
     });
-    if (selectedAddressId !== "new") {
-      setSelectedAddressId("new");
-      setSaveAddressToProfile(true);
-    }
     setError("");
   };
 
   const validateDeliveryDetails = () => {
-    const { fullName, phone, street, city, state, pincode } = address;
-    if (!fullName || !phone || !street || !city || !state || !pincode) {
-      setError("Please fill in all delivery details.");
+    if (!address.fullName.trim()) {
+      setError("Please enter your recipient full name.");
       return false;
     }
-
-    if (phone.replace(/\D/g, "").length < 10) {
-      setError("Please enter a valid 10-digit phone number.");
+    if (!address.phone.trim() || address.phone.trim().length < 8) {
+      setError("Please enter a valid 10-digit delivery contact number.");
+      return false;
+    }
+    if (!address.street.trim()) {
+      setError("Please provide your delivery street, house, or apartment address.");
+      return false;
+    }
+    if (!address.pincode.trim()) {
+      setError("Please provide a valid delivery area pincode.");
       return false;
     }
     return true;
   };
 
-  // Helper to persist address into user profile if requested
   const saveAddressIfRequested = async () => {
-    if (saveAddressToProfile && address.street?.trim() && address.pincode?.trim()) {
-      try {
-        await fetch("/api/user/addresses", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...address,
-            label: newAddressLabel || "Home",
-            isDefault: savedAddresses.length === 0,
-          }),
-        });
-      } catch (err) {
-        console.warn("Could not save address to profile:", err);
-      }
+    if (!saveAddressToProfile || !session?.user || selectedAddressId !== "new") return;
+    try {
+      await fetch("/api/user/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: newAddressLabel || "Home",
+          fullName: address.fullName,
+          phone: address.phone,
+          street: address.street,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode,
+          isDefault: savedAddresses.length === 0,
+        }),
+      });
+    } catch (e) {
+      console.warn("Could not save address to profile:", e);
     }
   };
 
-  // 1. Full Razorpay Standard Gateway Checkout Flow
+  // 1. Razorpay Real / Sandbox Checkout Flow
   const handleRazorpayCheckout = async () => {
     if (!validateDeliveryDetails()) return;
 
     setLoading(true);
-    setLoadingStep("Connecting to Razorpay gateway...");
+    setLoadingStep("Initializing secure Razorpay payment gateway...");
     setError("");
 
     try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        setError("Unable to initialize Razorpay SDK. Please check your internet connection.");
-        setLoading(false);
-        return;
-      }
-
-      const subtotal = getTotalPrice();
-      const delivery = subtotal > 499 ? 0 : 40;
-      const total = subtotal + delivery;
-
-      // Create Order on Backend
-      setLoadingStep("Creating secure payment order...");
-      const orderRes = await fetch("/api/payment/create-order", {
+      const res = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total }),
+        body: JSON.stringify({
+          items,
+          address,
+          notes,
+        }),
       });
 
-      const orderData = await orderRes.json();
-      if (!orderData.success || !orderData.order) {
-        setError(orderData.message || "Failed to create Razorpay payment order.");
+      const orderData = await res.json();
+      if (!orderData.success) {
+        setError(orderData.message || "Failed to initialize payment.");
         setLoading(false);
         return;
       }
 
-      setLoadingStep("Launching payment window...");
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || typeof window.Razorpay === "undefined") {
+        setError("Failed to load Razorpay payment SDK. Please check your internet connection.");
+        setLoading(false);
+        return;
+      }
 
-      // Configure Razorpay Standard Modal options
       const razorpayKey = orderData.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
       if (!razorpayKey) {
         setError("Payment gateway is not configured properly. Please contact support.");
@@ -259,7 +245,7 @@ export default function CheckoutClient() {
         amount: orderData.order.amount,
         currency: orderData.order.currency || "INR",
         name: "Pet Protocols",
-        description: `Pet Gourmet Order (${items.length} items)`,
+        description: `Food Feast Order (${items.length} items)`,
         order_id: orderData.order.id,
         prefill: {
           name: address.fullName,
@@ -267,7 +253,7 @@ export default function CheckoutClient() {
           email: session?.user?.email || "customer@petprotocols.com",
         },
         theme: {
-          color: "#f97316", // Brand orange accent
+          color: "#ea580c",
         },
         modal: {
           ondismiss: function () {
@@ -319,21 +305,20 @@ export default function CheckoutClient() {
         setError(`Payment Failed: ${response.error?.description || "Transaction declined"}`);
         setLoading(false);
       });
-
       razorpayInstance.open();
     } catch (err) {
-      console.error("Checkout error:", err);
-      setError("An unexpected error occurred while launching Razorpay.");
+      console.error(err);
+      setError("An unexpected network error occurred while preparing your checkout.");
       setLoading(false);
     }
   };
 
-  // 2. Direct Mock Simulator Fallback
+  // 2. Instant Simulator Checkout Flow (Demo/Dev)
   const handleSimulatorCheckout = async () => {
     if (!validateDeliveryDetails()) return;
 
     setLoading(true);
-    setLoadingStep("Simulating instant payment & dispatching order...");
+    setLoadingStep("Placing instant simulation order...");
     setError("");
 
     try {
@@ -406,6 +391,8 @@ export default function CheckoutClient() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (loading) return; // Prevent duplicate submissions
+
     if (paymentMode === "razorpay") {
       handleRazorpayCheckout();
     } else if (paymentMode === "cod") {
@@ -421,52 +408,101 @@ export default function CheckoutClient() {
   const delivery = subtotal > 499 ? 0 : 40;
   const total = subtotal + delivery;
 
+  if (items.length === 0) {
+    return (
+      <main className="min-h-screen pt-32 pb-24 px-6 flex items-center justify-center text-center text-[var(--text-main)]">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl">
+          <ShoppingBag size={40} className="mx-auto text-[var(--brand-accent)] mb-4" />
+          <h1 className="text-2xl font-black text-[var(--text-main)]">Your cart is empty</h1>
+          <p className="text-xs text-[var(--text-muted)] mt-2">
+            Add items from our partner kitchens before checking out.
+          </p>
+          <Link
+            href="/menu"
+            className="inline-block mt-6 px-6 py-3 rounded-2xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-lg shadow-[var(--brand-accent)]/20"
+          >
+            Explore Menu
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const steps = [
+    { num: 1, label: "Delivery Mode" },
+    { num: 2, label: "Address & Contact" },
+    { num: 3, label: "Order Review" },
+    { num: 4, label: "Payment Selection" },
+    { num: 5, label: "Place Order" },
+  ];
+
   return (
-    <main className="min-h-screen pt-28 pb-20 px-6 max-w-7xl mx-auto text-white">
-      {/* Header */}
+    <main className="min-h-screen pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
+      {/* ── 5-STEP CHECKOUT BREADCRUMB PROGRESS BAR ────────────────── */}
       <div className="mb-8">
-        <span className="text-orange-400 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-          <ShieldCheck size={14} /> Multi-Kitchen Secure Checkout
-        </span>
-        <h1 className="text-4xl font-extrabold mt-1">
-          Check<span className="text-orange-500">out</span>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] uppercase tracking-wider mb-2">
+          <ShieldCheck size={15} /> Multi-Kitchen Secure Checkout
+        </div>
+        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
+          Checkout & Order Confirmation
         </h1>
-        <p className="text-gray-400 text-sm mt-0.5">
-          Complete your order using Razorpay Payment Gateway (Test Mode) with instant multi-method support.
-        </p>
+
+        {/* Visual Steps Indicator */}
+        <div className="mt-6 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hidden md:flex items-center justify-between">
+          {steps.map((st, i) => (
+            <div key={st.num} className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-[var(--brand-accent)] text-white font-black text-xs flex items-center justify-center">
+                {st.num}
+              </span>
+              <span className="text-xs font-bold text-[var(--text-main)]">
+                {st.label}
+              </span>
+              {i < steps.length - 1 && (
+                <div className="w-12 h-0.5 bg-[var(--border-color)] ml-3" />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* LEFT: Delivery Address Form */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* LEFT: Delivery Address & Payment Form */}
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-[#0d0d0d] rounded-2xl p-6 md:p-8 border border-white/10 shadow-xl">
-              <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  🏠 Delivery Address & Contact
-                </h2>
+            {/* Step 1 & 2: Delivery Address Card */}
+            <div className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 border border-[var(--border-color)] shadow-xl space-y-5">
+              <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[var(--border-color)]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center">
+                    <Truck size={17} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-extrabold text-[var(--text-main)]">
+                      Delivery Address & Contact
+                    </h2>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      Doorstep delivery dispatched upon preparation
+                    </span>
+                  </div>
+                </div>
+
                 {session?.user && (
                   <Link
                     href="/profile"
-                    className="text-xs text-orange-400 hover:text-orange-300 font-medium transition flex items-center gap-1"
+                    className="text-xs text-[var(--brand-accent)] hover:underline font-semibold transition"
                   >
                     Manage saved addresses →
                   </Link>
                 )}
               </div>
 
-              {/* Saved Addresses Selector Cards */}
+              {/* Saved Addresses Selection */}
               {savedAddresses.length > 0 && (
-                <div className="mb-6 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <MapPin size={14} className="text-orange-400" />
-                      Select a Saved Location
-                    </span>
-                    <span className="text-[11px] text-gray-500">
-                      {savedAddresses.length} saved address{savedAddresses.length > 1 ? "es" : ""}
-                    </span>
-                  </div>
+                <div className="space-y-3">
+                  <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin size={13} className="text-[var(--brand-accent)]" />
+                    Select a Saved Location
+                  </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {savedAddresses.map((addr) => {
@@ -475,59 +511,51 @@ export default function CheckoutClient() {
                         <div
                           key={addr._id}
                           onClick={() => handleSelectSavedAddress(addr)}
-                          className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
                             isSelected
-                              ? "border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500"
-                              : "border-white/10 bg-[#141414] hover:border-white/25"
+                              ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
+                              : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
                               {addr.label === "Home" ? (
-                                <Home size={13} className="text-orange-400" />
+                                <Home size={13} className="text-[var(--brand-accent)]" />
                               ) : addr.label === "Work" ? (
                                 <Briefcase size={13} className="text-blue-400" />
                               ) : (
-                                <MapPin size={13} className="text-green-400" />
+                                <MapPin size={13} className="text-emerald-400" />
                               )}
                               {addr.label || "Home"}
                             </span>
-                            <div className="flex items-center gap-1">
-                              {addr.isDefault && (
-                                <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-medium">
-                                  Default
-                                </span>
-                              )}
-                              {isSelected && (
-                                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                              )}
-                            </div>
+                            {isSelected && (
+                              <span className="w-2 h-2 rounded-full bg-[var(--brand-accent)] animate-pulse" />
+                            )}
                           </div>
-                          <p className="text-xs font-semibold text-gray-200 truncate">
+                          <p className="text-xs font-semibold text-[var(--text-main)] truncate">
                             {addr.fullName}
                           </p>
-                          <p className="text-[11px] text-gray-400 line-clamp-2 mt-1 leading-relaxed">
+                          <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-0.5 leading-relaxed">
                             {addr.street}, {addr.city} - {addr.pincode}
                           </p>
-                          <p className="text-[10px] text-gray-500 mt-1 font-mono">
+                          <p className="text-[10px] text-[var(--text-muted)] mt-1 font-mono">
                             📞 {addr.phone}
                           </p>
                         </div>
                       );
                     })}
 
-                    {/* New Address option */}
                     <div
                       onClick={handleSelectCustomAddress}
-                      className={`p-3.5 rounded-xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                      className={`p-3.5 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                         selectedAddressId === "new"
-                          ? "border-orange-500 bg-orange-500/10 text-orange-400 ring-1 ring-orange-500"
-                          : "border-white/20 bg-[#141414]/60 hover:border-white/40 text-gray-400 hover:text-white"
+                          ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]"
+                          : "border-[var(--border-color)] bg-[var(--bg-sub)] text-[var(--text-muted)] hover:border-[var(--brand-accent)]/40 hover:text-[var(--text-main)]"
                       }`}
                     >
-                      <Plus size={16} className="mb-1 text-orange-400" />
+                      <Plus size={16} className="mb-1 text-[var(--brand-accent)]" />
                       <span className="text-xs font-bold">New Address</span>
-                      <span className="text-[10px] text-gray-500">Deliver to a different place</span>
+                      <span className="text-[10px] opacity-75">Deliver to a new place</span>
                     </div>
                   </div>
                 </div>
@@ -536,8 +564,8 @@ export default function CheckoutClient() {
               {/* Form Input Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
-                    Full Name *
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                    Recipient Full Name *
                   </label>
                   <input
                     name="fullName"
@@ -545,13 +573,13 @@ export default function CheckoutClient() {
                     value={address.fullName}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
-                    Phone Number *
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                    Contact Phone Number *
                   </label>
                   <input
                     name="phone"
@@ -559,26 +587,26 @@ export default function CheckoutClient() {
                     value={address.phone}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
-                    Street Address / Flat / Landmark *
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                    House / Flat / Street / Landmark *
                   </label>
                   <input
                     name="street"
-                    placeholder="e.g. Flat 402, Sunshine Residency, Green Park"
+                    placeholder="e.g. Flat 302, Green Valley Apartments"
                     value={address.street}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                     City *
                   </label>
                   <input
@@ -587,66 +615,52 @@ export default function CheckoutClient() {
                     value={address.city}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
-                    State *
-                  </label>
-                  <input
-                    name="state"
-                    placeholder="Delhi"
-                    value={address.state}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                     Pincode *
                   </label>
                   <input
                     name="pincode"
-                    placeholder="110016"
+                    placeholder="110001"
                     value={address.pincode}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
-                <div>
-                  <label className="text-gray-400 text-xs font-semibold uppercase mb-1 block">
-                    Special Cooking / Delivery Notes
+                <div className="md:col-span-2">
+                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                    Kitchen / Delivery Special Instructions
                   </label>
                   <input
-                    placeholder="e.g. Extra napkins, less spicy"
+                    placeholder="e.g. Ring bell, leave at reception, extra napkins"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-orange-500 transition"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
                   />
                 </div>
 
-                {/* Save Address to Profile Option */}
+                {/* Save address option */}
                 {selectedAddressId === "new" && (
-                  <div className="md:col-span-2 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white transition">
+                  <div className="md:col-span-2 pt-3 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
                       <input
                         type="checkbox"
                         checked={saveAddressToProfile}
                         onChange={(e) => setSaveAddressToProfile(e.target.checked)}
-                        className="rounded border-white/20 bg-[#141414] text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
+                        className="rounded border-[var(--border-color)] bg-[var(--bg-sub)] text-[var(--brand-accent)] focus:ring-[var(--brand-accent)] w-4 h-4 cursor-pointer"
                       />
                       <span>Save this address to my profile for future orders</span>
                     </label>
 
                     {saveAddressToProfile && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-gray-400">Save as:</span>
+                        <span className="text-[11px] text-[var(--text-muted)]">Save as:</span>
                         {["Home", "Work", "Other"].map((lbl) => (
                           <button
                             type="button"
@@ -654,8 +668,8 @@ export default function CheckoutClient() {
                             onClick={() => setNewAddressLabel(lbl)}
                             className={`text-xs px-2.5 py-1 rounded-lg border transition font-medium cursor-pointer ${
                               newAddressLabel === lbl
-                                ? "border-orange-500 bg-orange-500/20 text-orange-400"
-                                : "border-white/10 bg-[#141414] text-gray-400 hover:border-white/20"
+                                ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/20 text-[var(--brand-accent)]"
+                                : "border-[var(--border-color)] bg-[var(--bg-sub)] text-[var(--text-muted)] hover:border-[var(--brand-accent)]/30"
                             }`}
                           >
                             {lbl}
@@ -668,125 +682,93 @@ export default function CheckoutClient() {
               </div>
             </div>
 
-            {/* PAYMENT METHOD SELECTOR */}
-            <div className="bg-[#0d0d0d] rounded-2xl p-6 md:p-8 border border-white/10 shadow-xl space-y-4">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                💳 Choose Payment Option
+            {/* Step 4: Payment Method Selection */}
+            <div className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 border border-[var(--border-color)] shadow-xl space-y-4">
+              <h2 className="text-base font-extrabold text-[var(--text-main)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
+                <CreditCard size={18} className="text-[var(--brand-accent)]" />
+                Select Payment Method
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                {/* Option 1: Cash on Delivery (COD) */}
+                {/* 1. Cash on Delivery (COD) */}
                 <div
                   onClick={() => setPaymentMode("cod")}
-                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                  className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === "cod"
-                      ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40"
-                      : "border-white/10 bg-[#141414] hover:border-white/20"
+                      ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
+                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center font-bold shrink-0">
                         <Banknote size={18} />
                       </div>
                       <div>
-                        <span className="font-bold text-sm text-white block">
+                        <span className="font-bold text-sm text-[var(--text-main)] block">
                           Cash on Delivery
                         </span>
-                        <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
+                        <span className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wider">
                           Pay at Doorstep
                         </span>
                       </div>
                     </div>
                     <div
                       className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                        paymentMode === "cod"
-                          ? "border-emerald-500 bg-emerald-500 text-white"
-                          : "border-white/30"
+                        paymentMode === "cod" ? "border-emerald-500 bg-emerald-500 text-white" : "border-[var(--border-color)]"
                       }`}
                     >
-                      {paymentMode === "cod" && (
-                        <div className="w-2 h-2 rounded-full bg-white" />
-                      )}
+                      {paymentMode === "cod" && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Pay in cash or delivery-scan UPI directly to the delivery rider upon arrival.
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    Pay via cash or UPI scan directly to the delivery rider upon arrival.
                   </p>
-                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px]">
-                    <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-semibold">
-                      💵 Cash / UPI
-                    </span>
-                    <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-gray-300">
-                      Zero Risk
-                    </span>
-                  </div>
                 </div>
 
-                {/* Option 2: Razorpay Payment Gateway (WITH TOP-RIGHT TESTING RIBBON) */}
+                {/* 2. Razorpay Payment Gateway */}
                 <div
                   onClick={() => setPaymentMode("razorpay")}
-                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                  className={`relative p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === "razorpay"
-                      ? "border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/40"
-                      : "border-white/10 bg-[#141414] hover:border-white/20"
+                      ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
+                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
                   }`}
                 >
-                  {/* Top-Right Corner Prominent TESTING Ribbon */}
-                  <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none z-20">
-                    <div className="absolute top-[18px] -right-[32px] w-[126px] rotate-45 bg-amber-400 text-stone-950 text-center font-black text-[10px] tracking-widest uppercase py-1 shadow-md border-y border-amber-300">
-                      TESTING
-                    </div>
-                  </div>
-
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-[var(--brand-accent)]/20 text-[var(--brand-accent)] flex items-center justify-center font-bold shrink-0">
                         <CreditCard size={18} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-white block">
-                            Razorpay Gateway
-                          </span>
-                          <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-black uppercase tracking-wider">
-                            TESTING
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">
-                          Test Mode Active
+                        <span className="font-bold text-sm text-[var(--text-main)] block">
+                          Razorpay Gateway
+                        </span>
+                        <span className="text-[10px] text-[var(--brand-accent)] font-semibold uppercase tracking-wider">
+                          UPI / Cards / NetBanking
                         </span>
                       </div>
                     </div>
                     <div
                       className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                        paymentMode === "razorpay"
-                          ? "border-orange-500 bg-orange-500 text-white"
-                          : "border-white/30"
+                        paymentMode === "razorpay" ? "border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white" : "border-[var(--border-color)]"
                       }`}
                     >
-                      {paymentMode === "razorpay" && (
-                        <div className="w-2 h-2 rounded-full bg-white" />
-                      )}
+                      {paymentMode === "razorpay" && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Online cards, UPI, and NetBanking tested via Razorpay sandbox environment.
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    Instant online checkout tested via standard Razorpay sandbox.
                   </p>
-                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px] text-gray-300">
-                    <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">UPI</span>
-                    <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">Cards</span>
-                    <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded">NetBanking</span>
-                  </div>
                 </div>
 
-                {/* Option 3: Instant Simulator */}
+                {/* 3. Dev Simulator */}
                 <div
                   onClick={() => setPaymentMode("simulator")}
-                  className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                  className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === "simulator"
-                      ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40"
-                      : "border-white/10 bg-[#141414] hover:border-white/20"
+                      ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40"
+                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -795,7 +777,7 @@ export default function CheckoutClient() {
                         <Zap size={18} />
                       </div>
                       <div>
-                        <span className="font-bold text-sm text-white block">
+                        <span className="font-bold text-sm text-[var(--text-main)] block">
                           Dev Simulator
                         </span>
                         <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">
@@ -805,55 +787,37 @@ export default function CheckoutClient() {
                     </div>
                     <div
                       className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                        paymentMode === "simulator"
-                          ? "border-blue-500 bg-blue-500 text-white"
-                          : "border-white/30"
+                        paymentMode === "simulator" ? "border-blue-500 bg-blue-500 text-white" : "border-[var(--border-color)]"
                       }`}
                     >
-                      {paymentMode === "simulator" && (
-                        <div className="w-2 h-2 rounded-full bg-white" />
-                      )}
+                      {paymentMode === "simulator" && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    One-click mock order checkout bypass for testing kitchen display and notifications.
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    Quick mock order placement for testing order management and status tracker.
                   </p>
-                  <div className="mt-3 flex items-center gap-1.5 flex-wrap text-[10px] text-gray-300">
-                    <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-semibold">
-                      Fastest
-                    </span>
-                    <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
-                      Demo Only
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              {/* Helper Toggle for Razorpay Test Info */}
+              {/* Helper for Razorpay test info */}
               {paymentMode === "razorpay" && (
-                <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="mt-3 pt-3 border-t border-[var(--border-color)]">
                   <button
                     type="button"
                     onClick={() => setShowTestCards(!showTestCards)}
-                    className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1.5 transition font-semibold"
+                    className="text-xs text-[var(--brand-accent)] hover:underline flex items-center gap-1.5 transition font-semibold"
                   >
                     <Info size={14} />
-                    {showTestCards ? "Hide Razorpay Test Credentials" : "View Razorpay Test Mode Credentials"}
+                    {showTestCards ? "Hide Sandbox Instructions" : "View Sandbox Test Credentials"}
                   </button>
 
                   {showTestCards && (
-                    <div className="mt-3 p-4 bg-[#141414] border border-white/10 rounded-xl text-xs space-y-2 text-gray-300 animate-in fade-in">
-                      <p className="font-bold text-white text-xs">🧪 Razorpay Test Payment Instructions:</p>
-                      <ul className="list-disc pl-5 space-y-1 text-gray-400">
-                        <li>
-                          <strong className="text-white">UPI:</strong> Enter <code className="text-orange-400 bg-white/5 px-1 py-0.5 rounded font-mono">success@razorpay</code> and click approve.
-                        </li>
-                        <li>
-                          <strong className="text-white">Card:</strong> Any card number like <code className="text-orange-400 bg-white/5 px-1 py-0.5 rounded font-mono">4111 1111 1111 1111</code>, any future expiry date, and any 3-digit CVV.
-                        </li>
-                        <li>
-                          <strong className="text-white">OTP:</strong> Enter <code className="text-orange-400 bg-white/5 px-1 py-0.5 rounded font-mono">123456</code> in the mock bank verification.
-                        </li>
+                    <div className="mt-2.5 p-4 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl text-xs space-y-1.5 text-[var(--text-muted)]">
+                      <p className="font-bold text-[var(--text-main)]">Razorpay Sandbox Testing:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li><strong>UPI:</strong> Use <code className="text-[var(--brand-accent)] font-mono">success@razorpay</code>.</li>
+                        <li><strong>Card:</strong> Use card <code className="text-[var(--brand-accent)] font-mono">4111 1111 1111 1111</code> with any future expiry date and 123 CVV.</li>
+                        <li><strong>OTP:</strong> Enter <code className="text-[var(--brand-accent)] font-mono">123456</code>.</li>
                       </ul>
                     </div>
                   )}
@@ -862,25 +826,28 @@ export default function CheckoutClient() {
             </div>
 
             {error && (
-              <div className="bg-red-500/15 border border-red-500/30 rounded-xl p-4 text-red-300 text-sm flex items-center gap-2">
-                <AlertCircle size={16} className="shrink-0" />
-                {error}
+              <div className="bg-red-500/15 border border-red-500/30 rounded-2xl p-4 text-red-500 text-sm flex items-center gap-2">
+                <AlertCircle size={18} className="shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
+            {/* Step 5: Place Order Action Button */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full font-bold py-4 rounded-2xl text-base transition shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
-                paymentMode === "cod"
-                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
-                  : "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
+              className={`w-full font-black py-4 rounded-2xl text-sm transition shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
+                loading
+                  ? "opacity-75 cursor-not-allowed bg-[var(--brand-accent)] text-white"
+                  : paymentMode === "cod"
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-98"
+                  : "bg-[var(--brand-accent)] hover:opacity-95 text-white shadow-[var(--brand-accent)]/20 active:scale-98"
               }`}
             >
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>{loadingStep || "Processing..."}</span>
+                  <span>{loadingStep || "Confirming Order..."}</span>
                 </>
               ) : (
                 <>
@@ -889,7 +856,7 @@ export default function CheckoutClient() {
                     {paymentMode === "cod"
                       ? `Place Order (Cash on Delivery) • ₹${total}`
                       : paymentMode === "razorpay"
-                      ? `Pay ₹${total} with Razorpay (Test)`
+                      ? `Pay ₹${total} via Razorpay (Sandbox)`
                       : `Place Order via Dev Simulator (₹${total})`}
                   </span>
                   <ArrowRight size={18} />
@@ -899,37 +866,37 @@ export default function CheckoutClient() {
           </form>
         </div>
 
-        {/* RIGHT: Order Summary & Snapshot Review */}
-        <div className="sticky top-24">
-          <div className="bg-[#0d0d0d] rounded-2xl p-6 border border-white/10 shadow-2xl">
-            <h2 className="text-lg font-bold text-white mb-5 flex items-center justify-between">
+        {/* RIGHT: Order Summary Snapshot Card */}
+        <div className="sticky top-28 space-y-4">
+          <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl">
+            <h2 className="text-base font-extrabold text-[var(--text-main)] mb-4 flex items-center justify-between">
               <span>🧾 Order Summary</span>
-              <span className="text-xs font-mono text-orange-400 font-semibold bg-orange-500/10 px-2 py-0.5 rounded">
-                {items.length} item{items.length > 1 ? "s" : ""}
+              <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded-full">
+                {items.length} {items.length > 1 ? "items" : "item"}
               </span>
             </h2>
 
-            {/* Items */}
+            {/* Items List */}
             <div className="space-y-3 mb-6 max-h-72 overflow-y-auto pr-1">
               {items.map((item) => (
                 <div
                   key={item._id}
-                  className="flex items-center gap-3 bg-[#141414] p-2.5 rounded-xl border border-white/5"
+                  className="flex items-center gap-3 bg-[var(--bg-sub)] p-2.5 rounded-2xl border border-[var(--border-color)]"
                 >
                   <Image
                     src={item.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200"}
                     alt={item.name}
                     width={48}
                     height={48}
-                    className="w-12 h-12 rounded-lg object-cover shrink-0"
+                    className="w-12 h-12 rounded-xl object-cover shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{item.name}</p>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-xs font-bold text-[var(--text-main)] truncate">{item.name}</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
                       Qty: {item.quantity} × ₹{item.price}
                     </p>
                   </div>
-                  <span className="text-sm font-mono font-bold text-orange-400 shrink-0">
+                  <span className="text-xs font-mono font-extrabold text-[var(--brand-accent)] shrink-0">
                     ₹{item.price * item.quantity}
                   </span>
                 </div>
@@ -937,31 +904,31 @@ export default function CheckoutClient() {
             </div>
 
             {/* Price Calculations */}
-            <div className="border-t border-white/10 pt-4 space-y-2.5 text-xs">
-              <div className="flex justify-between text-gray-400">
+            <div className="border-t border-[var(--border-color)] pt-4 space-y-2.5 text-xs">
+              <div className="flex justify-between text-[var(--text-muted)]">
                 <span>Items Subtotal</span>
-                <span className="text-white font-semibold">₹{subtotal}</span>
+                <span className="text-[var(--text-main)] font-semibold">₹{subtotal}</span>
               </div>
-              <div className="flex justify-between text-gray-400">
+              <div className="flex justify-between text-[var(--text-muted)]">
                 <span>Delivery Charge</span>
-                <span className="text-white font-semibold">
-                  {delivery === 0 ? <span className="text-green-400 font-bold">FREE</span> : `₹${delivery}`}
+                <span className="text-[var(--text-main)] font-semibold">
+                  {delivery === 0 ? <span className="text-emerald-500 font-bold">FREE</span> : `₹${delivery}`}
                 </span>
               </div>
               {subtotal > 499 && (
-                <p className="text-[11px] text-green-400 font-semibold">
+                <p className="text-[11px] text-emerald-500 font-semibold">
                   ✦ Free delivery unlocked (Order &gt; ₹499)
                 </p>
               )}
-              <div className="flex justify-between font-extrabold text-base text-white border-t border-white/10 pt-3">
+              <div className="flex justify-between font-extrabold text-base text-[var(--text-main)] border-t border-[var(--border-color)] pt-3">
                 <span>Grand Total</span>
-                <span className="text-orange-400 font-mono text-xl">₹{total}</span>
+                <span className="text-[var(--brand-accent)] font-mono text-xl">₹{total}</span>
               </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-white/10 text-[11px] text-gray-500 space-y-1">
-              <div className="flex items-center gap-1.5 text-gray-400">
-                <ShieldCheck size={14} className="text-green-400" />
+            <div className="mt-5 pt-4 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] space-y-1">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-500" />
                 <span>256-bit encrypted checkout</span>
               </div>
               <p>Historical price snapshot is locked upon placement.</p>
@@ -969,7 +936,7 @@ export default function CheckoutClient() {
 
             <Link
               href="/cart"
-              className="block text-center text-xs text-gray-400 hover:text-white mt-4 transition"
+              className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] mt-4 transition font-semibold"
             >
               ← Modify Cart Items
             </Link>

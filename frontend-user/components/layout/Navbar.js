@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import Logo from "./Logo";
 import NavLinks from "./NavLinks";
 import RightSection from "./RightSection";
@@ -16,7 +17,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      setScrolled(window.scrollY > 15);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -35,21 +36,31 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`
-      w-full fixed top-0 z-50 border-b border-white/10
-      transition-transform duration-300 ease-in-out
-      ${scrolled ? 'bg-black/95 backdrop-blur-xl shadow-lg shadow-black/40' : 'bg-black'}
-      ${hidden && !mobileSearchOpen ? '-translate-y-full' : 'translate-y-0'}
-    `}>
-      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-2 sm:gap-4">
-        <Logo />
-        <div className="hidden md:flex">
-          <NavLinks />
-        </div>
-        <div className="hidden md:flex flex-1 max-w-xs">
+    <header
+      className={`w-full fixed top-0 z-50 border-b border-[var(--border-color)] transition-all duration-300 ${
+        scrolled
+          ? "bg-[var(--bg-main)]/95 backdrop-blur-xl shadow-lg shadow-black/5"
+          : "bg-[var(--bg-main)]/80 backdrop-blur-md"
+      } ${hidden && !mobileSearchOpen ? "-translate-y-full" : "translate-y-0"}`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-3.5 flex justify-between items-center gap-3 sm:gap-6">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center shrink-0 group" aria-label="Pet Protocols Home">
+          <Logo />
+        </Link>
+
+        {/* Desktop Search */}
+        <div className="hidden lg:block flex-1 max-w-sm">
           <SearchBar />
         </div>
-        <div className="flex gap-2 sm:gap-3 items-center">
+
+        {/* Desktop Nav Links */}
+        <div className="hidden lg:flex items-center">
+          <NavLinks />
+        </div>
+
+        {/* Right Section: Theme Toggle, Notifications, Cart, Profile */}
+        <div className="flex gap-1.5 sm:gap-2.5 items-center shrink-0">
           <RightSection
             onOpenMobileSearch={handleOpenMobileSearch}
             mobileSearchButtonRef={searchButtonRef}
@@ -65,7 +76,7 @@ const Navbar = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Search dishes and menu"
-          className="md:hidden fixed inset-0 z-[100] bg-black/95 light:bg-white/95 backdrop-blur-xl flex flex-col"
+          className="lg:hidden fixed inset-0 z-[100] bg-[var(--bg-main)]/98 backdrop-blur-2xl flex flex-col"
         >
           <SearchBar
             isMobile={true}
@@ -74,7 +85,7 @@ const Navbar = () => {
           />
         </div>
       )}
-    </nav>
+    </header>
   );
 };
 

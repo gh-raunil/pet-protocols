@@ -1,570 +1,484 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import PopularSection from "../components/layout/PopularSection";
+import { useRouter } from "next/navigation";
+import {
+  Sparkles,
+  ArrowRight,
+  Search,
+  UtensilsCrossed,
+  Tag,
+  Clock,
+  Building2,
+  CheckCircle2,
+  ShieldCheck,
+  Zap,
+  ShoppingBag,
+  Star,
+  Flame,
+  ChevronRight,
+} from "lucide-react";
+import ProductCard from "@/components/products/ProductCard";
 
-// ── Icons ──────────────────────────────────────────────────────
-const ArrowRight = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="white"
-    strokeWidth="2.5"
-  >
-    <path d="M5 12h14M12 5l7 7-7 7" />
-  </svg>
-);
-const SearchIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#888"
-    strokeWidth="2"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.35-4.35" />
-  </svg>
-);
-const CartIcon = () => (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="white"
-    strokeWidth="2"
-  >
-    <circle cx="9" cy="21" r="1" />
-    <circle cx="20" cy="21" r="1" />
-    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-  </svg>
-);
-const ChevronDown = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="m6 9 6 6 6-6" />
-  </svg>
-);
-const LogoutIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-const StarFilled = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f97316" stroke="none">
-    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-  </svg>
-);
-const InstagramIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-  >
-    <rect x="2" y="2" width="20" height="20" rx="5" />
-    <circle cx="12" cy="12" r="5" />
-    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-  </svg>
-);
-const FacebookIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-  >
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-  </svg>
-);
-const YoutubeIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-  >
-    <path d="M22.54 6.42A2.78 2.78 0 0 0 20.6 4.46C18.88 4 12 4 12 4s-6.88 0-8.6.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.4 19.54C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" />
-    <polygon
-      points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"
-      fill="currentColor"
-      stroke="none"
-    />
-  </svg>
-);
-const TwitterIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-  >
-    <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" />
-  </svg>
-);
-const DeliveryIcon = () => (
-  <svg
-    width="26"
-    height="26"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <rect x="1" y="3" width="15" height="13" rx="1" />
-    <path d="M16 8h4l3 3v5h-7V8z" />
-    <circle cx="5.5" cy="18.5" r="2.5" />
-    <circle cx="18.5" cy="18.5" r="2.5" />
-  </svg>
-);
-const LeafIcon = () => (
-  <svg
-    width="26"
-    height="26"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
-    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-  </svg>
-);
-const ShieldIcon = () => (
-  <svg
-    width="26"
-    height="26"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-);
-const PlateIcon = () => (
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M3 11l19-9-9 19-2-8-8-2z" />
-  </svg>
-);
-const ChefIcon = () => (
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z" />
-    <line x1="6" y1="17" x2="18" y2="17" />
-  </svg>
-);
-const StarIcon = () => (
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-  </svg>
-);
-const HeartIcon = () => (
-  <svg
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="#f97316"
-    strokeWidth="1.5"
-  >
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-  </svg>
-);
-
-// ── Data ──────────────────────────────────────────────────────
-const categoryIcons = {
-  Burgers: "/images/burger.png",
-  Pizza: "/images/pizza.png",
-  Fries: "/images/fries.png",
-  Drinks: "/images/drinks.png",
-  Momos: "/images/momos.png",
-};
-
-const reviews = [
-  {
-    name: "Rohit Sharma",
-    quote: "The best burgers in town. Always fresh and super delicious!",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-  },
-  {
-    name: "Priya Verma",
-    quote: "Lightning fast delivery and amazing packaging. Love it every time.",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
-  },
-  {
-    name: "Ankit Patel",
-    quote: "Pet Protocols never disappoints. Highly recommended to everyone.",
-    avatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face",
-  },
+const CATEGORIES = [
+  { name: "Burger", label: "Gourmet Burgers", icon: "🍔", query: "Burger" },
+  { name: "Pizza", label: "Stone-Baked Pizza", icon: "🍕", query: "Pizza" },
+  { name: "Fries", label: "Crispy Loaded Fries", icon: "🍟", query: "Fries" },
+  { name: "Momos", label: "Steamed & Fried Momos", icon: "🥟", query: "Momos" },
+  { name: "Cold Drinks", label: "Chilled Drinks", icon: "🥤", query: "Cold Drinks" },
 ];
 
-// ── Main ────────────────────────────────────────────────────────
-export default function Home() {
+export default function HomePage() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [products, setProducts] = useState([]);
+  const [restaurants, setRestaurants] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHomeData() {
+      try {
+        setLoading(true);
+        const [prodRes, restRes, offRes, rateRes] = await Promise.allSettled([
+          fetch("/api/products").then((r) => r.json()),
+          fetch("/api/restaurants").then((r) => r.json()),
+          fetch("/api/offers").then((r) => r.json()),
+          fetch("/api/ratings").then((r) => r.json()),
+        ]);
+
+        if (prodRes.status === "fulfilled" && prodRes.value?.success) {
+          setProducts(prodRes.value.products || []);
+        }
+        if (restRes.status === "fulfilled" && restRes.value?.success) {
+          setRestaurants(restRes.value.restaurants || []);
+        }
+        if (offRes.status === "fulfilled" && offRes.value?.success) {
+          setOffers(offRes.value.offers || []);
+        }
+        if (rateRes.status === "fulfilled" && rateRes.value?.ratings) {
+          setRatings(rateRes.value.ratings || []);
+        }
+      } catch (err) {
+        console.error("Error loading home data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadHomeData();
+  }, []);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/menu?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const popularDishes = products.slice(0, 8);
+
   return (
-    <div
-      className="min-h-screen bg-[#000000] text-white"
-      style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
-    >
-      {/* ── HERO ─────────────────────────────────────────── */}
-      <section className="relative px-8 md:px-14 pt-10 pb-0 overflow-hidden min-h-[520px] flex items-center">
-        <div className="absolute left-3 top-16 hidden md:grid grid-cols-4 gap-2 opacity-20 z-10">
-          {Array.from({ length: 32 }).map((_, i) => (
-            <div key={i} className="w-1 h-1 rounded-full bg-orange-500" />
-          ))}
+    <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
+      {/* ── SECTION A: HERO (TYPOGRAPHY-LED) ───────────────────────── */}
+      <section className="pt-32 pb-16 sm:pt-40 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
+        {/* Subtle pill tag */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-6 animate-[fadeIn_0.5s_ease]">
+          <Sparkles size={14} /> Certified Kitchen Partners
         </div>
 
-        {/* Hero Image */}
-        <div
-          className="
-            absolute
-            top-0
-            h-full
-            pointer-events-none
-            z-0
+        {/* Brand headline */}
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.08] text-[var(--text-main)] mb-6">
+          Pet Protocols
+          <span className="block text-[var(--brand-accent)] mt-1 sm:mt-2 text-3xl sm:text-5xl md:text-6xl font-extrabold">
+            Fresh food. Zero compromises.
+          </span>
+        </h1>
 
-            w-[60%] lg:w-[60%]
-            right-0 lg:right-0
+        {/* Clear mission description */}
+        <p className="max-w-2xl mx-auto text-base sm:text-lg text-[var(--text-muted)] font-normal leading-relaxed mb-10">
+          Discover vetted partner kitchens, explore chef-crafted menus, and order freshly prepared meals with seamless multi-restaurant ordering.
+        </p>
 
-            md:w-[80%]
-            md:right-[-20%]
-
-            max-md:w-[90%]
-            max-md:right-[-35%]
-          "
-        >
-          <Image
-            src="/images/hero.png"
-            alt="Hero food"
-            fill
-            priority
-            sizes="(max-width: 768px) 90vw, 80vw"
-            className="
-              object-cover
-              object-right
-              md:object-right
-              lg:object-center
-              "
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/20 to-transparent lg:hidden" />
-        </div>
-
-        <div className="w-full max-w-7xl mx-auto grid md:grid-cols-2 gap-8 items-center relative z-20">
-          <div>
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-orange-400 text-sm font-semibold tracking-widest uppercase">
-                ✦ GOOD FOOD, GREAT MOOD ✦
-              </span>
-            </div>
-            <h1 className="text-[56px] md:text-[68px] font-extrabold leading-tight">
-              <span className="text-white light:text-stone-900">पेट </span>
-              <span className="text-orange-500">Protocols</span>
-            </h1>
-            <p className="text-gray-300 light:text-stone-600 text-xl mt-3 mb-8 font-light">
-              Fresh food. Zero compromises.
-            </p>
-            <div className="flex flex-wrap gap-4 mb-12">
-              <Link
-                href="/menu"
-                className="flex items-center gap-3 bg-orange-500 hover:bg-orange-600 transition-colors font-bold text-base px-8 py-3.5 rounded-full text-white shadow-lg shadow-orange-500/20"
-              >
-                Order Now <ArrowRight />
-              </Link>
-              <Link
-                href="/menu"
-                className="flex items-center gap-3 border border-white/30 light:border-stone-400 hover:border-orange-500 transition-colors font-bold text-base px-8 py-3.5 rounded-full text-white light:text-stone-900"
-              >
-                Explore Menu
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-8">
-              {[
-                {
-                  Icon: DeliveryIcon,
-                  title: "Fast Delivery",
-                  sub: "On time, every time",
-                },
-                {
-                  Icon: LeafIcon,
-                  title: "Fresh Ingredients",
-                  sub: "Handpicked daily",
-                },
-                {
-                  Icon: ShieldIcon,
-                  title: "Premium Quality",
-                  sub: "Always the best",
-                },
-              ].map(({ Icon, title, sub }) => (
-                <div key={title} className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full border border-orange-500/40 flex items-center justify-center shrink-0">
-                    <Icon />
-                  </div>
-                  <div>
-                    <p className="text-orange-500 text-sm font-semibold">
-                      {title}
-                    </p>
-                    <p className="text-gray-500 text-xs">{sub}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div />
+        {/* Primary and secondary call-to-actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md mx-auto">
+          <Link
+            href="/menu"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-[var(--brand-accent)]/25 transition flex items-center justify-center gap-2 group"
+          >
+            Explore Food
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <Link
+            href="/offers"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 text-[var(--text-main)] font-semibold text-sm transition flex items-center justify-center gap-2"
+          >
+            <Tag size={15} className="text-[var(--brand-accent)]" />
+            View Offers
+          </Link>
         </div>
       </section>
 
-      {/* ── CATEGORIES ───────────────────────────────────── */}
-      <section className="px-8 md:px-14 py-6">
-        <div
-          className="
-            max-w-7xl mx-auto
-            bg-[#0d0d0d]
-            border border-white/8
-            rounded-2xl
-            px-8 py-7
-            flex flex-col md:flex-row
-            items-center gap-6
-            category-dark-banner
-
-            bg-[url('/images/category_img_phone.png')]
-            sm:bg-[url('/images/category_img_tab.png')]
-            lg:bg-[url('/images/category_img.png')]
-
-            bg-cover
-            bg-no-repeat
-            bg-center
-            md:bg-center
-            bg-top
-          "
+      {/* ── SECTION B: DISCOVER & QUICK SEARCH ───────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto -mt-4 mb-16">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="flex items-center gap-2 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl shadow-black/5 focus-within:border-[var(--brand-accent)] transition"
         >
-          <div className="flex items-center gap-8 md:gap-12 flex-1 flex-wrap justify-center md:justify-evenly">
-            {Object.entries(categoryIcons).map(([name, img]) => (
+          <div className="pl-3 text-[var(--text-muted)]">
+            <Search size={20} />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by dish name, cuisine, or restaurant..."
+            className="flex-1 bg-transparent px-2 py-2 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] text-white text-xs font-bold hover:opacity-90 transition shrink-0"
+          >
+            Search
+          </button>
+        </form>
+      </section>
+
+      {/* ── SECTION C: BROWSE CATEGORIES ───────────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
+              Browse Categories
+            </h2>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+              Select your craving for instant menu filtering
+            </p>
+          </div>
+          <Link
+            href="/menu"
+            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
+          >
+            All Dishes <ChevronRight size={14} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 sm:gap-4">
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.name}
+              href={`/menu?category=${encodeURIComponent(cat.query)}`}
+              className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-1 transition-all group flex flex-col items-center text-center shadow-sm"
+            >
+              <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">
+                {cat.icon}
+              </span>
+              <span className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
+                {cat.label}
+              </span>
+              <span className="text-[11px] text-[var(--text-muted)] mt-1">Explore menu</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECTION D: POPULAR DISHES ───────────────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--brand-accent)]" />
+              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
+                Popular Dishes
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+              Customer favorites prepared fresh upon order
+            </p>
+          </div>
+          <Link
+            href="/menu"
+            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
+          >
+            View Full Menu <ChevronRight size={14} />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-80 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse"
+              />
+            ))}
+          </div>
+        ) : popularDishes.length === 0 ? (
+          <div className="text-center py-16 px-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <UtensilsCrossed size={36} className="mx-auto text-[var(--text-muted)] mb-3" />
+            <h3 className="text-base font-bold text-[var(--text-main)]">Menu Catalog Updating</h3>
+            <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto mt-1">
+              Fresh dishes from our partnered kitchens are currently being prepared. Check back shortly!
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {popularDishes.map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── SECTION E: PARTNERED RESTAURANTS ───────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
+              <Building2 className="text-[var(--brand-accent)] w-5 h-5" />
+              Partnered Kitchens & Restaurants
+            </h2>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+              Verified dining kitchens preparing food to the highest hygiene standards
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-44 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse"
+              />
+            ))}
+          </div>
+        ) : restaurants.length === 0 ? (
+          <div className="text-center py-14 px-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <Building2 size={36} className="mx-auto text-[var(--text-muted)] mb-3" />
+            <h3 className="text-base font-bold text-[var(--text-main)]">Kitchen Onboarding in Progress</h3>
+            <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto mt-1">
+              We are connecting new verified kitchens in your area.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {restaurants.map((rest) => (
               <Link
-                key={name}
-                href={`/menu?category=${name === "Drinks" ? "Cold Drinks" : name}`}
-                className="flex flex-col items-center gap-2 group"
+                key={rest._id}
+                href={`/menu?restaurant=${rest._id}`}
+                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
               >
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center overflow-hidden transition-transform group-hover:scale-110"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 30% 30%, #2a2a2a, #111)",
-                    boxShadow:
-                      "0 0 0 2px rgba(249,115,22,0.15), inset 0 2px 8px rgba(0,0,0,0.5)",
-                  }}
-                >
-                  <Image
-                    src={img}
-                    alt={name}
-                    width={56}
-                    height={56}
-                    className="w-full h-full object-cover"
-                  />
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
+                        {rest.name}
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        {typeof rest.address === "string" && rest.address
+                          ? rest.address
+                          : rest.address && typeof rest.address === "object"
+                          ? [rest.address.street, rest.address.city].filter(Boolean).join(", ") || rest.city || "Verified Kitchen"
+                          : rest.city || "Verified Kitchen"}
+                      </p>
+                    </div>
+                    {rest.status === "active" ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                        Open Now
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                        Resting
+                      </span>
+                    )}
+                  </div>
+                  {rest.description && (
+                    <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-4">
+                      {rest.description}
+                    </p>
+                  )}
                 </div>
-                <span className="text-sm font-semibold text-white">{name}</span>
+
+                <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1 font-medium">
+                    <Clock size={13} className="text-[var(--brand-accent)]" /> Fresh delivery
+                  </span>
+                  <span className="font-bold text-[var(--brand-accent)] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                    View Menu <ChevronRight size={14} />
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
-          <div className="hidden md:block w-px h-24 bg-white/10" />
-          <div className="text-center md:text-left md:w-48 shrink-0">
-            <p className="text-orange-500 font-bold text-lg flex items-center gap-1.5 justify-center md:justify-start">
-              🔥 Hot & Fresh
-            </p>
-            <p className="text-gray-400 text-sm mt-1 leading-relaxed">
-              Made with love,
-              <br />
-              served with happiness.
-            </p>
-          </div>
-        </div>
+        )}
       </section>
 
-      {/* ── POPULAR THIS WEEK ─────────────────────────────── */}
-      <PopularSection />
-
-      {/* ── MEGA OFFER ───────────────────────────────────── */}
-      <section className="px-8 md:px-14 py-4 max-w-7xl mx-auto">
-        <div className="relative rounded-2xl overflow-hidden border border-orange-500/20">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#1a0a00] via-[#0d0d0d] to-[#1a0a00]" />
-          <div
-            className="absolute left-0 top-0 h-full w-72 opacity-30"
-            style={{
-              background:
-                "radial-gradient(ellipse at left, rgba(249,115,22,0.4), transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute right-0 top-0 h-full w-72 opacity-30"
-            style={{
-              background:
-                "radial-gradient(ellipse at right, rgba(249,115,22,0.4), transparent 70%)",
-            }}
-          />
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between px-10 py-8 gap-6">
+      {/* ── SECTION F: CURRENT OFFERS ───────────────────────────────── */}
+      {offers.length > 0 && (
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+          <div className="flex items-center justify-between mb-8">
             <div>
-              <p className="text-orange-400 text-xs font-bold tracking-[0.3em] uppercase mb-2">
-                Limited Time Offer
-              </p>
-              <h3 className="text-4xl md:text-5xl font-extrabold">
-                Get <span className="text-orange-500">30% OFF</span>
-              </h3>
-              <p className="text-gray-400 mt-2">
-                On all orders above ₹499. Use code{" "}
-                <span className="text-orange-400 font-bold">PET30</span>
+              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
+                <Tag className="text-[var(--brand-accent)] w-5 h-5" />
+                Active Special Offers
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+                Exclusive verified discounts on your favorite dishes
               </p>
             </div>
             <Link
-              href="/menu"
-              className="flex items-center gap-3 bg-orange-500 hover:bg-orange-600 transition-colors font-bold text-base px-8 py-3.5 rounded-full shrink-0 whitespace-nowrap"
+              href="/offers"
+              className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
             >
-              Order Now <ArrowRight />
+              All Deals <ChevronRight size={14} />
             </Link>
           </div>
-        </div>
-      </section>
 
-      {/* ── WHY CHOOSE US ────────────────────────────────── */}
-      <section className="px-8 md:px-14 py-14 max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <p className="text-orange-500 text-xs font-bold tracking-[0.3em] uppercase mb-3">
-            WHY CHOOSE US
-          </p>
-          <h2 className="text-4xl md:text-5xl font-extrabold">
-            Because You Deserve The{" "}
-            <span className="text-orange-500">Best</span>
-          </h2>
-          <div className="flex justify-center mt-4">
-            <div className="w-16 h-1 bg-orange-500 rounded-full" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            {
-              Icon: PlateIcon,
-              title: "Hygienic Food",
-              sub: "Prepared in a clean\nand safe environment",
-            },
-            {
-              Icon: ChefIcon,
-              title: "Expert Chefs",
-              sub: "Crafted by professionals\nwho love what they do",
-            },
-            {
-              Icon: StarIcon,
-              title: "Top Rated",
-              sub: "Loved by thousands\nof happy customers",
-            },
-            {
-              Icon: HeartIcon,
-              title: "Made with Love",
-              sub: "Every meal is made\nwith care & passion",
-            },
-          ].map(({ Icon, title, sub }) => (
-            <div key={title} className="flex items-start gap-4 p-2">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 border border-orange-500/35">
-                <Icon />
-              </div>
-              <div>
-                <p className="font-bold text-white text-base">{title}</p>
-                <p className="text-gray-500 text-sm mt-1 whitespace-pre-line leading-relaxed">
-                  {sub}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── REVIEWS ──────────────────────────────────────── */}
-      <section className="px-8 md:px-14 py-10 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold border-l-4 border-orange-500 pl-3">
-            What Our Customers Say
-          </h2>
-        </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {reviews.map((r) => (
-            <div
-              key={r.name}
-              className="bg-[#0d0d0d] border border-white/8 rounded-2xl p-6 hover:border-orange-500/20 transition"
-            >
-              <div className="flex gap-0.5 mb-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <StarFilled key={i} />
-                ))}
-              </div>
-              <p className="text-gray-300 text-sm leading-relaxed mb-5">
-                "{r.quote}"
-              </p>
-              <div className="flex items-center gap-3">
-                <Image
-                  src={r.avatar}
-                  alt={r.name}
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-500/30"
-                />
-                <div>
-                  <p className="font-semibold text-sm">{r.name}</p>
-                  <p className="text-gray-500 text-xs">Verified Customer</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {offers.slice(0, 3).map((offer) => (
+              <div
+                key={offer._id}
+                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-col justify-between shadow-sm relative overflow-hidden"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-black bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 uppercase tracking-wider">
+                    {offer.discountType === "percentage" ? `${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`}
+                  </span>
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)]">
+                    {offer.code}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-[var(--text-main)] mt-2">
+                  {offer.title || "Kitchen Special"}
+                </h3>
+                {offer.description && (
+                  <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">
+                    {offer.description}
+                  </p>
+                )}
+                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[11px] text-[var(--text-muted)]">
+                    {offer.minOrderAmount ? `Min order ₹${offer.minOrderAmount}` : "No min order"}
+                  </span>
+                  <Link
+                    href="/menu"
+                    className="text-xs font-bold text-[var(--brand-accent)] hover:underline"
+                  >
+                    Apply on Menu →
+                  </Link>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── SECTION G: WHY ORDER THROUGH PET PROTOCOLS ──────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-main)]">
+            Why Order Through Pet Protocols
+          </h2>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 leading-relaxed">
+            Built from the ground up for food lovers who value quality, transparency, and speed.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] flex items-center justify-center">
+              <Zap size={22} />
             </div>
-          ))}
+            <h3 className="text-base font-bold text-[var(--text-main)]">
+              Multi-Kitchen Cart
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Order gourmet pizza from one kitchen and momos from another seamlessly in one single platform.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center">
+              <ShieldCheck size={22} />
+            </div>
+            <h3 className="text-base font-bold text-[var(--text-main)]">
+              Verified Hygiene
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Every partnered restaurant adheres to standardized culinary quality protocols and clean prep standards.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center">
+              <Clock size={22} />
+            </div>
+            <h3 className="text-base font-bold text-[var(--text-main)]">
+              Real Order Stages
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Honest status updates directly from kitchen prep stations without misleading fake GPS claims.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-500 flex items-center justify-center">
+              <CheckCircle2 size={22} />
+            </div>
+            <h3 className="text-base font-bold text-[var(--text-main)]">
+              Zero Compromises
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Freshly packed, sealed, and handled with care to ensure the food arrives exactly as the chef intended.
+            </p>
+          </div>
         </div>
       </section>
-    </div>
+
+      {/* ── SECTION H: CUSTOMER REVIEWS (GENUINE DATA ONLY) ──────────── */}
+      {ratings.length > 0 && (
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-24">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
+                <Star className="text-amber-400 fill-amber-400 w-5 h-5" />
+                Customer Experiences
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+                Authentic feedback from verified diners
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {ratings.slice(0, 3).map((rate, i) => (
+              <div
+                key={rate._id || i}
+                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm space-y-3"
+              >
+                <div className="flex items-center gap-1 text-amber-400">
+                  {Array.from({ length: 5 }).map((_, s) => (
+                    <Star
+                      key={s}
+                      size={14}
+                      className={s < (rate.rating || 5) ? "fill-amber-400" : "text-gray-500"}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--text-main)] italic leading-relaxed">
+                  &ldquo;{rate.comment || rate.review || "Delicious food and prompt delivery!"}&rdquo;
+                </p>
+                <div className="pt-2 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)]">
+                  {rate.userName || rate.user?.name || "Verified Foodie"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
   );
 }

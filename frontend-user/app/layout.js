@@ -1,8 +1,19 @@
 import Providers from "./providers";
 import { ThemeProvider, ThemeScript } from "../components/ui/ThemeProvider";
+import { ToastProvider } from "../components/ui/ToastProvider";
 import AppShell from "../components/layout/AppShell";
-import { Toaster } from "react-hot-toast";
 import "./globals.css";
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#141518" },
+  ],
+};
 
 export const metadata = {
   title: {
@@ -10,9 +21,18 @@ export const metadata = {
     template: "%s | Pet Protocols",
   },
   description:
-    "Order fresh burgers, pizzas, momos, fries and cold drinks online across top kitchens.",
+    "Discover partner restaurants, explore gourmet menus, and order fresh food easily.",
   keywords: ["food delivery", "burgers", "pizza", "momos", "fries", "multi-restaurant food order"],
-  authors: [{ name: "Pet Protocols" }],
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: "/icons/favicon-32x32.png",
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   openGraph: {
     title: "Pet Protocols — Fresh Food, Zero Compromises",
     description: "Order fresh food across top partnered restaurants and cloud kitchens.",
@@ -27,12 +47,13 @@ export default function RootLayout({ children }) {
       <head>
         <ThemeScript />
       </head>
-      <body className="min-h-screen antialiased bg-black text-white" suppressHydrationWarning>
+      <body className="min-h-screen antialiased bg-[var(--bg-main)] text-[var(--text-main)]" suppressHydrationWarning>
         <ThemeProvider>
-          <Providers>
-            <Toaster position="top-right" />
-            <AppShell>{children}</AppShell>
-          </Providers>
+          <ToastProvider>
+            <Providers>
+              <AppShell>{children}</AppShell>
+            </Providers>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

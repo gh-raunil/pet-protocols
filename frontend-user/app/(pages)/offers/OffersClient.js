@@ -8,12 +8,13 @@ import {
   Sparkles,
   Building2,
   ArrowRight,
-  Clock,
   TicketPercent,
   RefreshCw,
   AlertTriangle,
   Flame,
+  Copy,
 } from "lucide-react";
+import { toast } from "@/components/ui/ToastProvider";
 
 export default function OffersClient() {
   const router = useRouter();
@@ -53,57 +54,64 @@ export default function OffersClient() {
     }
   };
 
+  const copyCouponCode = (e, code) => {
+    e.stopPropagation();
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      toast.success(`Coupon code ${code} copied!`);
+    }
+  };
+
   return (
-    <main className="min-h-screen pt-32 pb-24 px-6 max-w-6xl mx-auto font-jakarta text-white">
+    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto text-[var(--text-main)] transition-colors">
       {/* ── HEADER ──────────────────────────────────────────────── */}
-      <div className="text-center max-w-2xl mx-auto mb-14">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-widest mb-3">
+      <div className="text-center max-w-2xl mx-auto mb-12">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-3">
           <TicketPercent size={14} /> Deals & Specials
         </div>
-        <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white mb-3">
-          Offers
+        <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[var(--text-main)] mb-3">
+          Special Dining Offers
         </h1>
-        <p className="text-sm sm:text-base text-gray-400">
-          Exclusive culinary deals and limited-time savings from partner kitchens.
+        <p className="text-xs sm:text-sm text-[var(--text-muted)]">
+          Verified discount promotions and seasonal kitchen vouchers across Pet Protocols.
         </p>
       </div>
 
       {/* ── CONTENT AREA ────────────────────────────────────────── */}
       {loading ? (
-        <div className="py-24 flex flex-col items-center justify-center gap-3 text-orange-500">
+        <div className="py-24 flex flex-col items-center justify-center gap-3 text-[var(--brand-accent)]">
           <RefreshCw className="animate-spin w-8 h-8" />
-          <p className="text-xs text-gray-400">Loading current offers...</p>
+          <p className="text-xs text-[var(--text-muted)]">Loading verified offers...</p>
         </div>
       ) : error ? (
-        <div className="p-8 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-3 my-8 max-w-md mx-auto">
-          <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
-          <h3 className="text-sm font-bold text-rose-300">Unable to load offers</h3>
-          <p className="text-xs text-rose-300/80">{error}</p>
+        <div className="p-8 rounded-3xl bg-rose-500/10 border border-rose-500/25 text-center space-y-3 my-8 max-w-md mx-auto">
+          <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+          <h3 className="text-sm font-bold text-rose-500">Unable to load offers</h3>
+          <p className="text-xs text-[var(--text-muted)]">{error}</p>
           <button
             onClick={loadOffers}
-            className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition shadow-sm"
+            className="px-5 py-2.5 rounded-xl bg-rose-500 hover:opacity-95 text-white text-xs font-bold transition shadow-sm"
           >
             Retry
           </button>
         </div>
       ) : offers.length === 0 ? (
-        /* Empty State — Strictly follows specified copy */
-        <div className="max-w-lg mx-auto p-12 sm:p-16 rounded-3xl bg-[#0e1013] border border-white/10 text-center shadow-xl space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto">
+        <div className="max-w-lg mx-auto p-12 sm:p-16 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] text-center shadow-xl space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] flex items-center justify-center mx-auto">
             <Tag size={28} />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[var(--text-main)]">
               No ongoing offers right now.
             </h2>
-            <p className="text-sm text-gray-400 leading-relaxed max-w-sm mx-auto">
-              Check back soon for new deals and special offers from restaurants on Pet Protocols.
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
+              Check back soon for new deals and special offers from verified partner restaurants on Pet Protocols.
             </p>
           </div>
           <div className="pt-2">
             <Link
               href="/menu"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition shadow-md shadow-orange-500/20"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white text-xs font-bold transition shadow-lg shadow-[var(--brand-accent)]/20"
             >
               <span>Explore Kitchen Menu</span>
               <ArrowRight size={14} />
@@ -111,91 +119,58 @@ export default function OffersClient() {
           </div>
         </div>
       ) : (
-        /* Active Offers Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {offers.map((offer) => {
             const restaurant = offer.restaurant;
-            const restaurantId = restaurant?._id || restaurant;
             const discountLabel =
               offer.discountType === "flat"
-                ? `₹${offer.discountValue} OFF`
+                ? `₹${offer.discountValue} FLAT OFF`
                 : `${offer.discountValue}% OFF`;
 
             return (
               <div
                 key={offer._id}
                 onClick={() => handleOfferClick(offer)}
-                className="group p-6 rounded-3xl bg-[#0e1013] border border-white/10 hover:border-orange-500/40 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-orange-500/10 cursor-pointer flex flex-col justify-between"
+                className="group p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 transition-all duration-300 shadow-xl cursor-pointer flex flex-col justify-between"
               >
                 <div>
-                  {/* Top Badges */}
                   <div className="flex items-center justify-between gap-2 mb-4">
-                    <span className="inline-flex items-center gap-1 text-xs font-black px-3 py-1 rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/30">
+                    <span className="inline-flex items-center gap-1 text-xs font-black px-3 py-1 rounded-full bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25">
                       <Flame size={12} /> {discountLabel}
                     </span>
                     {offer.code && (
-                      <span className="font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-white/5 border border-white/15 text-orange-400 tracking-wider">
-                        {offer.code}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => copyCouponCode(e, offer.code)}
+                        className="font-mono text-xs font-bold px-2.5 py-1 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--brand-accent)] hover:border-[var(--brand-accent)] transition flex items-center gap-1.5"
+                        title="Click to copy promo code"
+                      >
+                        <span>{offer.code}</span>
+                        <Copy size={12} />
+                      </button>
                     )}
                   </div>
 
-                  {/* Title & Description */}
-                  <h3 className="text-lg font-extrabold text-white group-hover:text-orange-400 transition mb-2 leading-snug">
+                  <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition mb-2 leading-snug">
                     {offer.title}
                   </h3>
-                  <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed mb-4">
-                    {offer.description}
-                  </p>
+                  {offer.description && (
+                    <p className="text-xs text-[var(--text-muted)] line-clamp-3 leading-relaxed mb-4">
+                      {offer.description}
+                    </p>
+                  )}
                 </div>
 
-                <div>
-                  {/* Minimum Order & Validity */}
-                  <div className="pt-3 border-t border-white/5 space-y-1.5 text-xs text-gray-400 mb-4">
-                    {offer.minOrder > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span>Min Order:</span>
-                        <span className="font-bold text-gray-200">₹{offer.minOrder}</span>
-                      </div>
-                    )}
-                    {offer.endDate && (
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1">
-                          <Clock size={11} /> Valid until:
-                        </span>
-                        <span className="font-mono text-gray-300">
-                          {new Date(offer.endDate).toLocaleDateString("en-IN", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Restaurant Association & CTA */}
-                  <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 truncate">
-                      <div className="w-7 h-7 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center shrink-0">
-                        <Building2 size={14} />
-                      </div>
-                      <span className="text-xs font-bold text-gray-200 truncate">
-                        {restaurant?.name || "All Kitchens"}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOfferClick(offer);
-                      }}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition shadow-sm shrink-0"
-                    >
-                      <span>View Menu</span>
-                      <ArrowRight size={12} />
-                    </button>
-                  </div>
+                <div className="pt-4 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1">
+                    <Building2 size={13} className="text-[var(--brand-accent)]" />
+                    <span className="truncate max-w-[130px]">
+                      {restaurant?.name || "All Partner Kitchens"}
+                    </span>
+                  </span>
+                  <span className="font-bold text-[var(--brand-accent)] group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                    Apply <ArrowRight size={13} />
+                  </span>
                 </div>
               </div>
             );

@@ -1,183 +1,185 @@
-'use client'
-import { useEffect, useState, useRef } from 'react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Camera } from 'lucide-react'
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Camera, ArrowLeft } from "lucide-react";
+import { toast } from "@/components/ui/ToastProvider";
 
 export default function EditProfilePage() {
-  const { data: session, status, update } = useSession()
-  const router = useRouter()
-  const fileInputRef = useRef(null)
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
+  const fileInputRef = useRef(null);
 
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [previewImage, setPreviewImage] = useState(null)
-  const [imageFile, setImageFile] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [previewImage, setPreviewImage] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  // Redirect if not logged in
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login')
+    if (status === "unauthenticated") {
+      router.push("/auth/login");
     }
-  }, [status])
+  }, [status, router]);
 
-  // Populate fields from session
   useEffect(() => {
     if (session?.user) {
-      setName(session.user.name || '')
-      setPhone(session.user.phone || '')
-      setPreviewImage(session.user.image || null)
+      setName(session.user.name || "");
+      setPhone(session.user.phone || "");
+      setPreviewImage(session.user.image || null);
     }
-  }, [session])
+  }, [session]);
 
-  // Handle image selection
   const handleImageChange = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file')
-      return
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB')
-      return
+      setError("Image must be less than 5MB");
+      return;
     }
 
-    setImageFile(file)
-    setError('')
+    setImageFile(file);
+    setError("");
 
-    // Show preview
-    const reader = new FileReader()
-    reader.onload = (e) => setPreviewImage(e.target.result)
-    reader.readAsDataURL(file)
-  }
+    const reader = new FileReader();
+    reader.onload = (e) => setPreviewImage(e.target.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('Name is required')
-      return
+      setError("Full name is required");
+      return;
     }
 
     if (phone && phone.length !== 10) {
-      setError('Phone number must be 10 digits')
-      return
+      setError("Phone number must be exactly 10 digits");
+      return;
     }
 
-    setSaving(true)
-    setError('')
+    setSaving(true);
+    setError("");
 
     try {
-      let imageUrl = session?.user?.image
+      let imageUrl = session?.user?.image;
 
-      // Step 1 — Upload image if changed
       if (imageFile) {
-        setUploading(true)
-        const formData = new FormData()
-        formData.append('image', imageFile)
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("image", imageFile);
 
-        const uploadRes = await fetch('/api/user/upload', {
-          method: 'POST',
+        const uploadRes = await fetch("/api/user/upload", {
+          method: "POST",
           body: formData,
-        })
+        });
 
-        const uploadData = await uploadRes.json()
+        const uploadData = await uploadRes.json();
 
         if (!uploadData.success) {
-          setError('Image upload failed. Please try again.')
-          setSaving(false)
-          setUploading(false)
-          return
+          setError("Image upload failed. Please try again.");
+          setSaving(false);
+          setUploading(false);
+          return;
         }
 
-        imageUrl = uploadData.imageUrl
-        setUploading(false)
+        imageUrl = uploadData.imageUrl;
+        setUploading(false);
       }
 
-      // Step 2 — Update user profile
-      const res = await fetch('/api/user/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/user/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           phone,
           image: imageUrl,
         }),
-      })
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
       if (data.success) {
-        // Update session with new data
-        await update({
-          name: data.user.name,
-          image: data.user.image,
-        })
-        setSuccess(true)
+        if (update) {
+          await update({
+            name: data.user?.name || name.trim(),
+            image: data.user?.image || imageUrl,
+          });
+        }
+        setSuccess(true);
+        toast.success("Profile saved successfully!");
         setTimeout(() => {
-          router.push('/profile')
-        }, 1500)
+          router.push("/profile");
+        }, 1200);
       } else {
-        setError(data.message || 'Failed to update profile')
+        setError(data.message || "Failed to update profile");
       }
-
     } catch (err) {
-      setError('Something went wrong. Please try again.')
+      setError("Something went wrong. Please try again.");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-brand-muted text-xl animate-pulse">Loading...</p>
+        <p className="text-[var(--text-muted)] text-sm animate-pulse">Loading...</p>
       </div>
-    )
+    );
   }
 
   return (
-    <main className="min-h-screen pt-28 pb-16 px-6 max-w-lg mx-auto">
-
-      {/* Header */}
-      <div className="mb-8 flex items-center gap-4">
+    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 max-w-lg mx-auto text-[var(--text-main)] transition-colors">
+      <div className="mb-6 flex items-center gap-3">
         <Link
           href="/profile"
-          className="text-brand-muted hover:text-white transition text-sm">
-          ← Back
+          className="p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        >
+          <ArrowLeft size={16} />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">
-            Edit <span className="text-brand-orange">Profile</span>
+          <h1 className="text-2xl sm:text-3xl font-black">
+            Edit <span className="text-[var(--brand-accent)]">Profile</span>
           </h1>
-          <p className="text-brand-muted text-sm mt-0.5">
-            Update your personal information
+          <p className="text-[var(--text-muted)] text-xs mt-0.5">
+            Update your personal contact information
           </p>
         </div>
       </div>
 
-      <div className="bg-brand-card border border-brand-border rounded-2xl p-6 space-y-6">
-
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl">
         {/* Avatar Upload */}
         <div className="flex flex-col items-center gap-3">
           <div className="relative">
-            <img
-              src={previewImage || '/default-avatar.png'}
-              alt="Profile"
-              className="w-28 h-28 rounded-full object-cover border-4 border-brand-orange"
-            />
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-[var(--bg-sub)] border-4 border-[var(--brand-accent)] flex items-center justify-center text-3xl font-black text-[var(--brand-accent)]">
+              {previewImage ? (
+                <img
+                  src={previewImage}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{name?.charAt(0) || "U"}</span>
+              )}
+            </div>
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 w-9 h-9 bg-brand-orange rounded-full flex items-center justify-center hover:opacity-90 transition border-2 border-brand-card">
-              <Camera size={16} className="text-white" />
+              className="absolute bottom-0 right-0 w-8 h-8 bg-[var(--brand-accent)] rounded-full flex items-center justify-center hover:opacity-90 transition border-2 border-[var(--bg-card)] text-white shadow"
+              aria-label="Change photo"
+            >
+              <Camera size={14} />
             </button>
           </div>
           <input
@@ -188,95 +190,79 @@ export default function EditProfilePage() {
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-brand-orange text-sm hover:underline transition">
-            {imageFile ? '✅ Image selected — click to change' : 'Change profile picture'}
+            className="text-[var(--brand-accent)] text-xs font-semibold hover:underline transition"
+          >
+            {imageFile ? "Image selected — click to change" : "Upload new profile photo"}
           </button>
           {uploading && (
-            <p className="text-brand-muted text-xs animate-pulse">
-              Uploading image...
+            <p className="text-[var(--text-muted)] text-xs animate-pulse">
+              Uploading picture...
             </p>
           )}
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-brand-border" />
+        <div className="border-t border-[var(--border-color)]" />
 
         {/* Name */}
         <div>
-          <label className="text-brand-muted text-sm mb-1.5 block">
-            Full Name <span className="text-red-400">*</span>
+          <label className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1.5 block">
+            Full Name *
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your full name"
-            className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder-brand-muted outline-none focus:border-brand-orange transition"
+            className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
           />
         </div>
 
         {/* Phone */}
         <div>
-          <label className="text-brand-muted text-sm mb-1.5 block">
+          <label className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1.5 block">
             Phone Number
           </label>
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
             placeholder="10-digit phone number"
-            className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-white placeholder-brand-muted outline-none focus:border-brand-orange transition"
+            className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm font-mono"
           />
         </div>
 
-        {/* Email — disabled */}
+        {/* Email */}
         <div>
-          <label className="text-brand-muted text-sm mb-1.5 block">
-            Email <span className="text-xs text-brand-muted">(cannot be changed)</span>
+          <label className="text-[var(--text-muted)] text-xs font-bold uppercase tracking-wider mb-1.5 block">
+            Email (read-only)
           </label>
           <input
             type="email"
-            value={session?.user?.email || ''}
+            value={session?.user?.email || ""}
             disabled
-            className="w-full bg-brand-dark border border-brand-border rounded-xl px-4 py-3 text-brand-muted outline-none cursor-not-allowed opacity-50"
+            className="w-full bg-[var(--bg-sub)]/50 border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-muted)] text-sm font-mono cursor-not-allowed opacity-60"
           />
         </div>
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-500/20 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl">
-            ❌ {error}
+          <div className="bg-red-500/15 border border-red-500/30 text-red-500 text-xs px-4 py-3 rounded-xl font-medium">
+            {error}
           </div>
         )}
 
-        {/* Success message */}
-        {success && (
-          <div className="bg-green-500/20 border border-green-500/30 text-green-400 text-sm px-4 py-3 rounded-xl">
-            ✅ Profile updated! Redirecting...
-          </div>
-        )}
-
-        {/* Buttons */}
-        <div className="flex gap-3 pt-2">
-          <Link
-            href="/profile"
-            className="flex-1 py-3 rounded-full border border-brand-border text-brand-muted text-sm font-semibold text-center hover:bg-brand-border transition">
-            Cancel
-          </Link>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`flex-1 py-3 rounded-full text-sm font-semibold transition
-              ${saving
-                ? 'bg-brand-border text-brand-muted cursor-not-allowed'
-                : 'bg-brand-orange text-white hover:opacity-90'
-              }`}>
-            {saving ? (uploading ? 'Uploading...' : 'Saving...') : 'Save Changes'}
-          </button>
-        </div>
-
+        {/* Save button */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-3.5 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-[var(--brand-accent)]/20 cursor-pointer disabled:opacity-50"
+        >
+          {saving ? "Saving..." : success ? "✓ Saved!" : "Save Changes"}
+        </button>
       </div>
     </main>
-  )
+  );
 }
