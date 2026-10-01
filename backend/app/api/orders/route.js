@@ -7,7 +7,7 @@ import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { deductStockForOrder } from '@/lib/inventoryService';
-import { sendPushToUser } from '@/lib/pushService';
+import { sendPushForOrder } from '@/lib/pushService';
 
 // GET — Fetch customer's orders (with optional ?orderId= filter)
 export async function GET(request) {
@@ -180,20 +180,20 @@ export async function POST(request) {
 
       createdOrders.push(populatedOrder);
 
-      // Trigger Web Push notification to user's registered devices
-      if (userId) {
-        sendPushToUser(userId, {
-          title: "Order Confirmed! 🍽️",
-          body: `Your order #${newOrder.orderId} for ₹${newOrder.totalAmount} has been placed with ${populatedOrder.restaurant?.name || "the kitchen"}.`,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/favicon-32x32.png",
-          data: {
-            url: `/orders?orderId=${newOrder.orderId}`,
-            orderId: newOrder.orderId,
-          },
-          tag: `order-${newOrder.orderId}`,
-        }).catch((e) => console.warn("[Push] Order creation push failed:", e.message));
-      }
+      // Dispatch Web Push notification to customer confirming order placement
+      sendPushForOrder(populatedOrder, {
+        title: "Order Placed! 🍽️",
+        body: `Your order #${populatedOrder._id.toString().slice(-6).toUpperCase()} has been received by ${populatedOrder.restaurant?.name || 'the kitchen'}.`,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/favicon-32x32.png",
+        url: "/orders",
+        tag: `order-${populatedOrder._id}`,
+        data: {
+          orderId: populatedOrder._id.toString(),
+          status: "pending",
+          url: "/orders",
+        },
+      }).catch((e) => console.warn("[Order Create Push] Non-blocking push warning:", e.message));
     }
 
     const hasCod = createdOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));

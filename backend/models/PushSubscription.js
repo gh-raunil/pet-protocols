@@ -1,11 +1,11 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const PushSubscriptionSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: false,
+      ref: 'User',
+      default: null,
       index: true,
     },
     endpoint: {
@@ -26,18 +26,29 @@ const PushSubscriptionSchema = new mongoose.Schema(
     },
     userAgent: {
       type: String,
-      default: "",
+      default: '',
     },
-    lastUsedAt: {
+    status: {
+      type: String,
+      enum: ['active', 'expired', 'disabled'],
+      default: 'active',
+      index: true,
+    },
+    lastUsed: {
       type: Date,
       default: Date.now,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-// Delete existing compiled model in dev if any
-delete mongoose.models.PushSubscription;
+// Prevent mongoose model overwrite in Next.js development HMR
+if (mongoose.models.PushSubscription) {
+  delete mongoose.models.PushSubscription;
+}
 
-export default mongoose.models.PushSubscription ||
-  mongoose.model("PushSubscription", PushSubscriptionSchema);
+const PushSubscription = mongoose.model('PushSubscription', PushSubscriptionSchema);
+
+export default PushSubscription;

@@ -3,7 +3,7 @@ import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
-import { sendPushToUser } from "@/lib/pushService";
+import { sendPushForOrder } from "@/lib/pushService";
 
 // GET — List orders for this restaurant
 export async function GET(request) {
@@ -116,53 +116,11 @@ export async function PUT(request) {
       );
     }
 
+    const previousStatus = order.status;
     if (status) {
       order.status = status;
       if (status === "cancelled") {
         await restoreStockForOrder(order);
-      }
-
-      // Dispatch Web Push notification to customer
-      if (order.user) {
-        const restName = auth.restaurant?.name || "The kitchen";
-        let pushTitle = "";
-        let pushBody = "";
-
-        switch (status) {
-          case "preparing":
-            pushTitle = "Kitchen Preparing Your Order 👨‍🍳";
-            pushBody = `${restName} is now preparing your order #${order.orderId}. Fresh and hot soon!`;
-            break;
-          case "out_for_delivery":
-            pushTitle = "Order Out for Delivery! 🛵";
-            pushBody = `Your order #${order.orderId} from ${restName} is on the way with your delivery partner!`;
-            break;
-          case "delivered":
-            pushTitle = "Order Delivered! 🎉";
-            pushBody = `Your order #${order.orderId} from ${restName} has been delivered. Enjoy your feast!`;
-            break;
-          case "cancelled":
-            pushTitle = "Order Cancelled ⚠️";
-            pushBody = `Your order #${order.orderId} was cancelled by ${restName}.`;
-            break;
-          default:
-            break;
-        }
-
-        if (pushTitle) {
-          sendPushToUser(order.user, {
-            title: pushTitle,
-            body: pushBody,
-            icon: "/icons/icon-192x192.png",
-            badge: "/icons/favicon-32x32.png",
-            data: {
-              url: `/orders?orderId=${order.orderId}`,
-              orderId: order.orderId,
-              status,
-            },
-            tag: `order-${order.orderId}`,
-          }).catch((err) => console.warn("[Push] Status update push error:", err.message));
-        }
       }
     }
     if (paymentStatus) order.paymentStatus = paymentStatus;
@@ -189,6 +147,57 @@ export async function PUT(request) {
       }
     }
     await order.save();
+
+    // Send Web Push notification if order status changed
+    if (status && status !== previousStatus) {
+      const orderShortId = order._id.toString().slice(-6).toUpperCase();
+      let pushTitle = 'Order Status Update 🔔';
+      let pushBody = `Your order #${orderShortId} status is now ${status}.`;
+
+      switch (status) {
+        case 'confirmed':
+          pushTitle = 'Order Confirmed! 👨‍🍳';
+          pushBody = `Your order #${orderShortId} has been confirmed and is being prepared.`;
+          break;
+        case 'preparing':
+          pushTitle = 'Kitchen is Cooking! 🔥';
+          pushBody = `Chef is preparing your dishes for order #${orderShortId}.`;
+          break;
+        case 'ready':
+          pushTitle = 'Order Packed & Ready! 🍱';
+          pushBody = `Order #${orderShortId} is freshly packed and waiting for delivery handoff.`;
+          break;
+        case 'out_for_delivery':
+        case 'dispatched':
+          pushTitle = 'Out for Delivery! 🛵';
+          pushBody = `Your food for order #${orderShortId} is on its way to you!`;
+          break;
+        case 'delivered':
+          pushTitle = 'Order Delivered! 🎉';
+          pushBody = `Order #${orderShortId} has been delivered. Enjoy your feast!`;
+          break;
+        case 'cancelled':
+          pushTitle = 'Order Cancelled ⚠️';
+          pushBody = `Your order #${orderShortId} has been cancelled.`;
+          break;
+      }
+
+      sendPushForOrder(order, {
+        title: pushTitle,
+        body: pushBody,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/favicon-32x32.png',
+        url: '/orders',
+        tag: `order-${order._id}`,
+        data: {
+          orderId: order._id.toString(),
+          status,
+          url: '/orders',
+        },
+      }).catch((pushErr) => {
+        console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
+      });
+    }
 
     return NextResponse.json({
       success: true,

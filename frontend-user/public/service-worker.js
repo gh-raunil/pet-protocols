@@ -180,69 +180,48 @@ self.addEventListener('fetch', (event) => {
   // Default: Normal direct network request
 });
 
-// 5. Push Event: Receive and display background web push notifications
+// 5. Push Event: Handle incoming Web Push notifications from backend VAPID
 self.addEventListener('push', (event) => {
-  if (!event.data) {
-    return;
-  }
-
   let data = {};
-  try {
-    data = event.data.json();
-  } catch (e) {
-    data = {
-      title: 'Pet Protocols',
-      body: event.data.text(),
-    };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { title: 'Pet Protocols Alert', body: event.data.text() };
+    }
   }
 
-  const title = data.title || 'Pet Protocols';
+  const title = data.title || 'Pet Protocols Update 🔔';
   const options = {
-    body: data.body || 'You have a new update from Pet Protocols.',
+    body: data.body || 'You have an update on your order.',
     icon: data.icon || '/icons/icon-192x192.png',
     badge: data.badge || '/icons/favicon-32x32.png',
-    data: data.data || { url: '/orders' },
+    data: data.data || { url: data.url || '/orders' },
     tag: data.tag || 'pet-protocols-notification',
     renotify: true,
     vibrate: [100, 50, 100],
-    actions: data.actions || [
-      { action: 'open', title: 'View' },
-      { action: 'close', title: 'Dismiss' },
-    ],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// 6. Notification Click Event: Navigate user to relevant order or page
+// 6. Notification Click Event: Navigate to target URL or focus existing app window
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  if (event.action === 'close') {
-    return;
-  }
-
-  const targetUrl = event.notification.data?.url || '/orders';
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/orders';
 
   event.waitUntil(
-    clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // If a window is already open with the app, focus it and navigate
-        for (const client of clientList) {
-          if (client.url && 'focus' in client) {
-            client.focus();
-            if ('navigate' in client) {
-              return client.navigate(targetUrl);
-            }
-            return;
-          }
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
         }
-        // Otherwise open a new window
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
   );
 });
-

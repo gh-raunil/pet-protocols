@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { getVapidPublicKey } from '@/lib/pushService';
 
 export async function GET() {
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const publicKey = getVapidPublicKey();
+
   if (!publicKey) {
     return NextResponse.json(
-      { success: false, message: "VAPID public key not configured on server" },
-      { status: 500 }
+      { success: false, message: 'VAPID public key not configured' },
+      { status: 503 }
     );
   }
 
