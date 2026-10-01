@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Store, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Clock, Store, AlertTriangle, CheckCircle2, Globe, RotateCcw } from "lucide-react";
 
 const DAYS_OF_WEEK = [
   { key: "monday", label: "Monday" },
@@ -13,6 +14,38 @@ const DAYS_OF_WEEK = [
 ];
 
 export default function BusinessSection({ form, onChange, onSave, saving }) {
+  const [liveTime, setLiveTime] = useState("");
+
+  const regional = form.regionalSettings || { timezone: "Asia/Kolkata" };
+  const currentTimezone = regional.timezone || "Asia/Kolkata";
+
+  useEffect(() => {
+    const updateTime = () => {
+      try {
+        const str = new Intl.DateTimeFormat("en-IN", {
+          timeZone: currentTimezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        }).format(new Date());
+        setLiveTime(str);
+      } catch (e) {
+        setLiveTime("");
+      }
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [currentTimezone]);
+
+  function updateTimezone(tz) {
+    onChange("regionalSettings", {
+      ...regional,
+      timezone: tz,
+    });
+  }
+
   const weeklyHours = form.weeklyHours || {
     monday: { isOpen: true, slots: [{ open: "10:00", close: "23:00" }] },
     tuesday: { isOpen: true, slots: [{ open: "10:00", close: "23:00" }] },
@@ -141,14 +174,64 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
 
       {/* WEEKLY SCHEDULE */}
       <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 transition-colors">
-        <div className="flex items-center gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-            <Clock className="w-5 h-5" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-white">Weekly Schedule</h2>
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">Set regular opening and closing times for each day</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-white">Weekly Schedule</h2>
-            <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">Set regular opening and closing times for each day</p>
+
+          {/* Timezone Selector & Live Clock */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 text-xs">
+              <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span className="font-semibold text-zinc-600 dark:text-zinc-400">Time Zone:</span>
+              <select
+                value={currentTimezone}
+                onChange={(e) => updateTimezone(e.target.value)}
+                className="bg-transparent text-zinc-900 dark:text-white font-bold outline-none cursor-pointer"
+              >
+                <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30) [India] 🇮🇳</option>
+                <option value="Asia/Dubai">Asia/Dubai (GST, UTC+4:00) [Gulf] 🇦🇪</option>
+                <option value="Asia/Singapore">Asia/Singapore (SGT, UTC+8:00) 🇸🇬</option>
+                <option value="Asia/Bangkok">Asia/Bangkok (ICT, UTC+7:00) 🇹🇭</option>
+                <option value="Europe/London">Europe/London (GMT/BST) 🇬🇧</option>
+                <option value="Europe/Paris">Europe/Paris (CET/CEST) 🇪🇺</option>
+                <option value="America/New_York">America/New_York (EST/EDT) 🇺🇸</option>
+                <option value="America/Chicago">America/Chicago (CST/CDT) 🇺🇸</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT) 🇺🇸</option>
+                <option value="UTC">Coordinated Universal Time (UTC) 🌐</option>
+              </select>
+            </div>
+            {liveTime && (
+              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                🕒 {liveTime}
+              </span>
+            )}
           </div>
+        </div>
+
+        {/* Timezone sync notice */}
+        <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-zinc-700 dark:text-zinc-300">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>
+              All operating hours below are evaluated in <strong>{currentTimezone}</strong>. Customers see dishes as available or closed based on this clock.
+            </span>
+          </div>
+          {currentTimezone !== "Asia/Kolkata" && (
+            <button
+              type="button"
+              onClick={() => updateTimezone("Asia/Kolkata")}
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset to India (IST 🇮🇳)
+            </button>
+          )}
         </div>
 
         <div className="space-y-3">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Upload, AlertCircle, Phone, MessageSquare, Mail, MapPin, FileText } from "lucide-react";
+import { Building2, Upload, AlertCircle, Phone, MessageSquare, Mail, MapPin, FileText, Globe } from "lucide-react";
 
 export default function GeneralSection({ form, onChange, onSave, saving }) {
   const [logoUploading, setLogoUploading] = useState(false);
@@ -238,6 +238,41 @@ export default function GeneralSection({ form, onChange, onSave, saving }) {
             className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs sm:text-sm focus:border-orange-500 focus:bg-white dark:focus:bg-zinc-800 transition-colors"
           />
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">Tell customers a little about your restaurant.</p>
+        </div>
+
+        {/* Operating Time Zone */}
+        <div>
+          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Operating Time Zone</span>
+            </span>
+            <span className="text-[10px] text-zinc-400 font-normal">Default: Asia/Kolkata (IST 🇮🇳)</span>
+          </label>
+          <select
+            value={form.regionalSettings?.timezone || "Asia/Kolkata"}
+            onChange={(e) =>
+              onChange("regionalSettings", {
+                ...(form.regionalSettings || {}),
+                timezone: e.target.value,
+              })
+            }
+            className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs sm:text-sm focus:border-orange-500 focus:bg-white dark:focus:bg-zinc-800 transition-colors cursor-pointer"
+          >
+            <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30) [India] 🇮🇳</option>
+            <option value="Asia/Dubai">Asia/Dubai (GST, UTC+4:00) [Gulf] 🇦🇪</option>
+            <option value="Asia/Singapore">Asia/Singapore (SGT, UTC+8:00) 🇸🇬</option>
+            <option value="Asia/Bangkok">Asia/Bangkok (ICT, UTC+7:00) 🇹🇭</option>
+            <option value="Europe/London">Europe/London (GMT/BST) 🇬🇧</option>
+            <option value="Europe/Paris">Europe/Paris (CET/CEST) 🇪🇺</option>
+            <option value="America/New_York">America/New_York (EST/EDT) 🇺🇸</option>
+            <option value="America/Chicago">America/Chicago (CST/CDT) 🇺🇸</option>
+            <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT) 🇺🇸</option>
+            <option value="UTC">Coordinated Universal Time (UTC) 🌐</option>
+          </select>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+            Opening schedules and dish availability will be synchronized to this time zone.
+          </p>
         </div>
       </section>
     </div>
