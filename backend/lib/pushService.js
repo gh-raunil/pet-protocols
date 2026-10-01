@@ -113,3 +113,43 @@ export async function sendPushForOrder(order, payload) {
 
   return sendPushToUser(userId, payload);
 }
+
+/**
+ * Broadcast push notification to all active subscribers or filtered audience
+ */
+export async function broadcastPushNotification(payload, target = 'all') {
+  if (!ensureVapidConfig()) {
+    return { success: false, reason: 'VAPID not configured' };
+  }
+
+  try {
+    await connectDB();
+    const subscriptions = await PushSubscription.find({ status: 'active' }).populate('user').lean();
+    if (!subscriptions || subscriptions.length === 0) {
+      return { success: true, sentCount: 0, total: 0 };
+    }
+
+    const filtered = subscriptions.filter((sub) => {
+      if (target === 'all') return true;
+      const role = sub.user?.role || 'customer';
+      if (target === 'restaurants') {
+        return role === 'restaurant_admin' || role === 'admin' || role === 'staff';
+      }
+      if (target === 'customers') {
+        return role === 'customer' || role === 'user' || !sub.user;
+      }
+      return true;
+    });
+
+    const results = await Promise.allSettled(
+      filtered.map((sub) => sendPushNotification(sub, payload))
+    );
+
+    const sentCount = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
+    return { success: true, sentCount, total: filtered.length };
+  } catch (error) {
+    console.error('[PushService] Error broadcasting push:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+

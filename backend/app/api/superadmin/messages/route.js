@@ -120,6 +120,14 @@ export async function POST(request) {
 
     const recipientModel = recipientType === "customers" ? "User" : "Restaurant";
 
+    let validExpiresAt = null;
+    if (expiresAt) {
+      const parsedDate = new Date(expiresAt);
+      if (!isNaN(parsedDate.getTime()) && parsedDate > new Date()) {
+        validExpiresAt = parsedDate;
+      }
+    }
+
     const newMessage = await Message.create({
       title: title.trim(),
       content: content.trim(),
@@ -132,9 +140,32 @@ export async function POST(request) {
       status,
       scheduledFor: status === "scheduled" && scheduledFor ? new Date(scheduledFor) : null,
       sentAt: status === "sent" ? new Date() : null,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      expiresAt: validExpiresAt,
       createdBy: auth.user._id,
     });
+
+    // If sent immediately, dispatch Web Push broadcast asynchronously
+    if (status === "sent") {
+      try {
+        const { broadcastPushNotification } = await import("@/lib/pushService");
+        broadcastPushNotification(
+          {
+            title: `📢 ${title.trim()}`,
+            body: content.trim().slice(0, 140),
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/favicon-32x32.png",
+            data: {
+              url: recipientType === "restaurants" ? "/updates" : "/notifications",
+              type: "superadmin_broadcast",
+              messageId: newMessage._id.toString(),
+            },
+          },
+          recipientType
+        ).catch((err) => console.warn("[PushBroadcast] Non-blocking push warning:", err.message));
+      } catch (pushErr) {
+        console.warn("[PushBroadcast] Failed to trigger push broadcast:", pushErr.message);
+      }
+    }
 
     return NextResponse.json({
       success: true,

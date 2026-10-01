@@ -45,7 +45,7 @@ export default function MessagesManager({ restaurants = [] }) {
     content: "",
     messageType: "announcement",
     priority: "normal",
-    recipientType: "restaurants",
+    recipientType: "all",
     recipientSelection: "all",
     recipients: [],
     scheduledFor: "",
@@ -102,6 +102,10 @@ export default function MessagesManager({ restaurants = [] }) {
       toast.error("Please select a date and time to schedule.");
       return;
     }
+    if (form.expiresAt && new Date(form.expiresAt).getTime() <= Date.now()) {
+      toast.error("Expiry date must be in the future.");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -125,7 +129,7 @@ export default function MessagesManager({ restaurants = [] }) {
           content: "",
           messageType: "announcement",
           priority: "normal",
-          recipientType: "restaurants",
+          recipientType: "all",
           recipientSelection: "all",
           recipients: [],
           scheduledFor: "",

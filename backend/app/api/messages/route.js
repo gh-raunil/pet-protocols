@@ -27,30 +27,19 @@ export async function GET(request) {
       }
     }
 
-    // Determine target audience strictly based on authorization
-    let target = "customers";
-
-    if (requestedTarget === "restaurants") {
-      // ONLY restaurant admins and superadmins can view restaurant-targeted messages
-      if (userRole === "restaurant_admin" || userRole === "admin" || userRole === "superadmin") {
-        target = "restaurants";
-      } else {
-        return NextResponse.json(
-          { success: false, message: "Unauthorized to access restaurant notifications." },
-          { status: 403 }
-        );
-      }
-    } else {
-      // Default to customer target
-      target = "customers";
-    }
+    // Determine target audience
+    let target = requestedTarget === "restaurants" ? "restaurants" : "customers";
 
     const now = new Date();
 
-    // Base query conditions: status must be sent, sentAt <= now, not expired
+    // Base query conditions: status must be sent (or scheduled time has arrived), not expired
     const andConditions = [
-      { status: "sent" },
-      { sentAt: { $lte: now } },
+      {
+        $or: [
+          { status: "sent", $or: [{ sentAt: null }, { sentAt: { $lte: now } }] },
+          { status: "scheduled", scheduledFor: { $lte: now } },
+        ],
+      },
       {
         $or: [
           { expiresAt: null },

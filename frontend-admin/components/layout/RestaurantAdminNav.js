@@ -196,6 +196,7 @@ export default function RestaurantAdminNav() {
           const unread = data.messages.find((m) => !dismissedList.includes(m.id || m._id));
           if (unread) {
             setActiveNotice(unread);
+            setNoticeDismissed(false);
           } else {
             setNoticeDismissed(true);
           }
@@ -207,6 +208,8 @@ export default function RestaurantAdminNav() {
       }
     }
     loadNotice();
+    const interval = setInterval(loadNotice, 60000);
+    return () => clearInterval(interval);
   }, [isRestaurantAdmin]);
 
   // When visiting the messages page, dismiss notice
