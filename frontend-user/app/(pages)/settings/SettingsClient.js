@@ -15,11 +15,25 @@ import {
   ShieldCheck,
   RotateCcw,
   Smartphone,
+  Send,
+  AlertCircle,
 } from "lucide-react";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
+import { useWebPush } from "@/hooks/useWebPush";
 
 export default function SettingsClient() {
   const { theme, setTheme, palette, setPalette, palettes, mounted } = useTheme();
+
+  // Web Push Notifications
+  const {
+    isSupported: isPushSupported,
+    permission: pushPermission,
+    isSubscribed: isPushSubscribed,
+    loading: pushLoading,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+    sendTestNotification,
+  } = useWebPush();
 
   // Local notifications preferences
   const [orderAlerts, setOrderAlerts] = useState(true);
@@ -313,7 +327,84 @@ export default function SettingsClient() {
           </div>
 
           <div className="space-y-4 divide-y divide-[var(--border-color)]">
-            <div className="pt-2 flex items-center justify-between gap-4">
+            {/* Real Web Push Notifications */}
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-[var(--text-main)]">
+                      Web Push Notifications (Device Alerts)
+                    </h3>
+                    {isPushSubscribed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                      </span>
+                    ) : pushPermission === "denied" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                        <AlertCircle size={10} /> Blocked
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    Receive background alerts on your phone or computer when your food order is confirmed, preparing, or out for delivery.
+                  </p>
+                </div>
+
+                {isPushSupported ? (
+                  <button
+                    type="button"
+                    disabled={pushLoading}
+                    onClick={() => {
+                      if (isPushSubscribed) {
+                        unsubscribePush();
+                      } else {
+                        subscribePush();
+                      }
+                    }}
+                    className={`w-12 h-7 rounded-full p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                      isPushSubscribed ? "bg-[var(--brand-accent)]" : "bg-[var(--bg-sub)] border border-[var(--border-color)]"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                        isPushSubscribed ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-[var(--text-muted)] italic">
+                    Not supported
+                  </span>
+                )}
+              </div>
+
+              {pushPermission === "denied" && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-600 dark:text-rose-400 flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <span>
+                    Notifications are blocked in your browser. Click the lock/settings icon in your browser's address bar to change site permissions and allow notifications.
+                  </span>
+                </div>
+              )}
+
+              {isPushSubscribed && (
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Device successfully subscribed to Pet Protocols push server.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={sendTestNotification}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold hover:bg-[var(--brand-accent)]/25 transition"
+                  >
+                    <Send size={12} />
+                    <span>Send Test Notification</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-bold text-[var(--text-main)]">
                   Live Order Status Alerts

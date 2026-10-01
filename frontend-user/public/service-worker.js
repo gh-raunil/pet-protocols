@@ -179,3 +179,70 @@ self.addEventListener('fetch', (event) => {
 
   // Default: Normal direct network request
 });
+
+// 5. Push Event: Receive and display background web push notifications
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    return;
+  }
+
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch (e) {
+    data = {
+      title: 'Pet Protocols',
+      body: event.data.text(),
+    };
+  }
+
+  const title = data.title || 'Pet Protocols';
+  const options = {
+    body: data.body || 'You have a new update from Pet Protocols.',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/favicon-32x32.png',
+    data: data.data || { url: '/orders' },
+    tag: data.tag || 'pet-protocols-notification',
+    renotify: true,
+    vibrate: [100, 50, 100],
+    actions: data.actions || [
+      { action: 'open', title: 'View' },
+      { action: 'close', title: 'Dismiss' },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 6. Notification Click Event: Navigate user to relevant order or page
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || '/orders';
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If a window is already open with the app, focus it and navigate
+        for (const client of clientList) {
+          if (client.url && 'focus' in client) {
+            client.focus();
+            if ('navigate' in client) {
+              return client.navigate(targetUrl);
+            }
+            return;
+          }
+        }
+        // Otherwise open a new window
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
+  );
+});
+
