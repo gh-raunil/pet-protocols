@@ -33,6 +33,7 @@ const Footer = () => {
             <div className="flex flex-col gap-2.5 text-xs text-[var(--text-muted)]">
               <Link href="/" className="hover:text-[var(--brand-accent)] transition">Home</Link>
               <Link href="/menu" className="hover:text-[var(--brand-accent)] transition">Full Menu</Link>
+              <Link href="/download" className="hover:text-[var(--brand-accent)] transition">Download Android App</Link>
               <Link href="/offers" className="hover:text-[var(--brand-accent)] transition">Active Offers & Discounts</Link>
               <Link href="/orders" className="hover:text-[var(--brand-accent)] transition">Order Tracking</Link>
               <Link href="/settings" className="hover:text-[var(--brand-accent)] transition">Appearance & Palettes</Link>

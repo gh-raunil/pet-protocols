@@ -7,7 +7,6 @@ import {
   Download,
   Smartphone,
   ShieldCheck,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Sparkles,
@@ -16,7 +15,6 @@ import {
   Clock,
   Zap,
   ArrowRight,
-  ExternalLink,
   Copy,
   Check,
 } from "lucide-react";
@@ -106,19 +104,19 @@ export default function DownloadClient() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 selection:bg-[#ff8100] selection:text-white pt-28 pb-20 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
+    <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] selection:bg-[var(--brand-accent)] selection:text-white pt-28 pb-24 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden transition-colors">
       {/* ── AMBIENT GLOW EFFECTS ── */}
       <div className="relative max-w-6xl mx-auto w-full">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 w-[280px] sm:w-[500px] h-[280px] bg-[#ff8100]/15 blur-[100px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 w-[280px] sm:w-[500px] h-[280px] bg-[var(--brand-accent)]/15 blur-[100px] rounded-full pointer-events-none -z-10" />
 
         {/* ── HERO SECTION ── */}
         <section className="text-center pt-4 pb-12 sm:pb-20 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#ff8100]/10 border border-[#ff8100]/25 text-[#ff8100] text-xs font-bold uppercase tracking-wider mb-6 animate-pulse">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-6 animate-pulse">
             <Sparkles size={13} /> Official Android Release
           </div>
 
           <div className="flex justify-center mb-6">
-            <div className="relative p-2 bg-gradient-to-b from-zinc-800 to-zinc-950 rounded-3xl border border-zinc-700/60 shadow-2xl shadow-black/80">
+            <div className="relative p-2 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] shadow-xl transition-colors">
               <Image
                 src="/icons/icon-512x512.png"
                 alt="Pet Protocols App Icon"
@@ -127,17 +125,17 @@ export default function DownloadClient() {
                 className="rounded-2xl object-cover shadow-inner"
                 priority
               />
-              <div className="absolute -bottom-2 -right-2 bg-[#ff8100] text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+              <div className="absolute -bottom-2 -right-2 bg-[var(--brand-accent)] text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-md">
                 v1.0.0
               </div>
             </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white mb-4 px-2 break-words">
-            Your food. <span className="text-[#ff8100]">Your way.</span>
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-[var(--text-main)] mb-4 px-2 break-words transition-colors">
+            Your food. <span className="text-[var(--brand-accent)]">Your way.</span>
           </h1>
 
-          <p className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-xl mx-auto mb-8 font-normal leading-relaxed px-2">
+          <p className="text-sm sm:text-base md:text-lg text-[var(--text-muted)] max-w-xl mx-auto mb-8 font-normal leading-relaxed px-2 transition-colors">
             Order faster. Enjoy better. Get the Pet Protocols app.
           </p>
 
@@ -147,7 +145,7 @@ export default function DownloadClient() {
               href="/downloads/pet-protocols-release.apk"
               download="pet-protocols-1.0.0.apk"
               id="android-download-btn"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[#ff8100] hover:bg-[#ea580c] active:scale-[0.98] text-white text-base font-extrabold transition duration-200 shadow-xl shadow-[#ff8100]/25 group"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[var(--brand-accent)] hover:opacity-90 active:scale-[0.98] text-white text-base font-extrabold transition duration-200 shadow-xl shadow-[var(--brand-accent)]/25 group"
             >
               <Download size={20} className="group-hover:-translate-y-0.5 transition-transform" />
               <span>Download for Android</span>
@@ -155,7 +153,7 @@ export default function DownloadClient() {
 
             <Link
               href="/menu"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-sm font-semibold transition duration-200"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-[var(--text-main)] text-sm font-semibold transition duration-200 shadow-sm"
             >
               <span>Explore Web Menu</span>
               <ArrowRight size={16} />
@@ -163,15 +161,15 @@ export default function DownloadClient() {
           </div>
 
           {/* APK Meta Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400 font-medium px-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">
-              <Smartphone size={13} className="text-[#ff8100]" /> Android 5.0+
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--text-muted)] font-medium px-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] shadow-sm transition-colors">
+              <Smartphone size={13} className="text-[var(--brand-accent)]" /> Android 5.0+
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> 3.44 MB
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] shadow-sm transition-colors">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> 3.44 MB
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">
-              <ShieldCheck size={13} className="text-emerald-400" /> Signed APK
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] shadow-sm transition-colors">
+              <ShieldCheck size={13} className="text-emerald-500" /> Signed APK
             </span>
           </div>
         </section>
@@ -179,15 +177,15 @@ export default function DownloadClient() {
         {/* ── APP PREVIEWS (REAL ACTUAL APPLICATION UI) ── */}
         <section className="mb-24">
           <div className="text-center mb-10">
-            <p className="text-xs uppercase tracking-widest text-[#ff8100] font-bold mb-2">Interface Preview</p>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Experience Seamless Dining</h2>
+            <p className="text-xs uppercase tracking-widest text-[var(--brand-accent)] font-bold mb-2">Interface Preview</p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] transition-colors">Experience Seamless Dining</h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-5xl mx-auto">
             {/* Mobile Screenshot Frame */}
             <div className="lg:col-span-5 flex justify-center">
-              <div className="relative w-full max-w-[280px] sm:max-w-[300px] p-3 rounded-[38px] bg-gradient-to-b from-zinc-700 via-zinc-900 to-black border-2 border-zinc-700/60 shadow-2xl shadow-black/90">
-                <div className="relative rounded-[30px] overflow-hidden border border-zinc-800/80 bg-black aspect-[9/16]">
+              <div className="relative w-full max-w-[280px] sm:max-w-[300px] p-3 rounded-[38px] bg-[var(--bg-card)] dark:bg-gradient-to-b dark:from-zinc-700 dark:via-zinc-900 dark:to-black border-2 border-[var(--border-color)] shadow-2xl transition-colors">
+                <div className="relative rounded-[30px] overflow-hidden border border-[var(--border-color)] bg-black aspect-[9/16]">
                   <Image
                     src="/screenshots/mobile-home.png"
                     alt="Pet Protocols Mobile Application Experience"
@@ -197,20 +195,20 @@ export default function DownloadClient() {
                   />
                 </div>
                 {/* Speaker pill */}
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-16 h-1 bg-zinc-600 rounded-full" />
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-16 h-1 bg-[var(--border-color)] rounded-full" />
               </div>
             </div>
 
             {/* Desktop / Tablet Feature View */}
             <div className="lg:col-span-7 space-y-6">
-              <div className="relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900/60 shadow-2xl">
-                <div className="px-4 py-3 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between">
+              <div className="relative rounded-2xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl transition-colors">
+                <div className="px-4 py-3 bg-[var(--bg-sub)] border-b border-[var(--border-color)] flex items-center justify-between transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                   </div>
-                  <span className="text-[11px] text-zinc-400 font-mono">pet-protocols.vercel.app</span>
+                  <span className="text-[11px] text-[var(--text-muted)] font-mono">pet-protocols.vercel.app</span>
                   <div className="w-8" />
                 </div>
                 <div className="relative aspect-[16/9]">
@@ -224,13 +222,13 @@ export default function DownloadClient() {
                 </div>
               </div>
 
-              <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 space-y-2">
-                <div className="flex items-center gap-2 text-[#ff8100] font-bold text-sm">
+              <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2 shadow-sm transition-colors">
+                <div className="flex items-center gap-2 text-[var(--brand-accent)] font-bold text-sm">
                   <ShieldCheck size={18} />
                   <span>Native Fullscreen Android Experience</span>
                 </div>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  When launched from your home screen, Pet Protocols runs in dedicated standalone mode with no browser URL bar or navigation buttons. The dark charcoal interface matches your device’s status bar for an immersive experience.
+                <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed transition-colors">
+                  When launched from your home screen, Pet Protocols runs in dedicated standalone mode with no browser URL bar or navigation buttons. The seamless interface matches your system theme for an immersive dining experience.
                 </p>
               </div>
             </div>
@@ -240,9 +238,9 @@ export default function DownloadClient() {
         {/* ── CORE FEATURES ── */}
         <section className="mb-24">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <p className="text-xs uppercase tracking-widest text-[#ff8100] font-bold mb-2">Designed For Foodies</p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-4 break-words px-2">Everything You Need To Dine Well</h2>
-            <p className="text-xs sm:text-sm text-zinc-400 px-4">
+            <p className="text-xs uppercase tracking-widest text-[var(--brand-accent)] font-bold mb-2">Designed For Foodies</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--text-main)] mb-4 break-words px-2 transition-colors">Everything You Need To Dine Well</h2>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] px-4 transition-colors">
               Built with precision to make finding, ordering, and enjoying fresh meals effortless.
             </p>
           </div>
@@ -253,15 +251,15 @@ export default function DownloadClient() {
               return (
                 <div
                   key={idx}
-                  className="p-6 sm:p-8 rounded-3xl bg-zinc-900/60 border border-zinc-800/80 hover:border-[#ff8100]/40 transition duration-200 shadow-lg space-y-3 group"
+                  className="p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition duration-200 shadow-sm hover:shadow-md space-y-3 group"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#ff8100]/15 border border-[#ff8100]/25 text-[#ff8100] flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Icon size={22} />
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-[#ff8100] transition-colors">
+                  <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition-colors">
                     {feature.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-normal">
+                  <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed font-normal transition-colors">
                     {feature.desc}
                   </p>
                 </div>
@@ -273,9 +271,9 @@ export default function DownloadClient() {
         {/* ── INSTALLATION INSTRUCTIONS ── */}
         <section className="mb-24 max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <p className="text-xs uppercase tracking-widest text-[#ff8100] font-bold mb-2">Quick Setup Guide</p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-4 break-words px-2">How To Install The APK</h2>
-            <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto px-4">
+            <p className="text-xs uppercase tracking-widest text-[var(--brand-accent)] font-bold mb-2">Quick Setup Guide</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--text-main)] mb-4 break-words px-2 transition-colors">How To Install The APK</h2>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-xl mx-auto px-4 transition-colors">
               Follow these simple steps on your Android device to install Pet Protocols in under 60 seconds.
             </p>
           </div>
@@ -284,14 +282,14 @@ export default function DownloadClient() {
             {steps.map((step, idx) => (
               <div
                 key={idx}
-                className="p-5 sm:p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 flex items-start gap-4 sm:gap-6 hover:border-zinc-700 transition"
+                className="p-5 sm:p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-start gap-4 sm:gap-6 hover:border-[var(--brand-accent)]/40 transition shadow-sm"
               >
-                <div className="shrink-0 w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700/80 text-[#ff8100] font-mono font-black flex items-center justify-center text-sm shadow-inner">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--brand-accent)] font-mono font-black flex items-center justify-center text-sm shadow-inner transition-colors">
                   {step.num}
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm sm:text-base font-bold text-white">{step.title}</h4>
-                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">{step.desc}</p>
+                  <h4 className="text-sm sm:text-base font-bold text-[var(--text-main)] transition-colors">{step.title}</h4>
+                  <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed transition-colors">{step.desc}</p>
                 </div>
               </div>
             ))}
@@ -301,7 +299,7 @@ export default function DownloadClient() {
             <a
               href="/downloads/pet-protocols-release.apk"
               download="pet-protocols-1.0.0.apk"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#ff8100] hover:bg-[#ea580c] text-white text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-[#ff8100]/20"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-[var(--brand-accent)]/20"
             >
               <Download size={16} />
               <span>Download APK Now (3.44 MB)</span>
@@ -312,8 +310,8 @@ export default function DownloadClient() {
         {/* ── FREQUENTLY ASKED QUESTIONS (FAQ) ── */}
         <section className="mb-24 max-w-3xl mx-auto">
           <div className="text-center mb-12">
-            <p className="text-xs uppercase tracking-widest text-[#ff8100] font-bold mb-2">Got Questions?</p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-4 break-words px-2">Frequently Asked Questions</h2>
+            <p className="text-xs uppercase tracking-widest text-[var(--brand-accent)] font-bold mb-2">Got Questions?</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--text-main)] mb-4 break-words px-2 transition-colors">Frequently Asked Questions</h2>
           </div>
 
           <div className="space-y-3">
@@ -322,19 +320,19 @@ export default function DownloadClient() {
               return (
                 <div
                   key={idx}
-                  className="rounded-2xl bg-zinc-900/70 border border-zinc-800/90 overflow-hidden transition"
+                  className="rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden transition shadow-sm"
                 >
                   <button
                     onClick={() => toggleFaq(idx)}
-                    className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-3 font-semibold text-sm sm:text-base text-zinc-100 hover:text-[#ff8100] transition-colors"
+                    className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-3 font-semibold text-sm sm:text-base text-[var(--text-main)] hover:text-[var(--brand-accent)] transition-colors"
                   >
                     <span>{faq.q}</span>
-                    <span className="shrink-0 text-zinc-400">
+                    <span className="shrink-0 text-[var(--text-muted)]">
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </span>
                   </button>
                   {isOpen && (
-                    <div className="px-4 sm:px-5 pb-5 pt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed border-t border-zinc-800/50">
+                    <div className="px-4 sm:px-5 pb-5 pt-1 text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed border-t border-[var(--border-color)] transition-colors">
                       {faq.a}
                     </div>
                   )}
@@ -345,30 +343,30 @@ export default function DownloadClient() {
         </section>
 
         {/* ── VERIFICATION / INTEGRITY FOOTER ── */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-zinc-800/80 max-w-4xl mx-auto text-center space-y-4">
-          <div className="inline-flex items-center gap-2 text-xs font-bold text-zinc-300">
-            <ShieldCheck size={16} className="text-emerald-400" />
+        <section className="p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] max-w-4xl mx-auto text-center space-y-4 shadow-sm transition-colors">
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-[var(--text-main)] transition-colors">
+            <ShieldCheck size={16} className="text-emerald-500" />
             <span>Cryptographic Verification & Integrity</span>
           </div>
-          <p className="text-xs text-zinc-400 max-w-2xl mx-auto leading-relaxed px-2">
+          <p className="text-xs text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed px-2 transition-colors">
             Every build is signed with Pet Protocols’ official RSA-2048 private key. You can independently verify the SHA-256 certificate digest matching our production domain Digital Asset Links:
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-xl mx-auto bg-zinc-900 p-3 rounded-xl border border-zinc-800 text-xs font-mono">
-            <span className="text-[11px] sm:text-xs text-zinc-300 break-all select-all leading-normal">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-xl mx-auto bg-[var(--bg-sub)] p-3 rounded-xl border border-[var(--border-color)] text-xs font-mono transition-colors">
+            <span className="text-[11px] sm:text-xs text-[var(--text-main)] break-all select-all leading-normal transition-colors">
               A7:F1:5C:26:FD:E6:E0:26:A3:1B:58:03:F3:C2:DD:0F:36:CE:D8:F0:2F:D2:41:88:76:D5:FB:B7:38:CB:AB:74
             </span>
             <button
               onClick={handleCopyFingerprint}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition text-xs font-sans font-medium"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-[var(--text-main)] transition text-xs font-sans font-medium"
               title="Copy Certificate Fingerprint"
             >
-              {copiedFingerprint ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              {copiedFingerprint ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
               <span>{copiedFingerprint ? "Copied" : "Copy"}</span>
             </button>
           </div>
         </section>
       </div>
-    </div>
+    </main>
   );
 }
