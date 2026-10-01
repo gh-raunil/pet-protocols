@@ -673,7 +673,7 @@ export default function SuperadminClient() {
               Sign In to Super Admin Portal →
             </button>
             <a
-              href="http://localhost:3000"
+              href={customerBaseUrl}
               className="w-full py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs transition block border border-slate-200 dark:border-slate-800"
             >
               Return to Food Ordering App
