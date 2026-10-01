@@ -8,8 +8,8 @@ export default function manifest() {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#FAF7F2",
-    theme_color: "#EA580C",
+    background_color: "#0a0a0a",
+    theme_color: "#0a0a0a",
     icons: [
       {
         src: "/icons/icon-192x192.png",

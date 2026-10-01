@@ -44,3 +44,17 @@ next-env.d.ts
 
 # Password Changing file
 setAdminPassword.js
+
+# Android signing keys & TWA build artifacts
+*.keystore
+*.jks
+*.apk
+*.aab
+*.idsig
+keystore.env
+android-twa/app/build/
+android-twa/build/
+android-twa/.gradle/
+
+# Allow distributing the public signed release APK on the website
+!frontend-user/public/downloads/*.apk

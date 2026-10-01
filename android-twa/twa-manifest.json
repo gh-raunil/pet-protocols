@@ -1,0 +1,44 @@
+{
+  "packageId": "app.vercel.pet_protocols.twa",
+  "host": "pet-protocols.vercel.app",
+  "name": "Pet Protocols",
+  "launcherName": "Pet Protocols",
+  "display": "standalone",
+  "themeColor": "#0a0a0a",
+  "themeColorDark": "#0a0a0a",
+  "navigationColor": "#0a0a0a",
+  "navigationColorDark": "#0a0a0a",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#0a0a0a",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://pet-protocols.vercel.app/icons/icon-512x512.png",
+  "maskableIconUrl": "https://pet-protocols.vercel.app/icons/icon-maskable-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./pet-protocols-release.keystore",
+    "alias": "petprotocols"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://pet-protocols.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://pet-protocols.vercel.app/"
+}
