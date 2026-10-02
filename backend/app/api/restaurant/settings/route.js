@@ -113,12 +113,34 @@ export async function PUT(request) {
     if (body.acceptingOrders !== undefined) restaurant.acceptingOrders = Boolean(body.acceptingOrders);
     if (body.isTemporarilyClosed !== undefined) restaurant.isTemporarilyClosed = Boolean(body.isTemporarilyClosed);
     if (body.closureReason !== undefined) restaurant.closureReason = String(body.closureReason || '').trim();
-    if (body.openingHours !== undefined) restaurant.openingHours = String(body.openingHours || '').trim();
+    if (body.openingHours !== undefined) {
+      restaurant.openingHours = String(body.openingHours || '').trim();
+    }
     if (body.weeklyHours && typeof body.weeklyHours === 'object') {
       restaurant.weeklyHours = {
         ...restaurant.weeklyHours?.toObject?.() || restaurant.weeklyHours || {},
         ...body.weeklyHours,
       };
+
+      // If openingHours was not explicitly provided or is being auto-synced, synthesize from weeklyHours
+      if (!body.openingHours) {
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const openDay = days.find((d) => restaurant.weeklyHours[d]?.isOpen && restaurant.weeklyHours[d]?.slots?.[0]?.open);
+        if (openDay) {
+          const slot = restaurant.weeklyHours[openDay].slots[0];
+          const fmt12 = (t) => {
+            if (!t) return '';
+            const [hStr, mStr] = t.split(':');
+            let h = parseInt(hStr, 10);
+            const m = (mStr || '00').padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            if (h === 0) h = 12;
+            return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+          };
+          restaurant.openingHours = `${fmt12(slot.open)} - ${fmt12(slot.close)}`;
+        }
+      }
     }
     if (body.specialHours && Array.isArray(body.specialHours)) {
       restaurant.specialHours = body.specialHours;

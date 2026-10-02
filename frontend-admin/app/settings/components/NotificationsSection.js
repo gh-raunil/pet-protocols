@@ -9,8 +9,13 @@ import {
   Smartphone,
   Play,
   CheckCircle2,
+  Send,
+  AlertCircle,
+  Laptop,
+  RefreshCw,
 } from "lucide-react";
 import { CHIME_OPTIONS, getSavedChime, setSavedChime, playChime } from "@/lib/soundChimes";
+import { useWebPush } from "@/hooks/useWebPush";
 
 export default function NotificationsSection({ form, onChange, onSave, saving }) {
   const notif = form.notificationSettings || {
@@ -30,6 +35,16 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
   };
 
   const [currentChime, setCurrentChime] = useState("bell");
+
+  const {
+    isSupported: isPushSupported,
+    permission: pushPermission,
+    isSubscribed: isPushSubscribed,
+    isLoading: isPushLoading,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+    sendTest: sendTestPush,
+  } = useWebPush();
 
   useEffect(() => {
     setCurrentChime(getSavedChime() || notif.audioChime || "bell");
@@ -197,8 +212,8 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
                 <Smartphone className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-white">Browser Push Notifications</div>
-                <div className="text-xs text-zinc-400">Desktop and mobile browser alerts</div>
+                <div className="text-sm font-semibold text-white">Browser Push Channel</div>
+                <div className="text-xs text-zinc-400">Enable Web Push channel for this restaurant</div>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -211,6 +226,85 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
               <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
             </label>
           </div>
+        </div>
+
+        {/* Device Push Notifications Box */}
+        <div className="p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400 shrink-0">
+                <Laptop className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-white flex items-center gap-2 flex-wrap">
+                  <span>This Device Browser Push</span>
+                  {isPushSupported ? (
+                    isPushSubscribed ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Subscribed
+                      </span>
+                    ) : pushPermission === "denied" ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Blocked in Browser
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        Not Enabled
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-zinc-700 text-zinc-400">
+                      Unsupported
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-zinc-400">
+                  Receive instant order and cancellation alerts on this device even when the website tab is closed.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {isPushSubscribed ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={sendTestPush}
+                    disabled={isPushLoading}
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition-colors"
+                  >
+                    <Send className="w-3 h-3 text-orange-400" />
+                    Test Alert
+                  </button>
+                  <button
+                    type="button"
+                    onClick={unsubscribePush}
+                    disabled={isPushLoading}
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/30 transition-colors"
+                  >
+                    Disable Device
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={subscribePush}
+                  disabled={isPushLoading || !isPushSupported}
+                  className="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-orange-500/20 transition-colors"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  {isPushLoading ? "Enabling..." : "Enable Push on this Device"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {pushPermission === "denied" && (
+            <div className="text-[11px] text-rose-400 flex items-center gap-1.5 pt-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              Notifications are blocked in your browser. Click the lock icon in your browser address bar to allow notifications for this site.
+            </div>
+          )}
         </div>
       </section>
 

@@ -115,6 +115,12 @@ const UserSchema = new mongoose.Schema(
       type: [AddressSchema],
       default: [],
     },
+    favorites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+      },
+    ],
   },
   {
     timestamps: true,

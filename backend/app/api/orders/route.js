@@ -7,7 +7,7 @@ import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { deductStockForOrder, restoreStockForOrder } from '@/lib/inventoryService';
-import { sendPushForOrder } from '@/lib/pushService';
+import { notifyOrderEvent } from '@/lib/pushService';
 
 // GET — Fetch customer's orders (with optional ?orderId= filter)
 export async function GET(request) {
@@ -207,20 +207,10 @@ export async function POST(request) {
 
       createdOrders.push(populatedOrder);
 
-      // Dispatch Web Push notification to customer confirming order placement
-      sendPushForOrder(populatedOrder, {
-        title: "Order Placed! 🍽️",
-        body: `Your order #${populatedOrder._id.toString().slice(-6).toUpperCase()} has been received by ${populatedOrder.restaurant?.name || 'the kitchen'}.`,
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/favicon-32x32.png",
-        url: "/orders",
-        tag: `order-${populatedOrder._id}`,
-        data: {
-          orderId: populatedOrder._id.toString(),
-          status: "pending",
-          url: "/orders",
-        },
-      }).catch((e) => console.warn("[Order Create Push] Non-blocking push warning:", e.message));
+      // Dispatch Web Push notifications to customer and restaurant admins
+      notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
+        console.warn("[Order Create Push] Non-blocking push warning:", e.message)
+      );
     }
 
     const hasCod = createdOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
@@ -322,15 +312,8 @@ export async function PATCH(request) {
       }
     }
 
-    // Dispatch push notification to customer
-    sendPushForOrder(order, {
-      title: 'Order Cancelled ❌',
-      body: `Your order #${order._id.toString().slice(-6).toUpperCase()} has been cancelled.`,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/favicon-32x32.png',
-      url: '/orders',
-      data: { orderId: order._id.toString(), status: 'cancelled', url: '/orders' },
-    }).catch(() => {});
+    // Dispatch push notifications to customer and restaurant admins
+    notifyOrderEvent(order, 'order_cancelled_by_customer', { reason }).catch(() => {});
 
     return NextResponse.json({
       success: true,

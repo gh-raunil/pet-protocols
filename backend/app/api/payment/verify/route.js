@@ -8,6 +8,7 @@ import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { deductStockForOrder } from '@/lib/inventoryService';
+import { notifyOrderEvent } from '@/lib/pushService';
 
 export async function POST(request) {
   try {
@@ -165,6 +166,9 @@ export async function POST(request) {
         .populate("user", "name email");
 
       createdOrders.push(populatedOrder);
+      notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
+        console.warn('[Payment Verify Push] Push warning:', e.message)
+      );
     }
 
     return NextResponse.json(

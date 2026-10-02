@@ -1,8 +1,36 @@
-import { getZonedDateParts } from "@/lib/timeZone";
+import { useState, useEffect } from "react";
+import { getZonedDateParts } from "./timeZone.js";
+
+/**
+ * Convert 24-hour time "HH:mm" (e.g. "08:00", "21:00") into 12-hour formatted "08:00 AM", "09:00 PM".
+ */
+export function formatTime12(timeStr) {
+  if (!timeStr) return "";
+  const parts = String(timeStr).split(":");
+  if (parts.length < 2) return timeStr;
+  let h = parseInt(parts[0], 10);
+  const m = (parts[1] || "00").padStart(2, "0");
+  if (isNaN(h)) return timeStr;
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+}
+
+/**
+ * Format a slot range (e.g. "08:00" to "21:00" -> "08:00 AM – 09:00 PM").
+ */
+export function formatSlotRange(open, close) {
+  if (!open || !close) return "";
+  if ((open === "00:00" && close === "23:59") || (open === "00:00" && close === "00:00")) {
+    return "Open 24 Hours";
+  }
+  return `${formatTime12(open)} – ${formatTime12(close)}`;
+}
 
 /**
  * Helper utility to determine whether a restaurant is currently open and accepting orders.
- * Evaluates in India Standard Time (Asia/Kolkata) or configured restaurant timezone.
+ * Evaluates in restaurant's configured timezone (defaults to Asia/Kolkata).
  * Checks:
  * - isTemporarilyClosed flag and closure reason
  * - isOpen business operational flag
@@ -10,7 +38,6 @@ import { getZonedDateParts } from "@/lib/timeZone";
  * - weeklyHours schedule (day of week & opening slots)
  * - openingHours string fallback (e.g. "10:00 AM - 11:00 PM")
  */
-
 export function getRestaurantOperationalStatus(restaurant) {
   if (!restaurant) {
     return { isOpen: true, reason: "", hoursText: "" };
@@ -25,7 +52,7 @@ export function getRestaurantOperationalStatus(restaurant) {
     };
   }
 
-  // 2. Closed by toggle
+  // 2. Closed by master toggle
   if (restaurant.isOpen === false) {
     return {
       isOpen: false,
@@ -56,33 +83,70 @@ export function getRestaurantOperationalStatus(restaurant) {
         return {
           isOpen: false,
           reason: "Closed Today",
-          hoursText: restaurant.openingHours || "Closed today",
+          hoursText: "Closed today",
         };
       }
 
-      if (Array.isArray(todaySchedule.slots) && todaySchedule.slots.length > 0) {
+      const slots = Array.isArray(todaySchedule.slots) ? todaySchedule.slots : [];
+      if (slots.length > 0) {
         let isWithinAnySlot = false;
-        for (const slot of todaySchedule.slots) {
+        let activeSlot = null;
+
+        for (const slot of slots) {
           if (!slot.open || !slot.close) continue;
           const [openH, openM] = slot.open.split(":").map(Number);
           const [closeH, closeM] = slot.close.split(":").map(Number);
           const slotOpenMin = openH * 60 + (openM || 0);
           const slotCloseMin = closeH * 60 + (closeM || 0);
 
-          if (currentMinutes >= slotOpenMin && currentMinutes <= slotCloseMin) {
-            isWithinAnySlot = true;
-            break;
+          // Standard slot (e.g. 08:00 - 21:00)
+          if (slotCloseMin >= slotOpenMin) {
+            if (currentMinutes >= slotOpenMin && currentMinutes <= slotCloseMin) {
+              isWithinAnySlot = true;
+              activeSlot = slot;
+              break;
+            }
+          } else {
+            // Overnight slot (e.g. 18:00 - 02:00)
+            if (currentMinutes >= slotOpenMin || currentMinutes <= slotCloseMin) {
+              isWithinAnySlot = true;
+              activeSlot = slot;
+              break;
+            }
           }
         }
 
-        if (!isWithinAnySlot) {
-          const firstSlot = todaySchedule.slots[0];
+        const firstSlot = slots[0];
+        const formattedSlotRange = formatSlotRange(firstSlot?.open, firstSlot?.close);
+
+        if (isWithinAnySlot) {
           return {
-            isOpen: false,
-            reason: `Closed now (Opens ${firstSlot?.open || "later"})`,
-            hoursText: `${firstSlot?.open || "10:00"} - ${firstSlot?.close || "23:00"}`,
+            isOpen: true,
+            reason: "",
+            hoursText: formattedSlotRange || restaurant.openingHours || "Open Now",
           };
         }
+
+        // Not within open slot
+        const [firstOpenH, firstOpenM] = (firstSlot?.open || "10:00").split(":").map(Number);
+        const firstOpenMin = firstOpenH * 60 + (firstOpenM || 0);
+        const [firstCloseH, firstCloseM] = (firstSlot?.close || "23:00").split(":").map(Number);
+        const firstCloseMin = firstCloseH * 60 + (firstCloseM || 0);
+
+        let reason = `Closed now (Opens at ${formatTime12(firstSlot?.open)})`;
+        if (firstCloseMin >= firstOpenMin) {
+          if (currentMinutes > firstCloseMin) {
+            reason = `Closed for today (Closed at ${formatTime12(firstSlot?.close)})`;
+          } else if (currentMinutes < firstOpenMin) {
+            reason = `Closed now (Opens at ${formatTime12(firstSlot?.open)})`;
+          }
+        }
+
+        return {
+          isOpen: false,
+          reason,
+          hoursText: formattedSlotRange || restaurant.openingHours || "Closed",
+        };
       }
     }
   }
@@ -119,4 +183,33 @@ export function getRestaurantOperationalStatus(restaurant) {
     reason: "",
     hoursText: restaurant.openingHours || "10:00 AM - 11:00 PM",
   };
+}
+
+/**
+ * React hook to evaluate restaurant operational status reactively in live time.
+ * Automatically recalculates every 15 seconds so opening/closing time changes occur live.
+ */
+export function useOperationalStatus(restaurant) {
+  const [status, setStatus] = useState(() => getRestaurantOperationalStatus(restaurant));
+
+  useEffect(() => {
+    setStatus(getRestaurantOperationalStatus(restaurant));
+
+    // Re-check every 15 seconds to ensure live transitions on minute boundaries
+    const interval = setInterval(() => {
+      setStatus(getRestaurantOperationalStatus(restaurant));
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [
+    restaurant?._id,
+    restaurant?.isOpen,
+    restaurant?.acceptingOrders,
+    restaurant?.isTemporarilyClosed,
+    restaurant?.openingHours,
+    restaurant?.regionalSettings?.timezone,
+    JSON.stringify(restaurant?.weeklyHours),
+  ]);
+
+  return status;
 }

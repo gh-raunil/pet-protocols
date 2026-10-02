@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
+import { notifyOrderEvent } from "@/lib/pushService";
 
 // GET — List all platform orders across all restaurants
 export async function GET(request) {
@@ -80,6 +81,7 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: "Order not found." }, { status: 404 });
     }
 
+    const previousStatus = order.status;
     if (status && ["pending", "preparing", "out_for_delivery", "delivered", "cancelled"].includes(status)) {
       order.status = status;
     }
@@ -89,6 +91,10 @@ export async function PATCH(request) {
     }
 
     await order.save();
+
+    if (status && status !== previousStatus) {
+      notifyOrderEvent(order, 'status_update', { status, reason: notes, notifyRestaurant: true }).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,

@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { playChime } from "@/lib/soundChimes";
 import { Bell, ArrowRight, X, Sparkles, ChefHat } from "lucide-react";
+import { useWebPush } from "@/hooks/useWebPush";
 
 export default function GlobalKitchenOrderListener() {
   const { data: session, status } = useSession();
@@ -14,6 +15,22 @@ export default function GlobalKitchenOrderListener() {
   const [activeAlert, setActiveAlert] = useState(null);
   const seenOrderIdsRef = useRef(new Set());
   const initialLoadRef = useRef(true);
+
+  // Unobtrusive push permission prompt for admin
+  const { isSupported: isPushSupported, permission: pushPermission, isSubscribed: isPushSubscribed, subscribe: subscribePush } = useWebPush();
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (status === "authenticated" && isPushSupported && pushPermission === "default" && !isPushSubscribed) {
+      const dismissed = localStorage.getItem("admin_push_prompt_dismissed") === "true";
+      if (!dismissed) {
+        setShowPushPrompt(true);
+      }
+    } else {
+      setShowPushPrompt(false);
+    }
+  }, [status, isPushSupported, pushPermission, isPushSubscribed]);
 
   useEffect(() => {
     // Only poll if user is authenticated as restaurant admin / admin
@@ -77,66 +94,113 @@ export default function GlobalKitchenOrderListener() {
     };
   }, [status, session]);
 
-  if (!activeAlert) return null;
+  if (!activeAlert && !showPushPrompt) return null;
 
-  const displayId = activeAlert.orderId.toString().startsWith("ORD_")
-    ? `#${activeAlert.orderId.replace("ORD_", "PET-")}`
-    : activeAlert.orderId.toString().startsWith("PET-")
-    ? `#${activeAlert.orderId}`
-    : `#PET-${activeAlert.id.toString().slice(-6).toUpperCase()}`;
+  const displayId = activeAlert
+    ? activeAlert.orderId.toString().startsWith("ORD_")
+      ? `#${activeAlert.orderId.replace("ORD_", "PET-")}`
+      : activeAlert.orderId.toString().startsWith("PET-")
+      ? `#${activeAlert.orderId}`
+      : `#PET-${activeAlert.id.toString().slice(-6).toUpperCase()}`
+    : "";
 
   return (
-    <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-[420px] z-[9999] animate-bounce-in">
-      <div
-        onClick={() => {
-          router.push("/orders");
-          setActiveAlert(null);
-        }}
-        className="cursor-pointer bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 text-white p-4 rounded-2xl shadow-2xl border-2 border-orange-400/40 backdrop-blur-md flex flex-col gap-2 relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30"
-      >
-        {/* Glow ambient background effect */}
-        <div className="absolute -top-12 -right-12 w-28 h-28 bg-white/20 rounded-full blur-xl pointer-events-none" />
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-white/20 rounded-xl backdrop-blur-sm animate-pulse">
-              <ChefHat className="w-5 h-5 text-white" />
-            </span>
-            <div>
-              <div className="text-xs uppercase tracking-wider font-extrabold text-orange-100 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                New Kitchen Order!
-              </div>
-              <div className="text-sm font-black text-white">{displayId}</div>
-            </div>
-          </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
+    <>
+      {/* 1. Live Incoming Order Floating Alert */}
+      {activeAlert && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-[420px] z-[9999] animate-bounce-in">
+          <div
+            onClick={() => {
+              router.push("/orders");
               setActiveAlert(null);
             }}
-            className="p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-white/80 hover:text-white transition-colors"
-            title="Dismiss notification"
+            className="cursor-pointer bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 text-white p-4 rounded-2xl shadow-2xl border-2 border-orange-400/40 backdrop-blur-md flex flex-col gap-2 relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30"
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+            {/* Glow ambient background effect */}
+            <div className="absolute -top-12 -right-12 w-28 h-28 bg-white/20 rounded-full blur-xl pointer-events-none" />
 
-        <div className="text-xs text-orange-50 bg-black/15 p-2 rounded-xl flex items-center justify-between">
-          <span className="font-semibold truncate max-w-[200px]">
-            👤 {activeAlert.customerName} ({activeAlert.itemCount} items)
-          </span>
-          <span className="font-extrabold text-white text-sm">₹{activeAlert.totalAmount}</span>
-        </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-white/20 rounded-xl backdrop-blur-sm animate-pulse">
+                  <ChefHat className="w-5 h-5 text-white" />
+                </span>
+                <div>
+                  <div className="text-xs uppercase tracking-wider font-extrabold text-orange-100 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    New Kitchen Order!
+                  </div>
+                  <div className="text-sm font-black text-white">{displayId}</div>
+                </div>
+              </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-orange-200">Click banner to open in Kitchen Orders</span>
-          <span className="text-xs font-bold text-white flex items-center gap-1 bg-white/25 px-2.5 py-1 rounded-full hover:bg-white/35 transition-colors">
-            Open Orders <ArrowRight className="w-3.5 h-3.5" />
-          </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveAlert(null);
+                }}
+                className="p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-white/80 hover:text-white transition-colors"
+                title="Dismiss notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-orange-50 bg-black/15 p-2 rounded-xl flex items-center justify-between">
+              <span className="font-semibold truncate max-w-[200px]">
+                👤 {activeAlert.customerName} ({activeAlert.itemCount} items)
+              </span>
+              <span className="font-extrabold text-white text-sm">₹{activeAlert.totalAmount}</span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-orange-200">Click banner to open in Kitchen Orders</span>
+              <span className="text-xs font-bold text-white flex items-center gap-1 bg-white/25 px-2.5 py-1 rounded-full hover:bg-white/35 transition-colors">
+                Open Orders <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+
+      {/* 2. Unobtrusive Desktop Push Notification Permission Prompt (One-time, dismissible) */}
+      {showPushPrompt && !activeAlert && (
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-[380px] z-[9990] animate-fade-in">
+          <div className="bg-zinc-900 border border-orange-500/40 text-white p-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 bg-orange-500/20 text-orange-400 rounded-xl shrink-0">
+                <Bell className="w-4 h-4" />
+              </span>
+              <div>
+                <div className="text-xs font-bold text-white">Enable Desktop Order Alerts</div>
+                <div className="text-[11px] text-zinc-400">Get alerts even if this tab is closed</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  await subscribePush();
+                  setShowPushPrompt(false);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition cursor-pointer"
+              >
+                Enable
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("admin_push_prompt_dismissed", "true");
+                  setShowPushPrompt(false);
+                }}
+                className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
