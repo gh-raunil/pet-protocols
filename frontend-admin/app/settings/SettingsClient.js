@@ -18,6 +18,7 @@ import NotificationsSection from "./components/NotificationsSection";
 import StaffSection from "./components/StaffSection";
 import AppearanceSection from "./components/AppearanceSection";
 import SecuritySection from "./components/SecuritySection";
+import ProfileSection from "./components/ProfileSection";
 import AdvancedSection from "./components/AdvancedSection";
 
 import {
@@ -47,10 +48,6 @@ export default function SettingsClient() {
   }, [searchParams]);
 
   function handleSelectSection(sectionId) {
-    if (sectionId === "profile") {
-      router.push("/profile");
-      return;
-    }
     setActiveSection(sectionId);
     router.replace(`/settings?tab=${sectionId}`, { scroll: false });
   }
@@ -478,6 +475,8 @@ export default function SettingsClient() {
                     saving={saving}
                   />
                 )}
+
+                {activeSection === "profile" && <ProfileSection />}
 
                 {activeSection === "security" && <SecuritySection />}
 
