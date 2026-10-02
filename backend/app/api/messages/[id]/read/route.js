@@ -31,8 +31,18 @@ export async function POST(request, { params }) {
       recipientId = body.recipientId || "anonymous";
     }
 
-    const message = await Message.findById(id);
+    let message = await Message.findById(id);
     if (!message) {
+      const InAppNotification = (await import("@/models/InAppNotification")).default;
+      const inApp = await InAppNotification.findById(id);
+      if (inApp) {
+        if (inApp.user?.toString() === recipientId) {
+          inApp.isRead = true;
+          await inApp.save();
+          return NextResponse.json({ success: true, message: "Marked as read", recipientId });
+        }
+        return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 403 });
+      }
       return NextResponse.json({ success: false, message: "Message not found" }, { status: 404 });
     }
 

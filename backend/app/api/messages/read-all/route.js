@@ -48,6 +48,12 @@ export async function POST(request) {
       { "readBy.recipientId": { $ne: userId } },
     ];
 
+    const InAppNotification = (await import("@/models/InAppNotification")).default;
+    await InAppNotification.updateMany(
+      { user: dbUser._id, isRead: false },
+      { $set: { isRead: true } }
+    );
+
     const result = await Message.updateMany(
       { $and: andConditions },
       { $push: { readBy: { recipientId: userId, readAt: now } } }

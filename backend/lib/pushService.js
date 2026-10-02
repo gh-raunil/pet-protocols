@@ -105,14 +105,27 @@ export async function sendPushToUser(userId, payload) {
 
 import User from '../models/User.js';
 import Restaurant from '../models/Restaurant.js';
+import InAppNotification from '../models/InAppNotification.js';
 
 /**
- * Send push notification for an Order to the order's customer
+ * Send push notification for an Order to the order's customer, respecting customer notification preferences
  */
-export async function sendPushForOrder(order, payload) {
+export async function sendPushForOrder(order, payload, preferenceKey = null) {
   if (!order) return { success: false };
   const userId = order.user?._id || order.user;
   if (!userId) return { success: false, reason: 'Order has no registered user ID' };
+
+  if (preferenceKey) {
+    try {
+      await connectDB();
+      const user = await User.findById(userId).select('notificationPreferences').lean();
+      if (user?.notificationPreferences && user.notificationPreferences[preferenceKey] === false) {
+        return { success: true, sentCount: 0, reason: `Push suppressed by customer preference: ${preferenceKey}` };
+      }
+    } catch (prefErr) {
+      // Non-blocking fallback
+    }
+  }
 
   return sendPushToUser(userId, payload);
 }
@@ -194,9 +207,75 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
     const customerName = order.address?.fullName || order.user?.name || 'Customer';
     const itemCount = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || order.items?.length || 1;
     const totalFormatted = order.totalAmount !== undefined ? `₹${order.totalAmount}` : '';
+    const customerUserId = order.user?._id || order.user;
 
     const notifications = [];
 
+    // ── 1. PERSIST IN-APP NOTIFICATION FOR CUSTOMER ──────────────────────────
+    if (customerUserId) {
+      try {
+        await connectDB();
+        const notificationStatus = eventType === 'order_placed' ? 'placed' : (extraData.status || order.status || eventType);
+        const oneMinuteAgo = new Date(Date.now() - 60000);
+        const existing = await InAppNotification.findOne({
+          user: customerUserId,
+          order: order._id,
+          status: notificationStatus,
+          createdAt: { $gte: oneMinuteAgo },
+        });
+
+        if (!existing) {
+          let inAppTitle = 'Order Update';
+          let inAppContent = `Your order #${orderShortId} has an update.`;
+
+          if (eventType === 'order_placed') {
+            inAppTitle = 'Order Placed 🍽️';
+            inAppContent = `Your order #${orderShortId} has been placed with ${restaurantName} (${totalFormatted}).`;
+          } else if (eventType === 'status_update') {
+            const st = extraData.status || order.status;
+            if (st === 'confirmed') {
+              inAppTitle = 'Order Confirmed 👨‍🍳';
+              inAppContent = `Your order #${orderShortId} has been confirmed by ${restaurantName}.`;
+            } else if (st === 'preparing') {
+              inAppTitle = extraData.previousStatus === 'pending' ? 'Order Accepted & Cooking 👨‍🍳' : 'Kitchen is Cooking 🔥';
+              inAppContent = `Chef is preparing dishes for order #${orderShortId}.`;
+            } else if (st === 'ready') {
+              inAppTitle = 'Order Packed & Ready 🍱';
+              inAppContent = `Order #${orderShortId} is freshly packed and waiting for delivery handoff.`;
+            } else if (st === 'out_for_delivery' || st === 'dispatched') {
+              inAppTitle = 'Out for Delivery 🛵';
+              inAppContent = `Your food for order #${orderShortId} is on its way to you!`;
+            } else if (st === 'delivered') {
+              inAppTitle = 'Order Delivered 🎉';
+              inAppContent = `Order #${orderShortId} was delivered. Enjoy your meal!`;
+            } else if (st === 'cancelled') {
+              inAppTitle = 'Order Cancelled ⚠️';
+              inAppContent = extraData.reason
+                ? `Order #${orderShortId} was cancelled: ${extraData.reason}`
+                : `Order #${orderShortId} was cancelled.`;
+            }
+          } else if (eventType === 'order_cancelled_by_customer') {
+            inAppTitle = 'Order Cancelled ❌';
+            inAppContent = `Your order #${orderShortId} has been cancelled.`;
+          }
+
+          await InAppNotification.create({
+            user: customerUserId,
+            order: order._id,
+            orderId: order.orderId || orderShortId,
+            title: inAppTitle,
+            content: inAppContent,
+            type: 'order',
+            status: notificationStatus,
+            url: `/order-confirmation?orderId=${orderId}`,
+          });
+        }
+      } catch (inAppErr) {
+        console.warn('[PushService] Non-blocking in-app notification error:', inAppErr.message);
+      }
+    }
+
+    // ── 2. DISPATCH WEB PUSH NOTIFICATIONS ────────────────────────────────────
     if (eventType === 'order_placed') {
       // 1. Customer notification
       const customerPayload = {
@@ -212,7 +291,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           url: `/order-confirmation?orderId=${orderId}`,
         },
       };
-      notifications.push(sendPushForOrder(order, customerPayload));
+      notifications.push(sendPushForOrder(order, customerPayload, 'orderUpdates'));
 
       // 2. Restaurant admin notification
       if (restaurantId) {
@@ -236,41 +315,45 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
       const status = extraData.status || order.status;
       let pushTitle = 'Order Status Update 🔔';
       let pushBody = `Your order #${orderShortId} status is now ${status}.`;
-      let settingKey = null;
+      let preferenceKey = 'orderUpdates';
 
       switch (status) {
         case 'confirmed':
           pushTitle = 'Order Confirmed! 👨‍🍳';
-          pushBody = `Your order #${orderShortId} has been confirmed and is being prepared.`;
-          settingKey = 'customerOrderConfirmed';
+          pushBody = `Your order #${orderShortId} has been confirmed by ${restaurantName}.`;
+          preferenceKey = 'orderUpdates';
           break;
         case 'preparing':
-          pushTitle = 'Kitchen is Cooking! 🔥';
-          pushBody = `Chef is preparing your dishes for order #${orderShortId}.`;
-          settingKey = 'customerOrderPreparing';
+          pushTitle = extraData.previousStatus === 'pending'
+            ? 'Order Accepted & Cooking! 👨‍🍳🔥'
+            : 'Kitchen is Cooking! 🔥';
+          pushBody = extraData.previousStatus === 'pending'
+            ? `Your order #${orderShortId} was accepted by ${restaurantName} and the kitchen is cooking.`
+            : `Chef is preparing your dishes for order #${orderShortId}.`;
+          preferenceKey = 'prepUpdates';
           break;
         case 'ready':
           pushTitle = 'Order Packed & Ready! 🍱';
           pushBody = `Order #${orderShortId} is freshly packed and waiting for delivery handoff.`;
-          settingKey = 'customerOrderReady';
+          preferenceKey = 'prepUpdates';
           break;
         case 'out_for_delivery':
         case 'dispatched':
           pushTitle = 'Out for Delivery! 🛵';
           pushBody = `Your food for order #${orderShortId} is on its way to you!`;
-          settingKey = 'customerOutForDelivery';
+          preferenceKey = 'deliveryUpdates';
           break;
         case 'delivered':
           pushTitle = 'Order Delivered! 🎉';
           pushBody = `Order #${orderShortId} has been delivered. Enjoy your feast!`;
-          settingKey = 'customerDelivered';
+          preferenceKey = 'orderUpdates';
           break;
         case 'cancelled':
           pushTitle = 'Order Cancelled ⚠️';
           pushBody = extraData.reason
             ? `Your order #${orderShortId} has been cancelled: ${extraData.reason}`
             : `Your order #${orderShortId} has been cancelled.`;
-          settingKey = 'customerCancelled';
+          preferenceKey = 'cancellationAlerts';
           break;
       }
 
@@ -287,7 +370,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           url: `/order-confirmation?orderId=${orderId}`,
         },
       };
-      notifications.push(sendPushForOrder(order, customerPayload));
+      notifications.push(sendPushForOrder(order, customerPayload, preferenceKey));
 
       // If status is cancelled by superadmin or external event, also notify restaurant admins
       if (status === 'cancelled' && extraData.notifyRestaurant && restaurantId) {
@@ -321,7 +404,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           url: '/orders',
         },
       };
-      notifications.push(sendPushForOrder(order, customerPayload));
+      notifications.push(sendPushForOrder(order, customerPayload, 'cancellationAlerts'));
 
       // 2. Restaurant admin notification
       if (restaurantId) {
@@ -353,8 +436,9 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
 
 /**
  * Broadcast push notification to all active subscribers or filtered audience
+ * Supports recipientSelection: 'selected' to prevent accidental platform-wide blasts
  */
-export async function broadcastPushNotification(payload, target = 'all') {
+export async function broadcastPushNotification(payload, target = 'all', options = {}) {
   if (!ensureVapidConfig()) {
     return { success: false, reason: 'VAPID not configured' };
   }
@@ -366,7 +450,46 @@ export async function broadcastPushNotification(payload, target = 'all') {
       return { success: true, sentCount: 0, total: 0 };
     }
 
+    const { recipientSelection = 'all', recipients = [] } = options;
+    const recipientIdStrs = (recipients || []).map((r) => r.toString());
+
+    // If specific recipients were selected, resolve the eligible user IDs
+    let targetedUserIds = null;
+    if (recipientSelection === 'selected') {
+      if (recipientIdStrs.length === 0) {
+        // Explicitly selected but empty list -> target nobody (fail-safe against accidental broadcast)
+        targetedUserIds = new Set();
+      } else if (target === 'restaurants') {
+        const staffAndAdmins = await User.find({
+          restaurant: { $in: recipientIdStrs },
+          status: 'active',
+          role: { $in: ['restaurant_admin', 'admin', 'staff'] },
+        }).select('_id');
+        targetedUserIds = new Set(staffAndAdmins.map((u) => u._id.toString()));
+      } else if (target === 'customers') {
+        targetedUserIds = new Set(recipientIdStrs);
+      } else {
+        // target === 'all' with recipientSelection === 'selected':
+        // Resolve restaurant staff/admins for any matching restaurant IDs, plus direct user IDs
+        const staffAndAdmins = await User.find({
+          restaurant: { $in: recipientIdStrs },
+          status: 'active',
+          role: { $in: ['restaurant_admin', 'admin', 'staff'] },
+        }).select('_id');
+        const combinedSet = new Set(recipientIdStrs);
+        staffAndAdmins.forEach((u) => combinedSet.add(u._id.toString()));
+        targetedUserIds = combinedSet;
+      }
+    }
+
     const filtered = subscriptions.filter((sub) => {
+      // 1. If targeted to specific recipients, ensure user matches
+      if (targetedUserIds !== null) {
+        if (!sub.user?._id) return false;
+        return targetedUserIds.has(sub.user._id.toString());
+      }
+
+      // 2. Audience target filter
       if (target === 'all') return true;
       const role = sub.user?.role || 'customer';
       if (target === 'restaurants') {

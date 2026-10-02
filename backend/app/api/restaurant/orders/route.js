@@ -150,9 +150,21 @@ export async function PUT(request) {
 
     // Send Web Push notification if order status changed
     if (status && status !== previousStatus) {
-      notifyOrderEvent(order, 'status_update', { status, reason: notes }).catch((pushErr) => {
-        console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
-      });
+      Order.findById(order._id)
+        .populate('restaurant', 'name slug phone')
+        .populate('user', 'name email phone')
+        .then((populated) => {
+          notifyOrderEvent(populated || order, 'status_update', {
+            status,
+            previousStatus,
+            reason: notes,
+          }).catch((pushErr) => {
+            console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
+          });
+        })
+        .catch(() => {
+          notifyOrderEvent(order, 'status_update', { status, previousStatus, reason: notes }).catch(() => {});
+        });
     }
 
     return NextResponse.json({

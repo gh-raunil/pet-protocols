@@ -82,7 +82,7 @@ export async function PATCH(request) {
     }
 
     const previousStatus = order.status;
-    if (status && ["pending", "preparing", "out_for_delivery", "delivered", "cancelled"].includes(status)) {
+    if (status && ["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"].includes(status)) {
       order.status = status;
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
 function urlBase64ToUint8Array(base64String) {
@@ -14,12 +15,112 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+export function getDeviceLabel() {
+  if (typeof window === "undefined" || !navigator?.userAgent) return "Kitchen Terminal";
+  const ua = navigator.userAgent.toLowerCase();
+
+  let browser = "Browser";
+  let os = "Device";
+
+  if (ua.includes("firefox")) browser = "Firefox";
+  else if (ua.includes("edg")) browser = "Edge";
+  else if (ua.includes("chrome")) browser = "Chrome";
+  else if (ua.includes("safari")) browser = "Safari";
+
+  if (ua.includes("android")) os = "Android Tablet/Phone";
+  else if (ua.includes("ipad")) os = "iPad Kitchen Display";
+  else if (ua.includes("iphone")) os = "iPhone";
+  else if (ua.includes("windows")) os = "Windows PC / POS";
+  else if (ua.includes("macintosh") || ua.includes("mac os")) os = "Mac";
+  else if (ua.includes("linux")) os = "Linux POS";
+
+  return `${browser} on ${os}`;
+}
+
 export function useWebPush() {
+  const { data: session, status: authStatus } = useSession();
   const [isSupported, setIsSupported] = useState(false);
   const [permission, setPermission] = useState("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [subscription, setSubscription] = useState(null);
+
+  // Registered devices for the authenticated account
+  const [devices, setDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+
+  const syncedForUserRef = useRef(null);
+
+  // Sync existing browser subscription with backend
+  const syncSubscriptionWithBackend = useCallback(async (sub, notify = false) => {
+    try {
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subscription: sub.toJSON ? sub.toJSON() : sub,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+          deviceLabel: getDeviceLabel(),
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to persist subscription on server");
+      }
+      if (notify) {
+        toast.success("Desktop alerts active on this device!");
+      }
+      return true;
+    } catch (err) {
+      console.warn("[AdminWebPush] Failed to sync subscription with backend:", err);
+      return false;
+    }
+  }, []);
+
+  // Fetch registered devices for this account
+  const fetchDevices = useCallback(async () => {
+    if (authStatus !== "authenticated") return;
+    try {
+      setLoadingDevices(true);
+      const res = await fetch("/api/push/devices");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.devices)) {
+          setDevices(data.devices);
+        }
+      }
+    } catch (e) {
+      console.warn("[AdminWebPush] Failed to fetch registered devices:", e);
+    } finally {
+      setLoadingDevices(false);
+    }
+  }, [authStatus]);
+
+  // Revoke a device
+  const revokeDevice = useCallback(async (subscriptionId) => {
+    try {
+      const res = await fetch(`/api/push/devices?id=${encodeURIComponent(subscriptionId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Device revoked successfully.");
+        setDevices((prev) => prev.filter((d) => d.id !== subscriptionId));
+
+        // If revoking the current device's subscription, update local status
+        if (subscription && subscription.endpoint && subscription.endpoint === data.revokedEndpoint) {
+          try {
+            await subscription.unsubscribe();
+          } catch (e) {}
+          setSubscription(null);
+          setIsSubscribed(false);
+        }
+      } else {
+        toast.error(data.message || "Failed to revoke device.");
+      }
+    } catch (e) {
+      toast.error("Error revoking device.");
+    }
+  }, [subscription]);
 
   // Check support and current subscription status on mount
   useEffect(() => {
@@ -57,6 +158,22 @@ export function useWebPush() {
 
     checkSubscription();
   }, []);
+
+  // Sync push subscription whenever user logs in or auth state changes
+  useEffect(() => {
+    const currentUserId = session?.user?.id || session?.user?.email;
+    if (
+      authStatus === "authenticated" &&
+      currentUserId &&
+      subscription &&
+      syncedForUserRef.current !== currentUserId
+    ) {
+      syncedForUserRef.current = currentUserId;
+      syncSubscriptionWithBackend(subscription, false).then(() => {
+        fetchDevices();
+      });
+    }
+  }, [authStatus, session, subscription, syncSubscriptionWithBackend, fetchDevices]);
 
   // Subscribe to Web Push
   const subscribe = useCallback(async () => {
@@ -115,22 +232,11 @@ export function useWebPush() {
       }
 
       // 4. Send subscription to backend to persist linked to user
-      const response = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subscription: sub.toJSON(),
-          userAgent: navigator.userAgent,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to store push subscription on server.");
-      }
+      await syncSubscriptionWithBackend(sub, true);
 
       setSubscription(sub);
       setIsSubscribed(true);
-      toast.success("Desktop order alerts enabled!");
+      fetchDevices();
       return true;
     } catch (error) {
       console.error("[AdminWebPush] Subscription error:", error);
@@ -139,7 +245,7 @@ export function useWebPush() {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported]);
+  }, [isSupported, syncSubscriptionWithBackend, fetchDevices]);
 
   // Unsubscribe from Web Push
   const unsubscribe = useCallback(async () => {
@@ -163,6 +269,7 @@ export function useWebPush() {
       setSubscription(null);
       setIsSubscribed(false);
       toast.success("Desktop alerts disabled on this device.");
+      fetchDevices();
       return true;
     } catch (error) {
       console.error("[AdminWebPush] Unsubscribe error:", error);
@@ -171,7 +278,7 @@ export function useWebPush() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchDevices]);
 
   // Send a test notification
   const sendTest = useCallback(async () => {
@@ -208,5 +315,9 @@ export function useWebPush() {
     subscribe,
     unsubscribe,
     sendTest,
+    devices,
+    loadingDevices,
+    fetchDevices,
+    revokeDevice,
   };
 }

@@ -61,6 +61,24 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
     };
   }
 
+  // If order is ready for pickup/handoff
+  if (status === "ready") {
+    return {
+      text: "🍽️ Ready for Handoff",
+      color: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-500/30 font-semibold",
+      urgent: false,
+    };
+  }
+
+  // If order is confirmed
+  if (status === "confirmed") {
+    return {
+      text: "✓ Confirmed",
+      color: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-500/30 font-semibold",
+      urgent: false,
+    };
+  }
+
   // If order is out for delivery, show in-transit badge
   if (status === "out_for_delivery") {
     return {
@@ -568,7 +586,9 @@ export default function OrdersClient() {
   const statusTabs = [
     { id: "all", label: "All Orders" },
     { id: "pending", label: "Pending" },
+    { id: "confirmed", label: "Confirmed" },
     { id: "preparing", label: "Preparing" },
+    { id: "ready", label: "Ready" },
     { id: "out_for_delivery", label: "Out for Delivery" },
     { id: "delivered", label: "Delivered" },
     { id: "cancelled", label: "Cancelled" },
@@ -577,8 +597,12 @@ export default function OrdersClient() {
   const statusBadgeStyles = {
     pending:
       "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30",
+    confirmed:
+      "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/30",
     preparing:
       "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30",
+    ready:
+      "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30",
     out_for_delivery:
       "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30",
     delivered:
@@ -1061,6 +1085,18 @@ export default function OrdersClient() {
                           </>
                         )}
 
+                        {order.status === "confirmed" && (
+                          <button
+                            type="button"
+                            disabled={updatingOrderId === order._id}
+                            onClick={() => handleUpdateStatus(order._id, "preparing")}
+                            className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <ChefHat size={13} />
+                            <span>Start Cooking</span>
+                          </button>
+                        )}
+
                         {order.status === "preparing" && (
                           <button
                             type="button"
@@ -1068,8 +1104,20 @@ export default function OrdersClient() {
                             onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
                             className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
-                            <Zap size={13} />
-                            <span>Mark Ready (Dispatch)</span>
+                            <Truck size={13} />
+                            <span>Dispatch for Delivery</span>
+                          </button>
+                        )}
+
+                        {order.status === "ready" && (
+                          <button
+                            type="button"
+                            disabled={updatingOrderId === order._id}
+                            onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <Truck size={13} />
+                            <span>Dispatch for Delivery</span>
                           </button>
                         )}
 
@@ -1352,6 +1400,18 @@ export default function OrdersClient() {
                             </>
                           )}
 
+                          {order.status === "confirmed" && (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "preparing")}
+                              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <ChefHat size={14} />
+                              <span>Start Cooking</span>
+                            </button>
+                          )}
+
                           {order.status === "preparing" && (
                             <button
                               type="button"
@@ -1359,8 +1419,20 @@ export default function OrdersClient() {
                               onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
                               className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
-                              <Zap size={14} />
-                              <span>Mark Food Ready (Dispatch)</span>
+                              <Truck size={14} />
+                              <span>Dispatch for Delivery</span>
+                            </button>
+                          )}
+
+                          {order.status === "ready" && (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <Truck size={14} />
+                              <span>Dispatch for Delivery</span>
                             </button>
                           )}
 

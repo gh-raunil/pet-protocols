@@ -10,62 +10,17 @@ import {
   Check,
   Palette,
   Sparkles,
-  Bell,
-  CheckCircle2,
   ShieldCheck,
   RotateCcw,
   Smartphone,
-  AlertCircle,
-  Send,
-  Volume2,
 } from "lucide-react";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
-import { useWebPush } from "@/hooks/useWebPush";
 import TimezoneSelector from "@/components/ui/TimezoneSelector";
+import CustomerNotificationSection from "@/components/settings/CustomerNotificationSection";
 
 export default function SettingsClient() {
   const { theme, setTheme, palette, setPalette, palettes, mounted } = useTheme();
-
-  // Web Push Notifications Hook
-  const {
-    isSupported: isPushSupported,
-    permission: pushPermission,
-    isSubscribed: isPushSubscribed,
-    isLoading: isPushLoading,
-    subscribe: subscribePush,
-    unsubscribe: unsubscribePush,
-    sendTest: sendTestPush,
-  } = useWebPush();
-
-  // Local notifications preferences
-  const [orderAlerts, setOrderAlerts] = useState(true);
-  const [offerAlerts, setOfferAlerts] = useState(true);
   const [paletteFilter, setPaletteFilter] = useState("all");
-
-  useEffect(() => {
-    try {
-      const savedOrders = localStorage.getItem("pet_pref_orders");
-      const savedOffers = localStorage.getItem("pet_pref_offers");
-      if (savedOrders !== null) setOrderAlerts(savedOrders === "true");
-      if (savedOffers !== null) setOfferAlerts(savedOffers === "true");
-    } catch (e) {}
-  }, []);
-
-  const handleToggleOrders = (val) => {
-    setOrderAlerts(val);
-    try {
-      localStorage.setItem("pet_pref_orders", String(val));
-    } catch (e) {}
-    toast.info(`Order status alerts ${val ? "enabled" : "disabled"}`);
-  };
-
-  const handleToggleOffers = (val) => {
-    setOfferAlerts(val);
-    try {
-      localStorage.setItem("pet_pref_offers", String(val));
-    } catch (e) {}
-    toast.info(`Offer promotions ${val ? "enabled" : "disabled"}`);
-  };
 
   const filteredPalettes = palettes.filter((p) => {
     if (paletteFilter === "premium") return Boolean(p.isPremium);
@@ -317,122 +272,7 @@ export default function SettingsClient() {
         </section>
 
         {/* ── SECTION C: NOTIFICATIONS & PRIVACY ─────────────────────── */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-extrabold text-[var(--text-main)] flex items-center gap-2">
-                <Bell size={20} className="text-[var(--brand-accent)]" />
-                Notification Preferences
-              </h2>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                Manage Web Push updates and real-time alerts sent by Pet Protocols.
-              </p>
-            </div>
-            {isPushSupported && (
-              <div className="flex items-center gap-2">
-                {isPushSubscribed ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-xs font-bold">
-                    <CheckCircle2 size={13} /> Push Enabled
-                  </span>
-                ) : pushPermission === "denied" ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-500 text-xs font-bold">
-                    <AlertCircle size={13} /> Blocked
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-bold">
-                    <Bell size={13} /> Disabled
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-5 divide-y divide-[var(--border-color)]">
-            {/* Live Web Push Toggle */}
-            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
-                  <span>Web Push Order Notifications</span>
-                  {isPushSubscribed && (
-                    <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                      Live
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  Receive native lock-screen & desktop push alerts when your order is confirmed, cooking, and out for delivery.
-                </p>
-                {pushPermission === "denied" && (
-                  <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1.5">
-                    <AlertCircle size={13} /> Notifications are blocked in your browser. Tap the padlock icon next to the URL to enable.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                {isPushSubscribed && (
-                  <button
-                    type="button"
-                    onClick={sendTestPush}
-                    disabled={isPushLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] hover:border-[var(--brand-accent)] text-[var(--text-main)] text-xs font-bold transition shadow-sm cursor-pointer"
-                  >
-                    <Send size={13} className="text-[var(--brand-accent)]" />
-                    <span>Test Notification</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  disabled={isPushLoading || !isPushSupported}
-                  onClick={() => {
-                    if (isPushSubscribed) {
-                      unsubscribePush();
-                    } else {
-                      subscribePush();
-                    }
-                  }}
-                  className={`w-12 h-7 rounded-full p-1 transition-colors cursor-pointer disabled:opacity-50 ${
-                    isPushSubscribed ? "bg-[var(--brand-accent)]" : "bg-[var(--bg-sub)] border border-[var(--border-color)]"
-                  }`}
-                  aria-label="Toggle Web Push Notifications"
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                      isPushSubscribed ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Special Kitchen Deals Promo Toggle */}
-            <div className="pt-4 flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-[var(--text-main)]">
-                  Special Kitchen Deals & Promo Vouchers
-                </h3>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Get notified when seasonal discount vouchers and kitchen specials go live.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleOffers(!offerAlerts)}
-                className={`w-12 h-7 rounded-full p-1 transition-colors cursor-pointer ${
-                  offerAlerts ? "bg-[var(--brand-accent)]" : "bg-[var(--bg-sub)] border border-[var(--border-color)]"
-                }`}
-                aria-label="Toggle Promotional Alerts"
-              >
-                <div
-                  className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                    offerAlerts ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </section>
+        <CustomerNotificationSection />
 
         {/* ── SECTION D: TIME ZONE & REGIONAL SETTINGS ────────────────── */}
         <section>

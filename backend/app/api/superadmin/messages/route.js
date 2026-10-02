@@ -160,7 +160,11 @@ export async function POST(request) {
               messageId: newMessage._id.toString(),
             },
           },
-          recipientType
+          recipientType,
+          {
+            recipientSelection,
+            recipients: recipientSelection === "selected" ? recipients : [],
+          }
         ).catch((err) => console.warn("[PushBroadcast] Non-blocking push warning:", err.message));
       } catch (pushErr) {
         console.warn("[PushBroadcast] Failed to trigger push broadcast:", pushErr.message);

@@ -6,6 +6,8 @@ import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+import InAppNotification from "@/models/InAppNotification";
+
 // GET — Secure recipient endpoint for active notifications
 export async function GET(request) {
   try {
@@ -136,11 +138,57 @@ export async function GET(request) {
       };
     });
 
-    const unreadCount = formattedMessages.filter((m) => !m.isRead).length;
+    // If customer is authenticated, also retrieve in-app order notifications
+    let combinedMessages = formattedMessages;
+    if (target === "customers" && userId) {
+      try {
+        const orderNotifs = await InAppNotification.find({ user: userId })
+          .sort({ createdAt: -1 })
+          .limit(40)
+          .lean();
+
+        const formattedOrderNotifs = orderNotifs.map((n) => ({
+          _id: n._id,
+          id: n._id.toString(),
+          title: n.title,
+          content: n.content,
+          summary: n.content,
+          messageType: n.type || "order",
+          tag: "ORDER UPDATE",
+          priority: "normal",
+          sentAt: n.createdAt,
+          date: n.createdAt
+            ? new Date(n.createdAt).toLocaleDateString("en-IN", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Recent",
+          isRead: Boolean(n.isRead),
+          recipientType: "customers",
+          orderId: n.orderId,
+          url: n.url,
+          status: n.status,
+          isInAppOrderNotif: true,
+        }));
+
+        combinedMessages = [...formattedOrderNotifs, ...formattedMessages].sort((a, b) => {
+          const dateA = new Date(a.sentAt || 0).getTime();
+          const dateB = new Date(b.sentAt || 0).getTime();
+          return dateB - dateA;
+        });
+      } catch (err) {
+        console.warn("[Messages GET] Error loading order notifications:", err.message);
+      }
+    }
+
+    const unreadCount = combinedMessages.filter((m) => !m.isRead).length;
 
     return NextResponse.json({
       success: true,
-      messages: formattedMessages,
+      messages: combinedMessages,
       unreadCount,
     });
   } catch (error) {

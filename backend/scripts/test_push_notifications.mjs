@@ -31,6 +31,7 @@ const {
   sendPushToUser,
   sendPushToRestaurantAdmins,
   notifyOrderEvent,
+  broadcastPushNotification,
 } = await import("../lib/pushService.js");
 
 // Clean up any test records
@@ -242,6 +243,53 @@ try {
   assert.strictEqual(remainingAlphaSubs.length, 1, "Admin Alpha should still have 1 active device");
   assert.strictEqual(remainingAlphaSubs[0].endpoint, subAlphaPhone.endpoint, "Remaining device is Alpha Phone");
   console.log("Single device unsubscription verified: Phone remains active after Laptop removed.");
+
+  // TEST 8: Selected Recipient Safety in broadcastPushNotification
+  console.log("\n[TEST 8] Verifying Selected Recipient Safety in broadcastPushNotification...");
+  const dummyBroadcastPayload = {
+    title: "Test Broadcast",
+    body: "Safe test broadcast",
+    icon: "/icons/icon-192x192.png",
+  };
+
+  // Case 8A: target 'all' with recipientSelection 'selected' and empty recipients list
+  // MUST NOT broadcast to all; must target 0 devices
+  const emptySelectedRes = await broadcastPushNotification(dummyBroadcastPayload, "all", {
+    recipientSelection: "selected",
+    recipients: [],
+  });
+  assert.strictEqual(emptySelectedRes.success, true);
+  assert.strictEqual(emptySelectedRes.total, 0, "Empty selected recipients list must target 0 devices (no accidental broadcast)");
+  console.log("8A: Empty selected recipients list safely resolved to 0 devices.");
+
+  // Case 8B: target 'all' with recipientSelection 'selected' and only customer ID
+  // MUST only match customer's subscription, NOT admin subscriptions
+  const selectedCustomerRes = await broadcastPushNotification(dummyBroadcastPayload, "all", {
+    recipientSelection: "selected",
+    recipients: [customer._id.toString()],
+  });
+  assert.strictEqual(selectedCustomerRes.success, true);
+  assert.strictEqual(selectedCustomerRes.total, 1, "Must only target the 1 selected customer device");
+  console.log("8B: target 'all' with selected customer ID safely targeted only customer device.");
+
+  // Case 8C: target 'restaurants' with recipientSelection 'selected' and Restaurant Alpha ID
+  // MUST only match Restaurant Alpha admins, NOT Admin Beta or Customer
+  const selectedRestRes = await broadcastPushNotification(dummyBroadcastPayload, "restaurants", {
+    recipientSelection: "selected",
+    recipients: [restA._id.toString()],
+  });
+  assert.strictEqual(selectedRestRes.success, true);
+  assert.strictEqual(selectedRestRes.total, 1, "Must only target Restaurant Alpha staff/admin (phone remaining)");
+  console.log("8C: target 'restaurants' with selected restaurant ID safely targeted only Alpha staff.");
+
+  // Case 8D: target 'customers' with recipientSelection 'selected' and customer ID
+  const selectedCustomerOnlyRes = await broadcastPushNotification(dummyBroadcastPayload, "customers", {
+    recipientSelection: "selected",
+    recipients: [customer._id.toString()],
+  });
+  assert.strictEqual(selectedCustomerOnlyRes.success, true);
+  assert.strictEqual(selectedCustomerOnlyRes.total, 1, "Must target customer device");
+  console.log("8D: target 'customers' with selected customer ID passed successfully.");
 
 } finally {
   // Cleanup test entities

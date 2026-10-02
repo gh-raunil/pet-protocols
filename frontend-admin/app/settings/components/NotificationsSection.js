@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   Bell,
   Volume2,
@@ -13,9 +12,10 @@ import {
   AlertCircle,
   Laptop,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { CHIME_OPTIONS, getSavedChime, setSavedChime, playChime } from "@/lib/soundChimes";
-import { useWebPush } from "@/hooks/useWebPush";
+import { useWebPush, getDeviceLabel } from "@/hooks/useWebPush";
 
 export default function NotificationsSection({ form, onChange, onSave, saving }) {
   const notif = form.notificationSettings || {
@@ -30,11 +30,12 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
     restaurantCancelledOrder: true,
     restaurantPaymentFailure: true,
     restaurantCustomerMessage: true,
-    channels: { inApp: true, email: true, whatsapp: false, push: true },
+    channels: { inApp: true, email: false, whatsapp: false, push: true },
     audioChime: "bell",
   };
 
   const [currentChime, setCurrentChime] = useState("bell");
+  const [deviceLabel, setDeviceLabel] = useState("Kitchen Terminal");
 
   const {
     isSupported: isPushSupported,
@@ -44,7 +45,16 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
     subscribe: subscribePush,
     unsubscribe: unsubscribePush,
     sendTest: sendTestPush,
+    devices,
+    loadingDevices,
+    fetchDevices,
+    revokeDevice,
   } = useWebPush();
+
+  useEffect(() => {
+    setDeviceLabel(getDeviceLabel());
+    fetchDevices();
+  }, [fetchDevices]);
 
   useEffect(() => {
     setCurrentChime(getSavedChime() || notif.audioChime || "bell");
@@ -149,6 +159,7 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* In-App Live Alerts */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400">
@@ -156,64 +167,23 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
               </div>
               <div>
                 <div className="text-sm font-semibold text-white">In-App Live Alerts</div>
-                <div className="text-xs text-zinc-400">Dashboard popups & live order toasts</div>
+                <div className="text-xs text-zinc-400">Dashboard popups & live kitchen order toasts</div>
               </div>
             </div>
-            <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
-              Always Active
+            <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-md border border-emerald-500/30">
+              Active Channel
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
-                <Mail className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-white">Email Notifications</div>
-                <div className="text-xs text-zinc-400">Order receipts & cancellation emails</div>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notif.channels?.email ?? true}
-                onChange={(e) => updateChannel("email", e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <MessageSquare className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-white">WhatsApp Alerts</div>
-                <div className="text-xs text-zinc-400">Requires restaurant WhatsApp number</div>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notif.channels?.whatsapp ?? false}
-                onChange={(e) => updateChannel("whatsapp", e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-            </label>
-          </div>
-
+          {/* Browser Push Channel */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-white">Browser Push Channel</div>
-                <div className="text-xs text-zinc-400">Enable Web Push channel for this restaurant</div>
+                <div className="text-sm font-semibold text-white">Web Push Channel</div>
+                <div className="text-xs text-zinc-400">VAPID background push to kitchen terminals</div>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -226,6 +196,48 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
               <div className="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
             </label>
           </div>
+
+          {/* Email Notifications (Unavailable) */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/20 border border-zinc-800 opacity-60">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-zinc-700/40 flex items-center justify-center text-zinc-400">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                  <span>Email Receipts</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-700/50 text-zinc-400 font-mono">
+                    No SMTP Configured
+                  </span>
+                </div>
+                <div className="text-xs text-zinc-500">Transactional email integration unavailable</div>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+              Unavailable
+            </span>
+          </div>
+
+          {/* WhatsApp Alerts (Unavailable) */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-800/20 border border-zinc-800 opacity-60">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-zinc-700/40 flex items-center justify-center text-zinc-400">
+                <MessageSquare className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                  <span>WhatsApp Alerts</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-700/50 text-zinc-400 font-mono">
+                    Gateway Not Connected
+                  </span>
+                </div>
+                <div className="text-xs text-zinc-500">WhatsApp Business API delivery unavailable</div>
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+              Unavailable
+            </span>
+          </div>
         </div>
 
         {/* Device Push Notifications Box */}
@@ -237,7 +249,7 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
               </div>
               <div>
                 <div className="text-sm font-semibold text-white flex items-center gap-2 flex-wrap">
-                  <span>This Device Browser Push</span>
+                  <span>Push on This Device ({deviceLabel})</span>
                   {isPushSupported ? (
                     isPushSubscribed ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
@@ -259,7 +271,7 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
                   )}
                 </div>
                 <div className="text-xs text-zinc-400">
-                  Receive instant order and cancellation alerts on this device even when the website tab is closed.
+                  Receive instant incoming order and cancellation alerts on this device even when the kitchen dashboard tab is closed.
                 </div>
               </div>
             </div>
@@ -303,6 +315,63 @@ export default function NotificationsSection({ form, onChange, onSave, saving })
             <div className="text-[11px] text-rose-400 flex items-center gap-1.5 pt-1">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               Notifications are blocked in your browser. Click the lock icon in your browser address bar to allow notifications for this site.
+            </div>
+          )}
+        </div>
+
+        {/* Registered Kitchen Devices List */}
+        <div className="p-4 rounded-xl bg-zinc-800/40 border border-zinc-700/60 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+              <Laptop className="w-3.5 h-3.5 text-orange-400" />
+              <span>Registered Kitchen Devices ({devices.length})</span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchDevices}
+              disabled={loadingDevices}
+              className="text-[11px] text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingDevices ? "animate-spin" : ""}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {devices.length === 0 ? (
+            <div className="text-xs text-zinc-500 py-2">
+              No registered kitchen devices found for this account. Enable push on this device to register it.
+            </div>
+          ) : (
+            <div className="space-y-2 pt-1">
+              {devices.map((dev) => (
+                <div
+                  key={dev.id}
+                  className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 shrink-0">
+                      <Laptop className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-semibold text-white truncate block">
+                        {dev.deviceLabel || "Kitchen Terminal"}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 block truncate">
+                        Last Active: {new Date(dev.lastUsed || dev.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => revokeDevice(dev.id)}
+                    className="p-1.5 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition cursor-pointer shrink-0"
+                    title="Revoke device notifications"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 
 // Dynamically load Razorpay standard checkout script
 const loadRazorpayScript = () => {
@@ -632,6 +633,7 @@ export default function CheckoutClient() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* LEFT: Fulfillment, Address & Payment */}
         <div className="lg:col-span-2 space-y-6">
+          <DeliveryPushPrompt className="mb-2" />
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Step 1: Fulfillment Type Selector */}
             <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl space-y-4">
