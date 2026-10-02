@@ -1,6 +1,7 @@
 import Providers from "./providers";
 import { ThemeProvider, ThemeScript } from "../components/ui/ThemeProvider";
 import AppShell from "../components/layout/AppShell";
+import AdminServiceWorkerRegister from "../components/pwa/AdminServiceWorkerRegister";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
       <body className="min-h-screen antialiased bg-[var(--bg-main)] text-[var(--text-main)] font-jakarta" suppressHydrationWarning>
         <ThemeProvider>
           <Providers>
+            <AdminServiceWorkerRegister />
             <Toaster position="top-right" />
             <AppShell>{children}</AppShell>
           </Providers>

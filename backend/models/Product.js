@@ -59,6 +59,21 @@ const ProductSchema = new mongoose.Schema(
       type: Number,
       default: 12,
     },
+    originalPrice: {
+      type: Number,
+      default: null,
+    },
+    reviews: {
+      type: [
+        {
+          userName: { type: String, default: "Customer" },
+          rating: { type: Number, required: true },
+          comment: { type: String, default: "" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

@@ -3,7 +3,7 @@ import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
-import { sendPushForOrder } from "@/lib/pushService";
+import { notifyOrderEvent } from "@/lib/pushService";
 
 // GET — List orders for this restaurant
 export async function GET(request) {
@@ -150,53 +150,21 @@ export async function PUT(request) {
 
     // Send Web Push notification if order status changed
     if (status && status !== previousStatus) {
-      const orderShortId = order._id.toString().slice(-6).toUpperCase();
-      let pushTitle = 'Order Status Update 🔔';
-      let pushBody = `Your order #${orderShortId} status is now ${status}.`;
-
-      switch (status) {
-        case 'confirmed':
-          pushTitle = 'Order Confirmed! 👨‍🍳';
-          pushBody = `Your order #${orderShortId} has been confirmed and is being prepared.`;
-          break;
-        case 'preparing':
-          pushTitle = 'Kitchen is Cooking! 🔥';
-          pushBody = `Chef is preparing your dishes for order #${orderShortId}.`;
-          break;
-        case 'ready':
-          pushTitle = 'Order Packed & Ready! 🍱';
-          pushBody = `Order #${orderShortId} is freshly packed and waiting for delivery handoff.`;
-          break;
-        case 'out_for_delivery':
-        case 'dispatched':
-          pushTitle = 'Out for Delivery! 🛵';
-          pushBody = `Your food for order #${orderShortId} is on its way to you!`;
-          break;
-        case 'delivered':
-          pushTitle = 'Order Delivered! 🎉';
-          pushBody = `Order #${orderShortId} has been delivered. Enjoy your feast!`;
-          break;
-        case 'cancelled':
-          pushTitle = 'Order Cancelled ⚠️';
-          pushBody = `Your order #${orderShortId} has been cancelled.`;
-          break;
-      }
-
-      sendPushForOrder(order, {
-        title: pushTitle,
-        body: pushBody,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/favicon-32x32.png',
-        url: '/orders',
-        tag: `order-${order._id}`,
-        data: {
-          orderId: order._id.toString(),
-          status,
-          url: '/orders',
-        },
-      }).catch((pushErr) => {
-        console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
-      });
+      Order.findById(order._id)
+        .populate('restaurant', 'name slug phone')
+        .populate('user', 'name email phone')
+        .then((populated) => {
+          notifyOrderEvent(populated || order, 'status_update', {
+            status,
+            previousStatus,
+            reason: notes,
+          }).catch((pushErr) => {
+            console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
+          });
+        })
+        .catch(() => {
+          notifyOrderEvent(order, 'status_update', { status, previousStatus, reason: notes }).catch(() => {});
+        });
     }
 
     return NextResponse.json({

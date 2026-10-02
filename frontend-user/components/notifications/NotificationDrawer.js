@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   X,
   Bell,
@@ -17,6 +18,40 @@ import {
   ChevronRight,
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
+
+/**
+ * Validates and extracts a safe internal order URL from a notification message.
+ * Strictly prevents open-redirect vulnerabilities (no external protocols, no '//' or '/\').
+ */
+function getSafeOrderUrl(message) {
+  if (!message) return null;
+  const rawUrl = message.url;
+
+  if (
+    typeof rawUrl === "string" &&
+    rawUrl.startsWith("/") &&
+    !rawUrl.startsWith("//") &&
+    !rawUrl.startsWith("/\\")
+  ) {
+    const isOrderRelated =
+      message.isInAppOrderNotif ||
+      message.messageType === "order" ||
+      Boolean(message.orderId) ||
+      rawUrl.startsWith("/order-confirmation") ||
+      rawUrl.startsWith("/orders");
+
+    if (isOrderRelated) {
+      return rawUrl;
+    }
+  } else if (
+    message.orderId &&
+    typeof message.orderId === "string" &&
+    /^[a-zA-Z0-9_-]+$/.test(message.orderId)
+  ) {
+    return `/order-confirmation?orderId=${encodeURIComponent(message.orderId)}`;
+  }
+  return null;
+}
 
 export default function NotificationDrawer() {
   const {
@@ -199,6 +234,24 @@ export default function NotificationDrawer() {
             <div className="p-4 rounded-xl bg-[#14161a] border border-white/5 text-gray-200 text-sm leading-relaxed whitespace-pre-line">
               {selectedMessage.content}
             </div>
+
+            {/* Clear "View Order" action if valid safe internal order URL exists */}
+            {(() => {
+              const safeOrderUrl = getSafeOrderUrl(selectedMessage);
+              if (!safeOrderUrl) return null;
+              return (
+                <div className="pt-1">
+                  <Link
+                    href={safeOrderUrl}
+                    onClick={closeNotifications}
+                    className="w-full py-2.5 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20"
+                  >
+                    <span>View Order</span>
+                    <ChevronRight size={14} />
+                  </Link>
+                </div>
+              );
+            })()}
 
             <div className="pt-4 border-t border-white/10 flex items-center justify-between">
               <span className="text-xs text-gray-400 flex items-center gap-1.5">

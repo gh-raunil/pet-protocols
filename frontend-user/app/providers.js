@@ -2,10 +2,12 @@
 import { SessionProvider, useSession, signOut } from "next-auth/react";
 import { useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
+import useFavoritesStore from "@/lib/favoritesStore";
 
 function AuthHandler() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { clearCartLocal, loadCart, clearCart } = useCartStore();
+  const { loadFavorites, clearFavoritesLocal } = useFavoritesStore();
   const prevEmailRef = useRef(null);
   const timer = useRef(null);
   const TIMEOUT = 30 * 60 * 1000;
@@ -14,18 +16,22 @@ function AuthHandler() {
     if (session?.user?.email) {
       const currentEmail = session.user.email;
       if (prevEmailRef.current !== currentEmail) {
-        console.log("NEW LOGIN — loading cart for:", currentEmail);
-        setTimeout(() => loadCart(), 500);
+        setTimeout(() => {
+          loadCart();
+          loadFavorites(currentEmail);
+        }, 100);
         prevEmailRef.current = currentEmail;
       }
+    } else if (status === "unauthenticated") {
+      if (prevEmailRef.current) {
+        clearCartLocal();
+        clearFavoritesLocal();
+        prevEmailRef.current = null;
+      } else {
+        loadFavorites(null); // guest favorites
+      }
     }
-
-    if (!session && prevEmailRef.current) {
-      console.log("LOGOUT — clearing cart locally only");
-      clearCartLocal(); // ← only clear local, keep DB
-      prevEmailRef.current = null;
-    }
-  }, [session?.user?.email]);
+  }, [session?.user?.email, status]);
 
   const resetTimer = () => {
     clearTimeout(timer.current);

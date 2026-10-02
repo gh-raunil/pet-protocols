@@ -21,7 +21,14 @@ import {
   ChevronRight,
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
+import ProductCarousel from "@/components/products/ProductCarousel";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import {
+  getRecommendedProducts,
+  getBestSellingProducts,
+  getTopRatedProducts,
+  hasUserPreferences,
+} from "@/lib/userPreferences";
 
 export default function HomePage() {
   const router = useRouter();
@@ -32,6 +39,49 @@ export default function HomePage() {
   const [ratings, setRatings] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [, setLiveTick] = useState(0);
+
+  // Personalized & curated lists
+  const [userHasHistory, setUserHasHistory] = useState(false);
+  const [recommendedList, setRecommendedList] = useState([]);
+  const [bestSellingList, setBestSellingList] = useState([]);
+  const [topRatedList, setTopRatedList] = useState([]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTick((t) => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update curated and recommended lists whenever products load or preferences update
+  useEffect(() => {
+    if (products.length > 0) {
+      const hasHistory = hasUserPreferences();
+      setUserHasHistory(hasHistory);
+      if (hasHistory) {
+        setRecommendedList(getRecommendedProducts(products, 12));
+      } else {
+        setRecommendedList([]);
+      }
+      setBestSellingList(getBestSellingProducts(products, 12));
+      setTopRatedList(getTopRatedProducts(products, 12));
+    }
+  }, [products]);
+
+  useEffect(() => {
+    const handlePrefUpdate = () => {
+      if (products.length > 0) {
+        const hasHistory = hasUserPreferences();
+        setUserHasHistory(hasHistory);
+        if (hasHistory) {
+          setRecommendedList(getRecommendedProducts(products, 12));
+        } else {
+          setRecommendedList([]);
+        }
+      }
+    };
+    window.addEventListener("user_preferences_updated", handlePrefUpdate);
+    return () => window.removeEventListener("user_preferences_updated", handlePrefUpdate);
+  }, [products]);
 
   useEffect(() => {
     async function loadHomeData() {
@@ -192,38 +242,14 @@ export default function HomePage() {
         ) : null}
       </section>
 
-      {/* ── SECTION D: POPULAR DISHES ───────────────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--brand-accent)]" />
-              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
-                Popular Dishes
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-              Customer favorites prepared fresh upon order
-            </p>
-          </div>
-          <Link
-            href="/menu"
-            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
-          >
-            View Full Menu <ChevronRight size={14} />
-          </Link>
-        </div>
-
+      {/* ── SECTION D: CURATED CAROUSELS (FLIPKART STYLE) ───────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20 space-y-10">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-80 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse"
-              />
-            ))}
+          <div className="space-y-8">
+            <div className="h-64 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
+            <div className="h-64 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
           </div>
-        ) : popularDishes.length === 0 ? (
+        ) : products.length === 0 ? (
           <div className="text-center py-16 px-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)]">
             <UtensilsCrossed size={36} className="mx-auto text-[var(--text-muted)] mb-3" />
             <h3 className="text-base font-bold text-[var(--text-main)]">Menu Catalog Updating</h3>
@@ -232,11 +258,39 @@ export default function HomePage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {popularDishes.map((product) => (
-              <ProductCard key={product._id} product={product} />
-            ))}
-          </div>
+          <>
+            {/* 1. Recommended For You (Personalized - Only if user has interaction/search history) */}
+            {userHasHistory && recommendedList.length > 0 && (
+              <ProductCarousel
+                title="Recommended For You"
+                subtitle="Dishes curated based on your searches and dining preferences"
+                badge="For You"
+                icon={<Sparkles size={20} />}
+                products={recommendedList}
+                viewAllHref="/menu"
+              />
+            )}
+
+            {/* 2. Our Best Selling Products */}
+            <ProductCarousel
+              title="Our Best Selling Products"
+              subtitle="Most popular and frequently ordered dishes by foodies"
+              badge="Hot Sellers"
+              icon={<Flame size={20} />}
+              products={bestSellingList}
+              viewAllHref="/menu"
+            />
+
+            {/* 3. Top Rated Food */}
+            <ProductCarousel
+              title="Top Rated Food"
+              subtitle="Exceptional quality with highest customer reviews and ratings"
+              badge="Top Rated"
+              icon={<Star size={20} className="fill-orange-500 text-orange-500" />}
+              products={topRatedList}
+              viewAllHref="/menu"
+            />
+          </>
         )}
       </section>
 
@@ -315,7 +369,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-2 flex-wrap mb-3 text-[11px] text-[var(--text-muted)]">
                       <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)]">
                         <Clock size={11} className="text-[var(--brand-accent)]" />
-                        {rest.openingHours || opStatus.hoursText || "10 AM - 11 PM"}
+                        {opStatus.hoursText || rest.openingHours || "10 AM - 11 PM"}
                       </span>
                       <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)]">
                         📍 {radiusKm} km radius

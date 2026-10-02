@@ -17,9 +17,19 @@ import {
   Tag,
   Truck,
   ShoppingBag,
+  Flame,
+  Star,
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
+import ProductCarousel from "@/components/products/ProductCarousel";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import {
+  getRecommendedProducts,
+  getBestSellingProducts,
+  getTopRatedProducts,
+  hasUserPreferences,
+  trackProductSearch,
+} from "@/lib/userPreferences";
 
 export default function MenuClient() {
   const searchParams = useSearchParams();
@@ -41,6 +51,19 @@ export default function MenuClient() {
   const [dynamicCategories, setDynamicCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [, setLiveTick] = useState(0);
+
+  // Preference and recommendation tracking states
+  const [userHasHistory, setUserHasHistory] = useState(false);
+  const [recommendedList, setRecommendedList] = useState([]);
+  const [bestSellingList, setBestSellingList] = useState([]);
+  const [topRatedList, setTopRatedList] = useState([]);
+
+  // Keep operational status refreshed in live time every 15 seconds
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTick((t) => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Sync state with URL params
   useEffect(() => {
@@ -128,6 +151,59 @@ export default function MenuClient() {
 
     return result;
   }, [products, onlyInStock, sortBy]);
+
+  // Track search terms into preference engine (debounced)
+  useEffect(() => {
+    if (!searchTerm || searchTerm.trim().length < 2) return;
+    const timer = setTimeout(() => {
+      trackProductSearch(searchTerm.trim());
+      setUserHasHistory(hasUserPreferences());
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Update curated and recommended lists
+  useEffect(() => {
+    if (products.length > 0) {
+      const hasHistory = hasUserPreferences();
+      setUserHasHistory(hasHistory);
+      if (hasHistory) {
+        setRecommendedList(getRecommendedProducts(products, 12));
+      } else {
+        setRecommendedList([]);
+      }
+      setBestSellingList(getBestSellingProducts(products, 12));
+      setTopRatedList(getTopRatedProducts(products, 12));
+    }
+  }, [products]);
+
+  // React to preference updates
+  useEffect(() => {
+    const handlePrefUpdate = () => {
+      if (products.length > 0) {
+        const hasHistory = hasUserPreferences();
+        setUserHasHistory(hasHistory);
+        if (hasHistory) {
+          setRecommendedList(getRecommendedProducts(products, 12));
+        } else {
+          setRecommendedList([]);
+        }
+      }
+    };
+    window.addEventListener("user_preferences_updated", handlePrefUpdate);
+    return () => window.removeEventListener("user_preferences_updated", handlePrefUpdate);
+  }, [products]);
+
+  // Group displayed products by category for carousel browsing mode
+  const categoryGroups = useMemo(() => {
+    const groups = {};
+    displayedProducts.forEach((item) => {
+      const cat = item.category || "Specialties";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [displayedProducts]);
 
   const categories = useMemo(() => {
     const list = [{ id: "All", label: "All Items", icon: "✨" }];
@@ -249,7 +325,7 @@ export default function MenuClient() {
                     )}
                     <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                       <Clock size={12} className="text-[var(--brand-accent)]" />
-                      {activeKitchen.openingHours || op.hoursText || "10:00 AM - 11:00 PM"}
+                      {op.hoursText || activeKitchen.openingHours || "10:00 AM - 11:00 PM"}
                     </span>
                   </div>
 
@@ -449,16 +525,87 @@ export default function MenuClient() {
             </button>
           </div>
         </div>
-      ) : (
-        <div>
-          <div className="text-xs font-semibold text-[var(--text-muted)] mb-4">
-            Showing {displayedProducts.length} delicious {displayedProducts.length === 1 ? "dish" : "dishes"}
+      ) : searchTerm.trim() ? (
+        /* ── SEARCH RESULTS: SIMPLE NON-CAROUSEL GRID (USER REQUIREMENT) ── */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-[var(--text-main)]">
+                Search Results for &ldquo;{searchTerm}&rdquo;
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Showing {displayedProducts.length} matching {displayedProducts.length === 1 ? "dish" : "dishes"}
+              </p>
+            </div>
+            <button
+              onClick={() => setSearchTerm("")}
+              className="text-xs font-bold text-[var(--brand-accent)] hover:underline cursor-pointer"
+            >
+              Clear Search
+            </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {displayedProducts.map((product) => (
-              <ProductCard key={product._id} product={product} />
+              <ProductCard key={product._id} product={product} isCarousel={false} />
             ))}
           </div>
+        </div>
+      ) : (
+        /* ── BROWSING MODE: ALL PRODUCTS IN FLIPKART-STYLE CAROUSELS ── */
+        <div className="space-y-6 sm:space-y-8">
+          {/* 1. Personalized Recommendations (Only if user has search/view history) */}
+          {userHasHistory && recommendedList.length > 0 && (
+            <ProductCarousel
+              title="Recommended For You"
+              subtitle="Personalized recommendations based on your tastes and recent searches"
+              badge="For You"
+              icon={<Sparkles size={20} />}
+              products={recommendedList}
+            />
+          )}
+
+          {/* 2. Best Selling Products */}
+          {bestSellingList.length > 0 && (
+            <ProductCarousel
+              title="Best Selling Products"
+              subtitle="Most popular and frequently ordered dishes by foodies"
+              badge="Hot Sellers"
+              icon={<Flame size={20} />}
+              products={bestSellingList}
+            />
+          )}
+
+          {/* 3. Top Rated Dishes */}
+          {topRatedList.length > 0 && (
+            <ProductCarousel
+              title="Top Rated Dishes"
+              subtitle="Exceptional dishes with highest customer reviews and ratings"
+              badge="Top Rated"
+              icon={<Star size={20} className="fill-orange-500 text-orange-500" />}
+              products={topRatedList}
+            />
+          )}
+
+          {/* 4. Categorized Carousels */}
+          {selectedCategory === "All" ? (
+            Object.entries(categoryGroups).map(([catName, catProducts]) => (
+              <ProductCarousel
+                key={catName}
+                title={catName}
+                subtitle={`Handcrafted ${catName.toLowerCase()} prepared fresh upon order`}
+                badge="Freshly Made"
+                products={catProducts}
+              />
+            ))
+          ) : (
+            <ProductCarousel
+              title={selectedCategory}
+              subtitle={`All available fresh dishes under ${selectedCategory}`}
+              badge={selectedCategory}
+              products={displayedProducts}
+            />
+          )}
         </div>
       )}
     </main>

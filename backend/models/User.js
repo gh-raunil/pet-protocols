@@ -115,6 +115,19 @@ const UserSchema = new mongoose.Schema(
       type: [AddressSchema],
       default: [],
     },
+    favorites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+      },
+    ],
+    notificationPreferences: {
+      orderUpdates: { type: Boolean, default: true },
+      prepUpdates: { type: Boolean, default: true },
+      deliveryUpdates: { type: Boolean, default: true },
+      cancellationAlerts: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: true },
+    },
   },
   {
     timestamps: true,

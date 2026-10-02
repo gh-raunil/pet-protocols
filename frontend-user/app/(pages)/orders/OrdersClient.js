@@ -23,6 +23,7 @@ import {
   Tag,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
+import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { formatDateInTimeZone } from "@/lib/timeZone";
@@ -188,6 +189,9 @@ export default function OrdersClient() {
           {orders.length} {orders.length === 1 ? "order" : "orders"} placed on Pet Protocols
         </p>
       </div>
+
+      {/* Closed-Tab Delivery Alerts Permission Prompt */}
+      <DeliveryPushPrompt className="mb-6" />
 
       {/* Orders List */}
       <div className="space-y-6">

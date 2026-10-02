@@ -37,6 +37,7 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 import useFavoritesStore from "@/lib/favoritesStore";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
+import CustomerNotificationSection from "@/components/settings/CustomerNotificationSection";
 
 export default function CustomerProfileClient() {
   const { data: session, status, update } = useSession();
@@ -347,6 +348,7 @@ export default function CustomerProfileClient() {
       <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-3 mb-8 overflow-x-auto scrollbar-none">
         {[
           { id: "overview", label: "Profile & Habits" },
+          { id: "notifications", label: "Notification Settings" },
           { id: "addresses", label: `Saved Addresses (${addresses.length})` },
           { id: "favorites", label: `My Favorites (${favorites.length})` },
           { id: "orders", label: `Order History (${orders.length})` },
@@ -467,6 +469,11 @@ export default function CustomerProfileClient() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── TAB: NOTIFICATION PREFERENCES ───────────────────────── */}
+      {activeTab === "notifications" && (
+        <CustomerNotificationSection />
       )}
 
       {/* ── TAB 2: SAVED ADDRESSES ───────────────────────────────── */}

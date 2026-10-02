@@ -39,6 +39,10 @@ async function connectDB() {
   }
 
   if (cached.conn) return cached.conn
+  if (mongoose.connection.readyState >= 1) {
+    cached.conn = mongoose.connection
+    return cached.conn
+  }
 
   if (!cached.promise) {
     cached.promise = mongoose.connect(connectionUri, {

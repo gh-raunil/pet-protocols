@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
     await connectDB()
     const product = await Product.findById(id).populate(
       'restaurant',
-      'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
+      'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours regionalSettings orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
     );
     if (!product) return NextResponse.json({ success: false, message: 'Product not found' }, { status: 404 })
     return NextResponse.json({ success: true, product })

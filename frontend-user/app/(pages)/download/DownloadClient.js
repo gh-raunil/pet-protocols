@@ -56,7 +56,7 @@ export default function DownloadClient() {
     {
       num: "01",
       title: "Download the APK",
-      desc: "Tap the prominent 'Download for Android' button to download pet-protocols-1.0.0.apk directly to your device.",
+      desc: "Tap the prominent 'Download for Android' button to download pet-protocols-1.1.apk directly to your device.",
     },
     {
       num: "02",
@@ -143,7 +143,7 @@ export default function DownloadClient() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md mx-auto mb-6 px-2">
             <a
               href="/downloads/pet-protocols-release.apk"
-              download="pet-protocols-1.0.0.apk"
+              download="pet-protocols-1.1.apk"
               id="android-download-btn"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[var(--brand-accent)] hover:opacity-90 active:scale-[0.98] text-white text-base font-extrabold transition duration-200 shadow-xl shadow-[var(--brand-accent)]/25 group"
             >
@@ -298,7 +298,7 @@ export default function DownloadClient() {
           <div className="mt-8 text-center px-2">
             <a
               href="/downloads/pet-protocols-release.apk"
-              download="pet-protocols-1.0.0.apk"
+              download="pet-protocols-1.1.apk"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-[var(--brand-accent)]/20"
             >
               <Download size={16} />

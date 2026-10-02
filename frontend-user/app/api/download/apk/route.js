@@ -25,7 +25,7 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.android.package-archive",
-      "Content-Disposition": 'attachment; filename="pet-protocols-1.0.0.apk"',
+      "Content-Disposition": 'attachment; filename="pet-protocols-1.1.apk"',
       "Content-Length": stat.size.toString(),
       "Cache-Control": "public, max-age=86400, must-revalidate",
     },

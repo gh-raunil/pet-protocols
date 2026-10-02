@@ -28,6 +28,10 @@ const PushSubscriptionSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    deviceLabel: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
       enum: ['active', 'expired', 'disabled'],

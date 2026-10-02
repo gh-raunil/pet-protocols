@@ -87,7 +87,7 @@ export async function GET(request) {
     let products = await Product.find(filter)
       .populate(
         'restaurant',
-        'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
+        'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours regionalSettings orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
       )
       .sort({ isFeatured: -1, createdAt: -1 });
 

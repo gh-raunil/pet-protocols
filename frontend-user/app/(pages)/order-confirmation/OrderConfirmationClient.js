@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
+import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 
 const POLL_INTERVAL = 15000; // Poll status every 15s to keep UI lightweight
 
@@ -195,11 +196,12 @@ export default function OrderConfirmationClient() {
       </div>
 
       {/* Honest Order-Status Progress Tracker (No fake GPS) */}
-      <section className="space-y-2">
+      <section className="space-y-4">
         <OrderStatusTracker
           status={order.status}
           paymentStatus={order.paymentStatus}
         />
+        <DeliveryPushPrompt />
       </section>
 
       {/* Two-Column Details Grid */}

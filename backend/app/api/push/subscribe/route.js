@@ -32,21 +32,28 @@ export async function POST(req) {
       // Unauthenticated / guest subscription is permitted
     }
 
+    const updateFields = {
+      keys: {
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+      },
+      userAgent: userAgent || '',
+      status: 'active',
+      lastUsed: new Date(),
+    };
+
+    if (body.deviceLabel) {
+      updateFields.deviceLabel = body.deviceLabel;
+    }
+
+    if (userId) {
+      updateFields.user = userId;
+    }
+
     // Upsert the subscription
     const updatedSub = await PushSubscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
-      {
-        $set: {
-          user: userId,
-          keys: {
-            p256dh: subscription.keys.p256dh,
-            auth: subscription.keys.auth,
-          },
-          userAgent: userAgent || '',
-          status: 'active',
-          lastUsed: new Date(),
-        },
-      },
+      { $set: updateFields },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
