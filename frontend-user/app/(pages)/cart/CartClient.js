@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import { calculateCartDiscounts } from "@/lib/offersHelper";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -29,11 +30,18 @@ export default function CartClient() {
   const { items, increaseQty, decreaseQty, removeItem, getTotalPrice } = useCartStore();
   const [isMounted, setIsMounted] = useState(false);
   const [orderType, setOrderType] = useState("delivery"); // "delivery" | "pickup"
+  const [offers, setOffers] = useState([]);
   const { data: session } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
+    fetch("/api/offers")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && Array.isArray(d.offers)) setOffers(d.offers);
+      })
+      .catch(() => {});
   }, []);
 
   // Group items by restaurant if restaurant data exists
@@ -88,9 +96,13 @@ export default function CartClient() {
   const freeThreshold = primaryRest?.chargeSettings?.freeDeliveryThreshold ?? 500;
 
   const subtotal = isMounted ? getTotalPrice() : 0;
+  const { autoDiscountAmount } = useMemo(
+    () => calculateCartDiscounts(items, offers),
+    [items, offers]
+  );
   const isFreeDelivery = subtotal >= freeThreshold;
   const deliveryFee = orderType === "pickup" ? 0 : isFreeDelivery ? 0 : flatFee;
-  const total = subtotal > 0 ? subtotal + deliveryFee : 0;
+  const total = subtotal > 0 ? Math.max(0, subtotal + deliveryFee - autoDiscountAmount) : 0;
   const freeDeliveryDiff = Math.max(0, freeThreshold - subtotal);
 
   if (!isMounted) return null;
@@ -136,7 +148,7 @@ export default function CartClient() {
 
   // ── POPULATED CART ────────────────────────────────────────────────
   return (
-    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen pt-28 sm:pt-32 pb-24 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -383,6 +395,13 @@ export default function CartClient() {
               <span>Taxes & Kitchen Packaging</span>
               <span className="font-semibold text-emerald-500">Included</span>
             </div>
+
+            {autoDiscountAmount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span className="flex items-center gap-1">⚡ Automatic Kitchen Discount</span>
+                <span>-₹{autoDiscountAmount}</span>
+              </div>
+            )}
 
             <div className="pt-3 border-t border-[var(--border-color)] flex justify-between items-baseline">
               <span className="text-sm font-bold text-[var(--text-main)]">Total Amount</span>

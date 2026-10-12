@@ -25,12 +25,21 @@ import {
 import useNotificationStore from "@/lib/notificationStore";
 import useCartStore from "@/lib/cartStore";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
+import { useNavBadges } from "@/hooks/useNavBadges";
 
 export default function MobileNavDrawer({ isOpen, onClose }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { unreadCount } = useNotificationStore();
   const { clearCartLocal } = useCartStore();
+  const {
+    menuBadge,
+    offersBadge,
+    ordersBadge,
+    clearMenuBadge,
+    clearOffersBadge,
+    clearOrdersBadge,
+  } = useNavBadges();
   const drawerRef = useRef(null);
   const [mounted, setMounted] = useState(false);
 
@@ -73,9 +82,28 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
 
   const navLinks = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/menu", label: "Explore Menu", icon: UtensilsCrossed },
-    { href: "/offers", label: "Offers & Deals", icon: Tag },
-    { href: "/orders", label: "My Orders", icon: PackageCheck, authOnly: true },
+    {
+      href: "/menu",
+      label: "Explore Menu",
+      icon: UtensilsCrossed,
+      badge: menuBadge > 0 ? menuBadge : null,
+      onClear: clearMenuBadge,
+    },
+    {
+      href: "/offers",
+      label: "Offers & Deals",
+      icon: Tag,
+      badge: offersBadge > 0 ? offersBadge : null,
+      onClear: clearOffersBadge,
+    },
+    {
+      href: "/orders",
+      label: "My Orders",
+      icon: PackageCheck,
+      authOnly: true,
+      badge: ordersBadge > 0 ? ordersBadge : null,
+      onClear: clearOrdersBadge,
+    },
     {
       href: "/notifications",
       label: "Notifications",
@@ -200,7 +228,10 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={onClose}
+                  onClick={() => {
+                    item.onClear?.();
+                    onClose();
+                  }}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition ${
                     isActive
                       ? "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/25"

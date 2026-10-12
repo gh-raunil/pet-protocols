@@ -34,13 +34,21 @@ export async function PUT(request, { params }) {
     if (body.endDate !== undefined) offer.endDate = body.endDate ? new Date(body.endDate) : null;
     if (body.isActive !== undefined) offer.isActive = Boolean(body.isActive);
     if (body.image !== undefined) offer.image = body.image;
+    if (body.targetType !== undefined) offer.targetType = ["all", "category", "products"].includes(body.targetType) ? body.targetType : "all";
+    if (body.targetCategory !== undefined) offer.targetCategory = body.targetCategory ? body.targetCategory.trim() : "";
+    if (body.targetProducts !== undefined) offer.targetProducts = Array.isArray(body.targetProducts) ? body.targetProducts : [];
+    if (body.applyMode !== undefined) offer.applyMode = body.applyMode === "automatic" ? "automatic" : "coupon";
 
     await offer.save();
+
+    const populated = await Offer.findById(offer._id)
+      .populate("targetProducts", "name price image category")
+      .lean();
 
     return NextResponse.json({
       success: true,
       message: "Offer updated successfully!",
-      offer,
+      offer: populated || offer,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

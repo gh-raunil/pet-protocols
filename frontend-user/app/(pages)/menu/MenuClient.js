@@ -30,6 +30,7 @@ import {
   hasUserPreferences,
   trackProductSearch,
 } from "@/lib/userPreferences";
+import { getProductNewArrivalStatus } from "@/lib/offersHelper";
 
 export default function MenuClient() {
   const searchParams = useSearchParams();
@@ -194,6 +195,13 @@ export default function MenuClient() {
     return () => window.removeEventListener("user_preferences_updated", handlePrefUpdate);
   }, [products]);
 
+  // Newly Arrived dishes within freshness window
+  const newArrivalsList = useMemo(() => {
+    return displayedProducts
+      .filter((p) => getProductNewArrivalStatus(p, restaurants))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [displayedProducts, restaurants]);
+
   // Group displayed products by category for carousel browsing mode
   const categoryGroups = useMemo(() => {
     const groups = {};
@@ -234,23 +242,23 @@ export default function MenuClient() {
   };
 
   return (
-    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen pt-28 sm:pt-32 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── HEADER ─────────────────────────────────────────────────── */}
-      <div className="text-center max-w-2xl mx-auto mb-10">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-3">
-          <Sparkles size={14} /> Multi-Kitchen Menu
+      <div className="text-center w-full max-w-2xl mx-auto mb-8 sm:mb-10 px-2 min-w-0">
+        <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-3">
+          <Sparkles size={14} className="shrink-0" /> Multi-Kitchen Menu
         </div>
-        <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[var(--text-main)]">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-[var(--text-main)] break-words">
           Explore Menu
         </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2 leading-relaxed max-w-xl mx-auto break-words">
           Discover freshly cooked meals prepared by verified cloud kitchens and neighborhood culinary partners.
         </p>
       </div>
 
       {/* ── KITCHEN / RESTAURANT FILTER BAR ────────────────────────── */}
       {restaurants.length > 0 && (
-        <div className="p-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-sm">
+        <div className="p-3 sm:p-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-sm w-full max-w-full overflow-hidden min-w-0">
           <div className="flex items-center gap-2 mb-3">
             <Building2 className="text-[var(--brand-accent)] w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
@@ -547,13 +555,25 @@ export default function MenuClient() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {displayedProducts.map((product) => (
-              <ProductCard key={product._id} product={product} isCarousel={false} />
+              <ProductCard key={product._id} product={product} isCarousel={false} offers={offers} />
             ))}
           </div>
         </div>
       ) : (
         /* ── BROWSING MODE: ALL PRODUCTS IN FLIPKART-STYLE CAROUSELS ── */
         <div className="space-y-6 sm:space-y-8">
+          {/* 0. Newly Arrived Dishes (Admin controlled window; completely hidden if no dishes qualify) */}
+          {newArrivalsList.length > 0 && (
+            <ProductCarousel
+              title="Newly Arrived Dishes"
+              subtitle="Fresh culinary additions recently prepared by our partner kitchens"
+              badge="✨ Newly Arrived"
+              icon={<Sparkles size={20} className="text-amber-500 fill-amber-500/20" />}
+              products={newArrivalsList}
+              offers={offers}
+            />
+          )}
+
           {/* 1. Personalized Recommendations (Only if user has search/view history) */}
           {userHasHistory && recommendedList.length > 0 && (
             <ProductCarousel
@@ -562,6 +582,7 @@ export default function MenuClient() {
               badge="For You"
               icon={<Sparkles size={20} />}
               products={recommendedList}
+              offers={offers}
             />
           )}
 
@@ -573,6 +594,7 @@ export default function MenuClient() {
               badge="Hot Sellers"
               icon={<Flame size={20} />}
               products={bestSellingList}
+              offers={offers}
             />
           )}
 
@@ -584,6 +606,7 @@ export default function MenuClient() {
               badge="Top Rated"
               icon={<Star size={20} className="fill-orange-500 text-orange-500" />}
               products={topRatedList}
+              offers={offers}
             />
           )}
 
@@ -596,6 +619,7 @@ export default function MenuClient() {
                 subtitle={`Handcrafted ${catName.toLowerCase()} prepared fresh upon order`}
                 badge="Freshly Made"
                 products={catProducts}
+                offers={offers}
               />
             ))
           ) : (
@@ -604,6 +628,7 @@ export default function MenuClient() {
               subtitle={`All available fresh dishes under ${selectedCategory}`}
               badge={selectedCategory}
               products={displayedProducts}
+              offers={offers}
             />
           )}
         </div>

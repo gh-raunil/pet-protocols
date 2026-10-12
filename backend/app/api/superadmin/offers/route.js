@@ -14,6 +14,7 @@ export async function GET() {
     await connectDB();
     const offers = await Offer.find()
       .populate("restaurant", "name slug cuisineType")
+      .populate("targetProducts", "name price image category")
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 })
       .lean();
@@ -45,6 +46,10 @@ export async function POST(request) {
       endDate,
       isActive = true,
       image = "",
+      targetType = "all",
+      targetCategory = "",
+      targetProducts = [],
+      applyMode = "coupon",
     } = body;
 
     if (!title?.trim() || !description?.trim()) {
@@ -60,22 +65,32 @@ export async function POST(request) {
       title: title.trim(),
       description: description.trim(),
       restaurant: restaurantId || null,
-      discountType,
-      discountValue: Number(discountValue) || 0,
-      minOrder: Number(minOrder) || 0,
+      discountType: discountType === "flat" ? "flat" : "percentage",
+      discountValue: Math.max(0, Number(discountValue) || 0),
+      minOrder: Math.max(0, Number(minOrder) || 0),
       code: code ? code.trim().toUpperCase() : "",
-      startDate: startDate ? new Date(startDate) : new Date(),
+      startDate: startDate ? new Date(startDate) : new Date(Date.now() - 60000),
       endDate: endDate ? new Date(endDate) : null,
       isActive: Boolean(isActive),
       image: image || "",
+      targetType: ["all", "category", "products"].includes(targetType) ? targetType : "all",
+      targetCategory: targetCategory ? targetCategory.trim() : "",
+      targetProducts: Array.isArray(targetProducts) ? targetProducts : [],
+      applyMode: applyMode === "automatic" ? "automatic" : "coupon",
       createdBy: auth.user._id,
       creatorRole: "superadmin",
     });
 
+    const populatedOffer = await Offer.findById(newOffer._id)
+      .populate("restaurant", "name slug cuisineType")
+      .populate("targetProducts", "name price image category")
+      .populate("createdBy", "name email")
+      .lean();
+
     return NextResponse.json({
       success: true,
       message: "Offer created successfully by Super Admin!",
-      offer: newOffer,
+      offer: populatedOffer || newOffer,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

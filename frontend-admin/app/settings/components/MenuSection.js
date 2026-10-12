@@ -104,6 +104,55 @@ export default function MenuSection({ form, onChange, onSave, saving }) {
               <div className="w-11 h-6 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
             </label>
           </div>
+
+          {/* Show Newly Arrived Dishes Carousel */}
+          <div className="pt-3 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                <span>Show Newly Arrived Dishes Carousel</span>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  New
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">
+                Pushes recently launched dishes to a dedicated "Newly Arrived Dishes" carousel. Automatically hides when no fresh dishes qualify.
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={menuSettings.showNewArrivals ?? true}
+                onChange={(e) => updateMenu("showNewArrivals", e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+            </label>
+          </div>
+
+          {/* Newly Arrived Window (Days) */}
+          {(menuSettings.showNewArrivals ?? true) && (
+            <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+                  New Dish Freshness Window
+                </div>
+                <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">
+                  Number of days a dish is showcased as "Newly Arrived" before expiring from the section.
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={menuSettings.newArrivalsDays || 14}
+                  onChange={(e) => updateMenu("newArrivalsDays", Math.max(1, parseInt(e.target.value) || 14))}
+                  className="w-20 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-white text-center"
+                />
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">days</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -29,6 +29,7 @@ import {
   getTopRatedProducts,
   hasUserPreferences,
 } from "@/lib/userPreferences";
+import { getProductNewArrivalStatus } from "@/lib/offersHelper";
 
 export default function HomePage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function HomePage() {
 
   // Personalized & curated lists
   const [userHasHistory, setUserHasHistory] = useState(false);
+  const [newArrivalsList, setNewArrivalsList] = useState([]);
   const [recommendedList, setRecommendedList] = useState([]);
   const [bestSellingList, setBestSellingList] = useState([]);
   const [topRatedList, setTopRatedList] = useState([]);
@@ -64,8 +66,14 @@ export default function HomePage() {
       }
       setBestSellingList(getBestSellingProducts(products, 12));
       setTopRatedList(getTopRatedProducts(products, 12));
+
+      // Newly Arrived Dishes (Admin window + freshness calculation)
+      const freshDishes = products
+        .filter((p) => getProductNewArrivalStatus(p, restaurants))
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setNewArrivalsList(freshDishes);
     }
-  }, [products]);
+  }, [products, restaurants]);
 
   useEffect(() => {
     const handlePrefUpdate = () => {
@@ -129,24 +137,24 @@ export default function HomePage() {
   const popularDishes = products.slice(0, 8);
 
   return (
-    <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors w-full max-w-full overflow-x-hidden min-w-0">
       {/* ── SECTION A: HERO (TYPOGRAPHY-LED) ───────────────────────── */}
-      <section className="pt-32 pb-16 sm:pt-40 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
+      <section className="pt-28 pb-14 sm:pt-40 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center w-full min-w-0">
         {/* Subtle pill tag */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-6 animate-[fadeIn_0.5s_ease]">
           <Sparkles size={14} /> Certified Kitchen Partners
         </div>
 
         {/* Brand headline */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.08] text-[var(--text-main)] mb-6">
+        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.08] text-[var(--text-main)] mb-6 break-words">
           Pet Protocols
-          <span className="block text-[var(--brand-accent)] mt-1 sm:mt-2 text-3xl sm:text-5xl md:text-6xl font-extrabold">
+          <span className="block text-[var(--brand-accent)] mt-1 sm:mt-2 text-2xl sm:text-4xl md:text-6xl font-extrabold break-words">
             Fresh food. Zero compromises.
           </span>
         </h1>
 
         {/* Clear mission description */}
-        <p className="max-w-2xl mx-auto text-base sm:text-lg text-[var(--text-muted)] font-normal leading-relaxed mb-10">
+        <p className="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-[var(--text-muted)] font-normal leading-relaxed mb-10 break-words px-2">
           Discover vetted partner kitchens, explore chef-crafted menus, and order freshly prepared meals with seamless multi-restaurant ordering.
         </p>
 
@@ -221,9 +229,19 @@ export default function HomePage() {
                 href={`/menu?category=${encodeURIComponent(cat.name)}`}
                 className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-1 transition-all group flex flex-col items-center text-center shadow-sm"
               >
-                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">
-                  {cat.icon || "🍽️"}
-                </span>
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mb-3 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800/80 border border-[var(--border-color)] flex items-center justify-center shadow-xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300 relative">
+                  {cat.image ? (
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">
+                      {cat.icon || "🍽️"}
+                    </span>
+                  )}
+                </div>
                 <span className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition line-clamp-1">
                   {cat.name}
                 </span>
@@ -259,6 +277,19 @@ export default function HomePage() {
           </div>
         ) : (
           <>
+            {/* 0. Newly Arrived Dishes (Admin controlled window; completely hidden if no dishes qualify) */}
+            {newArrivalsList.length > 0 && (
+              <ProductCarousel
+                title="Newly Arrived Dishes"
+                subtitle="Fresh culinary additions recently prepared by our partner kitchens"
+                badge="✨ Newly Arrived"
+                icon={<Sparkles size={20} className="text-amber-500 fill-amber-500/20" />}
+                products={newArrivalsList}
+                offers={offers}
+                viewAllHref="/menu"
+              />
+            )}
+
             {/* 1. Recommended For You (Personalized - Only if user has interaction/search history) */}
             {userHasHistory && recommendedList.length > 0 && (
               <ProductCarousel
@@ -267,6 +298,7 @@ export default function HomePage() {
                 badge="For You"
                 icon={<Sparkles size={20} />}
                 products={recommendedList}
+                offers={offers}
                 viewAllHref="/menu"
               />
             )}
@@ -278,6 +310,7 @@ export default function HomePage() {
               badge="Hot Sellers"
               icon={<Flame size={20} />}
               products={bestSellingList}
+              offers={offers}
               viewAllHref="/menu"
             />
 
@@ -288,6 +321,7 @@ export default function HomePage() {
               badge="Top Rated"
               icon={<Star size={20} className="fill-orange-500 text-orange-500" />}
               products={topRatedList}
+              offers={offers}
               viewAllHref="/menu"
             />
           </>

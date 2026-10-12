@@ -15,6 +15,7 @@ export async function GET() {
     await connectDB();
 
     const offers = await Offer.find({ restaurant: restaurantId })
+      .populate("targetProducts", "name price image category")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -45,6 +46,10 @@ export async function POST(request) {
       endDate,
       isActive = true,
       image = "",
+      targetType = "all",
+      targetCategory = "",
+      targetProducts = [],
+      applyMode = "coupon",
     } = body;
 
     if (!title?.trim() || !description?.trim()) {
@@ -68,14 +73,22 @@ export async function POST(request) {
       endDate: endDate ? new Date(endDate) : null,
       isActive: Boolean(isActive),
       image: image || "",
+      targetType: ["all", "category", "products"].includes(targetType) ? targetType : "all",
+      targetCategory: targetCategory ? targetCategory.trim() : "",
+      targetProducts: Array.isArray(targetProducts) ? targetProducts : [],
+      applyMode: applyMode === "automatic" ? "automatic" : "coupon",
       createdBy: user._id,
       creatorRole: "restaurant_admin",
     });
 
+    const populated = await Offer.findById(newOffer._id)
+      .populate("targetProducts", "name price image category")
+      .lean();
+
     return NextResponse.json({
       success: true,
       message: "Offer created successfully!",
-      offer: newOffer,
+      offer: populated || newOffer,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Minus, Plus, Trash2, X, ShoppingBag, ArrowRight } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { calculateCartDiscounts } from "@/lib/offersHelper";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -23,6 +24,16 @@ export default function CartDrawer() {
 
   const { data: session } = useSession();
   const router = useRouter();
+  const [offers, setOffers] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/offers")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && Array.isArray(d.offers)) setOffers(d.offers);
+      })
+      .catch(() => {});
+  }, []);
 
   // Handle escape key and lock body scroll
   useEffect(() => {
@@ -50,8 +61,12 @@ export default function CartDrawer() {
   };
 
   const subtotal = getTotalPrice();
+  const { autoDiscountAmount } = useMemo(
+    () => calculateCartDiscounts(items, offers),
+    [items, offers]
+  );
   const deliveryFee = items.length > 0 ? 40 : 0;
-  const total = subtotal + deliveryFee;
+  const total = Math.max(0, subtotal + deliveryFee - autoDiscountAmount);
 
   return (
     <>
@@ -192,6 +207,12 @@ export default function CartDrawer() {
                   <span>Delivery fee</span>
                   <span className="font-semibold text-[var(--text-main)]">₹{deliveryFee}</span>
                 </div>
+                {autoDiscountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-bold">
+                    <span>⚡ Auto Discount</span>
+                    <span>-₹{autoDiscountAmount}</span>
+                  </div>
+                )}
                 <div className="pt-2 border-t border-[var(--border-color)] flex justify-between items-baseline text-sm">
                   <span className="font-bold text-[var(--text-main)]">Total</span>
                   <span className="text-xl font-black text-[var(--brand-accent)]">₹{total}</span>

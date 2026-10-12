@@ -122,6 +122,7 @@ export async function POST(request) {
 
     const createdOrders = [];
     let cumulativeSubtotal = 0;
+    let remainingDiscount = Math.max(0, Number(body.discount) || 0);
 
     for (const [targetRestId, restSnapshotItems] of itemsByRestaurant.entries()) {
       const restDoc = await Restaurant.findById(targetRestId).lean();
@@ -138,8 +139,9 @@ export async function POST(request) {
         ? 0
         : flatFee;
 
-      const discount = Number(body.discount) || 0;
-      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discount);
+      const discountForThisOrder = Math.min(restSubtotal + restDeliveryFee, remainingDiscount);
+      remainingDiscount -= discountForThisOrder;
+      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discountForThisOrder);
 
       const newOrder = await Order.create({
         user: userId,
@@ -148,7 +150,8 @@ export async function POST(request) {
         address,
         subtotal: restSubtotal,
         deliveryFee: restDeliveryFee,
-        discount,
+        discount: discountForThisOrder,
+        couponCode: body.couponCode || "",
         totalAmount: restTotal,
         paymentId: razorpay_payment_id,
         orderId: razorpay_order_id,

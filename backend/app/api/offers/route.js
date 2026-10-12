@@ -11,21 +11,39 @@ export async function GET(request) {
     const restaurantId = searchParams.get("restaurant");
 
     const now = new Date();
-    const query = {
-      isActive: true,
-      startDate: { $lte: now },
-      $or: [{ endDate: null }, { endDate: { $gt: now } }],
-    };
+    const andConditions = [
+      { isActive: true },
+      {
+        $or: [
+          { startDate: null },
+          { startDate: { $exists: false } },
+          { startDate: { $lte: now } },
+        ],
+      },
+      {
+        $or: [
+          { endDate: null },
+          { endDate: { $exists: false } },
+          { endDate: { $gt: now } },
+        ],
+      },
+    ];
 
     if (restaurantId && restaurantId !== "all") {
-      query.$or = [
-        { restaurant: null }, // platform-wide
-        { restaurant: restaurantId }, // restaurant specific
-      ];
+      andConditions.push({
+        $or: [
+          { restaurant: null },
+          { restaurant: { $exists: false } },
+          { restaurant: restaurantId },
+        ],
+      });
     }
+
+    const query = { $and: andConditions };
 
     const offers = await Offer.find(query)
       .populate("restaurant", "name slug image cuisineType rating phone whatsappNumber address")
+      .populate("targetProducts", "name price image category")
       .sort({ createdAt: -1 })
       .lean();
 

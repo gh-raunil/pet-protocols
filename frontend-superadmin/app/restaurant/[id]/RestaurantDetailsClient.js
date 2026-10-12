@@ -37,6 +37,7 @@ import {
   Star,
   CheckSquare,
   Square,
+  FolderTree,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 
@@ -493,6 +494,15 @@ export default function RestaurantDetailsClient() {
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
+
+                  <Link
+                    href={`/?tab=categories&restaurant=${restaurant._id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+                    title="Manage categories for this kitchen"
+                  >
+                    <FolderTree size={12} />
+                    <span>Manage Categories</span>
+                  </Link>
                 </div>
               </div>
             </div>

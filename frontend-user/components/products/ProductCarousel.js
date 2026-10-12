@@ -12,6 +12,7 @@ export default function ProductCarousel({
   products = [],
   viewAllHref,
   icon,
+  offers = [],
 }) {
   const containerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -48,22 +49,22 @@ export default function ProductCarousel({
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="relative my-8 sm:my-10">
+    <section className="relative my-8 sm:my-10 w-full max-w-full overflow-hidden">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-4 px-1">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between mb-4 px-1 gap-2">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {badge && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20 shrink-0">
               {badge}
             </span>
           )}
-          <div>
-            <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[var(--text-main)] flex items-center gap-2 tracking-tight">
-              {icon && <span className="text-[var(--brand-accent)]">{icon}</span>}
-              {title}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base sm:text-xl md:text-2xl font-black text-[var(--text-main)] flex items-center gap-2 tracking-tight truncate">
+              {icon && <span className="text-[var(--brand-accent)] shrink-0">{icon}</span>}
+              <span className="truncate">{title}</span>
             </h2>
             {subtitle && (
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
                 {subtitle}
               </p>
             )}
@@ -150,6 +151,7 @@ export default function ProductCarousel({
               key={product._id}
               product={product}
               isCarousel={true}
+              offers={offers}
             />
           ))}
         </div>

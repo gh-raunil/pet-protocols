@@ -7,11 +7,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 import InAppNotification from "@/models/InAppNotification";
+import { processDueScheduledMessages } from "@/lib/scheduledMessagesService";
 
 // GET — Secure recipient endpoint for active notifications
 export async function GET(request) {
   try {
     await connectDB();
+    // Non-blocking opportunistic processing of due scheduled broadcasts
+    processDueScheduledMessages().catch((e) => console.warn("[Messages GET] Opportunistic check warning:", e.message));
+
     const { searchParams } = new URL(request.url);
     const requestedTarget = searchParams.get("target"); // 'restaurants' | 'customers'
 

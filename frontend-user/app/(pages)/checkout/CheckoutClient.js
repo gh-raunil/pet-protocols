@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
+import { calculateCartDiscounts } from "@/lib/offersHelper";
 
 // Dynamically load Razorpay standard checkout script
 const loadRazorpayScript = () => {
@@ -144,7 +145,7 @@ export default function CheckoutClient() {
     }
   }, [session]);
 
-  // Load customer-facing offers
+  // Load customer-facing offers and auto-apply pre-selected coupon
   useEffect(() => {
     async function loadOffers() {
       try {
@@ -153,6 +154,24 @@ export default function CheckoutClient() {
         const data = await res.json();
         if (data.success && Array.isArray(data.offers)) {
           setAvailableOffers(data.offers);
+
+          // Auto-apply coupon from query params or localStorage
+          const paramCoupon = searchParams.get("coupon");
+          let savedCoupon = "";
+          try {
+            savedCoupon = localStorage.getItem("pet_protocols_applied_coupon") || "";
+          } catch (e) {}
+
+          const targetCode = (paramCoupon || savedCoupon || "").trim().toUpperCase();
+          if (targetCode) {
+            const matched = data.offers.find(
+              (o) => o.code && o.code.toUpperCase() === targetCode
+            );
+            if (matched) {
+              setAppliedOffer(matched);
+              setCouponInput(matched.code);
+            }
+          }
         }
       } catch (err) {
         console.warn("Could not load offers:", err);
@@ -161,7 +180,7 @@ export default function CheckoutClient() {
       }
     }
     loadOffers();
-  }, []);
+  }, [searchParams]);
 
   // Sync payment mode when orderType changes
   const handleOrderTypeChange = (type) => {
@@ -249,25 +268,25 @@ export default function CheckoutClient() {
   const freeThreshold = primaryRest?.chargeSettings?.freeDeliveryThreshold ?? 500;
   const deliveryRadius = primaryRest?.deliverySettings?.deliveryRadiusKm;
 
-  // Subtotal, Delivery & Discounts
+  // Subtotal, Delivery & Discounts (Option A Coupon + Option B Auto)
   const subtotal = getTotalPrice();
   const isFreeDelivery = orderType === "pickup" || subtotal >= freeThreshold;
   const deliveryFee = orderType === "pickup" ? 0 : isFreeDelivery ? 0 : flatFee;
 
-  // Calculate discount for an offer
-  const calculateDiscount = (offer, currentSubtotal) => {
-    if (!offer) return 0;
-    if (offer.minOrder && currentSubtotal < offer.minOrder) return 0;
-    if (offer.discountType === "percentage") {
-      return Math.round((currentSubtotal * Number(offer.discountValue || 0)) / 100);
-    }
-    return Math.min(currentSubtotal, Number(offer.discountValue || 0));
-  };
+  const {
+    autoDiscountAmount,
+    couponDiscountAmount,
+    totalDiscountAmount,
+    autoOffersApplied,
+  } = useMemo(
+    () => calculateCartDiscounts(items, availableOffers, appliedOffer),
+    [items, availableOffers, appliedOffer]
+  );
 
-  const discountAmount = appliedOffer ? calculateDiscount(appliedOffer, subtotal) : 0;
+  const discountAmount = totalDiscountAmount;
   const total = Math.max(0, subtotal + deliveryFee - discountAmount);
 
-  // Apply Coupon Code
+  // Apply Coupon Code (Option A)
   const handleApplyCoupon = (offerOrCode) => {
     setCouponError("");
     let targetOffer = null;
@@ -284,26 +303,73 @@ export default function CheckoutClient() {
         (o) => o.code && o.code.toUpperCase() === codeStr
       );
       if (!targetOffer) {
-        // Allow applying valid format coupon if matching known codes
         setCouponError(`Coupon code "${codeStr}" is not active or invalid.`);
         return;
       }
     }
 
-    if (targetOffer.minOrder && subtotal < targetOffer.minOrder) {
-      setCouponError(`This offer requires a minimum order of ₹${targetOffer.minOrder}.`);
+    const targetRestId = targetOffer.restaurant?._id || targetOffer.restaurant;
+    if (targetRestId) {
+      const restGroup = Object.values(groupedRestaurants).find((g) => {
+        const rId = g.restaurant?._id || g.restaurant?.id;
+        return rId && String(rId) === String(targetRestId);
+      });
+
+      if (!restGroup) {
+        const restName = targetOffer.restaurant?.name || "the participating kitchen";
+        setCouponError(`This offer is valid only for orders from ${restName}. Your cart does not have dishes from this kitchen.`);
+        return;
+      }
+
+      if (targetOffer.minOrder && restGroup.subtotal < targetOffer.minOrder) {
+        setCouponError(
+          `This offer requires a minimum order of ₹${targetOffer.minOrder} from ${targetOffer.restaurant?.name || "this kitchen"} (current: ₹${restGroup.subtotal}).`
+        );
+        return;
+      }
+    } else if (targetOffer.minOrder && subtotal < targetOffer.minOrder) {
+      setCouponError(`This offer requires a minimum order of ₹${targetOffer.minOrder} (current subtotal: ₹${subtotal}).`);
       return;
+    }
+
+    // Target Scope: Category Check
+    if (targetOffer.targetType === "category" && targetOffer.targetCategory) {
+      const hasCategoryMatch = items.some(
+        (item) => item.category && item.category.trim().toLowerCase() === targetOffer.targetCategory.trim().toLowerCase()
+      );
+      if (!hasCategoryMatch) {
+        setCouponError(`This coupon is only valid for dishes in the "${targetOffer.targetCategory}" category.`);
+        return;
+      }
+    }
+
+    // Target Scope: Specific Products Check
+    if (targetOffer.targetType === "products" && Array.isArray(targetOffer.targetProducts) && targetOffer.targetProducts.length > 0) {
+      const targetIds = targetOffer.targetProducts.map((p) => (typeof p === "object" ? String(p._id) : String(p)));
+      const hasProductMatch = items.some((item) => targetIds.includes(String(item._id)));
+      if (!hasProductMatch) {
+        setCouponError("This coupon is only valid for specific selected dishes in the offer.");
+        return;
+      }
     }
 
     setAppliedOffer(targetOffer);
     setCouponInput(targetOffer.code || "");
     setCouponError("");
+    try {
+      if (targetOffer.code) {
+        localStorage.setItem("pet_protocols_applied_coupon", targetOffer.code);
+      }
+    } catch (e) {}
   };
 
   const handleRemoveCoupon = () => {
     setAppliedOffer(null);
     setCouponInput("");
     setCouponError("");
+    try {
+      localStorage.removeItem("pet_protocols_applied_coupon");
+    } catch (e) {}
   };
 
   const validateDetails = () => {
@@ -438,12 +504,16 @@ export default function CheckoutClient() {
                 totalAmount: total,
                 orderType,
                 discount: discountAmount,
+                couponCode: appliedOffer?.code || "",
               }),
             });
 
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
               setLoadingStep("Order confirmed! Redirecting...");
+              try {
+                localStorage.removeItem("pet_protocols_applied_coupon");
+              } catch (e) {}
               await saveAddressIfRequested();
               await clearCart();
               const targetOrderId = verifyData.order?._id || verifyData.orderId || "";
@@ -505,6 +575,9 @@ export default function CheckoutClient() {
       }
 
       await saveAddressIfRequested();
+      try {
+        localStorage.removeItem("pet_protocols_applied_coupon");
+      } catch (e) {}
       await clearCart();
       const targetOrderId = data.order?._id || data.orderId || "";
       router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
@@ -549,6 +622,9 @@ export default function CheckoutClient() {
       }
 
       await saveAddressIfRequested();
+      try {
+        localStorage.removeItem("pet_protocols_applied_coupon");
+      } catch (e) {}
       await clearCart();
       const targetOrderId = data.order?._id || data.orderId || "";
       router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
@@ -603,7 +679,7 @@ export default function CheckoutClient() {
   ];
 
   return (
-    <main className="min-h-screen pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen pt-28 pb-20 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── BREADCRUMB PROGRESS BAR ────────────────── */}
       <div className="mb-8">
         <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] uppercase tracking-wider mb-2">
@@ -1253,26 +1329,38 @@ export default function CheckoutClient() {
                     </span>
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                       {availableOffers.map((off) => {
-                        const qualifies = !off.minOrder || subtotal >= off.minOrder;
+                        const targetRestId = off.restaurant?._id || off.restaurant;
+                        const hasRestMatch =
+                          !targetRestId ||
+                          Object.values(groupedRestaurants).some(
+                            (g) => String(g.restaurant?._id || g.restaurant?.id) === String(targetRestId)
+                          );
+                        const qualifies = (!off.minOrder || subtotal >= off.minOrder) && hasRestMatch;
+
                         return (
                           <div
                             key={off._id}
-                            onClick={() => qualifies && handleApplyCoupon(off)}
+                            onClick={() => handleApplyCoupon(off)}
                             className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2 ${
                               qualifies
                                 ? "border-dashed border-[var(--brand-accent)]/50 bg-[var(--brand-accent)]/5 hover:bg-[var(--brand-accent)]/10"
-                                : "opacity-50 border-[var(--border-color)] bg-[var(--bg-sub)] cursor-not-allowed"
+                                : "opacity-60 border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-amber-500/50"
                             }`}
                           >
                             <div className="min-w-0">
-                              <span className="font-mono font-bold text-xs text-[var(--brand-accent)] block">
-                                {off.code || off.title}
-                              </span>
-                              <span className="text-[11px] text-[var(--text-muted)] line-clamp-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono font-bold text-xs text-[var(--brand-accent)] block">
+                                  {off.code || off.title}
+                                </span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)]">
+                                  {off.restaurant?.name ? `Kitchen: ${off.restaurant.name}` : "Platform-Wide"}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-[var(--text-muted)] line-clamp-1 mt-0.5">
                                 {off.description || (off.discountType === "percentage" ? `${off.discountValue}% OFF` : `₹${off.discountValue} OFF`)}
                               </span>
                               {off.minOrder > 0 && (
-                                <span className="text-[10px] text-[var(--text-muted)]">
+                                <span className="text-[10px] text-[var(--text-muted)] block">
                                   Min order: ₹{off.minOrder}
                                 </span>
                               )}
@@ -1281,10 +1369,12 @@ export default function CheckoutClient() {
                               className={`text-[10px] font-extrabold uppercase px-2 py-1 rounded-md shrink-0 ${
                                 qualifies
                                   ? "bg-[var(--brand-accent)] text-white"
+                                  : !hasRestMatch
+                                  ? "bg-amber-500/20 text-amber-500"
                                   : "bg-stone-500/20 text-[var(--text-muted)]"
                               }`}
                             >
-                              {qualifies ? "Apply" : `Min ₹${off.minOrder}`}
+                              {qualifies ? "Apply" : !hasRestMatch ? "Kitchen Only" : `Min ₹${off.minOrder}`}
                             </span>
                           </div>
                         );
@@ -1351,10 +1441,17 @@ export default function CheckoutClient() {
                 </span>
               </div>
 
-              {discountAmount > 0 && (
+              {autoDiscountAmount > 0 && (
                 <div className="flex justify-between text-emerald-500 font-semibold">
-                  <span>Offer Discount ({appliedOffer?.code || "Deal"})</span>
-                  <span className="font-mono">- ₹{discountAmount}</span>
+                  <span>⚡ Auto Kitchen Discount</span>
+                  <span className="font-mono">- ₹{autoDiscountAmount}</span>
+                </div>
+              )}
+
+              {couponDiscountAmount > 0 && (
+                <div className="flex justify-between text-emerald-500 font-semibold">
+                  <span>🎟️ Promo Coupon ({appliedOffer?.code})</span>
+                  <span className="font-mono">- ₹{couponDiscountAmount}</span>
                 </div>
               )}
 

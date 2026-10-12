@@ -136,7 +136,7 @@ async function seed() {
           name: "Peri-Peri Skin-On Fries",
           description: "Crispy hand-cut potatoes tossed in aromatic African bird's eye spice mix with chipotle dip.",
           price: 129,
-          image: "https://images.unsplash.com/photo-1576107232684-1279f3908594?w=500",
+          image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500",
           category: "Fries",
           type: "veg",
           isAvailable: true,

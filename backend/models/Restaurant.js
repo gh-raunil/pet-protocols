@@ -182,7 +182,7 @@ const RestaurantSchema = new mongoose.Schema(
     },
     cancellationSettings: {
       allowCustomerCancel: { type: Boolean, default: true },
-      customerCancelWindowMinutes: { type: Number, default: 5 },
+      customerCancelWindowMinutes: { type: Number, default: 1 },
       allowRestaurantCancel: { type: Boolean, default: true },
       requireCancelReason: { type: Boolean, default: true },
     },
@@ -201,6 +201,8 @@ const RestaurantSchema = new mongoose.Schema(
       showFeaturedCategories: { type: Boolean, default: true },
       enableSearch: { type: Boolean, default: true },
       enableFilters: { type: Boolean, default: true },
+      showNewArrivals: { type: Boolean, default: true },
+      newArrivalsDays: { type: Number, default: 14, min: 1, max: 90 },
     },
     // Payments & Charges
     paymentSettings: {

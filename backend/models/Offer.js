@@ -57,6 +57,31 @@ const OfferSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Target Scope: All Products | Category | Specific Products
+    targetType: {
+      type: String,
+      enum: ["all", "category", "products"],
+      default: "all",
+      index: true,
+    },
+    targetCategory: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    targetProducts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+      },
+    ],
+    // Application Mode: Option A (Requires Coupon Code) vs Option B (Automatic Discount)
+    applyMode: {
+      type: String,
+      enum: ["coupon", "automatic"],
+      default: "coupon",
+      index: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

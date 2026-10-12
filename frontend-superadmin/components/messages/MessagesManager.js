@@ -109,8 +109,11 @@ export default function MessagesManager({ restaurants = [] }) {
 
     try {
       setSubmitting(true);
+      const isRestaurants = form.recipientType === "restaurants";
       const payload = {
         ...form,
+        recipientSelection: isRestaurants ? form.recipientSelection : "all",
+        recipients: isRestaurants && form.recipientSelection === "selected" ? form.recipients : [],
         status: statusToSet,
       };
 
@@ -277,8 +280,17 @@ export default function MessagesManager({ restaurants = [] }) {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => loadMessages()}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition cursor-pointer"
+            title="Check for due scheduled broadcasts and refresh"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600 dark:text-indigo-400" : ""} />
+            <span>Sync</span>
+          </button>
+          <button
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-sm shadow-indigo-200 dark:shadow-indigo-950"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-sm shadow-indigo-200 dark:shadow-indigo-950 cursor-pointer"
           >
             <Plus size={15} />
             <span>Create Message</span>
@@ -643,7 +655,15 @@ export default function MessagesManager({ restaurants = [] }) {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setForm({ ...form, recipientType: id })}
+                    onClick={() => {
+                      const isRestaurants = id === "restaurants";
+                      setForm({
+                        ...form,
+                        recipientType: id,
+                        recipientSelection: isRestaurants ? form.recipientSelection : "all",
+                        recipients: isRestaurants ? form.recipients : [],
+                      });
+                    }}
                     className={`p-2.5 rounded-xl border text-center font-bold flex flex-col items-center gap-1 transition ${
                       form.recipientType === id
                         ? "bg-indigo-50 dark:bg-indigo-950/50 border-indigo-600 text-indigo-700 dark:text-indigo-300"
@@ -656,29 +676,31 @@ export default function MessagesManager({ restaurants = [] }) {
                 ))}
               </div>
 
-              {/* Target Selection */}
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
-                  <input
-                    type="radio"
-                    name="recipientSelection"
-                    checked={form.recipientSelection === "all"}
-                    onChange={() => setForm({ ...form, recipientSelection: "all", recipients: [] })}
-                    className="text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>All in this group</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
-                  <input
-                    type="radio"
-                    name="recipientSelection"
-                    checked={form.recipientSelection === "selected"}
-                    onChange={() => setForm({ ...form, recipientSelection: "selected" })}
-                    className="text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>Selected Specific Partners</span>
-                </label>
-              </div>
+              {/* Target Selection — only applicable when targeting Restaurant Partners */}
+              {form.recipientType === "restaurants" && (
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                    <input
+                      type="radio"
+                      name="recipientSelection"
+                      checked={form.recipientSelection === "all"}
+                      onChange={() => setForm({ ...form, recipientSelection: "all", recipients: [] })}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>All in this group</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                    <input
+                      type="radio"
+                      name="recipientSelection"
+                      checked={form.recipientSelection === "selected"}
+                      onChange={() => setForm({ ...form, recipientSelection: "selected" })}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Selected Specific Partners</span>
+                  </label>
+                </div>
+              )}
 
               {/* Multi-select if selected */}
               {form.recipientSelection === "selected" && form.recipientType === "restaurants" && (

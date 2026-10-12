@@ -3,26 +3,43 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Star, Heart, Clock, Check } from "lucide-react";
+import { Plus, Star, Heart, Clock, Check, Sparkles, Tag, Zap } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
+import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } from "@/lib/offersHelper";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
-export default function ProductCard({ product, isCarousel = false }) {
+export default function ProductCard({ product, isCarousel = false, offers = [] }) {
   const { addItem } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   const imageSrc = product.image || FALLBACK_IMAGE;
   const isFav = isFavorite(product._id);
   const restStatus = useOperationalStatus(product.restaurant);
 
-  // Simulated original MRP and discount percentage for authentic Flipkart e-commerce feel
-  const mrp = product.originalPrice || Math.round(product.price * 1.25);
-  const discountPercent = mrp > product.price ? Math.round(((mrp - product.price) / mrp) * 100) : 0;
-  const offerPrice = Math.round(product.price * 0.9);
+  // Check if product qualifies as Newly Arrived (within 14 days)
+  const isNew = isProductNewArrival(product, 14);
+
+  // Match targeted active offer (Option A vs Option B)
+  const matchedOffer = getProductActiveOffer(product, offers);
+  const isAutoDiscount = matchedOffer && matchedOffer.applyMode === "automatic";
+  const isCouponOffer = matchedOffer && (!matchedOffer.applyMode || matchedOffer.applyMode === "coupon");
+
+  // Option B: discount directly reduces the price automatically
+  let autoDiscount = 0;
+  let displayPrice = product.price;
+  if (isAutoDiscount) {
+    autoDiscount = calculateItemDiscount(product, matchedOffer);
+    displayPrice = Math.max(0, product.price - autoDiscount);
+  }
+
+  // Option A: catalog price is NOT reduced; coupon code is displayed
+  const hasStrikethrough = isAutoDiscount ? true : Boolean(product.originalPrice && product.originalPrice > product.price);
+  const struckPrice = isAutoDiscount ? product.price : product.originalPrice;
+  const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
 
   const handleCardClick = () => {
     trackProductView(product);
@@ -75,8 +92,8 @@ export default function ProductCard({ product, isCarousel = false }) {
             }`}
           />
 
-          {/* FSSAI Veg / Non-Veg Indicator Icon */}
-          <div className="absolute top-2 left-2 z-10">
+          {/* FSSAI Veg / Non-Veg Indicator Icon & Newly Arrived Tag */}
+          <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
             <span
               className={`w-3.5 h-3.5 rounded-[3px] border-2 bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center shadow-xs ${
                 product.type === "veg" ? "border-emerald-600" : "border-rose-600"
@@ -89,6 +106,11 @@ export default function ProductCard({ product, isCarousel = false }) {
                 }`}
               />
             </span>
+            {isNew && (
+              <span className="px-1.5 py-0.5 rounded-[4px] bg-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-xs flex items-center gap-0.5 leading-none">
+                <Sparkles size={8} className="fill-white" /> New
+              </span>
+            )}
           </div>
 
           {/* Wishlist Button */}
@@ -121,8 +143,8 @@ export default function ProductCard({ product, isCarousel = false }) {
         </div>
 
         {/* Card Body */}
-        <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-          <div>
+        <div className="p-3 flex-1 flex flex-col justify-between space-y-2 min-w-0">
+          <div className="min-w-0">
             {/* Rating Badge + Review Count (Flipkart Style) */}
             <div className="flex items-center gap-1.5 mb-1">
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs">
@@ -147,20 +169,20 @@ export default function ProductCard({ product, isCarousel = false }) {
             )}
 
             {/* Dish Title */}
-            <h3 className="text-xs sm:text-[13px] font-bold text-[var(--text-main)] line-clamp-1 group-hover:text-[var(--brand-accent)] transition-colors">
+            <h3 className="text-xs sm:text-[13px] font-bold text-[var(--text-main)] line-clamp-1 group-hover:text-[var(--brand-accent)] transition-colors break-words">
               {product.name}
             </h3>
           </div>
 
-          {/* Pricing & Flipkart Offer Row */}
-          <div>
+          {/* Pricing & Offer Row (Option A vs Option B) */}
+          <div className="min-w-0">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-sm sm:text-base font-black text-[var(--text-main)]">
-                ₹{product.price}
+                ₹{displayPrice}
               </span>
-              {mrp > product.price && (
+              {hasStrikethrough && struckPrice > displayPrice && (
                 <span className="text-[10px] text-[var(--text-muted)] line-through">
-                  ₹{mrp}
+                  ₹{struckPrice}
                 </span>
               )}
               {discountPercent > 0 && (
@@ -170,10 +192,18 @@ export default function ProductCard({ product, isCarousel = false }) {
               )}
             </div>
 
-            {/* Flipkart-style Offer Callout */}
-            <p className="text-[10px] font-semibold text-[var(--brand-accent)] mt-0.5 truncate">
-              ₹{offerPrice} with Deals
-            </p>
+            {/* Offer Callout: Option B (Auto discount) vs Option A (Requires coupon code) */}
+            {isAutoDiscount ? (
+              <p className="text-[10px] font-bold text-emerald-600 mt-0.5 truncate flex items-center gap-1">
+                <Zap size={10} className="fill-emerald-600 shrink-0" />
+                <span>Auto Applied: ₹{autoDiscount} OFF</span>
+              </p>
+            ) : isCouponOffer ? (
+              <p className="text-[10px] font-semibold text-[var(--brand-accent)] mt-0.5 truncate flex items-center gap-1">
+                <Tag size={10} className="shrink-0" />
+                <span>Use code <strong className="font-mono">{matchedOffer.code}</strong></span>
+              </p>
+            ) : null}
           </div>
         </div>
       </Link>

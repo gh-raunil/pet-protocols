@@ -18,9 +18,13 @@ import {
   CreditCard,
   MessageSquare,
   ExternalLink,
+  XCircle,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
+import { toast } from "@/components/ui/ToastProvider";
 
 const POLL_INTERVAL = 15000; // Poll status every 15s to keep UI lightweight
 
@@ -34,6 +38,17 @@ export default function OrderConfirmationClient() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [currentTime, setCurrentTime] = useState(0);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  useEffect(() => {
+    setCurrentTime(Date.now());
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchOrder = useCallback(
     async (isManual = false) => {
@@ -163,6 +178,46 @@ export default function OrderConfirmationClient() {
   const restWhatsapp = activeRest?.whatsappNumber && activeRest?.showWhatsappToCustomers !== false ? activeRest.whatsappNumber : null;
   const cleanWaDigits = restWhatsapp ? restWhatsapp.replace(/\D/g, "") : "";
 
+  const cancelSettings = activeRest?.cancellationSettings || (typeof order.restaurant === "object" ? order.restaurant?.cancellationSettings : {}) || {};
+  const allowCancel = cancelSettings.allowCustomerCancel !== false;
+  const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
+  const createdAtMs = new Date(order.createdAt).getTime();
+  const remainingMs = createdAtMs + windowMinutes * 60 * 1000 - currentTime;
+  const canCancel = order.status === "pending" && allowCancel && remainingMs > 0;
+  const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const remainingMinDisplay = Math.floor(remainingSeconds / 60);
+  const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
+
+  const handleCancelOrder = async () => {
+    if (!order?._id) return;
+    setIsCancelling(true);
+    setCancelError("");
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order._id,
+          reason: cancelReason.trim() || "Cancelled by customer within 1-minute window",
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setCancelError(data.message || "Failed to cancel order.");
+        toast.error(data.message || "Failed to cancel order.");
+        return;
+      }
+      toast.success("Order cancelled successfully.");
+      setShowCancelModal(false);
+      setOrder((prev) => ({ ...prev, status: "cancelled" }));
+    } catch (err) {
+      setCancelError("Network error while cancelling order.");
+      toast.error("Network error while cancelling order.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <main className="min-h-screen pt-28 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] space-y-8 transition-colors">
       {/* Celebration Header */}
@@ -179,19 +234,37 @@ export default function OrderConfirmationClient() {
         </p>
 
         {/* Quick status bar */}
-        <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-mono shadow-sm">
-          <span className="text-[var(--text-muted)]">Order ID:</span>
-          <span className="text-[var(--brand-accent)] font-bold">#{orderIdDisplay}</span>
-          <span className="text-[var(--border-color)]">•</span>
-          <button
-            onClick={() => fetchOrder(true)}
-            disabled={isRefreshing}
-            className="text-[var(--text-muted)] hover:text-[var(--text-main)] flex items-center gap-1 font-sans text-[11px] font-semibold transition cursor-pointer"
-            title="Refresh order status"
-          >
-            <RefreshCw size={12} className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""} />
-            <span>{isRefreshing ? "Updating..." : "Refresh"}</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+          <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-mono shadow-sm">
+            <span className="text-[var(--text-muted)]">Order ID:</span>
+            <span className="text-[var(--brand-accent)] font-bold">#{orderIdDisplay}</span>
+            <span className="text-[var(--border-color)]">•</span>
+            <button
+              onClick={() => fetchOrder(true)}
+              disabled={isRefreshing}
+              className="text-[var(--text-muted)] hover:text-[var(--text-main)] flex items-center gap-1 font-sans text-[11px] font-semibold transition cursor-pointer"
+              title="Refresh order status"
+            >
+              <RefreshCw size={12} className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""} />
+              <span>{isRefreshing ? "Updating..." : "Refresh"}</span>
+            </button>
+          </div>
+
+          {canCancel && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowCancelModal(true);
+                setCancelReason("");
+                setCancelError("");
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-bold transition shadow-sm cursor-pointer"
+              title="Cancel order within 1-minute grace window"
+            >
+              <XCircle size={13} />
+              <span>Cancel Order ({remainingMinDisplay}:{remainingSecDisplay})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -396,6 +469,86 @@ export default function OrderConfirmationClient() {
           </div>
         </div>
       </div>
+
+      {/* Cancellation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-2 text-rose-500 font-bold text-sm">
+                <AlertTriangle size={18} />
+                <span>Cancel Order</span>
+              </div>
+              <span className="font-mono text-xs font-bold text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
+                {remainingMinDisplay}:{remainingSecDisplay} left
+              </span>
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Are you sure you want to cancel this order? The restaurant has not started preparing your food yet.
+            </p>
+
+            {cancelError && (
+              <p className="text-xs text-rose-500 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20 font-medium">
+                {cancelError}
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                Quick Reason:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Ordered by mistake",
+                  "Need to change address",
+                  "Selected wrong dishes",
+                  "Changed my mind",
+                ].map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setCancelReason(reason)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
+                      cancelReason === reason
+                        ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
+                        : "bg-[var(--bg-sub)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Or type cancellation reason..."
+                className="w-full mt-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelOrder}
+                disabled={isCancelling}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

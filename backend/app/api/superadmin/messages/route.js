@@ -4,6 +4,7 @@ import Message from "@/models/Message";
 import Restaurant from "@/models/Restaurant";
 import User from "@/models/User";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
+import { processDueScheduledMessages } from "@/lib/scheduledMessagesService";
 
 // GET — List messages with filters & metrics
 export async function GET(request) {
@@ -14,6 +15,9 @@ export async function GET(request) {
     }
 
     await connectDB();
+    // Opportunistically process any overdue scheduled messages
+    await processDueScheduledMessages().catch((e) => console.warn("[Superadmin Messages] Process due error:", e.message));
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "sent";
     const search = searchParams.get("search") || "";

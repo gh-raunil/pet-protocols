@@ -35,6 +35,7 @@ import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
 import ProductCarousel from "@/components/products/ProductCarousel";
+import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } from "@/lib/offersHelper";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800";
 
@@ -45,6 +46,7 @@ export default function ProductDetailClient({ product }) {
   const [reviewsList, setReviewsList] = useState(product?.reviews || []);
   const [currentRating, setCurrentRating] = useState(product?.rating || 4.5);
   const [numRatings, setNumRatings] = useState(product?.numRatings || 18);
+  const [offers, setOffers] = useState([]);
 
   // Rate Modal State
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -62,9 +64,26 @@ export default function ProductDetailClient({ product }) {
   const imageSrc = product.image || FALLBACK_IMAGE;
   const restStatus = useOperationalStatus(product.restaurant);
 
-  // Calculate simulated MRP and discount like Flipkart
-  const mrp = product.originalPrice || Math.round(product.price * 1.25);
-  const discountPercent = mrp > product.price ? Math.round(((mrp - product.price) / mrp) * 100) : 0;
+  // Check if product qualifies as Newly Arrived (within 14 days)
+  const isNew = isProductNewArrival(product, 14);
+
+  // Match targeted active offer (Option A vs Option B)
+  const matchedOffer = getProductActiveOffer(product, offers);
+  const isAutoDiscount = matchedOffer && matchedOffer.applyMode === "automatic";
+  const isCouponOffer = matchedOffer && (!matchedOffer.applyMode || matchedOffer.applyMode === "coupon");
+
+  // Option B: discount directly reduces the price automatically
+  let autoDiscount = 0;
+  let displayPrice = product.price;
+  if (isAutoDiscount) {
+    autoDiscount = calculateItemDiscount(product, matchedOffer);
+    displayPrice = Math.max(0, product.price - autoDiscount);
+  }
+
+  // Option A: catalog price is NOT reduced; coupon code is displayed
+  const hasStrikethrough = isAutoDiscount ? true : Boolean(product.originalPrice && product.originalPrice > product.price);
+  const struckPrice = isAutoDiscount ? product.price : product.originalPrice;
+  const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
   const deliveryFee = product.restaurant?.chargeSettings?.flatDeliveryFee ?? 40;
   const freeThreshold = product.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
   const prepTime = product.preparationTime ? `${product.preparationTime} mins` : "15–20 mins";
@@ -101,6 +120,13 @@ export default function ProductDetailClient({ product }) {
           );
           setSimilarProducts(related.length >= 3 ? related : others.slice(0, 10));
         }
+        // Fetch offers
+        fetch("/api/offers")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.success && Array.isArray(d.offers)) setOffers(d.offers);
+          })
+          .catch(() => {});
       } catch (e) {
         console.error("Failed to fetch product extras:", e);
       }
@@ -239,8 +265,8 @@ export default function ProductDetailClient({ product }) {
               </div>
             )}
 
-            {/* FSSAI Veg / Non-Veg badge */}
-            <div className="absolute top-3.5 left-3.5 z-20">
+            {/* FSSAI Veg / Non-Veg badge & Newly Arrived Tag */}
+            <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-2">
               <span
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs bg-[var(--bg-card)]/95 border ${
                   product.type === "veg"
@@ -255,6 +281,12 @@ export default function ProductDetailClient({ product }) {
                 />
                 {product.type === "veg" ? "Pure Veg" : "Non-Veg"}
               </span>
+
+              {isNew && (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500 text-white shadow-md">
+                  <Sparkles size={11} className="fill-white" /> New
+                </span>
+              )}
             </div>
 
             {/* Bestseller Badge */}
@@ -359,11 +391,11 @@ export default function ProductDetailClient({ product }) {
           <div className="p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
-                ₹{product.price}
+                ₹{displayPrice}
               </span>
-              {mrp > product.price && (
+              {hasStrikethrough && struckPrice > displayPrice && (
                 <span className="text-base text-[var(--text-muted)] line-through">
-                  ₹{mrp}
+                  ₹{struckPrice}
                 </span>
               )}
               {discountPercent > 0 && (
@@ -372,6 +404,11 @@ export default function ProductDetailClient({ product }) {
                 </span>
               )}
             </div>
+            {isAutoDiscount && (
+              <p className="text-xs font-bold text-emerald-600 mt-1 flex items-center gap-1">
+                ⚡ Auto Discount Applied: Save ₹{autoDiscount} instantly!
+              </p>
+            )}
             <div className="text-xs text-[var(--text-muted)] mt-1 font-medium">
               Inclusive of all taxes • No hidden packing charges
             </div>
@@ -383,13 +420,39 @@ export default function ProductDetailClient({ product }) {
               <Tag size={14} className="text-emerald-600" /> Available Offers
             </h3>
             <div className="space-y-2 text-xs text-[var(--text-main)]">
+              {/* Option B Highlight */}
+              {isAutoDiscount && (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
+                  <span className="text-emerald-600 font-black text-sm">⚡</span>
+                  <div>
+                    <p className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                      Automatic Kitchen Discount: {matchedOffer.discountType === "percentage" ? `${matchedOffer.discountValue}% OFF` : `₹${matchedOffer.discountValue} OFF`}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      No coupon code needed. Discount is automatically calculated on this dish.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Option A Highlight */}
+              {isCouponOffer && (
+                <div className="p-2.5 rounded-xl bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 flex items-start gap-2">
+                  <span className="text-[var(--brand-accent)] font-black text-sm">🎟️</span>
+                  <div>
+                    <p className="font-extrabold text-[var(--brand-accent)]">
+                      Coupon Deal: Use code <span className="font-mono bg-[var(--brand-accent)] text-white px-1.5 py-0.5 rounded text-[11px] uppercase tracking-wider">{matchedOffer.code}</span>
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      Apply code at checkout to get {matchedOffer.discountType === "percentage" ? `${matchedOffer.discountValue}% OFF` : `₹${matchedOffer.discountValue} OFF`}{matchedOffer.minOrder ? ` on orders above ₹${matchedOffer.minOrder}` : ""}.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold shrink-0">🏷️ Bank Offer:</span>
                 <span className="text-[var(--text-muted)]">5% Unlimited Cashback on Pet Protocols Axis or ICICI Cards</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-emerald-600 font-bold shrink-0">🏷️ Special Price:</span>
-                <span className="text-[var(--text-muted)]">Get flat ₹50 OFF on orders above ₹299 using promo coupon at checkout</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold shrink-0">🏷️ Partner Deal:</span>

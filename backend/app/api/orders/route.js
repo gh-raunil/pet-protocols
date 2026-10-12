@@ -139,6 +139,7 @@ export async function POST(request) {
 
     const createdOrders = [];
     let overallSubtotal = 0;
+    let remainingDiscount = Math.max(0, Number(body.discount) || 0);
 
     for (const [targetRestId, restSnapshotItems] of itemsByRestaurant.entries()) {
       const restDoc = await Restaurant.findById(targetRestId).lean();
@@ -172,8 +173,9 @@ export async function POST(request) {
         ? 0
         : flatFee;
 
-      const discount = Number(body.discount) || 0;
-      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discount);
+      const discountForThisOrder = Math.min(restSubtotal + restDeliveryFee, remainingDiscount);
+      remainingDiscount -= discountForThisOrder;
+      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discountForThisOrder);
 
       const isCod = paymentMethod?.toLowerCase().includes("cash on delivery") || paymentMethod?.toLowerCase().includes("cod");
       const isCop = paymentMethod?.toLowerCase().includes("cash on pickup") || paymentMethod?.toLowerCase().includes("cop");
@@ -189,8 +191,8 @@ export async function POST(request) {
         items: restSnapshotItems,
         address,
         subtotal: restSubtotal,
-        deliveryFee: restDeliveryFee,
-        discount,
+        discount: discountForThisOrder,
+        couponCode: body.couponCode || "",
         totalAmount: restTotal,
         paymentStatus,
         paymentMethod: finalPaymentMethod,
@@ -287,7 +289,7 @@ export async function PATCH(request) {
     }
 
     // Check cancellation time window
-    const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 5;
+    const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
     const createdAtMs = new Date(order.createdAt).getTime();
     const elapsedMinutes = (Date.now() - createdAtMs) / (60 * 1000);
 

@@ -3,33 +3,70 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useNavBadges } from "@/hooks/useNavBadges";
 
 const NavLinks = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const {
+    menuBadge,
+    offersBadge,
+    ordersBadge,
+    clearMenuBadge,
+    clearOffersBadge,
+    clearOrdersBadge,
+  } = useNavBadges();
 
   const links = [
-    { href: "/menu", label: "Explore Menu" },
-    { href: "/offers", label: "Offers" },
-    ...(session ? [{ href: "/orders", label: "Orders" }] : []),
-    { href: "/about", label: "About" },
+    {
+      href: "/menu",
+      label: "Explore Menu",
+      badge: menuBadge,
+      onClear: clearMenuBadge,
+    },
+    {
+      href: "/offers",
+      label: "Offers",
+      badge: offersBadge,
+      onClear: clearOffersBadge,
+    },
+    ...(session
+      ? [
+          {
+            href: "/orders",
+            label: "Orders",
+            badge: ordersBadge,
+            onClear: clearOrdersBadge,
+          },
+        ]
+      : []),
+    { href: "/about", label: "About", badge: 0 },
   ];
 
   return (
-    <div className="flex items-center gap-6 lg:gap-8">
+    <div className="flex items-center gap-5 lg:gap-7 xl:gap-8">
       {links.map((link) => {
         const isActive = pathname === link.href;
         return (
           <Link
             key={link.href}
             href={link.href}
-            className={`text-sm font-semibold transition-colors duration-150 py-1 border-b-2 ${
+            onClick={link.onClear}
+            className={`text-sm font-semibold transition-colors duration-150 py-1 border-b-2 flex items-center gap-1.5 shrink-0 ${
               isActive
                 ? "text-[var(--brand-accent)] border-[var(--brand-accent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)] border-transparent"
             }`}
           >
-            {link.label}
+            <span>{link.label}</span>
+            {link.badge > 0 && (
+              <span
+                className="inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 text-[10px] font-black rounded-full bg-amber-500 text-white shadow-xs animate-pulse leading-none"
+                title={`${link.badge} new`}
+              >
+                {link.badge}
+              </span>
+            )}
           </Link>
         );
       })}

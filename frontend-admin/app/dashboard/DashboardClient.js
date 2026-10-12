@@ -100,14 +100,15 @@ export default function DashboardClient() {
   const restaurantName = stats?.restaurantName || session?.user?.restaurantName || "Partner Kitchen";
 
   // Min selectable date: restaurant createdAt date
+  const restaurantCreatedAt = stats?.restaurantCreatedAt;
   const minSelectableDate = useMemo(() => {
-    if (stats?.restaurantCreatedAt) {
+    if (restaurantCreatedAt) {
       try {
-        return new Date(stats.restaurantCreatedAt).toISOString().split("T")[0];
+        return new Date(restaurantCreatedAt).toISOString().split("T")[0];
       } catch (e) {}
     }
     return "2024-01-01";
-  }, [stats?.restaurantCreatedAt]);
+  }, [restaurantCreatedAt]);
 
   const isTodaySelected = selectedDate === todayStr;
 

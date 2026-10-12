@@ -3,6 +3,7 @@ import connectDB from "@/lib/db";
 import Restaurant from "@/models/Restaurant";
 import User from "@/models/User";
 import Product from "@/models/Product";
+import Category from "@/models/Category";
 import Order from "@/models/Order";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
 
@@ -23,6 +24,7 @@ export async function GET() {
       totalCustomers,
       totalProducts,
       totalOrders,
+      totalCategories,
       orders,
     ] = await Promise.all([
       Restaurant.countDocuments(),
@@ -32,6 +34,7 @@ export async function GET() {
       User.countDocuments({ role: { $in: ["customer", "user"] } }),
       Product.countDocuments(),
       Order.countDocuments(),
+      Category.countDocuments(),
       Order.find({ status: { $ne: "cancelled" } }).select("totalAmount status createdAt").lean(),
     ]);
 
@@ -47,6 +50,7 @@ export async function GET() {
         totalCustomers,
         totalProducts,
         totalOrders,
+        totalCategories,
         totalRevenue,
       },
     });

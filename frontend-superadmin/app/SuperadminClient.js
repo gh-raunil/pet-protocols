@@ -43,11 +43,13 @@ import {
   Tag,
   Headphones,
   Sliders,
+  FolderTree,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import MessagesManager from "@/components/messages/MessagesManager";
 import CustomersManager from "@/components/customers/CustomersManager";
 import OrdersManager from "@/components/orders/OrdersManager";
+import CategoriesManager from "@/components/categories/CategoriesManager";
 import OffersManager from "@/components/offers/OffersManager";
 import SupportManager from "@/components/support/SupportManager";
 import SettingsManager from "@/components/settings/SettingsManager";
@@ -112,6 +114,7 @@ export default function SuperadminClient() {
     adminPassword: "",
   });
   const [creatingRestaurant, setCreatingRestaurant] = useState(false);
+  const [isCreateRestaurantModalOpen, setIsCreateRestaurantModalOpen] = useState(false);
 
   const [newAdmin, setNewAdmin] = useState({
     restaurantId: "",
@@ -121,6 +124,7 @@ export default function SuperadminClient() {
     role: "restaurant_admin",
   });
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [isCreateAdminModalOpen, setIsCreateAdminModalOpen] = useState(false);
 
   // Route protection: immediately redirect unauthenticated users to /login
   useEffect(() => {
@@ -128,6 +132,30 @@ export default function SuperadminClient() {
       window.location.replace("/login");
     }
   }, [status]);
+
+  // Synchronize activeSection with ?tab= query parameter
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get("tab");
+      if (tab && ["overview", "customers", "orders", "categories", "offers", "support", "messages", "settings"].includes(tab)) {
+        setActiveSection(tab);
+      }
+    }
+  }, []);
+
+  const handleTabChange = (section) => {
+    setActiveSection(section);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (section === "overview") {
+        url.searchParams.delete("tab");
+      } else {
+        url.searchParams.set("tab", section);
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   // Fetch all superadmin data
   async function loadData() {
@@ -228,15 +256,10 @@ export default function SuperadminClient() {
     }));
   }
 
-  // Quick shortcut to pre-select a restaurant in the Add Admin form and scroll down
+  // Quick shortcut to pre-select a restaurant and open Add Admin modal
   function handleQuickAddAdmin(restaurantId) {
-    setNewAdmin((prev) => ({ ...prev, restaurantId }));
-    const formElement = document.getElementById("add-admin-form");
-    if (formElement) {
-      formElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      const nameInput = document.getElementById("new-admin-name");
-      if (nameInput) nameInput.focus();
-    }
+    setNewAdmin((prev) => ({ ...prev, restaurantId: restaurantId || (restaurants[0]?._id || "") }));
+    setIsCreateAdminModalOpen(true);
   }
 
   // Group Admins by Restaurant with filter support
@@ -366,6 +389,7 @@ export default function SuperadminClient() {
         adminEmail: "",
         adminPassword: "",
       });
+      setIsCreateRestaurantModalOpen(false);
 
       await loadData();
     } catch (err) {
@@ -502,6 +526,7 @@ export default function SuperadminClient() {
         email: "",
         password: "",
       }));
+      setIsCreateAdminModalOpen(false);
 
       await loadData();
     } catch (err) {
@@ -702,9 +727,7 @@ export default function SuperadminClient() {
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-200 antialiased transition-colors">
       {/* ── TOP NAVIGATION ────────────────────────────────────────── */}
-      <header className={`sticky top-0 z-40 bg-white/80 dark:bg-[#0b0f17]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-transform duration-300 ease-in-out ${
-        hidden ? "-translate-y-full" : "translate-y-0"
-      }`}>
+      <header className="bg-white dark:bg-[#0b0f17] border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Left side: Brand identity & current status */}
           <div className="flex items-center gap-3">
@@ -767,121 +790,119 @@ export default function SuperadminClient() {
         </div>
       </header>
 
-      {/* ── MAIN CONTAINER ────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 pb-16">
-        {/* ── HERO HEADER / PLATFORM MANAGEMENT ────────────────────── */}
-        <section
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl shadow-slate-900/10 border border-slate-800/80"
-          data-purpose="hero-header"
-        >
-          {/* Subtle background decoration grid */}
-          <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px] opacity-15 pointer-events-none" />
+      {/* ── MODULE NAVIGATION BAR ─────────────────────────────────── */}
+      <div className="bg-slate-50/70 dark:bg-[#0f141f] border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-1.5 py-2.5 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => handleTabChange("overview")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "overview"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Building2 size={14} />
+              <span>Tenants & Admins</span>
+            </button>
 
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold tracking-wider uppercase mb-3 border border-indigo-400/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Control Center
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Platform Management
-              </h1>
-              <p className="mt-1.5 text-sm sm:text-base text-slate-300 max-w-2xl">
-                Manage partner restaurants, admins, and broadcast real-time operational messages.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleTabChange("customers")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "customers"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Users size={14} />
+              <span>Customers</span>
+            </button>
 
-            {/* Navigation Switcher Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/80 text-xs font-semibold shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveSection("overview")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "overview"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Building2 size={13} />
-                <span>Tenants & Admins</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("customers")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "customers"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Users size={13} />
-                <span>Customers</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("orders")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "orders"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <ShoppingBag size={13} />
-                <span>Orders</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("offers")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "offers"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Tag size={13} />
-                <span>Offers</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("support")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "support"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Headphones size={13} />
-                <span>Support</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("messages")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "messages"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Bell size={13} />
-                <span>Bulletins</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSection("settings")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                  activeSection === "settings"
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Sliders size={13} />
-                <span>Settings</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleTabChange("orders")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "orders"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <ShoppingBag size={14} />
+              <span>Orders</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("categories")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "categories"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <FolderTree size={14} />
+              <span>Categories</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("offers")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "offers"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Tag size={14} />
+              <span>Offers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("support")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "support"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Headphones size={14} />
+              <span>Support</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("messages")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "messages"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Bell size={14} />
+              <span>Bulletins</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("settings")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                activeSection === "settings"
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Sliders size={14} />
+              <span>Settings</span>
+            </button>
           </div>
-        </section>
+        </div>
+      </div>
 
+      {/* ── MAIN CONTAINER ────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-24">
         {/* ── FEEDBACK ALERT ──────────────────────────────────────── */}
         {feedback.message && (
           <div
@@ -912,14 +933,50 @@ export default function SuperadminClient() {
         {activeSection === "messages" && <MessagesManager restaurants={restaurants} />}
         {activeSection === "customers" && <CustomersManager />}
         {activeSection === "orders" && <OrdersManager restaurants={restaurants} />}
+        {activeSection === "categories" && <CategoriesManager restaurants={restaurants} />}
         {activeSection === "offers" && <OffersManager restaurants={restaurants} />}
         {activeSection === "support" && <SupportManager />}
         {activeSection === "settings" && <SettingsManager />}
 
         {activeSection === "overview" && (
           <>
-            {/* ── METRIC CARDS GRID ───────────────────────────────────── */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-purpose="platform-metrics">
+            {/* ── OVERVIEW PAGE TITLE & COMMAND ACTIONS ───────────── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800/80">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Tenants & Platform Control
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Unified command console for partner kitchens, branch managers, and platform taxonomy.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateRestaurantModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/30 inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                >
+                  <PlusCircle size={14} />
+                  <span>New Restaurant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewAdmin((prev) => ({ ...prev, restaurantId: restaurants[0]?._id || "" }));
+                    setIsCreateAdminModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                >
+                  <Users size={14} />
+                  <span>Add Admin</span>
+                </button>
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Sync
+                </span>
+              </div>
+            </div>
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" data-purpose="platform-metrics">
           {/* Card 1: Total Restaurants */}
           <div className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -964,12 +1021,15 @@ export default function SuperadminClient() {
           </div>
 
           {/* Card 3: Orders */}
-          <div className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-shadow">
+          <div
+            onClick={() => handleTabChange("orders")}
+            className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-all cursor-pointer group hover:border-purple-500/50"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Orders
               </span>
-              <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-100 dark:border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-100 dark:border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
                 <ShoppingBag className="w-5 h-5" />
               </div>
             </div>
@@ -978,12 +1038,35 @@ export default function SuperadminClient() {
                 {totalOrdersCount}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              All restaurant orders
+            <p className="mt-2 text-xs font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1 group-hover:underline">
+              <span>View All Orders →</span>
             </p>
           </div>
 
-          {/* Card 4: Revenue */}
+          {/* Card 4: Categories */}
+          <div
+            onClick={() => handleTabChange("categories")}
+            className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-all cursor-pointer group hover:border-indigo-500/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Categories
+              </span>
+              <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+                <FolderTree className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {stats?.totalCategories ?? "—"}
+              </span>
+            </div>
+            <p className="mt-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1 group-hover:underline">
+              <span>View & Edit Categories →</span>
+            </p>
+          </div>
+
+          {/* Card 5: Revenue */}
           <div className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -1021,7 +1104,7 @@ export default function SuperadminClient() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               {/* Search Box */}
               <div className="relative">
                 <input
@@ -1029,14 +1112,23 @@ export default function SuperadminClient() {
                   placeholder="Search restaurant..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-56 bg-white dark:bg-slate-950/70 text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg border border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 px-3 py-1.5 pl-8 transition outline-none shadow-sm"
+                  className="w-52 bg-white dark:bg-slate-950/70 text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg border border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 px-3 py-1.5 pl-8 transition outline-none shadow-sm"
                 />
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               </div>
 
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                 {restaurants.length} Total
               </span>
+
+              <button
+                type="button"
+                onClick={() => setIsCreateRestaurantModalOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition inline-flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Add Restaurant</span>
+              </button>
             </div>
           </div>
 
@@ -1053,8 +1145,16 @@ export default function SuperadminClient() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300 font-normal">
                 {filteredRestaurants.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-500 text-xs">
-                      No matching restaurants found.
+                    <td colSpan={3} className="py-12 text-center text-slate-500 text-xs">
+                      <p className="mb-3 text-slate-500 dark:text-slate-400 font-medium">No matching restaurants found.</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateRestaurantModalOpen(true)}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition inline-flex items-center gap-1.5 shadow-xs"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Create New Restaurant Branch</span>
+                      </button>
                     </td>
                   </tr>
                 ) : (
@@ -1145,160 +1245,6 @@ export default function SuperadminClient() {
               </tbody>
             </table>
           </div>
-
-          {/* Create New Restaurant Form Container */}
-          <div className="p-6 bg-slate-50/50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-6 h-6 rounded-md bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-                <PlusCircle className="w-3.5 h-3.5" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                Create a new restaurant
-              </h3>
-            </div>
-
-            <form onSubmit={handleCreateRestaurant} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Restaurant Name */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Restaurant Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Pet Protocols Bistro"
-                    value={newRestaurant.name}
-                    onChange={(e) =>
-                      setNewRestaurant({ ...newRestaurant, name: e.target.value })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* Cuisine / Categories */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Cuisine / Categories
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Burgers, Pizza, Fast Food"
-                    value={newRestaurant.cuisineType}
-                    onChange={(e) =>
-                      setNewRestaurant({ ...newRestaurant, cuisineType: e.target.value })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* First Admin Name */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    First Admin Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Vikram Malhotra"
-                    value={newRestaurant.adminName}
-                    onChange={(e) =>
-                      setNewRestaurant({ ...newRestaurant, adminName: e.target.value })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* First Admin Email */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    First Admin Email <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. admin@bistro.com"
-                    value={newRestaurant.adminEmail}
-                    onChange={(e) =>
-                      setNewRestaurant({ ...newRestaurant, adminEmail: e.target.value })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* First Admin Password */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    First Admin Password <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={newRestaurant.adminPassword}
-                    onChange={(e) =>
-                      setNewRestaurant({ ...newRestaurant, adminPassword: e.target.value })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* Location / City */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Location / City
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. New Delhi"
-                    value={newRestaurant.address.city}
-                    onChange={(e) =>
-                      setNewRestaurant({
-                        ...newRestaurant,
-                        address: { ...newRestaurant.address, city: e.target.value },
-                      })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-
-                {/* Restaurant Logo / Picture */}
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Restaurant Logo / Pic URL (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://... or paste image URL"
-                    value={newRestaurant.image}
-                    onChange={(e) =>
-                      setNewRestaurant({
-                        ...newRestaurant,
-                        image: e.target.value,
-                      })
-                    }
-                    className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Submit CTA */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={creatingRestaurant}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-indigo-600/20 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 active:scale-[0.99]"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>
-                    {creatingRestaurant
-                      ? "Creating Restaurant..."
-                      : "Create Restaurant"}
-                  </span>
-                </button>
-              </div>
-            </form>
-          </div>
         </section>
 
         {/* ── ADMIN ACCOUNTS SECTION ──────────────────────────────── */}
@@ -1368,6 +1314,19 @@ export default function SuperadminClient() {
                   <span>All Admins</span>
                 </button>
               </div>
+
+              {/* Add Admin Trigger Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setNewAdmin((prev) => ({ ...prev, restaurantId: restaurants[0]?._id || "" }));
+                  setIsCreateAdminModalOpen(true);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition inline-flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Add Admin</span>
+              </button>
             </div>
           </div>
 
@@ -1843,106 +1802,6 @@ export default function SuperadminClient() {
             </div>
           )}
 
-          {/* Add Admin Form Container */}
-          <div id="add-admin-form" className="p-6 bg-slate-50/50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center">
-                <PlusCircle className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Add an admin user</h3>
-              </div>
-            </div>
-
-            <form
-              onSubmit={handleAddAdmin}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end"
-            >
-              {/* Select Restaurant */}
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Select Restaurant <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  required
-                  value={newAdmin.restaurantId}
-                  onChange={(e) =>
-                    setNewAdmin({ ...newAdmin, restaurantId: e.target.value })
-                  }
-                  className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-sm outline-none"
-                >
-                  <option value="" disabled>
-                    Select a restaurant
-                  </option>
-                  {restaurants.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Admin Full Name */}
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Admin Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  id="new-admin-name"
-                  type="text"
-                  required
-                  placeholder="e.g. John Doe"
-                  value={newAdmin.name}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                  className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-sm outline-none"
-                />
-              </div>
-
-              {/* Admin Email */}
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Admin Email <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. admin2@flagship.com"
-                  value={newAdmin.email}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                  className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-sm outline-none"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Password <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={newAdmin.password}
-                  onChange={(e) =>
-                    setNewAdmin({ ...newAdmin, password: e.target.value })
-                  }
-                  className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition shadow-sm outline-none"
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="sm:col-span-2 lg:col-span-4 flex justify-end pt-1">
-                <button
-                  type="submit"
-                  disabled={creatingAdmin}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 shadow-sm shadow-blue-200 dark:shadow-indigo-600/20 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>{creatingAdmin ? "Adding..." : "Add Admin"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
         </section>
       </>
     )}
@@ -2254,6 +2113,302 @@ export default function SuperadminClient() {
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95"
                 >
                   {savingFeatures ? "Saving..." : "Save Feature Permissions"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE NEW RESTAURANT MODAL ── */}
+      {isCreateRestaurantModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Create New Restaurant Branch
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Add a partner kitchen to the platform and initialize its manager credentials.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateRestaurantModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRestaurant} className="space-y-5">
+              <div className="space-y-4">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <Store size={13} />
+                  <span>Restaurant Branch Details</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Restaurant Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Pet Protocols Bistro"
+                      value={newRestaurant.name}
+                      onChange={(e) => setNewRestaurant({ ...newRestaurant, name: e.target.value })}
+                      className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Cuisine / Categories
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Burgers, Pizza, Fast Food"
+                      value={newRestaurant.cuisineType}
+                      onChange={(e) => setNewRestaurant({ ...newRestaurant, cuisineType: e.target.value })}
+                      className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Location / City
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. New Delhi"
+                      value={newRestaurant.address.city}
+                      onChange={(e) =>
+                        setNewRestaurant({
+                          ...newRestaurant,
+                          address: { ...newRestaurant.address, city: e.target.value },
+                        })
+                      }
+                      className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Contact Phone
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="e.g. +91 98765 43210"
+                      value={newRestaurant.phone}
+                      onChange={(e) => setNewRestaurant({ ...newRestaurant, phone: e.target.value })}
+                      className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Logo / Picture URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://... or paste image URL"
+                      value={newRestaurant.image}
+                      onChange={(e) => setNewRestaurant({ ...newRestaurant, image: e.target.value })}
+                      className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 mb-3">
+                    <KeyRound size={13} />
+                    <span>Initial Branch Admin Account</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                        Admin Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Vikram Malhotra"
+                        value={newRestaurant.adminName}
+                        onChange={(e) => setNewRestaurant({ ...newRestaurant, adminName: e.target.value })}
+                        className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                        Admin Email <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="admin@branch.com"
+                        value={newRestaurant.adminEmail}
+                        onChange={(e) => setNewRestaurant({ ...newRestaurant, adminEmail: e.target.value })}
+                        className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                        Admin Password <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={newRestaurant.adminPassword}
+                        onChange={(e) => setNewRestaurant({ ...newRestaurant, adminPassword: e.target.value })}
+                        className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateRestaurantModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingRestaurant}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition active:scale-95 disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <PlusCircle size={14} />
+                  <span>{creatingRestaurant ? "Creating Branch..." : "Create Restaurant Branch"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD BRANCH ADMIN MODAL ── */}
+      {isCreateAdminModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Add Restaurant Admin
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Assign a new manager account to a branch.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateAdminModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAdmin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Select Restaurant Branch <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  value={newAdmin.restaurantId}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, restaurantId: e.target.value })}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                >
+                  <option value="" disabled>
+                    Select a restaurant branch
+                  </option>
+                  {restaurants.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Admin Full Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={newAdmin.name}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Admin Email <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. manager@branch.com"
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Initial Password <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={newAdmin.password}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Minimum 6 characters.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateAdminModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingAdmin}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition active:scale-95 disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <PlusCircle size={14} />
+                  <span>{creatingAdmin ? "Adding..." : "Add Branch Admin"}</span>
                 </button>
               </div>
             </form>

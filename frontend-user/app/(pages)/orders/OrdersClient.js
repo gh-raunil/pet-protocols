@@ -46,7 +46,7 @@ export default function OrdersClient() {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Customer Cancellation Modal/State
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
@@ -61,6 +61,7 @@ export default function OrdersClient() {
 
   // Live timer for cancellation window countdown
   useEffect(() => {
+    setCurrentTime(Date.now());
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -207,7 +208,7 @@ export default function OrdersClient() {
           // Cancellation window calculations
           const cancelSettings = order.restaurant?.cancellationSettings || {};
           const allowCancel = cancelSettings.allowCustomerCancel !== false;
-          const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 5;
+          const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
           const createdAtMs = new Date(order.createdAt).getTime();
           const remainingMs = createdAtMs + windowMinutes * 60 * 1000 - currentTime;
           const canCancel = isPending && allowCancel && remainingMs > 0;

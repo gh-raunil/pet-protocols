@@ -242,7 +242,7 @@ export default function OrdersClient() {
     }
     return {};
   });
-  const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
+  const [currentTimeTick, setCurrentTimeTick] = useState(0);
   const [kitchenActive, setKitchenActive] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("restaurant_kitchen_active") !== "false";
@@ -252,6 +252,7 @@ export default function OrdersClient() {
 
   // Ticking timer clock every 30 seconds for live order urgency badges
   useEffect(() => {
+    setCurrentTimeTick(Date.now());
     const timer = setInterval(() => setCurrentTimeTick(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
@@ -267,47 +268,41 @@ export default function OrdersClient() {
     return Boolean(packedItems[`${order._id}_${idx}`]);
   };
 
-  // Dish checklist toggle: selectable when pending, locked once order is accepted
+  // Dish checklist toggle: freely toggleable in pending and preparing stages
   const toggleItemPacked = (order, idx) => {
     if (order.status === "out_for_delivery" || order.status === "delivered" || order.status === "cancelled") {
       return;
     }
     const key = `${order._id}_${idx}`;
-
-    // 1. When order arrives (pending), admin can freely check/uncheck dishes to verify them
-    if (order.status === "pending") {
-      setPackedItems((prev) => {
-        const next = { ...prev, [key]: !prev[key] };
-        try {
-          localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-        } catch (e) {}
-        return next;
-      });
-      return;
-    }
-
-    // 2. Once order is accepted (preparing), any checked item CANNOT be unchecked
-    if (order.status === "preparing") {
-      if (packedItems[key]) {
-        return; // Locked: cannot be unchecked after order is accepted
-      }
-      setPackedItems((prev) => {
-        const next = { ...prev, [key]: true };
-        try {
-          localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-        } catch (e) {}
-        return next;
-      });
-    }
+    setPackedItems((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
 
-  // Pack all dishes in an order (only during preparing)
+  // Pack all dishes in an order
   const packAllDishes = (order) => {
-    if (order.status !== "preparing") return;
     setPackedItems((prev) => {
       const next = { ...prev };
       (order.items || []).forEach((_, idx) => {
         next[`${order._id}_${idx}`] = true;
+      });
+      try {
+        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // Reset/unpack all dishes in an order
+  const resetAllDishes = (order) => {
+    setPackedItems((prev) => {
+      const next = { ...prev };
+      (order.items || []).forEach((_, idx) => {
+        delete next[`${order._id}_${idx}`];
       });
       try {
         localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
@@ -983,41 +978,47 @@ export default function OrdersClient() {
                           <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider pb-0.5">
                             <span>Dishes ({order.items?.length || 0})</span>
                             {allPacked ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                                <Check size={11} /> All Packed
-                              </span>
-                            ) : order.status === "preparing" ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-stone-400">
-                                  Locked 🔒
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 text-[10px]">
+                                    <Check size={11} /> All Packed
+                                  </span>
+                                  {order.status === "preparing" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => resetAllDishes(order)}
+                                      className="text-[10px] text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 font-medium cursor-pointer"
+                                    >
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
+                              ) : order.status === "preparing" ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                                    {packedCount}/{(order.items || []).length}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => packAllDishes(order)}
+                                    className="text-[10px] text-stone-600 dark:text-stone-300 hover:underline font-bold cursor-pointer"
+                                  >
+                                    Pack All
+                                  </button>
+                                </div>
+                              ) : order.status === "pending" ? (
+                                <span className="text-[10px] text-stone-500 dark:text-stone-400 font-semibold">
+                                  Tap to verify dishes
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => packAllDishes(order)}
-                                  className="text-[10px] text-stone-600 dark:text-stone-300 hover:underline font-bold cursor-pointer"
-                                >
-                                  Pack All
-                                </button>
-                              </div>
-                            ) : order.status === "pending" ? (
-                              <span className="text-[10px] text-stone-500 dark:text-stone-400 font-semibold">
-                                Tap to verify dishes
-                              </span>
-                            ) : null}
+                              ) : null}
                           </div>
 
                           <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canClick = order.status === "pending" || (order.status === "preparing" && !isPacked);
-                              const itemTitle =
-                                order.status === "pending"
-                                  ? isPacked
-                                    ? "Verified (click to uncheck before accepting)"
-                                    : "Click to select/verify dish before accepting"
-                                  : isPacked
-                                  ? "Locked: Cannot be unchecked after order is accepted"
-                                  : "Click to pack (locks once checked)";
+                              const canClick = order.status === "pending" || order.status === "preparing";
+                              const itemTitle = isPacked
+                                ? "Packed (click to uncheck)"
+                                : "Click to mark packed";
 
                               return (
                                 <div
@@ -1056,7 +1057,6 @@ export default function OrdersClient() {
                           </div>
                         </div>
                       </div>
-
                       {/* Primary Action Button Stepper */}
                       <div className="pt-2 border-t border-stone-100 dark:border-white/10 flex items-center gap-2">
                         {order.status === "pending" && (
@@ -1277,12 +1277,25 @@ export default function OrdersClient() {
                             </span>
                             <div className="text-[11px] font-semibold text-stone-400 flex items-center gap-2">
                               {allPacked ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                  <Check size={12} /> All Items Packed ✓
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                    <Check size={12} /> All Items Packed ✓
+                                  </span>
+                                  {order.status === "preparing" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => resetAllDishes(order)}
+                                      className="px-2 py-0.5 rounded-md bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 text-[10px] font-semibold transition cursor-pointer"
+                                    >
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
                               ) : order.status === "preparing" ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-stone-400 text-[10px]">Locked 🔒</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-amber-600 dark:text-amber-400 font-mono font-bold text-xs">
+                                    {packedCount}/{(order.items || []).length} packed
+                                  </span>
                                   <button
                                     type="button"
                                     onClick={() => packAllDishes(order)}
@@ -1304,15 +1317,10 @@ export default function OrdersClient() {
                           <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                             {(order.items || []).map((item, idx) => {
                               const isPacked = isDishPacked(order, idx);
-                              const canClick = order.status === "pending" || (order.status === "preparing" && !isPacked);
-                              const itemTitle =
-                                order.status === "pending"
-                                  ? isPacked
-                                    ? "Verified (click to uncheck before accepting order)"
-                                    : "Click to select/verify dish before accepting order"
-                                  : isPacked
-                                  ? "Locked: Checked item cannot be unchecked after order is accepted"
-                                  : "Click to mark packed (locks once checked)";
+                              const canClick = order.status === "pending" || order.status === "preparing";
+                              const itemTitle = isPacked
+                                ? "Packed (click to uncheck)"
+                                : "Click to mark packed";
 
                               return (
                                 <div

@@ -46,11 +46,17 @@ export default function OffersClient() {
   }, []);
 
   const handleOfferClick = (offer) => {
+    if (offer.code) {
+      try {
+        localStorage.setItem("pet_protocols_applied_coupon", offer.code);
+        toast.success(`Offer coupon "${offer.code}" applied!`);
+      } catch (e) {}
+    }
     const restaurantId = offer.restaurant?._id || offer.restaurant;
     if (restaurantId) {
-      router.push(`/menu?restaurant=${restaurantId}`);
+      router.push(`/menu?restaurant=${restaurantId}&coupon=${encodeURIComponent(offer.code || "")}`);
     } else {
-      router.push("/menu");
+      router.push(`/menu?coupon=${encodeURIComponent(offer.code || "")}`);
     }
   };
 
@@ -63,17 +69,17 @@ export default function OffersClient() {
   };
 
   return (
-    <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen pt-28 sm:pt-32 pb-24 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── HEADER ──────────────────────────────────────────────── */}
-      <div className="text-center max-w-2xl mx-auto mb-12">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-3">
-          <TicketPercent size={14} /> Deals & Specials
+      <div className="text-center w-full max-w-2xl mx-auto mb-10 px-2 min-w-0">
+        <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-3">
+          <TicketPercent size={14} className="shrink-0" /> Deals & Specials
         </div>
-        <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[var(--text-main)] mb-3">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-[var(--text-main)] mb-3 break-words">
           Special Dining Offers
         </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-          Verified discount promotions and seasonal kitchen vouchers across Pet Protocols.
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-xl mx-auto break-words">
+          Verified discount promotions, automatic deals, and seasonal kitchen vouchers across Pet Protocols.
         </p>
       </div>
 
@@ -126,6 +132,7 @@ export default function OffersClient() {
               offer.discountType === "flat"
                 ? `₹${offer.discountValue} FLAT OFF`
                 : `${offer.discountValue}% OFF`;
+            const isAuto = offer.applyMode === "automatic";
 
             return (
               <div
@@ -134,11 +141,15 @@ export default function OffersClient() {
                 className="group p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 transition-all duration-300 shadow-xl cursor-pointer flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="inline-flex items-center gap-1 text-xs font-black px-3 py-1 rounded-full bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25">
                       <Flame size={12} /> {discountLabel}
                     </span>
-                    {offer.code && (
+                    {isAuto ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        ⚡ Auto Deal
+                      </span>
+                    ) : offer.code ? (
                       <button
                         type="button"
                         onClick={(e) => copyCouponCode(e, offer.code)}
@@ -148,14 +159,27 @@ export default function OffersClient() {
                         <span>{offer.code}</span>
                         <Copy size={12} />
                       </button>
-                    )}
+                    ) : null}
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition mb-2 leading-snug">
+                  {/* Target Scope Tag */}
+                  <div className="mb-2">
+                    {offer.targetType === "category" && offer.targetCategory ? (
+                      <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)]">
+                        Valid on Category: <strong>{offer.targetCategory}</strong>
+                      </span>
+                    ) : offer.targetType === "products" && offer.targetProducts?.length > 0 ? (
+                      <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)]">
+                        Valid on {offer.targetProducts.length} selected dishes
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition mb-2 leading-snug break-words">
                     {offer.title}
                   </h3>
                   {offer.description && (
-                    <p className="text-xs text-[var(--text-muted)] line-clamp-3 leading-relaxed mb-4">
+                    <p className="text-xs text-[var(--text-muted)] line-clamp-3 leading-relaxed mb-4 break-words">
                       {offer.description}
                     </p>
                   )}
