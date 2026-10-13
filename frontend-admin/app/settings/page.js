@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import SettingsClient from "./SettingsClient";
 
 export const metadata = {
-  title: "Restaurant Settings — Pet Protocols",
+  title: "Restaurant Settings — पेट Protocols",
   description: "Configure restaurant details and operating information.",
 };
 

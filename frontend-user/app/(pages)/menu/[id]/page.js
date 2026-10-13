@@ -9,14 +9,14 @@ export async function generateMetadata({ params }) {
       : "https://pet-protocols-backend.vercel.app";
     const backendUrl = process.env.BACKEND_INTERNAL_URL || defaultBackendUrl;
     const res = await fetch(`${backendUrl}/api/products/${id}`, { cache: "no-store" });
-    if (!res.ok) return { title: "Dish Details | Pet Protocols" };
+    if (!res.ok) return { title: "Dish Details | पेट Protocols" };
     const data = await res.json();
     return {
-      title: `${data.product?.name || "Dish"} | Pet Protocols`,
-      description: data.product?.description || "Order fresh food on Pet Protocols.",
+      title: `${data.product?.name || "Dish"} | पेट Protocols`,
+      description: data.product?.description || "Order fresh food on पेट Protocols.",
     };
   } catch {
-    return { title: "Dish Details | Pet Protocols" };
+    return { title: "Dish Details | पेट Protocols" };
   }
 }
 

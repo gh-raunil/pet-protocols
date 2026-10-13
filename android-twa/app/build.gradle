@@ -24,8 +24,8 @@ def twaManifest = [
     applicationId: 'app.vercel.pet_protocols.twa',
     hostName: 'pet-protocols.vercel.app', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
-    name: 'Pet Protocols', // The application name.
-    launcherName: 'Pet Protocols', // The name shown on the Android Launcher.
+    name: 'पेट Protocols', // The application name.
+    launcherName: 'पेट Protocols', // The name shown on the Android Launcher.
     themeColor: '#0A0A0A', // The color used for the status bar.
     themeColorDark: '#0A0A0A', // The color used for the dark status bar.
     navigationColor: '#0A0A0A', // The color used for the navigation bar.

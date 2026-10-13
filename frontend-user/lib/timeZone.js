@@ -1,5 +1,5 @@
 /**
- * Time Zone Utility for Pet Protocols.
+ * Time Zone Utility for पेट Protocols.
  * Default: "Asia/Kolkata" (India Standard Time / IST, UTC+5:30).
  * Provides functions to get, set, and format dates in India time or user-selected timezone.
  */

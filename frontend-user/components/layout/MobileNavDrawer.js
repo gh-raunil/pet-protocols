@@ -112,7 +112,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
     },
     { href: "/profile", label: "Profile & Addresses", icon: User, authOnly: true },
     { href: "/settings", label: "Settings", icon: Settings },
-    { href: "/about", label: "About Pet Protocols", icon: Info },
+    { href: "/about", label: "About पेट Protocols", icon: Info },
     { href: "/contact", label: "Contact & Kitchens", icon: PhoneCall },
   ];
 
@@ -145,10 +145,10 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-card)] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full overflow-hidden border border-[var(--brand-accent)]/30">
-              <Image src="/images/logo1.png" alt="Pet Protocols" width={32} height={32} className="object-cover" />
+              <Image src="/images/logo1.png" alt="पेट Protocols" width={32} height={32} className="object-cover" />
             </div>
             <span className="font-extrabold text-base tracking-tight text-[var(--text-main)]">
-              Pet Protocols
+              पेट Protocols
             </span>
           </div>
           <button
@@ -271,7 +271,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
             </button>
           )}
           <p className="text-[11px] text-center text-[var(--text-muted)] mt-2">
-            Pet Protocols • Fresh food. Zero compromises.
+            पेट Protocols • Fresh food. Zero compromises.
           </p>
         </div>
       </aside>

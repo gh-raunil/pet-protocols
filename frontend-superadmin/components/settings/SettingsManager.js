@@ -16,7 +16,7 @@ import {
 
 export default function SettingsManager() {
   const [settings, setSettings] = useState({
-    platformName: "Pet Protocols",
+    platformName: "पेट Protocols",
     platformFeePercent: 5.0,
     taxPercent: 5.0,
     maintenanceMode: false,
@@ -38,7 +38,7 @@ export default function SettingsManager() {
       const data = await res.json();
       if (data.success && data.settings) {
         setSettings({
-          platformName: data.settings.platformName ?? "Pet Protocols",
+          platformName: data.settings.platformName ?? "पेट Protocols",
           platformFeePercent: data.settings.platformFeePercent ?? 5.0,
           taxPercent: data.settings.taxPercent ?? 5.0,
           maintenanceMode: Boolean(data.settings.maintenanceMode),

@@ -1,4 +1,4 @@
-// Pet Protocols Restaurant Admin Portal — Web Push Service Worker
+// पेट Protocols Restaurant Admin Portal — Web Push Service Worker
 // Version: 1.0.0
 
 self.addEventListener('install', (event) => {

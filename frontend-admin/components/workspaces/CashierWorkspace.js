@@ -472,7 +472,7 @@ export default function CashierWorkspace({ restaurantName = "" }) {
 
             <div className="text-center pb-2">
               <h4 className="font-extrabold text-base text-stone-900 dark:text-white">
-                {restaurantName || "Pet Protocols Kitchen"}
+                {restaurantName || "पेट Protocols Kitchen"}
               </h4>
               <p className="text-[11px] text-stone-400">
                 Order #{receiptOrder.orderId || receiptOrder._id.slice(-6).toUpperCase()}

@@ -204,7 +204,7 @@ export async function POST(request) {
       await deductStockForOrder(newOrder);
 
       const populatedOrder = await Order.findById(newOrder._id)
-        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers")
+        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
         .populate("user", "name email");
 
       createdOrders.push(populatedOrder);
@@ -238,10 +238,6 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { orderId, reason = 'Cancelled by customer' } = body;
 
@@ -257,11 +253,18 @@ export async function PATCH(request) {
     }
 
     // Verify ownership
-    const currentUser = await User.findOne({ email: session.user.email });
+    let currentUser = null;
+    if (session?.user?.email) {
+      currentUser = await User.findOne({ email: session.user.email });
+    }
+
     const isOwner =
       (order.user && currentUser && order.user.toString() === currentUser._id.toString()) ||
-      session.user.role === 'superadmin' ||
-      (session.user.role === 'restaurant_admin' && order.restaurant?._id?.toString() === session.user.restaurantId);
+      (session?.user && order.address?.phone && session.user.phone && order.address.phone === session.user.phone) ||
+      (session?.user && order.address?.email && session.user.email && order.address.email === session.user.email) ||
+      (!order.user) || // Guest orders placed without an account
+      session?.user?.role === 'superadmin' ||
+      (session?.user?.role === 'restaurant_admin' && order.restaurant?._id?.toString() === session.user.restaurantId);
 
     if (!isOwner) {
       return NextResponse.json({ success: false, message: 'Not authorized to cancel this order' }, { status: 403 });
@@ -281,19 +284,22 @@ export async function PATCH(request) {
 
     // Check restaurant customer cancellation settings
     const cancelSettings = order.restaurant?.cancellationSettings || {};
-    if (cancelSettings.allowCustomerCancel === false && session.user.role !== 'superadmin') {
+    if (cancelSettings.allowCustomerCancel === false && session?.user?.role !== 'superadmin') {
       return NextResponse.json({
         success: false,
         message: 'This restaurant does not allow self-cancellation. Please contact the kitchen directly.',
       }, { status: 400 });
     }
 
-    // Check cancellation time window
+    // Check cancellation time window (default 1 minute)
     const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
     const createdAtMs = new Date(order.createdAt).getTime();
     const elapsedMinutes = (Date.now() - createdAtMs) / (60 * 1000);
 
-    if (elapsedMinutes > windowMinutes && session.user.role !== 'superadmin') {
+    // Provide a small 30-second grace buffer to handle network travel time
+    const allowedWindowMinutes = windowMinutes + 0.5;
+
+    if (elapsedMinutes > allowedWindowMinutes && session?.user?.role !== 'superadmin') {
       return NextResponse.json({
         success: false,
         message: `The ${windowMinutes}-minute cancellation window has passed. Please contact the kitchen directly.`,

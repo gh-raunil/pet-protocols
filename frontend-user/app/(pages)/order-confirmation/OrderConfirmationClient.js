@@ -167,7 +167,7 @@ export default function OrderConfirmationClient() {
 
   const orderIdDisplay = order.orderId || order._id?.slice(-8) || "N/A";
   const activeRest = restaurantDetails || (typeof order.restaurant === "object" ? order.restaurant : null);
-  const restaurantName = activeRest?.name || (typeof order.restaurant === "object" ? order.restaurant?.name : "Pet Protocols Kitchen") || "Partner Kitchen";
+  const restaurantName = activeRest?.name || (typeof order.restaurant === "object" ? order.restaurant?.name : "पेट Protocols Kitchen") || "Partner Kitchen";
 
   const rawRestAddr = activeRest?.address;
   const restaurantAddressStr = typeof rawRestAddr === "object" && rawRestAddr
@@ -182,9 +182,10 @@ export default function OrderConfirmationClient() {
   const allowCancel = cancelSettings.allowCustomerCancel !== false;
   const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
   const createdAtMs = new Date(order.createdAt).getTime();
-  const remainingMs = createdAtMs + windowMinutes * 60 * 1000 - currentTime;
-  const canCancel = order.status === "pending" && allowCancel && remainingMs > 0;
+  const effectiveCurrentTime = currentTime > 0 ? currentTime : createdAtMs;
+  const remainingMs = Math.max(0, createdAtMs + windowMinutes * 60 * 1000 - effectiveCurrentTime);
   const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+  const canCancel = order.status === "pending" && allowCancel && remainingSeconds > 0;
   const remainingMinDisplay = Math.floor(remainingSeconds / 60);
   const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
 
@@ -209,7 +210,7 @@ export default function OrderConfirmationClient() {
       }
       toast.success("Order cancelled successfully.");
       setShowCancelModal(false);
-      setOrder((prev) => ({ ...prev, status: "cancelled" }));
+      setOrder((prev) => ({ ...prev, status: "cancelled", cancelReason: cancelReason.trim() || "Cancelled by customer" }));
     } catch (err) {
       setCancelError("Network error while cancelling order.");
       toast.error("Network error while cancelling order.");
@@ -275,6 +276,57 @@ export default function OrderConfirmationClient() {
           paymentStatus={order.paymentStatus}
         />
         <DeliveryPushPrompt />
+
+        {/* Prominent Cancellation Banner for Pending Orders */}
+        {order.status === "pending" && (
+          <div className="bg-rose-500/10 border border-rose-500/25 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                <Clock size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                    Need to cancel this order?
+                  </h4>
+                  {canCancel && (
+                    <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-500/25 text-rose-600 dark:text-rose-300 border border-rose-500/30">
+                      {remainingMinDisplay}:{remainingSecDisplay} grace window
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                  {canCancel
+                    ? "You can cancel your order immediately before the kitchen accepts and starts cooking."
+                    : "The 1-minute grace window has passed. If you need urgent assistance, contact the kitchen team directly."}
+                </p>
+              </div>
+            </div>
+
+            {canCancel ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelModal(true);
+                  setCancelReason("");
+                  setCancelError("");
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              >
+                <XCircle size={15} />
+                <span>Cancel Order ({remainingMinDisplay}:{remainingSecDisplay})</span>
+              </button>
+            ) : restPhone ? (
+              <a
+                href={`tel:${restPhone.replace(/\s+/g, "")}`}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[var(--bg-card)] hover:border-[var(--brand-accent)] text-[var(--text-main)] border border-[var(--border-color)] font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              >
+                <Phone size={14} className="text-[var(--brand-accent)]" />
+                <span>Call Kitchen: {restPhone}</span>
+              </a>
+            ) : null}
+          </div>
+        )}
       </section>
 
       {/* Two-Column Details Grid */}
@@ -418,7 +470,7 @@ export default function OrderConfirmationClient() {
               {cleanWaDigits && (
                 <a
                   href={`https://wa.me/${cleanWaDigits}?text=${encodeURIComponent(
-                    `Hi ${restaurantName}, I'm checking on my order #${orderIdDisplay} on Pet Protocols.`
+                    `Hi ${restaurantName}, I'm checking on my order #${orderIdDisplay} on पेट Protocols.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"

@@ -7,15 +7,15 @@ import "./globals.css";
 
 export const metadata = {
   title: {
-    default: "Pet Protocols — Fresh Food, Zero Compromises",
-    template: "%s | Pet Protocols",
+    default: "पेट Protocols — Fresh Food, Zero Compromises",
+    template: "%s | पेट Protocols",
   },
   description:
     "Order fresh burgers, pizzas, momos, fries and cold drinks online across top kitchens.",
   keywords: ["food delivery", "burgers", "pizza", "momos", "fries", "multi-restaurant food order"],
-  authors: [{ name: "Pet Protocols" }],
+  authors: [{ name: "पेट Protocols" }],
   openGraph: {
-    title: "Pet Protocols — Fresh Food, Zero Compromises",
+    title: "पेट Protocols — Fresh Food, Zero Compromises",
     description: "Order fresh food across top partnered restaurants and cloud kitchens.",
     type: "website",
     locale: "en_IN",
@@ -32,7 +32,13 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <Providers>
             <AdminServiceWorkerRegister />
-            <Toaster position="top-right" />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                className: "text-xs font-semibold border border-stone-200 dark:border-white/10 bg-white dark:bg-[#10141f] text-stone-900 dark:text-white shadow-xl rounded-2xl",
+                duration: 3500,
+              }}
+            />
             <AppShell>{children}</AppShell>
           </Providers>
         </ThemeProvider>

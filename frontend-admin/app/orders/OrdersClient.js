@@ -1160,8 +1160,6 @@ export default function OrdersClient() {
                   const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
 
                   const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
-                  const packedCount = (order.items || []).filter((_, idx) => isDishPacked(order, idx)).length;
-                  const allPacked = totalItems > 0 && packedCount === (order.items || []).length;
 
                   return (
                     <div
@@ -1269,95 +1267,36 @@ export default function OrdersClient() {
                           )}
                         </div>
 
-                        {/* Interactive Dish Checklist */}
+                        {/* Order Items List */}
                         <div className="space-y-2.5 bg-stone-50/80 dark:bg-white/[0.02] p-3.5 sm:p-4 rounded-2xl border border-stone-200/70 dark:border-white/5">
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                              Dish Checklist ({order.items?.length || 0} {order.items?.length === 1 ? "item" : "items"})
+                              Order Items ({order.items?.length || 0} {order.items?.length === 1 ? "item" : "items"})
                             </span>
-                            <div className="text-[11px] font-semibold text-stone-400 flex items-center gap-2">
-                              {allPacked ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                    <Check size={12} /> All Items Packed ✓
-                                  </span>
-                                  {order.status === "preparing" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => resetAllDishes(order)}
-                                      className="px-2 py-0.5 rounded-md bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 text-[10px] font-semibold transition cursor-pointer"
-                                    >
-                                      Reset
-                                    </button>
-                                  )}
-                                </div>
-                              ) : order.status === "preparing" ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-amber-600 dark:text-amber-400 font-mono font-bold text-xs">
-                                    {packedCount}/{(order.items || []).length} packed
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => packAllDishes(order)}
-                                    className="px-2 py-0.5 rounded-md bg-stone-200/70 hover:bg-stone-300 dark:bg-white/10 dark:hover:bg-white/20 text-stone-800 dark:text-stone-200 text-[10px] font-bold transition cursor-pointer"
-                                  >
-                                    Pack All
-                                  </button>
-                                </div>
-                              ) : order.status === "pending" ? (
-                                <span className="text-stone-500 dark:text-stone-400 text-[10px] font-medium">
-                                  Verify before accepting
-                                </span>
-                              ) : (
-                                <span>Awaiting Acceptance</span>
-                              )}
-                            </div>
+                            <span className="text-[11px] font-medium text-stone-400">
+                              Total dishes: {totalItems}
+                            </span>
                           </div>
 
                           <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-                            {(order.items || []).map((item, idx) => {
-                              const isPacked = isDishPacked(order, idx);
-                              const canClick = order.status === "pending" || order.status === "preparing";
-                              const itemTitle = isPacked
-                                ? "Packed (click to uncheck)"
-                                : "Click to mark packed";
-
-                              return (
-                                <div
-                                  key={idx}
-                                  title={itemTitle}
-                                  onClick={() => canClick && toggleItemPacked(order, idx)}
-                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs select-none transition ${
-                                    canClick
-                                      ? "cursor-pointer hover:border-stone-400 dark:hover:border-white/20"
-                                      : "cursor-default"
-                                  } ${
-                                    isPacked
-                                      ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/25 text-stone-700 dark:text-stone-300 font-medium"
-                                      : "bg-white dark:bg-white/[0.03] border-stone-200/80 dark:border-white/5 text-stone-800 dark:text-stone-200"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${
-                                      isPacked
-                                        ? "bg-emerald-500 border-emerald-500 text-white"
-                                        : "border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-white/5"
-                                    }`}>
-                                      {isPacked && <Check size={11} strokeWidth={3} />}
-                                    </div>
-                                    <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
-                                      {item.quantity}×
-                                    </span>
-                                    <span className={`font-semibold truncate ${isPacked ? "text-stone-500 dark:text-stone-400 line-through" : "text-stone-900 dark:text-white"}`}>
-                                      {item.name}
-                                    </span>
-                                  </div>
-                                  <span className="font-mono text-stone-500 dark:text-stone-400 text-xs shrink-0 ml-2">
-                                    ₹{(item.price || 0) * (item.quantity || 1)}
+                            {(order.items || []).map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-2 rounded-xl border border-stone-200/80 dark:border-white/5 bg-white dark:bg-white/[0.03] text-xs select-none"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
+                                    {item.quantity}×
+                                  </span>
+                                  <span className="font-semibold truncate text-stone-900 dark:text-white">
+                                    {item.name}
                                   </span>
                                 </div>
-                              );
-                            })}
+                                <span className="font-mono text-stone-500 dark:text-stone-400 text-xs shrink-0 ml-2">
+                                  ₹{(item.price || 0) * (item.quantity || 1)}
+                                </span>
+                              </div>
+                            ))}
                           </div>
 
                           <div className="pt-2 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 border-t border-stone-200/60 dark:border-white/5">

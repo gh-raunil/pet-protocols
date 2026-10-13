@@ -1,3 +1,3 @@
 export default function ApiHome() {
-  return <main>Pet Protocols API</main>
+  return <main>पेट Protocols API</main>
 }

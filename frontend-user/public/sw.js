@@ -1,4 +1,4 @@
-// Pet Protocols — Production-Safe Progressive Web App Service Worker
+// पेट Protocols — Production-Safe Progressive Web App Service Worker
 // Version: 2.0.0
 
 const CACHE_VERSION = 'pet-protocols-v2';
@@ -120,7 +120,7 @@ self.addEventListener('fetch', (event) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline — Pet Protocols</title>
+  <title>Offline — पेट Protocols</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #FAF7F2; color: #1E293B; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; text-align: center; }
     .card { background: #FFFFFF; border: 1px solid #E2E8F0; padding: 36px 24px; border-radius: 24px; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
@@ -132,7 +132,7 @@ self.addEventListener('fetch', (event) => {
 <body>
   <div class="card">
     <h1>You are currently offline</h1>
-    <p>Pet Protocols requires an active connection to view live menus and place orders.</p>
+    <p>पेट Protocols requires an active connection to view live menus and place orders.</p>
     <button onclick="window.location.reload()">Retry Connection</button>
   </div>
 </body>
@@ -187,11 +187,11 @@ self.addEventListener('push', (event) => {
     try {
       data = event.data.json();
     } catch (e) {
-      data = { title: 'Pet Protocols Alert', body: event.data.text() };
+      data = { title: 'पेट Protocols Alert', body: event.data.text() };
     }
   }
 
-  const title = data.title || 'Pet Protocols Update 🔔';
+  const title = data.title || 'पेट Protocols Update 🔔';
   const options = {
     body: data.body || 'You have an update on your order.',
     icon: data.icon || '/icons/icon-192x192.png',

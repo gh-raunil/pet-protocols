@@ -165,7 +165,7 @@ export async function POST(request) {
       await deductStockForOrder(newOrder);
 
       const populatedOrder = await Order.findById(newOrder._id)
-        .populate("restaurant", "name slug image phone address")
+        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
         .populate("user", "name email");
 
       createdOrders.push(populatedOrder);

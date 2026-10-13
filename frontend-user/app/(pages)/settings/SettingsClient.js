@@ -53,7 +53,7 @@ export default function SettingsClient() {
           Settings
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-muted)] mt-1.5">
-          Make Pet Protocols feel right for you.
+          Make पेट Protocols feel right for you.
         </p>
       </div>
 
@@ -287,14 +287,14 @@ export default function SettingsClient() {
               App Installation & Offline Support
             </h2>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Install Pet Protocols directly to your home screen or desktop for fast ordering and offline shell resilience.
+              Install पेट Protocols directly to your home screen or desktop for fast ordering and offline shell resilience.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
             <div className="space-y-1">
               <div className="text-sm font-bold text-[var(--text-main)]">
-                Pet Protocols PWA
+                पेट Protocols PWA
               </div>
               <p className="text-xs text-[var(--text-muted)]">
                 Standalone mobile experience, instant navigation, and zero app store downloads required.

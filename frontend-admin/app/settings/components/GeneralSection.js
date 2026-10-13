@@ -96,7 +96,7 @@ export default function GeneralSection({ form, onChange, onSave, saving }) {
             required
             value={form.name || ""}
             onChange={(e) => onChange("name", e.target.value)}
-            placeholder="e.g. Pet Protocols Bistro"
+            placeholder="e.g. पेट Protocols Bistro"
             className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs sm:text-sm focus:border-orange-500 focus:bg-white dark:focus:bg-zinc-800 transition-colors"
           />
         </div>

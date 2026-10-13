@@ -29,7 +29,7 @@ if (!fs.existsSync(ksPath)) {
     '-validity', '10000',
     '-storepass', pass,
     '-keypass', pass,
-    '-dname', 'CN=Pet Protocols, OU=Mobile, O=Pet Protocols, L=Bangalore, ST=Karnataka, C=IN',
+    '-dname', 'CN=पेट Protocols, OU=Mobile, O=पेट Protocols, L=Bangalore, ST=Karnataka, C=IN',
   ]);
   console.log('Release keystore created successfully.');
 } else {

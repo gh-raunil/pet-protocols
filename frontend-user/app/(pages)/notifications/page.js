@@ -1,7 +1,7 @@
 import NotificationsClient from "./NotificationsClient";
 
 export const metadata = {
-  title: "Notifications & Messages | Pet Protocols",
+  title: "Notifications & Messages | पेट Protocols",
   description: "View important platform announcements, offers, and kitchen updates.",
 };
 

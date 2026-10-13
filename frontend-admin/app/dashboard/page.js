@@ -1,7 +1,7 @@
 import DashboardClient from "./DashboardClient";
 
 export const metadata = {
-  title: "Restaurant Dashboard — Pet Protocols",
+  title: "Restaurant Dashboard — पेट Protocols",
   description: "Manage restaurant products, live orders, and metrics.",
 };
 

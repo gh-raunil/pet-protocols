@@ -1808,7 +1808,7 @@ export default function SuperadminClient() {
 
     {/* ── PLATFORM FOOTER ─────────────────────────────────────── */}
         <footer className="pt-6 pb-2 text-center text-xs text-slate-400 dark:text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800">
-          <div>Pet Protocols Platform Management</div>
+          <div>पेट Protocols Platform Management</div>
           <div className="text-xs text-slate-400 dark:text-slate-500">Super Admin Control Panel</div>
         </footer>
       </main>
@@ -2162,7 +2162,7 @@ export default function SuperadminClient() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Pet Protocols Bistro"
+                      placeholder="e.g. पेट Protocols Bistro"
                       value={newRestaurant.name}
                       onChange={(e) => setNewRestaurant({ ...newRestaurant, name: e.target.value })}
                       className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition shadow-xs"

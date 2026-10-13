@@ -43,7 +43,7 @@ export default function NotFound() {
 
       {/* Brand Watermark */}
       <p className="text-[var(--text-muted)]/20 text-4xl sm:text-6xl font-black mt-20 select-none tracking-widest uppercase">
-        Pet Protocols
+        पेट Protocols
       </p>
 
     </main>

@@ -2,7 +2,7 @@
   "name": "pet-protocols-monorepo",
   "version": "2.0.0",
   "private": true,
-  "description": "Pet Protocols multi-tenant food ordering platform monorepo",
+  "description": "पेट Protocols multi-tenant food ordering platform monorepo",
   "scripts": {
     "dev": "concurrently -n \"BACKEND,USER,ADMIN,SUPERADMIN\" -c \"blue,green,magenta,yellow\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend-user\" \"npm run dev --prefix frontend-admin\" \"npm run dev --prefix frontend-superadmin\"",
     "dev:backend": "npm run dev --prefix backend",

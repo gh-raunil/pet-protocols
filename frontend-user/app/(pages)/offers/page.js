@@ -1,9 +1,9 @@
 import OffersClient from "./OffersClient";
 
 export const metadata = {
-  title: "Offers & Specials | Pet Protocols",
+  title: "Offers & Specials | पेट Protocols",
   description:
-    "Check out ongoing dining deals, seasonal promotions, and restaurant discounts on Pet Protocols.",
+    "Check out ongoing dining deals, seasonal promotions, and restaurant discounts on पेट Protocols.",
 };
 
 export default function OffersPage() {

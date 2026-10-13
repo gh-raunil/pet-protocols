@@ -96,7 +96,7 @@ export async function POST(request) {
     const restaurant = await Restaurant.create({
       name: name.trim(),
       slug: generatedSlug,
-      description: description || `Welcome to ${name.trim()} on Pet Protocols`,
+      description: description || `Welcome to ${name.trim()} on पेट Protocols`,
       cuisineType: Array.isArray(cuisineType) ? cuisineType : cuisineType ? [cuisineType] : ["Fast Food"],
       address: address || {},
       phone: phone || "",

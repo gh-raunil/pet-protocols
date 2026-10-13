@@ -107,7 +107,7 @@ export default function ContactClient() {
             </div>
             <h3 className="text-sm font-bold text-[var(--text-main)]">Headquarters</h3>
             <p className="text-xs text-[var(--text-muted)]">
-              Pet Protocols Central Culinary Hub
+              पेट Protocols Central Culinary Hub
               <br />
               Bangalore, Karnataka, India
             </p>
@@ -126,7 +126,7 @@ export default function ContactClient() {
               <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
               <h3 className="text-base font-bold text-emerald-600 dark:text-emerald-300">Message Received!</h3>
               <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-                Thank you for reaching out. A Pet Protocols team representative will review your message shortly.
+                Thank you for reaching out. A पेट Protocols team representative will review your message shortly.
               </p>
             </div>
           ) : (
@@ -302,7 +302,7 @@ export default function ContactClient() {
                         </span>
                         <a
                           href={`https://wa.me/${cleanWaDigits}?text=${encodeURIComponent(
-                            `Hi ${restaurant.name}, I'm contacting you via Pet Protocols regarding an order inquiry.`
+                            `Hi ${restaurant.name}, I'm contacting you via पेट Protocols regarding an order inquiry.`
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"

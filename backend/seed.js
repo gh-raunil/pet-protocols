@@ -195,7 +195,7 @@ async function seed() {
         },
         {
           title: "15-Minute Kitchen Preparation SLA Standard Mandatory",
-          content: "Orders must be acknowledged within 2 minutes and transitioned to 'Preparing'. Packaging must feature Pet Protocols thermal double-seals prior to dispatch handover.",
+          content: "Orders must be acknowledged within 2 minutes and transitioned to 'Preparing'. Packaging must feature पेट Protocols thermal double-seals prior to dispatch handover.",
           messageType: "important",
           priority: "high",
           recipientType: "restaurants",

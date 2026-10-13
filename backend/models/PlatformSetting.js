@@ -10,7 +10,7 @@ const PlatformSettingSchema = new mongoose.Schema(
     },
     platformName: {
       type: String,
-      default: "Pet Protocols",
+      default: "पेट Protocols",
     },
     platformFeePercent: {
       type: Number,

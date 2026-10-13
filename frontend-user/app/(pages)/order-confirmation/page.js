@@ -3,7 +3,7 @@ import OrderConfirmationClient from "./OrderConfirmationClient";
 import { RefreshCw } from "lucide-react";
 
 export const metadata = {
-  title: "Order Confirmed — Pet Protocols",
+  title: "Order Confirmed — पेट Protocols",
   description: "Track your food order progress live from our partner kitchen.",
 };
 

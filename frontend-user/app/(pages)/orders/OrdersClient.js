@@ -187,7 +187,7 @@ export default function OrdersClient() {
           My <span className="text-[var(--brand-accent)]">Orders</span>
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
-          {orders.length} {orders.length === 1 ? "order" : "orders"} placed on Pet Protocols
+          {orders.length} {orders.length === 1 ? "order" : "orders"} placed on पेट Protocols
         </p>
       </div>
 
@@ -210,9 +210,10 @@ export default function OrdersClient() {
           const allowCancel = cancelSettings.allowCustomerCancel !== false;
           const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
           const createdAtMs = new Date(order.createdAt).getTime();
-          const remainingMs = createdAtMs + windowMinutes * 60 * 1000 - currentTime;
-          const canCancel = isPending && allowCancel && remainingMs > 0;
+          const effectiveCurrentTime = currentTime > 0 ? currentTime : createdAtMs;
+          const remainingMs = Math.max(0, createdAtMs + windowMinutes * 60 * 1000 - effectiveCurrentTime);
           const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+          const canCancel = isPending && allowCancel && remainingSeconds > 0;
           const remainingMinDisplay = Math.floor(remainingSeconds / 60);
           const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
 
@@ -328,9 +329,30 @@ export default function OrdersClient() {
                       {remainingMinDisplay}:{remainingSecDisplay} left
                     </span>
                   </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      "Ordered by mistake",
+                      "Need to change address",
+                      "Selected wrong dishes",
+                      "Changed my mind",
+                    ].map((reason) => (
+                      <button
+                        key={reason}
+                        type="button"
+                        onClick={() => setCancelReason(reason)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-medium border transition cursor-pointer ${
+                          cancelReason === reason
+                            ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
+                            : "bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
+                        }`}
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="text"
-                    placeholder="Reason for cancellation (optional)"
+                    placeholder="Or type reason for cancellation..."
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
@@ -347,13 +369,13 @@ export default function OrdersClient() {
                       type="button"
                       disabled={submittingCancel}
                       onClick={() => handleCancelOrder(order._id)}
-                      className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {submittingCancel ? (
                         <span>Cancelling...</span>
                       ) : (
                         <>
-                          <XCircle size={13} /> Cancel Order
+                          <XCircle size={13} /> Confirm Cancellation
                         </>
                       )}
                     </button>

@@ -1,6 +1,6 @@
-# Pet Protocols — Multi-Tenant Food Ordering Monorepo
+# पेट Protocols — Multi-Tenant Food Ordering Monorepo
 
-Pet Protocols is architected into 4 independently runnable Next.js services:
+पेट Protocols is architected into 4 independently runnable Next.js services:
 
 1. **`backend/` (Port 4000)**: Unified REST API, MongoDB/Mongoose models, NextAuth handler, Razorpay payments, Cloudinary media, and multi-tenant authorization middleware.
 2. **`frontend-user/` (Port 3000)**: Customer-facing food ordering storefront, interactive cart drawer, menu catalog, checkout, order tracking, and customer profile.

@@ -1,7 +1,7 @@
 import AvailabilityClient from "./AvailabilityClient";
 
 export const metadata = {
-  title: "Menu Availability — Pet Protocols",
+  title: "Menu Availability — पेट Protocols",
   description: "Choose which dishes customers can order right now.",
 };
 

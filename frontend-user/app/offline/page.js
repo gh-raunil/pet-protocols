@@ -55,7 +55,7 @@ export default function OfflinePage() {
             You're Currently Offline
           </h1>
           <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed">
-            Pet Protocols requires an active internet connection to browse partner kitchens, update cart items, and place fresh food orders.
+            पेट Protocols requires an active internet connection to browse partner kitchens, update cart items, and place fresh food orders.
           </p>
         </div>
 

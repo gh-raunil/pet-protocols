@@ -14,7 +14,7 @@ const Footer = () => {
             <Link href="/" className="inline-flex items-center gap-2.5 group">
               <Logo />
               <span className="font-extrabold text-lg text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
-                Pet Protocols
+                पेट Protocols
               </span>
             </Link>
             <p className="text-sm font-semibold text-[var(--brand-accent)] flex items-center gap-1.5 pt-1">
@@ -70,7 +70,7 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-[var(--border-color)] mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-muted)]">
-          <p>© {new Date().getFullYear()} Pet Protocols. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} पेट Protocols. All rights reserved.</p>
           <p className="flex items-center gap-1.5">
             Designed for food lovers • Zero compromises.
           </p>

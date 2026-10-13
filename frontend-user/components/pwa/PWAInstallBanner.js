@@ -46,7 +46,7 @@ export default function PWAInstallBanner() {
         <div className="w-11 h-11 rounded-2xl overflow-hidden border border-[var(--brand-accent)]/30 shrink-0 shadow-inner bg-[var(--bg-sub)]">
           <Image
             src="/images/logo1.png"
-            alt="Pet Protocols"
+            alt="पेट Protocols"
             width={44}
             height={44}
             className="object-cover w-full h-full"
@@ -55,7 +55,7 @@ export default function PWAInstallBanner() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 text-xs font-black text-[var(--text-main)]">
-            <span>Install Pet Protocols</span>
+            <span>Install पेट Protocols</span>
             <span className="text-[10px] font-bold text-[var(--brand-accent)] flex items-center gap-0.5">
               <Sparkles size={10} /> Fast & Clean
             </span>

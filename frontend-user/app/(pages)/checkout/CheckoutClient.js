@@ -469,7 +469,7 @@ export default function CheckoutClient() {
         key: razorpayKey,
         amount: orderData.order.amount,
         currency: orderData.order.currency || "INR",
-        name: "Pet Protocols",
+        name: "पेट Protocols",
         description: `Food Feast Order (${items.length} items)`,
         order_id: orderData.order.id,
         prefill: {

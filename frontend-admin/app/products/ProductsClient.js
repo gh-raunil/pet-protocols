@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NextImage from "next/image";
+import toast from "react-hot-toast";
 import {
   UtensilsCrossed,
   PlusCircle,
@@ -43,6 +44,89 @@ export const PRESET_FOOD_PHOTOS = [
   { label: "Coffee & Tea", url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80", icon: "☕" },
 ];
 
+export function getProductFallbackImage(product) {
+  const cat = (product?.category || "").toLowerCase();
+  const name = (product?.name || "").toLowerCase();
+
+  if (
+    name.includes("gulab") ||
+    name.includes("jamun") ||
+    name.includes("sweet") ||
+    name.includes("dessert") ||
+    cat.includes("dessert") ||
+    cat.includes("gulab") ||
+    cat.includes("sweet")
+  ) {
+    return "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("soup") || cat.includes("soup")) {
+    return "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("burger") || cat.includes("burger")) {
+    return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("pizza") || cat.includes("pizza")) {
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("fries") || name.includes("finger") || cat.includes("fries") || cat.includes("sides")) {
+    return "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("cold drink") || name.includes("beverage") || name.includes("shake") || name.includes("drink") || cat.includes("drink")) {
+    return "https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("momo") || name.includes("dumpling") || cat.includes("momo")) {
+    return "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("biryani") || name.includes("rice") || cat.includes("biryani") || cat.includes("rice")) {
+    return "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("noodle") || name.includes("pasta") || cat.includes("pasta") || cat.includes("noodle")) {
+    return "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("sandwich") || name.includes("wrap") || cat.includes("sandwich") || cat.includes("wrap")) {
+    return "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("salad") || cat.includes("salad")) {
+    return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80";
+  }
+  if (name.includes("coffee") || name.includes("tea") || cat.includes("coffee") || cat.includes("tea")) {
+    return "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80";
+  }
+  return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+}
+
+function DishThumbnail({ src, alt, product, fill = false, className = "" }) {
+  const fallbackSrc = useMemo(() => getProductFallbackImage(product), [product]);
+  const [currentSrc, setCurrentSrc] = useState(src || fallbackSrc);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src || fallbackSrc);
+    setHasError(false);
+  }, [src, fallbackSrc]);
+
+  const isExternal = Boolean(
+    currentSrc && (currentSrc.startsWith("http://") || currentSrc.startsWith("https://"))
+  );
+
+  return (
+    <NextImage
+      src={currentSrc}
+      alt={alt || product?.name || "Dish image"}
+      fill={fill}
+      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      className={className}
+      unoptimized={isExternal}
+      onError={() => {
+        if (!hasError && currentSrc !== fallbackSrc) {
+          setHasError(true);
+          setCurrentSrc(fallbackSrc);
+        }
+      }}
+    />
+  );
+}
+
 export default function ProductsClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -54,7 +138,6 @@ export default function ProductsClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [feedback, setFeedback] = useState({ type: "", message: "" });
 
   // Dynamic restaurant-launched categories
   const [launchedCategories, setLaunchedCategories] = useState([]);
@@ -159,7 +242,7 @@ export default function ProductsClient() {
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Failed to load products." });
+      toast.error("Failed to load products.");
     } finally {
       setLoading(false);
     }
@@ -188,7 +271,7 @@ export default function ProductsClient() {
   function processCategoryImage(file, callback) {
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) {
-      setFeedback({ type: "error", message: "Image exceeds 8MB. Please choose a smaller photo." });
+      toast.error("Image exceeds 8MB. Please choose a smaller photo.");
       return;
     }
 
@@ -219,10 +302,10 @@ export default function ProductsClient() {
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
 
         callback(dataUrl);
-        setFeedback({ type: "success", message: "Category photo selected & optimized!" });
+        toast.success("Category photo selected & optimized!");
       };
       img.onerror = () => {
-        setFeedback({ type: "error", message: "Invalid image file format." });
+        toast.error("Invalid image file format.");
       };
       img.src = e.target.result;
     };
@@ -234,7 +317,7 @@ export default function ProductsClient() {
     e.preventDefault();
     const catName = newCategoryForm.name.trim();
     if (!catName) {
-      setFeedback({ type: "error", message: "Category name is required." });
+      toast.error("Category name is required.");
       return;
     }
 
@@ -253,19 +336,16 @@ export default function ProductsClient() {
 
       const data = await res.json();
       if (data.success) {
-        setFeedback({
-          type: "success",
-          message: `Category "${catName}" launched successfully! Live on menu & category filters.`,
-        });
+        toast.success(`Category "${catName}" launched successfully! Live on menu & category filters.`);
         setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
         setIsCategoryModalOpen(false);
         await loadCategories();
       } else {
-        setFeedback({ type: "error", message: data.message || "Failed to launch category." });
+        toast.error(data.message || "Failed to launch category.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Network error launching category." });
+      toast.error("Network error launching category.");
     } finally {
       setLaunchingCategory(false);
     }
@@ -289,7 +369,7 @@ export default function ProductsClient() {
   async function handleUpdateCategory(e) {
     e.preventDefault();
     if (!editCategoryForm.name?.trim()) {
-      setFeedback({ type: "error", message: "Category name is required." });
+      toast.error("Category name is required.");
       return;
     }
 
@@ -308,20 +388,17 @@ export default function ProductsClient() {
 
       const data = await res.json();
       if (data.success) {
-        setFeedback({
-          type: "success",
-          message: `Category "${editCategoryForm.name}" updated successfully!`,
-        });
+        toast.success(`Category "${editCategoryForm.name}" updated successfully!`);
         setIsEditCategoryModalOpen(false);
         setEditingCategory(null);
         await loadCategories();
         await loadProducts();
       } else {
-        setFeedback({ type: "error", message: data.message || "Failed to update category." });
+        toast.error(data.message || "Failed to update category.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Network error updating category." });
+      toast.error("Network error updating category.");
     } finally {
       setSavingCategory(false);
     }
@@ -330,13 +407,14 @@ export default function ProductsClient() {
   // Pre-fill Add Dish modal with category
   function handleAddDishToCategory(categoryName) {
     setIsEditing(false);
-    setImageMode("file");
+    setImageMode("preset");
+    const defaultImg = getProductFallbackImage({ category: categoryName, name: "" });
     setModalForm({
       _id: "",
       name: "",
       description: "",
       price: "",
-      image: "",
+      image: defaultImg,
       category: categoryName || "Other",
       customCategory: "",
       type: "veg",
@@ -350,14 +428,15 @@ export default function ProductsClient() {
   // Open modal for new product
   function openAddModal() {
     setIsEditing(false);
-    setImageMode("file");
+    setImageMode("preset");
     const initialCat = selectableCategories.length > 1 ? selectableCategories[0] : "Other";
+    const defaultImg = getProductFallbackImage({ category: initialCat, name: "" });
     setModalForm({
       _id: "",
       name: "",
       description: "",
       price: "",
-      image: "",
+      image: defaultImg,
       category: initialCat,
       customCategory: "",
       type: "veg",
@@ -371,7 +450,14 @@ export default function ProductsClient() {
   // Open modal for editing existing product
   function openEditModal(product) {
     setIsEditing(true);
-    setImageMode(product.image?.startsWith("http") ? "url" : "file");
+    const isPreset = PRESET_FOOD_PHOTOS.some((p) => p.url === product.image);
+    if (isPreset) {
+      setImageMode("preset");
+    } else if (product.image?.startsWith("http")) {
+      setImageMode("url");
+    } else {
+      setImageMode("file");
+    }
     const isExisting = selectableCategories.filter((c) => c !== "Other").includes(product.category);
     setModalForm({
       _id: product._id,
@@ -396,12 +482,12 @@ export default function ProductsClient() {
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      setFeedback({ type: "error", message: "Only JPEG, PNG, and WebP images are allowed." });
+      toast.error("Only JPEG, PNG, and WebP images are allowed.");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: "error", message: "Image exceeds 5 MB limit. Please select a smaller photo." });
+      toast.error("Image exceeds 5 MB limit. Please select a smaller photo.");
       return;
     }
 
@@ -421,13 +507,13 @@ export default function ProductsClient() {
       const data = await res.json();
       if (data.success && data.imageUrl) {
         setModalForm((prev) => ({ ...prev, image: data.imageUrl }));
-        setFeedback({ type: "success", message: "Dish photo uploaded from device successfully!" });
+        toast.success("Dish photo uploaded from device successfully!");
       } else {
-        setFeedback({ type: "error", message: data.message || "Failed to upload image." });
+        toast.error(data.message || "Failed to upload image.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Error uploading image from device." });
+      toast.error("Error uploading image from device.");
     } finally {
       setUploadingImage(false);
     }
@@ -438,23 +524,23 @@ export default function ProductsClient() {
     e.preventDefault();
     try {
       setSubmitting(true);
-      setFeedback({ type: "", message: "" });
 
       const finalCategory = modalForm.category === "Other"
         ? modalForm.customCategory.trim()
         : modalForm.category;
 
       if (modalForm.category === "Other" && !finalCategory) {
-        setFeedback({ type: "error", message: "Please specify the custom category name." });
+        toast.error("Please specify the custom category name.");
         setSubmitting(false);
         return;
       }
 
+      const defaultImage = getProductFallbackImage({ category: finalCategory, name: modalForm.name });
       const payload = {
         name: modalForm.name.trim(),
         description: modalForm.description?.trim() || "",
         price: Number(modalForm.price),
-        image: modalForm.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
+        image: modalForm.image?.trim() || defaultImage,
         category: finalCategory,
         type: modalForm.type,
         preparationTime: Number(modalForm.preparationTime) || 15,
@@ -475,23 +561,22 @@ export default function ProductsClient() {
 
       const data = await res.json();
       if (!data.success) {
-        setFeedback({ type: "error", message: data.message || "Failed to save product." });
+        toast.error(data.message || "Failed to save product.");
         return;
       }
 
-      setFeedback({
-        type: "success",
-        message: isEditing
+      toast.success(
+        isEditing
           ? `Product "${payload.name}" updated successfully!`
-          : `Product "${payload.name}" created and added to your menu!`,
-      });
+          : `Product "${payload.name}" created and added to your menu!`
+      );
 
       setIsModalOpen(false);
       await loadProducts();
       await loadCategories();
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Error saving product." });
+      toast.error("Error saving product.");
     } finally {
       setSubmitting(false);
     }
@@ -511,14 +596,13 @@ export default function ProductsClient() {
         setProducts((prev) =>
           prev.map((p) => (p._id === product._id ? { ...p, isAvailable: newAvailability } : p))
         );
-        setFeedback({
-          type: "success",
-          message: `"${product.name}" is now marked as ${newAvailability ? "AVAILABLE" : "OUT OF STOCK"}.`,
-        });
+        toast.success(`"${product.name}" is now marked as ${newAvailability ? "AVAILABLE" : "OUT OF STOCK"}.`);
+      } else {
+        toast.error(data.message || "Failed to update availability.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Failed to update availability." });
+      toast.error("Failed to update availability.");
     }
   }
 
@@ -535,14 +619,14 @@ export default function ProductsClient() {
       });
       const data = await res.json();
       if (data.success) {
-        setFeedback({ type: "success", message: `Deleted "${product.name}" successfully.` });
+        toast.success(`Deleted "${product.name}" successfully.`);
         setProducts((prev) => prev.filter((p) => p._id !== product._id));
       } else {
-        setFeedback({ type: "error", message: data.message });
+        toast.error(data.message);
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Failed to delete product." });
+      toast.error("Failed to delete product.");
     }
   }
 
@@ -646,31 +730,6 @@ export default function ProductsClient() {
           </div>
         </div>
 
-        {/* Feedback Alert */}
-        {feedback.message && (
-          <div
-            className={`mb-6 p-4 rounded-2xl flex items-center justify-between border ${
-              feedback.type === "success"
-                ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
-                : "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-300"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {feedback.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
-              )}
-              <p className="text-sm font-medium">{feedback.message}</p>
-            </div>
-            <button
-              onClick={() => setFeedback({ type: "", message: "" })}
-              className="text-xs opacity-70 hover:opacity-100 font-bold ml-4 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
 
         {/* ── CONDITIONAL VIEW RENDER: CATEGORIES vs DISHES ──────── */}
         {viewTab === "categories" ? (
@@ -850,8 +909,14 @@ export default function ProductsClient() {
                                   className="flex items-center justify-between gap-3 p-2 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200/60 dark:border-white/5 hover:border-orange-500/30 transition text-xs"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-stone-200 shrink-0">
-                                      <img src={dish.image} alt={dish.name} className="w-full h-full object-cover" />
+                                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-stone-200 dark:bg-stone-800 shrink-0 relative">
+                                      <DishThumbnail
+                                        src={dish.image}
+                                        alt={dish.name}
+                                        product={dish}
+                                        fill
+                                        className="object-cover"
+                                      />
                                     </div>
                                     <div className="min-w-0">
                                       <div className="font-bold text-stone-900 dark:text-white truncate">
@@ -973,12 +1038,12 @@ export default function ProductsClient() {
                     }`}
                   >
                     {/* Image and badges */}
-                    <div className="relative h-48 w-full bg-stone-100 dark:bg-white/5 overflow-hidden">
-                      <NextImage
-                        src={product.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500"}
+                    <div className="relative h-48 w-full bg-stone-100 dark:bg-white/5 overflow-hidden group">
+                      <DishThumbnail
+                        src={product.image}
                         alt={product.name}
+                        product={product}
                         fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover group-hover:scale-105 transition duration-300"
                       />
                       <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
@@ -1206,11 +1271,22 @@ export default function ProductsClient() {
                     <div className="flex items-center gap-1 text-[11px] font-semibold bg-stone-100 dark:bg-white/5 p-0.5 rounded-lg border border-stone-200/80 dark:border-white/10">
                       <button
                         type="button"
+                        onClick={() => setImageMode("preset")}
+                        className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                          imageMode === "preset"
+                            ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                        }`}
+                      >
+                        Presets
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setImageMode("file")}
                         className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
                           imageMode === "file"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
-                            : "text-stone-500 hover:text-stone-800"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
                         }`}
                       >
                         Upload Device
@@ -1221,7 +1297,7 @@ export default function ProductsClient() {
                         className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
                           imageMode === "url"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
-                            : "text-stone-500 hover:text-stone-800"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
                         }`}
                       >
                         Web URL
@@ -1229,7 +1305,7 @@ export default function ProductsClient() {
                     </div>
                   </div>
 
-                  {imageMode === "file" ? (
+                  {imageMode === "file" && (
                     <div className="space-y-2">
                       <input
                         ref={fileInputRef}
@@ -1257,23 +1333,74 @@ export default function ProductsClient() {
                         <span className="text-[10px] text-stone-400">JPG, PNG, WEBP (Max 5MB)</span>
                       </button>
                     </div>
-                  ) : (
-                    <input
-                      type="url"
-                      placeholder="https://images.unsplash.com/..."
-                      value={modalForm.image}
-                      onChange={(e) => setModalForm((prev) => ({ ...prev, image: e.target.value }))}
-                      className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none transition font-medium"
-                    />
+                  )}
+
+                  {imageMode === "preset" && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-44 overflow-y-auto p-1.5 border border-stone-200/80 dark:border-white/10 rounded-xl bg-stone-50/50 dark:bg-white/5">
+                      {PRESET_FOOD_PHOTOS.map((preset) => {
+                        const isSelected = modalForm.image === preset.url;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setModalForm((prev) => ({
+                                ...prev,
+                                image: preset.url,
+                              }));
+                            }}
+                            className={`group relative rounded-xl overflow-hidden border p-1 flex flex-col items-center gap-1 transition text-left cursor-pointer ${
+                              isSelected
+                                ? "border-orange-500 ring-2 ring-orange-500/20 bg-orange-50/40 dark:bg-orange-500/10"
+                                : "border-stone-200/80 dark:border-white/10 hover:border-stone-300 dark:hover:border-white/20 bg-white dark:bg-stone-800"
+                            }`}
+                          >
+                            <div className="w-full h-14 rounded-lg overflow-hidden relative bg-stone-100">
+                              <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-orange-500/40 flex items-center justify-center">
+                                  <Check className="w-4 h-4 text-white drop-shadow" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-bold text-stone-700 dark:text-stone-200 truncate w-full text-center">
+                              {preset.icon} {preset.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {imageMode === "url" && (
+                    <div className="space-y-1.5">
+                      <input
+                        type="url"
+                        placeholder="https://images.unsplash.com/... or any picture URL"
+                        value={modalForm.image}
+                        onChange={(e) => setModalForm((prev) => ({ ...prev, image: e.target.value }))}
+                        className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none transition font-medium"
+                      />
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                        Paste any web image URL. If unreachable, a category-matched food photo will automatically be used.
+                      </p>
+                    </div>
                   )}
 
                   {modalForm.image && (
-                    <div className="relative h-24 rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 mt-2">
+                    <div className="relative h-28 rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 mt-2 bg-stone-100 dark:bg-white/5 group">
                       <img
                         src={modalForm.image}
                         alt="Preview"
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = getProductFallbackImage(modalForm);
+                        }}
                       />
+                      <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold">
+                        Preview
+                      </div>
                     </div>
                   )}
                 </div>

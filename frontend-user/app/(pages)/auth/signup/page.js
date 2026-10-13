@@ -123,7 +123,7 @@ export default function SignupPage() {
             ✨
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
-            Join Pet Protocols
+            Join पेट Protocols
           </h1>
 
           <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2">

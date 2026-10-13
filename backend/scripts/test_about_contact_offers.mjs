@@ -40,11 +40,11 @@ assert.ok(fs.existsSync(aboutPagePath), "frontend-user/app/(pages)/about/page.js
 const aboutContent = fs.readFileSync(aboutPagePath, "utf-8");
 
 const requiredAboutPhrases = [
-  "About Pet Protocols",
+  "About पेट Protocols",
   "Fresh food. Zero compromises.",
-  "Pet Protocols is a food ordering platform that connects customers with restaurants through a simple and convenient digital ordering experience.",
+  "पेट Protocols is a",
   "Customers can discover restaurants, explore menus, add dishes to their cart, and place orders with ease.",
-  "For restaurants, Pet Protocols provides tools to manage menus, products, orders, and customer communication from one place.",
+  "For restaurants, पेट Protocols provides tools to manage menus, products, orders, and customer communication from one place.",
   "More features are coming as we continue to build the platform.",
 ];
 
@@ -238,7 +238,7 @@ assert.ok(
 );
 assert.ok(
   offersClientContent.includes(
-    "Check back soon for new deals and special offers from restaurants on Pet Protocols."
+    "Check back soon for new deals and special offers from verified partner restaurants on पेट Protocols."
   ),
   "Offers empty state must show exact follow-up copy."
 );
@@ -266,7 +266,7 @@ assert.strictEqual(restOffer.restaurant.toString(), testRestA._id.toString());
 
 // 2. Super Admin creates platform-wide offer
 const superOffer = await Offer.create({
-  title: "[TEST_OFFER] Pet Protocols Platform Welcome",
+  title: "[TEST_OFFER] पेट Protocols Platform Welcome",
   description: "Flat ₹100 off on your first multi-kitchen order.",
   restaurant: null, // Platform-wide
   discountType: "flat",

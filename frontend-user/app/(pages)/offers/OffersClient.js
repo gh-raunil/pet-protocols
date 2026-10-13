@@ -79,7 +79,7 @@ export default function OffersClient() {
           Special Dining Offers
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-xl mx-auto break-words">
-          Verified discount promotions, automatic deals, and seasonal kitchen vouchers across Pet Protocols.
+          Verified discount promotions, automatic deals, and seasonal kitchen vouchers across पेट Protocols.
         </p>
       </div>
 
@@ -111,7 +111,7 @@ export default function OffersClient() {
               No ongoing offers right now.
             </h2>
             <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
-              Check back soon for new deals and special offers from verified partner restaurants on Pet Protocols.
+              Check back soon for new deals and special offers from verified partner restaurants on पेट Protocols.
             </p>
           </div>
           <div className="pt-2">

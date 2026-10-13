@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 
-// GET — Secure endpoint providing Pet Protocols support WhatsApp to authorized Restaurant Admins
+// GET — Secure endpoint providing पेट Protocols support WhatsApp to authorized Restaurant Admins
 export async function GET() {
   try {
     const auth = await requireRestaurantAdmin();

@@ -10,7 +10,7 @@ export async function POST(req) {
     const { subscription } = body;
 
     const payload = {
-      title: 'Pet Protocols Alert 🔔',
+      title: 'पेट Protocols Alert 🔔',
       body: 'Web Push is active! You will now receive instant updates on your order status and kitchen specials.',
       icon: '/icons/icon-192x192.png',
       badge: '/icons/favicon-32x32.png',

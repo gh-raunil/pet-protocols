@@ -14,8 +14,8 @@ export const viewport = {
 
 export const metadata = {
   title: {
-    default: "Pet Protocols — Fresh Food, Zero Compromises",
-    template: "%s | Pet Protocols",
+    default: "पेट Protocols — Fresh Food, Zero Compromises",
+    template: "%s | पेट Protocols",
   },
   description:
     "Discover partner restaurants, explore gourmet menus, and order fresh food easily.",
@@ -31,7 +31,7 @@ export const metadata = {
     ],
   },
   openGraph: {
-    title: "Pet Protocols — Fresh Food, Zero Compromises",
+    title: "पेट Protocols — Fresh Food, Zero Compromises",
     description: "Order fresh food across top partnered restaurants and cloud kitchens.",
     type: "website",
     locale: "en_IN",

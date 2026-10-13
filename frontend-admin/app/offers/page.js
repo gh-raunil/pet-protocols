@@ -1,7 +1,7 @@
 import OffersClient from "./OffersClient";
 
 export const metadata = {
-  title: "Offers & Promotions — Pet Protocols Partner Hub",
+  title: "Offers & Promotions — पेट Protocols Partner Hub",
   description: "Create customer discount codes, percentage vouchers, and promotional deals.",
 };
 

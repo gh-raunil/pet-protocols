@@ -4,7 +4,7 @@ import { useTheme } from "@/components/ui/ThemeProvider";
 import { Sun, Moon, Laptop, Palette, Megaphone, Check } from "lucide-react";
 
 const COLOR_PRESETS = [
-  { name: "Pet Protocols Orange", hex: "#f97316" },
+  { name: "पेट Protocols Orange", hex: "#f97316" },
   { name: "Royal Amber", hex: "#d97706" },
   { name: "Ocean Emerald", hex: "#10b981" },
   { name: "Electric Cyan", hex: "#06b6d4" },

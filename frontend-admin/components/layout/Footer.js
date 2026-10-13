@@ -85,7 +85,7 @@ const Footer = () => {
 
         {/* Bottom bar */}
         <div className="border-t border-brand-border mt-10 pt-6 text-center text-brand-muted text-sm">
-          © 2025 Pet Protocols. All rights reserved.
+          © 2025 पेट Protocols. All rights reserved.
         </div>
 
       </div>

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Pet Protocols API',
+  title: 'पेट Protocols API',
 }
 
 export default function RootLayout({ children }) {

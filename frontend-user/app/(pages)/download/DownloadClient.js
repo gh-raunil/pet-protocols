@@ -36,7 +36,7 @@ export default function DownloadClient() {
   const faqs = [
     {
       q: "Is this available on Google Play?",
-      a: "Currently, we distribute the Pet Protocols Android app directly through our official website to deliver immediate updates, optimal performance, and zero store restrictions. A Google Play Store release is planned for a future phase.",
+      a: "Currently, we distribute the पेट Protocols Android app directly through our official website to deliver immediate updates, optimal performance, and zero store restrictions. A Google Play Store release is planned for a future phase.",
     },
     {
       q: "Is installing this APK safe?",
@@ -48,7 +48,7 @@ export default function DownloadClient() {
     },
     {
       q: "Which Android devices are supported?",
-      a: "Pet Protocols is built with Android API 21+ support, making it compatible with virtually all Android smartphones and tablets running Android 5.0 (Lollipop) through the latest Android 15 and 16 releases.",
+      a: "पेट Protocols is built with Android API 21+ support, making it compatible with virtually all Android smartphones and tablets running Android 5.0 (Lollipop) through the latest Android 15 and 16 releases.",
     },
   ];
 
@@ -75,7 +75,7 @@ export default function DownloadClient() {
     },
     {
       num: "05",
-      title: "Open Pet Protocols",
+      title: "Open पेट Protocols",
       desc: "Launch the app directly from your home screen or app drawer to enjoy instant, full-screen food ordering!",
     },
   ];
@@ -119,7 +119,7 @@ export default function DownloadClient() {
             <div className="relative p-2 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] shadow-xl transition-colors">
               <Image
                 src="/icons/icon-512x512.png"
-                alt="Pet Protocols App Icon"
+                alt="पेट Protocols App Icon"
                 width={80}
                 height={80}
                 className="rounded-2xl object-cover shadow-inner"
@@ -136,7 +136,7 @@ export default function DownloadClient() {
           </h1>
 
           <p className="text-sm sm:text-base md:text-lg text-[var(--text-muted)] max-w-xl mx-auto mb-8 font-normal leading-relaxed px-2 transition-colors">
-            Order faster. Enjoy better. Get the Pet Protocols app.
+            Order faster. Enjoy better. Get the पेट Protocols app.
           </p>
 
           {/* Download CTA Button */}
@@ -188,7 +188,7 @@ export default function DownloadClient() {
                 <div className="relative rounded-[30px] overflow-hidden border border-[var(--border-color)] bg-black aspect-[9/16]">
                   <Image
                     src="/screenshots/mobile-home.png"
-                    alt="Pet Protocols Mobile Application Experience"
+                    alt="पेट Protocols Mobile Application Experience"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 768px) 100vw, 320px"
@@ -214,7 +214,7 @@ export default function DownloadClient() {
                 <div className="relative aspect-[16/9]">
                   <Image
                     src="/screenshots/desktop-home.png"
-                    alt="Pet Protocols Desktop Experience"
+                    alt="पेट Protocols Desktop Experience"
                     fill
                     className="object-cover object-top"
                     sizes="(max-width: 1024px) 100vw, 600px"
@@ -228,7 +228,7 @@ export default function DownloadClient() {
                   <span>Native Fullscreen Android Experience</span>
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed transition-colors">
-                  When launched from your home screen, Pet Protocols runs in dedicated standalone mode with no browser URL bar or navigation buttons. The seamless interface matches your system theme for an immersive dining experience.
+                  When launched from your home screen, पेट Protocols runs in dedicated standalone mode with no browser URL bar or navigation buttons. The seamless interface matches your system theme for an immersive dining experience.
                 </p>
               </div>
             </div>
@@ -274,7 +274,7 @@ export default function DownloadClient() {
             <p className="text-xs uppercase tracking-widest text-[var(--brand-accent)] font-bold mb-2">Quick Setup Guide</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[var(--text-main)] mb-4 break-words px-2 transition-colors">How To Install The APK</h2>
             <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-xl mx-auto px-4 transition-colors">
-              Follow these simple steps on your Android device to install Pet Protocols in under 60 seconds.
+              Follow these simple steps on your Android device to install पेट Protocols in under 60 seconds.
             </p>
           </div>
 
@@ -349,7 +349,7 @@ export default function DownloadClient() {
             <span>Cryptographic Verification & Integrity</span>
           </div>
           <p className="text-xs text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed px-2 transition-colors">
-            Every build is signed with Pet Protocols’ official RSA-2048 private key. You can independently verify the SHA-256 certificate digest matching our production domain Digital Asset Links:
+            Every build is signed with पेट Protocols’ official RSA-2048 private key. You can independently verify the SHA-256 certificate digest matching our production domain Digital Asset Links:
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-xl mx-auto bg-[var(--bg-sub)] p-3 rounded-xl border border-[var(--border-color)] text-xs font-mono transition-colors">

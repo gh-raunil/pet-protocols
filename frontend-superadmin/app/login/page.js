@@ -140,7 +140,7 @@ export default function SuperadminLoginPage() {
 
         <div className="mt-6 pt-4 border-t border-slate-800 text-center">
           <p className="text-xs text-slate-500">
-            Pet Protocols Platform Management
+            पेट Protocols Platform Management
           </p>
         </div>
       </div>

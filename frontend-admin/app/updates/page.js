@@ -1,7 +1,7 @@
 import UpdatesClient from "./UpdatesClient";
 
 export const metadata = {
-  title: "Superadmin Updates & Directives — Pet Protocols Partner Hub",
+  title: "Superadmin Updates & Directives — पेट Protocols Partner Hub",
   description: "Official bulletins, operational mandates, and technical guidelines from the platform owner.",
 };
 

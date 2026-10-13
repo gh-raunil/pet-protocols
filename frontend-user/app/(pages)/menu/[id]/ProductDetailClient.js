@@ -452,7 +452,7 @@ export default function ProductDetailClient({ product }) {
 
               <div className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold shrink-0">🏷️ Bank Offer:</span>
-                <span className="text-[var(--text-muted)]">5% Unlimited Cashback on Pet Protocols Axis or ICICI Cards</span>
+                <span className="text-[var(--text-muted)]">5% Unlimited Cashback on पेट Protocols Axis or ICICI Cards</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold shrink-0">🏷️ Partner Deal:</span>

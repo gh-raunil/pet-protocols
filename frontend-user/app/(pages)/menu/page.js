@@ -3,7 +3,7 @@ import MenuClient from "./MenuClient.js";
 import { Loader2 } from "lucide-react";
 
 export const metadata = {
-  title: "Menu — Pet Protocols",
+  title: "Menu — पेट Protocols",
   description: "Browse our full menu — burgers, pizzas, momos, fries and cold drinks.",
 };
 

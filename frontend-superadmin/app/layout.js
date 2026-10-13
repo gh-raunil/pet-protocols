@@ -11,7 +11,7 @@ export const metadata = {
   },
   description:
     "Enterprise Multi-Tenant Infrastructure — Manage multi-tenant restaurants, restaurant admins, and monitor overall platform health.",
-  authors: [{ name: "Pet Protocols" }],
+  authors: [{ name: "पेट Protocols" }],
 };
 
 export default function RootLayout({ children }) {

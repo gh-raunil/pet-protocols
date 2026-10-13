@@ -1,8 +1,8 @@
 import RestaurantLoginPage from "../page";
 
 export const metadata = {
-  title: "Staff Login — Pet Protocols Kitchen",
-  description: "Official staff station login for Pet Protocols restaurant staff.",
+  title: "Staff Login — पेट Protocols Kitchen",
+  description: "Official staff station login for पेट Protocols restaurant staff.",
 };
 
 export default function StaffLoginPage() {

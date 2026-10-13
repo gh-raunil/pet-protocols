@@ -27,7 +27,7 @@ export default function PWAInstallButton({ variant = "button", className = "" })
     if (variant === "settings") {
       return (
         <div className="text-xs text-[var(--text-muted)] italic">
-          To install, open Pet Protocols in Chrome, Edge, or Safari on your mobile or desktop device.
+          To install, open पेट Protocols in Chrome, Edge, or Safari on your mobile or desktop device.
         </div>
       );
     }
@@ -42,7 +42,7 @@ export default function PWAInstallButton({ variant = "button", className = "" })
 
     const result = await triggerInstall();
     if (result.outcome === "accepted") {
-      toast.success("Thank you for installing Pet Protocols!");
+      toast.success("Thank you for installing पेट Protocols!");
     }
   };
 
@@ -56,7 +56,7 @@ export default function PWAInstallButton({ variant = "button", className = "" })
         >
           <div className="flex items-center gap-3">
             <Download size={18} className="text-[var(--brand-accent)]" />
-            <span>Install Pet Protocols App</span>
+            <span>Install पेट Protocols App</span>
           </div>
           <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--brand-accent)] text-white">
             App
@@ -69,7 +69,7 @@ export default function PWAInstallButton({ variant = "button", className = "" })
           className={`px-4 py-2.5 rounded-2xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-md shadow-[var(--brand-accent)]/25 hover:opacity-90 transition flex items-center gap-2 ${className}`}
         >
           <Download size={15} />
-          <span>Install Pet Protocols App</span>
+          <span>Install पेट Protocols App</span>
         </button>
       ) : (
         <button
@@ -104,7 +104,7 @@ export default function PWAInstallButton({ variant = "button", className = "" })
             </div>
 
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Install Pet Protocols on your iPhone or iPad for a full-screen, app-like experience:
+              Install पेट Protocols on your iPhone or iPad for a full-screen, app-like experience:
             </p>
 
             <ol className="space-y-3 text-xs">

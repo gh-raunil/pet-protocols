@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Offline — Pet Protocols</title>
+  <title>Offline — पेट Protocols</title>
   <link rel="icon" href="/icons/favicon-32x32.png" type="image/png">
   <meta name="theme-color" content="#0a0a0a">
   <style>
@@ -129,7 +129,7 @@
     </div>
     <div class="badge">No Connection</div>
     <h1>You're Currently Offline</h1>
-    <p>Pet Protocols requires an active internet connection to browse gourmet menus, update your cart, and place orders.</p>
+    <p>पेट Protocols requires an active internet connection to browse gourmet menus, update your cart, and place orders.</p>
     <button class="btn" onclick="retry()">Retry Connection</button>
     <div class="status" id="status-text">Please check your Wi-Fi or mobile data network.</div>
   </div>
@@ -138,7 +138,7 @@
     function updateOnlineStatus() {
       const status = document.getElementById('status-text');
       if (navigator.onLine) {
-        status.textContent = 'Connection restored! Click retry to return to Pet Protocols.';
+        status.textContent = 'Connection restored! Click retry to return to पेट Protocols.';
         status.style.color = '#10B981';
       } else {
         status.textContent = 'Please check your Wi-Fi or mobile data network.';

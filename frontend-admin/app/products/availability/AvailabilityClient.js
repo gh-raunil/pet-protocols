@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import {
   UtensilsCrossed,
   Search,
@@ -67,11 +68,13 @@ export default function AvailabilityClient() {
         setProducts((prev) =>
           prev.map((p) => (p._id === product._id ? { ...p, isAvailable: newAvailability } : p))
         );
+        toast.success(`"${product.name}" is now ${newAvailability ? "Available" : "Sold Out"}`);
       } else {
-        alert(data.message || "Failed to update dish availability");
+        toast.error(data.message || "Failed to update dish availability");
       }
     } catch (err) {
       console.error("Update availability error:", err);
+      toast.error("Failed to update dish availability");
     } finally {
       setUpdatingId(null);
     }
@@ -189,6 +192,10 @@ export default function AvailabilityClient() {
                           src={product.image}
                           alt={product.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500";
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-stone-400">

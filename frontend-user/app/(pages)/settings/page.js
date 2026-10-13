@@ -1,8 +1,8 @@
 import SettingsClient from "./SettingsClient";
 
 export const metadata = {
-  title: "Settings — Pet Protocols",
-  description: "Customize your theme, color palette, and preferences on Pet Protocols.",
+  title: "Settings — पेट Protocols",
+  description: "Customize your theme, color palette, and preferences on पेट Protocols.",
 };
 
 export default function SettingsPage() {

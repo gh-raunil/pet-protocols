@@ -147,7 +147,7 @@ export default function HomePage() {
 
         {/* Brand headline */}
         <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.08] text-[var(--text-main)] mb-6 break-words">
-          Pet Protocols
+          पेट Protocols
           <span className="block text-[var(--brand-accent)] mt-1 sm:mt-2 text-2xl sm:text-4xl md:text-6xl font-extrabold break-words">
             Fresh food. Zero compromises.
           </span>
@@ -497,11 +497,11 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ── SECTION G: WHY ORDER THROUGH PET PROTOCOLS ──────────────── */}
+      {/* ── SECTION G: WHY ORDER THROUGH पेट PROTOCOLS ──────────────── */}
       <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-main)]">
-            Why Order Through Pet Protocols
+            Why Order Through पेट Protocols
           </h2>
           <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 leading-relaxed">
             Built from the ground up for food lovers who value quality, transparency, and speed.
