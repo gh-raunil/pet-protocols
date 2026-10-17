@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
+import SearchBar from "@/components/ui/SearchBar";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import {
   getRecommendedProducts,
@@ -32,7 +33,6 @@ import { getProductNewArrivalStatus } from "@/lib/offersHelper";
 
 export default function HomePage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -126,83 +126,60 @@ export default function HomePage() {
     loadHomeData();
   }, []);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/menu?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors w-full max-w-full overflow-x-hidden min-w-0">
       {/* ── SECTION A: COMPACT DISCOVERY HERO ───────────────────────── */}
-      <section className="pt-28 pb-8 sm:pt-36 sm:pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center w-full min-w-0">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] text-xs font-semibold tracking-wide mb-4">
-          <Sparkles size={13} /> Multi-Kitchen Dining Platform
+      <section className="pt-20 pb-6 sm:pt-28 sm:pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center w-full min-w-0">
+        <div className="max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] text-xs font-semibold tracking-wide mb-3 sm:mb-4 border border-[var(--brand-accent)]/20">
+            <Sparkles size={13} /> Multi-Kitchen Dining Platform
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-[var(--text-main)] mb-3 sm:mb-4 leading-[1.14] max-w-2xl sm:max-w-3xl mx-auto">
+            Fresh food, <span className="text-[var(--brand-accent)]">zero compromises.</span>
+          </h1>
+
+          <p className="max-w-xl mx-auto text-xs sm:text-sm md:text-base text-[var(--text-muted)] font-normal leading-relaxed mb-6 sm:mb-7 px-2">
+            Discover vetted partner kitchens, explore chef-crafted menus, and order freshly prepared meals with seamless multi-restaurant ordering.
+          </p>
+
+          {/* Prominent Hero Search Bar (Reuses SearchBar component with hero variant) */}
+          <div className="w-full max-w-xl mx-auto">
+            <SearchBar variant="hero" />
+          </div>
+
+          {/* Quick Cravings Pill Bar */}
+          {categories.length > 0 && (
+            <div className="flex items-center justify-center gap-2 flex-wrap mt-4 text-xs">
+              <span className="text-[11px] text-[var(--text-muted)] font-medium">Quick explore:</span>
+              {categories.slice(0, 6).map((cat) => (
+                <Link
+                  key={cat._id || cat.name}
+                  href={`/menu?category=${encodeURIComponent(cat.name)}`}
+                  className="px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] text-[11px] font-medium transition shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]"
+                >
+                  {cat.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-[var(--text-main)] mb-3 leading-[1.12]">
-          Fresh food, <span className="text-[var(--brand-accent)]">zero compromises.</span>
-        </h1>
-
-        <p className="max-w-xl mx-auto text-xs sm:text-sm md:text-base text-[var(--text-muted)] font-normal leading-relaxed mb-8 px-2">
-          Discover vetted partner kitchens, explore chef-crafted menus, and order freshly prepared meals with seamless multi-restaurant ordering.
-        </p>
-
-        {/* Integrated Clean Search Box */}
-        <form
-          onSubmit={handleSearchSubmit}
-          className="flex items-center gap-2 p-1.5 sm:p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm focus-within:border-[var(--brand-accent)] focus-within:ring-2 focus-within:ring-[var(--brand-accent)]/20 transition max-w-xl mx-auto"
-        >
-          <div className="pl-3 text-[var(--text-muted)] shrink-0">
-            <Search size={18} />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search dishes, cuisines, or partner kitchens..."
-            className="flex-1 bg-transparent px-2 py-2 text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none min-w-0"
-          />
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold transition shrink-0 cursor-pointer shadow-xs active:scale-97"
-          >
-            Search
-          </button>
-        </form>
-
-        {/* Quick Cravings Pill Bar */}
-        {categories.length > 0 && (
-          <div className="flex items-center justify-center gap-2 flex-wrap mt-4 text-xs">
-            <span className="text-[11px] text-[var(--text-muted)] font-medium">Quick explore:</span>
-            {categories.slice(0, 6).map((cat) => (
-              <Link
-                key={cat._id || cat.name}
-                href={`/menu?category=${encodeURIComponent(cat.name)}`}
-                className="px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] text-[11px] font-medium transition shadow-2xs"
-              >
-                {cat.name}
-              </Link>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* ── SECTION B: BROWSE FOOD CATEGORIES ───────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-        <div className="flex items-center justify-between mb-6">
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12 sm:mb-14">
+        <div className="flex items-center justify-between mb-5 sm:mb-6">
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[var(--text-main)] tracking-tight">
               Explore Categories
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
               Select your craving for instant menu filtering
             </p>
           </div>
           <Link
             href="/menu"
-            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0"
+            className="text-xs sm:text-sm font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] rounded-md px-1"
           >
             All Dishes <ChevronRight size={14} />
           </Link>
@@ -214,25 +191,35 @@ export default function HomePage() {
               <Link
                 key={cat._id || cat.name}
                 href={`/menu?category=${encodeURIComponent(cat.name)}`}
-                className="p-3.5 sm:p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-0.5 transition-all group flex flex-col items-center text-center shadow-2xs"
+                className="p-3 sm:p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/60 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex flex-col items-center text-center shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]"
               >
-                <div className="w-14 h-14 sm:w-16 sm:h-16 mb-2.5 rounded-xl overflow-hidden bg-[var(--bg-sub)] border border-[var(--border-color)] flex items-center justify-center relative">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 aspect-square mb-2.5 rounded-xl overflow-hidden bg-[var(--bg-sub)] border border-[var(--border-color)] flex items-center justify-center relative shrink-0">
                   {cat.image ? (
                     <img
                       src={cat.image}
                       alt={cat.name}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        if (e.currentTarget.nextSibling) {
+                          e.currentTarget.nextSibling.style.display = "flex";
+                        }
+                      }}
                     />
-                  ) : (
-                    <span className="text-2xl group-hover:scale-110 transition-transform">
-                      {cat.icon || "🍽️"}
-                    </span>
-                  )}
+                  ) : null}
+                  <span
+                    className={`text-2xl group-hover:scale-110 transition-transform ${
+                      cat.image ? "hidden" : "flex"
+                    }`}
+                  >
+                    {cat.icon || "🍽️"}
+                  </span>
                 </div>
-                <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition line-clamp-1">
+                <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition-colors line-clamp-1">
                   {cat.name}
                 </span>
-                <span className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                <span className="text-[10px] sm:text-[11px] text-[var(--text-muted)] mt-0.5 font-medium">
                   {cat.dishCount > 0 ? `${cat.dishCount} ${cat.dishCount === 1 ? "dish" : "dishes"}` : "Explore"}
                 </span>
               </Link>
@@ -249,37 +236,37 @@ export default function HomePage() {
 
       {/* ── SECTION C: SPECIAL OFFERS STRIP ─────────────────────────── */}
       {offers.length > 0 && (
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-          <div className="flex items-center justify-between mb-5">
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12 sm:mb-14">
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
-                <Tag className="text-[var(--brand-accent)] w-4 h-4" />
+              <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+                <Tag className="text-[var(--brand-accent)] w-4 h-4 sm:w-5 sm:h-5" />
                 Active Special Offers
               </h2>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
                 Verified discounts and kitchen promotions
               </p>
             </div>
             <Link
               href="/offers"
-              className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0"
+              className="text-xs sm:text-sm font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] rounded-md px-1"
             >
               All Offers <ChevronRight size={14} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
             {offers.slice(0, 3).map((offer) => (
               <div
                 key={offer._id}
-                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-col justify-between shadow-2xs hover:border-[var(--brand-accent)]/40 transition"
+                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-col justify-between shadow-xs hover:border-[var(--brand-accent)]/50 hover:shadow-md transition-all duration-200"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] uppercase tracking-wider border border-[var(--brand-accent)]/20">
                       {offer.discountType === "percentage" ? `${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`}
                     </span>
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)]">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)]">
                       {offer.code}
                     </span>
                   </div>
@@ -287,18 +274,18 @@ export default function HomePage() {
                     {offer.title || "Kitchen Special"}
                   </h3>
                   {offer.description && (
-                    <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">
+                    <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">
                       {offer.description}
                     </p>
                   )}
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-[var(--text-muted)]">
+                <div className="mt-3.5 pt-2.5 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-[var(--text-muted)] font-medium">
                     {offer.minOrderAmount ? `Min order ₹${offer.minOrderAmount}` : "No minimum"}
                   </span>
                   <Link
                     href={`/menu?coupon=${encodeURIComponent(offer.code || "")}`}
-                    className="font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-0.5"
+                    className="font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] rounded-sm"
                   >
                     Apply <ChevronRight size={12} />
                   </Link>
@@ -310,7 +297,7 @@ export default function HomePage() {
       )}
 
       {/* ── SECTION D: CURATED FOOD DISCOVERY CAROUSELS ─────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16 space-y-8">
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12 sm:mb-14 space-y-6 sm:space-y-8">
         {loading ? (
           <div className="space-y-6">
             <div className="h-60 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
@@ -378,14 +365,14 @@ export default function HomePage() {
       </section>
 
       {/* ── SECTION E: PARTNERED RESTAURANTS ───────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-        <div className="flex items-center justify-between mb-6">
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12 sm:mb-14">
+        <div className="flex items-center justify-between mb-5 sm:mb-6">
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
-              <Building2 className="text-[var(--brand-accent)] w-4 h-4" />
+            <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+              <Building2 className="text-[var(--brand-accent)] w-4 h-4 sm:w-5 sm:h-5" />
               Partnered Kitchens & Cloud Restaurants
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
               Verified dining kitchens preparing food to high hygiene standards
             </p>
           </div>
@@ -421,12 +408,12 @@ export default function HomePage() {
                 <Link
                   key={rest._id}
                   href={`/menu?restaurant=${rest._id}`}
-                  className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-2xs hover:shadow-xs"
+                  className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all duration-200 flex flex-col justify-between group shadow-xs hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div>
-                        <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition flex items-center gap-1.5">
+                        <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition-colors flex items-center gap-1.5">
                           {rest.name}
                         </h3>
                         <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">
@@ -486,8 +473,8 @@ export default function HomePage() {
       </section>
 
       {/* ── SECTION F: QUALITY STANDARDS ───────────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-        <div className="text-center max-w-xl mx-auto mb-8">
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12 sm:mb-14">
+        <div className="text-center max-w-xl mx-auto mb-7 sm:mb-8">
           <h2 className="text-lg sm:text-2xl font-black text-[var(--text-main)] tracking-tight">
             Built for Transparent Dining
           </h2>
@@ -497,7 +484,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-xs hover:shadow-md hover:border-[var(--brand-accent)]/40 transition-all duration-200">
             <div className="w-10 h-10 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center">
               <Layers size={20} />
             </div>
@@ -509,7 +496,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-xs hover:shadow-md hover:border-[var(--brand-accent)]/40 transition-all duration-200">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <ShieldCheck size={20} />
             </div>
@@ -521,7 +508,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-xs hover:shadow-md hover:border-[var(--brand-accent)]/40 transition-all duration-200">
             <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <Clock size={20} />
             </div>
@@ -537,14 +524,14 @@ export default function HomePage() {
 
       {/* ── SECTION G: CUSTOMER EXPERIENCES (GENUINE DATA ONLY) ──────── */}
       {ratings.length > 0 && (
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-          <div className="flex items-center justify-between mb-6">
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16 sm:mb-20">
+          <div className="flex items-center justify-between mb-5 sm:mb-6">
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
-                <Star className="text-amber-400 fill-amber-400 w-4 h-4" />
+              <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+                <Star className="text-amber-400 fill-amber-400 w-4 h-4 sm:w-5 sm:h-5" />
                 Diner Feedback
               </h2>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
                 Authentic feedback from verified diners
               </p>
             </div>
@@ -554,7 +541,7 @@ export default function HomePage() {
             {ratings.slice(0, 3).map((rate, i) => (
               <div
                 key={rate._id || i}
-                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2.5"
+                className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs hover:shadow-md transition-all duration-200 space-y-2.5"
               >
                 <div className="flex items-center gap-1 text-amber-400">
                   {Array.from({ length: 5 }).map((_, s) => (
@@ -568,7 +555,7 @@ export default function HomePage() {
                 <p className="text-xs text-[var(--text-main)] italic leading-relaxed">
                   &ldquo;{rate.comment || rate.review || "Delicious food and prompt delivery!"}&rdquo;
                 </p>
-                <div className="pt-2 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)]">
+                <div className="pt-2 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] font-medium">
                   {rate.userName || rate.user?.name || "Verified Diner"}
                 </div>
               </div>

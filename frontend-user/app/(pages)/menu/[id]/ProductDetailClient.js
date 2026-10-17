@@ -399,8 +399,8 @@ export default function ProductDetailClient({ product }) {
             </button>
           </div>
 
-          {/* Action Buttons: ADD TO CART & ORDER NOW */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Action Buttons: ADD TO CART & ORDER NOW (Desktop view: visible on lg+) */}
+          <div className="hidden lg:grid grid-cols-2 gap-3 pt-1">
             <button
               type="button"
               onClick={handleAddToCart}
@@ -422,8 +422,8 @@ export default function ProductDetailClient({ product }) {
             </button>
           </div>
 
-          {/* Safe & Hygiene Trust Badges */}
-          <div className="p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs text-[var(--text-muted)]">
+          {/* Safe & Hygiene Trust Badges (Desktop view: visible on lg+) */}
+          <div className="hidden lg:block p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs text-[var(--text-muted)]">
             <div className="flex items-center gap-2">
               <ShieldCheck className="text-emerald-500 w-4 h-4 shrink-0" />
               <span><strong className="text-[var(--text-main)]">100% Certified Kitchen</strong> with audited hygiene standards</span>
@@ -440,7 +440,7 @@ export default function ProductDetailClient({ product }) {
         </div>
 
         {/* RIGHT COLUMN: Product Information (7 Columns) */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-5 sm:space-y-6">
           {/* Header & Kitchen */}
           <div>
             <div className="flex items-center justify-between gap-3">
@@ -465,7 +465,7 @@ export default function ProductDetailClient({ product }) {
               </button>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--text-main)] tracking-tight">
               {product.name}
             </h1>
 
@@ -486,7 +486,7 @@ export default function ProductDetailClient({ product }) {
           </div>
 
           {/* Pricing Section */}
-          <div className="p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
                 ₹{displayPrice}
@@ -507,7 +507,7 @@ export default function ProductDetailClient({ product }) {
                 ⚡ Auto Discount Applied: Save ₹{autoDiscount} instantly!
               </p>
             )}
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-medium">
+            <div className="text-xs text-[var(--text-muted)] mt-1.5 font-medium">
               Inclusive of all taxes • No hidden packing charges
             </div>
           </div>
@@ -573,32 +573,57 @@ export default function ProductDetailClient({ product }) {
             </div>
           )}
 
-          {/* Quantity Selector */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
-            <span className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
-              Select Quantity:
-            </span>
-            <div className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                disabled={quantity <= 1}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-                aria-label="Decrease quantity"
-              >
-                <Minus size={14} />
-              </button>
-              <span className="w-6 text-center text-xs font-black text-[var(--text-main)]">
-                {quantity}
+          {/* Quantity Selector & Mobile Action Buttons */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+              <span className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
+                Select Quantity:
               </span>
+              <div className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="w-6 text-center text-xs font-black text-[var(--text-main)]">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                  disabled={quantity >= 20}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  aria-label="Increase quantity"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Action Buttons: Visible only on mobile (< lg) right after quantity */}
+            <div className="grid lg:hidden grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setQuantity((q) => Math.min(20, q + 1))}
-                disabled={quantity >= 20}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-                aria-label="Increase quantity"
+                onClick={handleAddToCart}
+                disabled={!product.isAvailable || !restStatus.isOpen}
+                className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
               >
-                <Plus size={14} />
+                <ShoppingBag size={17} />
+                <span>Add To Cart</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                disabled={!product.isAvailable || !restStatus.isOpen}
+                className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
+              >
+                <Zap size={17} />
+                <span>Order Now</span>
               </button>
             </div>
           </div>
@@ -647,6 +672,22 @@ export default function ProductDetailClient({ product }) {
               </p>
             </div>
           )}
+
+          {/* Safe & Hygiene Trust Badges (Mobile view: visible below lg) */}
+          <div className="lg:hidden p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs text-[var(--text-muted)]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="text-emerald-500 w-4 h-4 shrink-0" />
+              <span><strong className="text-[var(--text-main)]">100% Certified Kitchen</strong> with audited hygiene standards</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="text-[var(--brand-accent)] w-4 h-4 shrink-0" />
+              <span>Prepared fresh upon order in <strong className="text-[var(--text-main)]">{prepTime}</strong></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Truck className="text-blue-500 w-4 h-4 shrink-0" />
+              <span>Contactless tamper-proof sealed packaging</span>
+            </div>
+          </div>
 
           {/* ── RATINGS & REVIEWS SECTION ───────────────────────────── */}
           <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-5">

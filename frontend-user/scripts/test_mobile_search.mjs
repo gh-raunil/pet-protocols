@@ -71,6 +71,32 @@ assert(
   searchBarCode.includes('e.key === "Escape"') && searchBarCode.includes('onClose?.()'),
   'Escape key listener cleanly dismisses mobile search overlay'
 )
+assert(
+  searchBarCode.includes('if (isHero) return;') && searchBarCode.includes('window.addEventListener("keydown"'),
+  'Global Cmd/Ctrl+K and hotkey listener is owned exclusively by navbar search, skipping hero search'
+)
+assert(
+  searchBarCode.includes('function handleInputKeyDown(e)') &&
+    searchBarCode.includes('if (e.key === "Escape")') &&
+    searchBarCode.includes('setIsOpen(false)') &&
+    searchBarCode.includes('setActiveIndex(-1)'),
+  'Input-scoped handleInputKeyDown dismisses dropdown and resets activeIndex on Escape'
+)
+assert(
+  searchBarCode.includes('e.stopPropagation()') && searchBarCode.includes('e.preventDefault()'),
+  'Input-scoped Escape stops propagation and prevents default to avoid closing unrelated UI or navigating'
+)
+assert(
+  searchBarCode.includes('e.key === "ArrowDown"') &&
+    searchBarCode.includes('e.key === "ArrowUp"') &&
+    searchBarCode.includes('handleSelectProduct'),
+  'SearchBar provides arrow-key navigation and Enter selection for suggestions'
+)
+assert(
+  searchBarCode.includes('onKeyDown={handleInputKeyDown}') &&
+    searchBarCode.includes('aria-activedescendant='),
+  'SearchBar attaches input-scoped keydown handler and ARIA activedescendant attributes'
+)
 
 // 2. Inspect RightSection.js
 console.log('\n--- 2. Testing RightSection.js Mobile Search Button ---')

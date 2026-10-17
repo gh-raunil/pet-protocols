@@ -44,7 +44,7 @@ const NavLinks = () => {
   ];
 
   return (
-    <div className="flex items-center gap-5 lg:gap-7 xl:gap-8">
+    <div className="flex items-center gap-3.5 lg:gap-5 xl:gap-7">
       {links.map((link) => {
         const isActive = pathname === link.href;
         return (

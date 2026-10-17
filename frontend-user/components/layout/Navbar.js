@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import NavLinks from "./NavLinks";
 import RightSection from "./RightSection";
@@ -11,7 +12,9 @@ import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 
 const Navbar = () => {
   const hidden = useHideOnScroll();
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchButtonRef = useRef(null);
 
@@ -25,11 +28,17 @@ const Navbar = () => {
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 15);
+      setScrolledPastHero(window.scrollY > 280);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const isHome = pathname === "/";
+  const isMenu = pathname === "/menu";
+  // On homepage, suppress navbar search while hero search is in view. On /menu, suppress because in-page filter search is present.
+  const showDesktopSearch = (!isHome || scrolledPastHero) && !isMenu;
 
   return (
     <header
@@ -54,7 +63,13 @@ const Navbar = () => {
         </div>
 
         {/* Desktop SearchBar */}
-        <div className="hidden md:flex flex-1 max-w-xs mx-2 lg:mx-4">
+        <div
+          className={`hidden md:flex flex-1 max-w-xs min-w-0 mx-2 lg:mx-3 xl:mx-4 transition-all duration-300 ${
+            showDesktopSearch
+              ? "opacity-100 scale-100 pointer-events-auto"
+              : "opacity-0 scale-95 pointer-events-none invisible"
+          }`}
+        >
           <SearchBar />
         </div>
 

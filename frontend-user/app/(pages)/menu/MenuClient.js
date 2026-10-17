@@ -308,164 +308,51 @@ export default function MenuClient() {
   return (
     <main className="min-h-screen pt-24 sm:pt-28 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── HEADER ─────────────────────────────────────────────────── */}
-      <div className="text-center w-full max-w-2xl mx-auto mb-6 sm:mb-8 px-2 min-w-0">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-2.5">
-          <Sparkles size={13} className="shrink-0" /> Verified Kitchen Menu
+      <div className="text-center w-full max-w-2xl mx-auto mb-5 sm:mb-6 px-2 min-w-0">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] font-bold uppercase tracking-wider mb-2">
+          <Sparkles size={12} className="shrink-0" /> Verified Kitchen Menu
         </div>
-        <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-[var(--text-main)] break-words">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-[var(--text-main)] break-words">
           Explore Our Menu
         </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 leading-relaxed max-w-xl mx-auto break-words">
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1 max-w-lg mx-auto break-words">
           Freshly prepared food crafted upon order by certified kitchens and culinary partners.
         </p>
       </div>
 
-      {/* ── PARTNER KITCHEN BAR ────────────────────────────────────── */}
-      {restaurants.length > 0 && (
-        <div className="p-3 sm:p-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-xs w-full max-w-full overflow-hidden min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <Building2 className="text-[var(--brand-accent)] w-4 h-4 shrink-0" />
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Partner Kitchens
-              </span>
-            </div>
-            {selectedRestaurant !== "all" && (
-              <button
-                type="button"
-                onClick={() => handleRestaurantClick("all")}
-                className="text-xs font-bold text-[var(--brand-accent)] hover:underline cursor-pointer"
-              >
-                Show All Kitchens
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => handleRestaurantClick("all")}
-              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                selectedRestaurant === "all"
-                  ? "bg-[var(--brand-accent)] text-white shadow-xs"
-                  : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-              }`}
-            >
-              All Kitchens ({restaurants.length})
-            </button>
-
-            {restaurants.map((rest) => {
-              const op = getRestaurantOperationalStatus(rest);
-              const isSelected = selectedRestaurant === rest._id;
-              return (
-                <button
-                  key={rest._id}
-                  type="button"
-                  onClick={() => handleRestaurantClick(rest._id)}
-                  className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                    isSelected
-                      ? "bg-[var(--brand-accent)] text-white shadow-xs"
-                      : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-                  }`}
-                >
-                  <span>{rest.name}</span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      op.isOpen ? "bg-emerald-500" : "bg-amber-500"
-                    }`}
-                    title={op.isOpen ? "Open Now" : op.reason}
-                  />
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Kitchen Operational Banner */}
-          {selectedRestaurant !== "all" && (() => {
-            const activeKitchen = restaurants.find((r) => r._id === selectedRestaurant);
-            if (!activeKitchen) return null;
-            const op = getRestaurantOperationalStatus(activeKitchen);
-            const flatFee = activeKitchen.chargeSettings?.flatDeliveryFee ?? 40;
-            const freeAbove = activeKitchen.chargeSettings?.freeDeliveryThreshold ?? 500;
-            const radius = activeKitchen.deliverySettings?.deliveryRadiusKm ?? 10;
-            const minOrder = activeKitchen.orderLimits?.minOrderAmount ?? 0;
-            const kitchenOffers = offers.filter(
-              (o) => !o.restaurant || o.restaurant?._id === activeKitchen._id || o.restaurant === activeKitchen._id
-            );
-
+      {/* ── UNIFIED MENU DISCOVERY HUB ─────────────────────────────── */}
+      <div className="p-3 sm:p-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-xs space-y-3 w-full max-w-full overflow-hidden min-w-0">
+        {/* Row 1: Primary Category Discovery */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
             return (
-              <div className="mt-3 pt-3 border-t border-[var(--border-color)] space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-extrabold text-sm text-[var(--text-main)]">
-                      {activeKitchen.name}
-                    </span>
-                    {op.isOpen ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                        ● Open Now
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                        ● Closed ({op.reason})
-                      </span>
-                    )}
-                    <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                      <Clock size={12} className="text-[var(--brand-accent)]" />
-                      {op.hoursText || activeKitchen.openingHours || "10:00 AM - 11:00 PM"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] flex-wrap">
-                    <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium">
-                      🛵 Delivery: ₹{flatFee} {freeAbove > 0 ? `(Free > ₹${freeAbove})` : ""}
-                    </span>
-                    <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium">
-                      📍 Up to {radius} km
-                    </span>
-                    {minOrder > 0 && (
-                      <span className="bg-[var(--bg-sub)] px-2.5 py-1 rounded-xl border border-[var(--border-color)] font-medium text-amber-600 dark:text-amber-400">
-                        Min Order ₹{minOrder}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {!op.isOpen && (
-                  <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-2">
-                    <Clock size={14} className="shrink-0" />
-                    <span>
-                      This kitchen is currently closed or ordering is temporarily paused. Dishes are viewable but ordering is unavailable until opening.
-                    </span>
-                  </div>
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => handleCategoryClick(cat.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shadow-2xs shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                  isSelected
+                    ? "bg-[var(--brand-accent)] text-white shadow-xs"
+                    : "bg-[var(--bg-sub)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/50 border border-[var(--border-color)]"
+                }`}
+              >
+                <span className="mr-1">{cat.icon}</span>
+                <span>{cat.label}</span>
+                {cat.count > 0 && (
+                  <span className={`ml-1 text-[10px] font-semibold opacity-75`}>
+                    ({cat.count})
+                  </span>
                 )}
-
-                {kitchenOffers.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                    <span className="text-[11px] font-bold text-[var(--brand-accent)] flex items-center gap-1 uppercase tracking-wider">
-                      <Tag size={12} /> Kitchen Deals:
-                    </span>
-                    {kitchenOffers.slice(0, 2).map((off) => (
-                      <span
-                        key={off._id}
-                        className="px-2 py-0.5 rounded-lg bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-xs font-bold"
-                      >
-                        {off.code}: {off.discountType === "percentage" ? `${off.discountValue}% OFF` : `₹${off.discountValue} OFF`}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </button>
             );
-          })()}
+          })}
         </div>
-      )}
 
-      {/* ── SEARCH, CONTROLS & FILTER ROW ──────────────────────────── */}
-      <div className="space-y-3.5 mb-6">
-        {/* Search Input & Quick Controls */}
-        <div className="flex flex-col md:flex-row gap-3">
+        {/* Row 2: Search, Dietary, Stock, and Sort Controls */}
+        <div className="flex flex-col md:flex-row gap-2.5 sm:gap-3 items-stretch md:items-center">
           {/* Search Input */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4 pointer-events-none" />
             <input
               type="text"
@@ -473,7 +360,7 @@ export default function MenuClient() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search dishes by name or category..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)] transition shadow-2xs"
+              className="w-full pl-10 pr-9 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-2 focus:ring-[var(--brand-accent)]/20 outline-none transition shadow-2xs font-medium"
             />
             {searchInput && (
               <button
@@ -491,15 +378,15 @@ export default function MenuClient() {
           </div>
 
           {/* Quick Filter Controls */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none shrink-0">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none shrink-0 flex-wrap sm:flex-nowrap">
             {/* Veg / Non-Veg Toggle */}
-            <div className="flex rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] p-1 shrink-0">
+            <div className="flex rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] p-0.5 shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={() => handleTypeClick("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   selectedType === "all"
-                    ? "bg-[var(--brand-accent)] text-white"
+                    ? "bg-[var(--brand-accent)] text-white shadow-2xs"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 }`}
               >
@@ -508,9 +395,9 @@ export default function MenuClient() {
               <button
                 type="button"
                 onClick={() => handleTypeClick("veg")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   selectedType === "veg"
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-emerald-600 text-white shadow-2xs"
                     : "text-emerald-600 dark:text-emerald-400 hover:opacity-80"
                 }`}
               >
@@ -519,9 +406,9 @@ export default function MenuClient() {
               <button
                 type="button"
                 onClick={() => handleTypeClick("non-veg")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   selectedType === "non-veg"
-                    ? "bg-rose-600 text-white"
+                    ? "bg-rose-600 text-white shadow-2xs"
                     : "text-rose-600 dark:text-rose-400 hover:opacity-80"
                 }`}
               >
@@ -534,14 +421,14 @@ export default function MenuClient() {
               type="button"
               onClick={handleStockToggle}
               aria-pressed={onlyInStock}
-              className={`px-3 py-2 rounded-2xl text-xs font-bold border transition shrink-0 flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold border transition shrink-0 flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden shadow-2xs ${
                 onlyInStock
                   ? "bg-[var(--brand-accent)]/15 border-[var(--brand-accent)] text-[var(--brand-accent)]"
-                  : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                  : "bg-[var(--bg-sub)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
               }`}
             >
               <Check size={13} className={onlyInStock ? "opacity-100" : "opacity-30"} />
-              In Stock Only
+              <span>In Stock Only</span>
             </button>
 
             {/* Sort Dropdown */}
@@ -550,7 +437,7 @@ export default function MenuClient() {
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
                 aria-label="Sort dishes"
-                className="pl-3 pr-7 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] focus:border-[var(--brand-accent)] transition cursor-pointer appearance-none shadow-2xs"
+                className="pl-3 pr-7 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)] outline-none transition cursor-pointer appearance-none shadow-2xs"
               >
                 <option value="default">Sort: Recommended</option>
                 <option value="price-low">Price: Low to High</option>
@@ -566,7 +453,7 @@ export default function MenuClient() {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-3 py-2 rounded-2xl bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-bold text-[var(--brand-accent)] transition shrink-0 cursor-pointer flex items-center gap-1"
+                className="px-3 py-2 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-bold text-[var(--brand-accent)] transition shrink-0 cursor-pointer flex items-center gap-1 shadow-2xs"
               >
                 <X size={12} />
                 <span>Reset ({activeFiltersCount})</span>
@@ -575,32 +462,127 @@ export default function MenuClient() {
           </div>
         </div>
 
-        {/* Categories Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleCategoryClick(cat.id)}
-                className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer shadow-2xs shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                  isSelected
-                    ? "bg-[var(--brand-accent)] text-white shadow-xs"
-                    : "bg-[var(--bg-card)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/50 border border-[var(--border-color)]"
-                }`}
-              >
-                <span className="mr-1">{cat.icon}</span>
-                <span>{cat.label}</span>
-                {cat.count > 0 && (
-                  <span className={`ml-1 text-[10px] font-semibold opacity-75`}>
-                    ({cat.count})
+        {/* Row 3: Integrated Partner Kitchen Chips */}
+        {restaurants.length > 0 && (
+          <div className="pt-2.5 border-t border-[var(--border-color)] flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none text-xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1 shrink-0 mr-1">
+              <Building2 size={13} className="text-[var(--brand-accent)]" /> Partner Kitchens:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleRestaurantClick("all")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                selectedRestaurant === "all"
+                  ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
+                  : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
+              }`}
+            >
+              All Kitchens ({restaurants.length})
+            </button>
+            {restaurants.map((rest) => {
+              const op = getRestaurantOperationalStatus(rest);
+              const isSelected = selectedRestaurant === rest._id;
+              return (
+                <button
+                  key={rest._id}
+                  type="button"
+                  onClick={() => handleRestaurantClick(rest._id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                    isSelected
+                      ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
+                      : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
+                  }`}
+                >
+                  <span>{rest.name}</span>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      op.isOpen ? "bg-emerald-500" : "bg-amber-500"
+                    }`}
+                    title={op.isOpen ? "Open Now" : op.reason}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Active Kitchen Operational Banner (Expanded when a specific kitchen is selected) */}
+        {selectedRestaurant !== "all" && (() => {
+          const activeKitchen = restaurants.find((r) => r._id === selectedRestaurant);
+          if (!activeKitchen) return null;
+          const op = getRestaurantOperationalStatus(activeKitchen);
+          const flatFee = activeKitchen.chargeSettings?.flatDeliveryFee ?? 40;
+          const freeAbove = activeKitchen.chargeSettings?.freeDeliveryThreshold ?? 500;
+          const radius = activeKitchen.deliverySettings?.deliveryRadiusKm ?? 10;
+          const minOrder = activeKitchen.orderLimits?.minOrderAmount ?? 0;
+          const kitchenOffers = offers.filter(
+            (o) => !o.restaurant || o.restaurant?._id === activeKitchen._id || o.restaurant === activeKitchen._id
+          );
+
+          return (
+            <div className="pt-2.5 border-t border-[var(--border-color)] space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs sm:text-sm text-[var(--text-main)]">
+                    {activeKitchen.name}
                   </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  {op.isOpen ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      ● Open Now
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      ● Closed ({op.reason})
+                    </span>
+                  )}
+                  <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                    <Clock size={11} className="text-[var(--brand-accent)]" />
+                    {op.hoursText || activeKitchen.openingHours || "10:00 AM - 11:00 PM"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] flex-wrap">
+                  <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium">
+                    🛵 ₹{flatFee} {freeAbove > 0 ? `(Free > ₹${freeAbove})` : ""}
+                  </span>
+                  <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium">
+                    📍 Up to {radius} km
+                  </span>
+                  {minOrder > 0 && (
+                    <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium text-amber-600 dark:text-amber-400">
+                      Min ₹{minOrder}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {!op.isOpen && (
+                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-2">
+                  <Clock size={13} className="shrink-0" />
+                  <span>
+                    This kitchen is currently closed or ordering is temporarily paused. Dishes are viewable but ordering is unavailable until opening.
+                  </span>
+                </div>
+              )}
+
+              {kitchenOffers.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                  <span className="text-[10px] font-bold text-[var(--brand-accent)] flex items-center gap-1 uppercase tracking-wider">
+                    <Tag size={11} /> Deals:
+                  </span>
+                  {kitchenOffers.slice(0, 2).map((off) => (
+                    <span
+                      key={off._id}
+                      className="px-2 py-0.5 rounded-md bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] font-bold"
+                    >
+                      {off.code}: {off.discountType === "percentage" ? `${off.discountValue}% OFF` : `₹${off.discountValue} OFF`}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── PRODUCTS CONTENT & STATES ───────────────────────────────── */}
