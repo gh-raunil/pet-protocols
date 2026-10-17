@@ -9,3 +9,26 @@ export function OrderCardSkeleton() {
 export function StatCardSkeleton() {
   return <div className="h-32 rounded-2xl bg-brand-card border border-brand-border animate-pulse" />
 }
+
+export function ProductCardSkeleton({ isCarousel = false }) {
+  return (
+    <div
+      className={`flex flex-col justify-between bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden animate-pulse ${
+        isCarousel ? "w-[170px] sm:w-[190px] md:w-[205px] shrink-0" : "w-full"
+      }`}
+    >
+      <div className="relative aspect-[4/3] w-full bg-[var(--bg-sub)]" />
+      <div className="p-3 flex-1 flex flex-col justify-between space-y-3">
+        <div className="space-y-1.5">
+          <div className="h-3 w-16 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-4 w-3/4 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-3 w-1/2 bg-[var(--bg-sub)] rounded-md" />
+        </div>
+        <div className="pt-1 flex items-center justify-between">
+          <div className="h-4 w-12 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-7 w-16 bg-[var(--bg-sub)] rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,16 +1,26 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Logo from "./Logo";
 import NavLinks from "./NavLinks";
 import RightSection from "./RightSection";
 import HamburgerIcon from "./HamburgerIcon";
+import SearchBar from "../ui/SearchBar";
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 
 const Navbar = () => {
   const hidden = useHideOnScroll();
   const [scrolled, setScrolled] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const searchButtonRef = useRef(null);
+
+  const handleCloseMobileSearch = () => {
+    setMobileSearchOpen(false);
+    setTimeout(() => {
+      searchButtonRef.current?.focus();
+    }, 50);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,12 +37,15 @@ const Navbar = () => {
         scrolled
           ? "bg-[var(--bg-main)]/95 backdrop-blur-xl shadow-lg shadow-black/5"
           : "bg-[var(--bg-main)]/80 backdrop-blur-md"
-      } ${hidden ? "-translate-y-full" : "translate-y-0"}`}
+      } ${hidden && !mobileSearchOpen ? '-translate-y-full' : 'translate-y-0'}`}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3.5 flex justify-between items-center gap-2 sm:gap-6 w-full">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center shrink-0 group" aria-label="पेट Protocols Home">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 group" aria-label="पेट Protocols Home">
           <Logo />
+          <span className="font-extrabold text-base tracking-tight hidden sm:inline text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
+            पेट Protocols
+          </span>
         </Link>
 
         {/* Desktop Nav Links */}
@@ -40,12 +53,37 @@ const Navbar = () => {
           <NavLinks />
         </div>
 
-        {/* Right Section: Theme Toggle, Notifications, Cart, Profile */}
+        {/* Desktop SearchBar */}
+        <div className="hidden md:flex flex-1 max-w-xs mx-2 lg:mx-4">
+          <SearchBar />
+        </div>
+
+        {/* Right Section: Theme Toggle, Notifications, Mobile Search, Cart, Profile */}
         <div className="flex gap-1.5 sm:gap-2.5 items-center shrink-0">
-          <RightSection />
+          <RightSection
+            onOpenMobileSearch={() => setMobileSearchOpen(true)}
+            isMobileSearchOpen={mobileSearchOpen}
+            mobileSearchButtonRef={searchButtonRef}
+          />
           <HamburgerIcon />
         </div>
       </div>
+
+      {/* Mobile Full-Screen Search Dialog */}
+      {mobileSearchOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search dishes and menu"
+          className="md:hidden fixed inset-0 z-[100] bg-[var(--bg-main)]"
+        >
+          <SearchBar
+            isMobile={true}
+            onClose={handleCloseMobileSearch}
+            autoFocus={true}
+          />
+        </div>
+      )}
     </header>
   );
 };

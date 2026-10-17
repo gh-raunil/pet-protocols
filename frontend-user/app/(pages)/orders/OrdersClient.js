@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -21,12 +21,48 @@ import {
   ShoppingBag,
   Truck,
   Tag,
+  RefreshCw,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { formatDateInTimeZone } from "@/lib/timeZone";
+import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
+
+function OrderHistoryDishItem({ item }) {
+  const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
+
+  useEffect(() => {
+    setImgSrc(item.image || FALLBACK_IMAGE);
+  }, [item.image]);
+
+  return (
+    <div className="flex items-center gap-3.5 bg-[var(--bg-sub)] p-3 rounded-2xl border border-[var(--border-color)]">
+      <Image
+        src={imgSrc}
+        alt={item.name || "Dish item"}
+        width={52}
+        height={52}
+        onError={() => setImgSrc(FALLBACK_IMAGE)}
+        className="w-13 h-13 rounded-xl object-cover border border-[var(--border-color)] shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-[var(--text-main)] font-bold text-xs sm:text-sm truncate">
+          {item.name}
+        </p>
+        <p className="text-[var(--text-muted)] text-xs mt-0.5">
+          ₹{item.price} × {item.quantity}
+        </p>
+      </div>
+      <p className="text-[var(--brand-accent)] font-mono font-bold text-xs sm:text-sm shrink-0">
+        ₹{(item.price || 0) * (item.quantity || 1)}
+      </p>
+    </div>
+  );
+}
 
 const formatDate = (dateStr) => {
   return formatDateInTimeZone(dateStr, undefined, {
@@ -41,12 +77,15 @@ const formatDate = (dateStr) => {
 export default function OrdersClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const addItem = useCartStore((s) => s.addItem);
+  const addBatch = useCartStore((s) => s.addBatch);
   const openCart = useCartStore((s) => s.openCart);
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
+  const [reorderingOrderId, setReorderingOrderId] = useState(null);
 
   // Customer Cancellation Modal/State
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
@@ -66,44 +105,181 @@ export default function OrdersClient() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (!session) return;
+  const isFetchingRef = useRef(false);
 
-    async function fetchOrders() {
-      try {
-        const res = await fetch("/api/orders");
-        const data = await res.json();
+  const fetchOrders = useCallback(async (isManual = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (isManual) setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/orders");
+      const data = await res.json();
+      if (data.success) {
         setOrders(data.orders || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+        setError("");
+      } else {
+        setError(data.message || "Failed to load orders.");
       }
+    } catch (err) {
+      console.error("Orders fetch error:", err);
+      setError("Network error while loading your order history.");
+    } finally {
+      isFetchingRef.current = false;
+      setLoading(false);
+      setIsRefreshing(false);
     }
+  }, []);
 
-    fetchOrders();
-  }, [session]);
+  // 1. Initial fetch when authenticated session is available or session changes
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      fetchOrders(false);
+    } else if (status === "unauthenticated") {
+      setLoading(false);
+    }
+  }, [status, session?.user?.email, fetchOrders]);
 
-  const handleReorder = (order) => {
+  // 2. Stable primitive fingerprint of active in-progress orders (avoids array-reference churn)
+  const activeOrdersFingerprint = useMemo(() => {
+    if (!Array.isArray(orders) || orders.length === 0) return "";
+    return orders
+      .filter((o) =>
+        ["pending", "confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)
+      )
+      .map((o) => `${o._id || o.orderId}:${o.status}`)
+      .sort()
+      .join("|");
+  }, [orders]);
+
+  // 3. Background polling for active in-progress orders (pauses on hidden tab)
+  useEffect(() => {
+    if (!session || !activeOrdersFingerprint) return;
+
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      fetchOrders(false);
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchOrders(false);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [session, fetchOrders, activeOrdersFingerprint]);
+
+  const handleReorder = async (order) => {
     if (!order.items || order.items.length === 0) return;
 
-    let addedCount = 0;
-    order.items.forEach((item) => {
-      for (let i = 0; i < (item.quantity || 1); i++) {
-        addItem({
-          _id: item.productId || item.product || item._id,
-          name: item.name,
-          price: item.price,
-          image: item.image,
+    setReorderingOrderId(order._id);
+    try {
+      const restId =
+        order.restaurant?._id?.toString() ||
+        order.restaurant?.toString() ||
+        order.restaurantId;
+
+      const queryUrl = restId
+        ? `/api/products?restaurant=${encodeURIComponent(restId)}`
+        : "/api/products";
+
+      const res = await fetch(queryUrl);
+      if (!res.ok) {
+        toast.error("Could not verify dish availability. Please check the menu to reorder.");
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.success || !Array.isArray(data.products)) {
+        toast.error("Could not verify dish availability. Please check the menu to reorder.");
+        return;
+      }
+
+      const liveProducts = data.products;
+      const availableItems = [];
+      const unavailableItems = [];
+
+      for (const item of order.items) {
+        const itemId = (item.productId || item.product?._id || item.product || item._id)?.toString();
+        const itemName = item.name?.trim().toLowerCase();
+
+        const matched = liveProducts.find((p) => {
+          if (itemId && p._id?.toString() === itemId) return true;
+          if (itemName && p.name?.trim().toLowerCase() === itemName) return true;
+          return false;
+        });
+
+        if (!matched) {
+          unavailableItems.push({ name: item.name || "Dish", reason: "No longer on the menu" });
+          continue;
+        }
+
+        if (matched.isAvailable === false) {
+          unavailableItems.push({ name: matched.name, reason: "Currently sold out" });
+          continue;
+        }
+
+        // Verify kitchen operational status
+        const restObj = matched.restaurant || order.restaurant;
+        if (restObj && typeof restObj === "object") {
+          const opStatus = getRestaurantOperationalStatus(restObj);
+          if (!opStatus.isOpen) {
+            unavailableItems.push({
+              name: matched.name,
+              reason: `Kitchen closed (${opStatus.reason || "Currently Closed"})`,
+            });
+            continue;
+          }
+        }
+
+        const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+        availableItems.push({
+          _id: matched._id?.toString(),
+          name: matched.name,
+          price: Number(matched.price),
+          image: matched.image || item.image,
+          category: matched.category,
+          type: matched.type,
           isAvailable: true,
-          restaurant: order.restaurant,
+          isFeatured: matched.isFeatured,
+          description: matched.description,
+          quantity: qty,
+          restaurant: matched.restaurant?._id?.toString() || matched.restaurant?.toString() || restId,
+          restaurantId: matched.restaurantId || matched.restaurant?._id?.toString() || matched.restaurant?.toString() || restId,
         });
       }
-      addedCount++;
-    });
 
-    toast.success(`Reordered ${addedCount} dishes into your cart!`);
-    openCart();
+      if (availableItems.length > 0) {
+        addBatch(availableItems);
+        openCart();
+        if (unavailableItems.length === 0) {
+          toast.success(`Reordered ${availableItems.length} dishes into your cart!`);
+        } else {
+          toast.info(`Added ${availableItems.length} available dishes to cart.`);
+        }
+      }
+
+      if (unavailableItems.length > 0) {
+        const details = unavailableItems.map((u) => `${u.name} (${u.reason})`).join(", ");
+        if (availableItems.length === 0) {
+          toast.error(`Cannot reorder items: ${details}`);
+        } else {
+          toast.error(`Some items could not be reordered: ${details}`);
+        }
+      }
+    } catch (err) {
+      console.error("Reorder failed:", err);
+      toast.error("Could not verify dish availability. Please check the menu to reorder.");
+    } finally {
+      setReorderingOrderId(null);
+    }
   };
 
   const handleCancelOrder = async (orderId) => {
@@ -156,6 +332,27 @@ export default function OrdersClient() {
     );
   }
 
+  if (error && orders.length === 0) {
+    return (
+      <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 max-w-md mx-auto flex flex-col items-center justify-center text-center gap-4 text-[var(--text-main)]">
+        <div className="w-16 h-16 rounded-3xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500">
+          <AlertTriangle size={32} />
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-black">Unable to load orders</h2>
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed">
+          {error}
+        </p>
+        <button
+          type="button"
+          onClick={() => fetchOrders(true)}
+          className="mt-2 bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold px-8 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition shadow-lg shadow-[var(--brand-accent)]/20 cursor-pointer"
+        >
+          Try Again
+        </button>
+      </main>
+    );
+  }
+
   if (orders.length === 0) {
     return (
       <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 max-w-md mx-auto flex flex-col items-center justify-center text-center gap-4 text-[var(--text-main)]">
@@ -179,16 +376,29 @@ export default function OrdersClient() {
   return (
     <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] transition-colors">
       {/* Header */}
-      <div className="mb-8">
-        <span className="text-[var(--brand-accent)] text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-          <Sparkles size={14} /> Order History & Tracking
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
-          My <span className="text-[var(--brand-accent)]">Orders</span>
-        </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
-          {orders.length} {orders.length === 1 ? "order" : "orders"} placed on पेट Protocols
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <span className="text-[var(--brand-accent)] text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+            <Sparkles size={14} /> Order History & Tracking
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
+            My <span className="text-[var(--brand-accent)]">Orders</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
+            {orders.length} {orders.length === 1 ? "order" : "orders"} placed on पेट Protocols
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => fetchOrders(true)}
+          disabled={isRefreshing}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer self-start sm:self-auto"
+          title="Refresh order history & live statuses"
+        >
+          <RefreshCw size={13} className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""} />
+          <span>{isRefreshing ? "Updating..." : "Refresh"}</span>
+        </button>
       </div>
 
       {/* Closed-Tab Delivery Alerts Permission Prompt */}
@@ -284,29 +494,7 @@ export default function OrdersClient() {
               {/* Order Items */}
               <div className="py-2 space-y-2.5">
                 {order.items?.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3.5 bg-[var(--bg-sub)] p-3 rounded-2xl border border-[var(--border-color)]"
-                  >
-                    <Image
-                      src={item.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200"}
-                      alt={item.name}
-                      width={52}
-                      height={52}
-                      className="w-13 h-13 rounded-xl object-cover border border-[var(--border-color)] shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[var(--text-main)] font-bold text-xs sm:text-sm truncate">
-                        {item.name}
-                      </p>
-                      <p className="text-[var(--text-muted)] text-xs mt-0.5">
-                        ₹{item.price} × {item.quantity}
-                      </p>
-                    </div>
-                    <p className="text-[var(--brand-accent)] font-mono font-bold text-xs sm:text-sm shrink-0">
-                      ₹{item.price * item.quantity}
-                    </p>
-                  </div>
+                  <OrderHistoryDishItem key={idx} item={item} />
                 ))}
               </div>
 
@@ -315,6 +503,8 @@ export default function OrdersClient() {
                 <OrderStatusTracker
                   status={order.status}
                   paymentStatus={order.paymentStatus}
+                  isPickup={isPickup}
+                  cancellationReason={order.cancellationReason || ""}
                 />
               </div>
 
@@ -439,10 +629,15 @@ export default function OrdersClient() {
                     {/* Reorder Button */}
                     <button
                       type="button"
+                      disabled={reorderingOrderId === order._id}
                       onClick={() => handleReorder(order)}
-                      className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer disabled:opacity-50"
                     >
-                      <RotateCcw size={13} /> Reorder
+                      <RotateCcw
+                        size={13}
+                        className={reorderingOrderId === order._id ? "animate-spin" : ""}
+                      />
+                      {reorderingOrderId === order._id ? "Checking..." : "Reorder"}
                     </button>
                   </div>
                 </div>

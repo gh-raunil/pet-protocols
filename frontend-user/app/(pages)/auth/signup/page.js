@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { signIn } from "next-auth/react";
-
+import { Sparkles } from "lucide-react";
 import { Chrome } from "@deemlol/next-icons";
 
 export default function SignupPage() {
@@ -119,8 +119,8 @@ export default function SignupPage() {
       >
         {/* Heading */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] mb-3 text-xl font-black">
-            ✨
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] mb-3">
+            <Sparkles size={22} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
             Join पेट Protocols

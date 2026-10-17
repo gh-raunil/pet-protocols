@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Star, Heart, Clock, Check, Sparkles, Tag, Zap } from "lucide-react";
+import { Plus, Star, Heart, Clock, Sparkles, Tag, Zap } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import { toast } from "@/components/ui/ToastProvider";
@@ -13,12 +13,41 @@ import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } fro
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
+export function ProductCardSkeleton({ isCarousel = false }) {
+  return (
+    <div
+      className={`flex flex-col justify-between bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden animate-pulse ${
+        isCarousel ? "w-[170px] sm:w-[190px] md:w-[205px] shrink-0" : "w-full"
+      }`}
+    >
+      <div className="relative aspect-[4/3] w-full bg-[var(--bg-sub)]" />
+      <div className="p-3 flex-1 flex flex-col justify-between space-y-3">
+        <div className="space-y-1.5">
+          <div className="h-3 w-16 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-4 w-3/4 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-3 w-1/2 bg-[var(--bg-sub)] rounded-md" />
+        </div>
+        <div className="pt-1 flex items-center justify-between">
+          <div className="h-4 w-12 bg-[var(--bg-sub)] rounded-md" />
+          <div className="h-7 w-16 bg-[var(--bg-sub)] rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductCard({ product, isCarousel = false, offers = [] }) {
   const { addItem } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const imageSrc = product.image || FALLBACK_IMAGE;
-  const isFav = isFavorite(product._id);
-  const restStatus = useOperationalStatus(product.restaurant);
+  const [imgSrc, setImgSrc] = useState(product?.image || FALLBACK_IMAGE);
+  const isFav = product?._id ? isFavorite(product._id) : false;
+  const restStatus = useOperationalStatus(product?.restaurant);
+
+  useEffect(() => {
+    setImgSrc(product?.image || FALLBACK_IMAGE);
+  }, [product?.image]);
+
+  if (!product) return null;
 
   // Check if product qualifies as Newly Arrived (within 14 days)
   const isNew = isProductNewArrival(product, 14);
@@ -83,13 +112,14 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
         {/* Top Product Image Container */}
         <div className="relative aspect-[4/3] w-full bg-[var(--bg-sub)] overflow-hidden">
           <Image
-            src={imageSrc}
+            src={imgSrc}
             alt={product.name}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
+            sizes={isCarousel ? "(max-width: 640px) 170px, 205px" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
             className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
               product.isAvailable ? "" : "grayscale-[40%]"
             }`}
+            onError={() => setImgSrc(FALLBACK_IMAGE)}
           />
 
           {/* FSSAI Veg / Non-Veg Indicator Icon & Newly Arrived Tag */}
@@ -99,6 +129,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
                 product.type === "veg" ? "border-emerald-600" : "border-rose-600"
               }`}
               title={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
+              aria-label={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
@@ -117,8 +148,8 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <button
             type="button"
             onClick={handleToggleFav}
-            aria-label={isFav ? "Remove from wishlist" : "Add to wishlist"}
-            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 transition shadow-xs cursor-pointer"
+            aria-label={isFav ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
           >
             <Heart size={13} className={isFav ? "fill-rose-500 text-rose-500" : ""} />
           </button>
@@ -145,7 +176,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
         {/* Card Body */}
         <div className="p-3 flex-1 flex flex-col justify-between space-y-2 min-w-0">
           <div className="min-w-0">
-            {/* Rating Badge + Review Count (Flipkart Style) */}
+            {/* Rating Badge + Review Count */}
             <div className="flex items-center gap-1.5 mb-1">
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs">
                 <span>{(product.rating || 4.5).toFixed(1)}</span>
@@ -174,7 +205,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             </h3>
           </div>
 
-          {/* Pricing & Offer Row (Option A vs Option B) */}
+          {/* Pricing & Offer Row */}
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-sm sm:text-base font-black text-[var(--text-main)]">
@@ -186,15 +217,14 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
                 </span>
               )}
               {discountPercent > 0 && (
-                <span className="text-[10px] font-bold text-emerald-600">
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                   {discountPercent}% off
                 </span>
               )}
             </div>
 
-            {/* Offer Callout: Option B (Auto discount) vs Option A (Requires coupon code) */}
             {isAutoDiscount ? (
-              <p className="text-[10px] font-bold text-emerald-600 mt-0.5 truncate flex items-center gap-1">
+              <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 truncate flex items-center gap-1">
                 <Zap size={10} className="fill-emerald-600 shrink-0" />
                 <span>Auto Applied: ₹{autoDiscount} OFF</span>
               </p>
@@ -213,6 +243,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
         {!product.isAvailable ? (
           <button
             disabled
+            aria-disabled="true"
             className="w-full py-1.5 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed"
           >
             Unavailable
@@ -221,7 +252,8 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <button
             type="button"
             onClick={handleAddToCart}
-            className="w-full py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer"
+            aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
+            className="w-full py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden"
           >
             <Clock size={11} /> Closed
           </button>
@@ -229,7 +261,8 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <button
             type="button"
             onClick={handleAddToCart}
-            className="w-full py-1.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1 cursor-pointer"
+            aria-label={`Add ${product.name} to cart`}
+            className="w-full py-1.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden"
           >
             <Plus size={13} strokeWidth={3} />
             <span>Add</span>

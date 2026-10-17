@@ -16,7 +16,13 @@ const useNotificationStore = create((set, get) => ({
   setSelectedMessage: (msg) => set({ selectedMessage: msg }),
   setActiveFilter: (filter) => set({ activeFilter: filter }),
 
-  fetchNotifications: async () => {
+  fetchNotifications: async (options = {}) => {
+    const { force = false } = options || {};
+    if (!force && typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
+    if (get().loading) return;
+
     try {
       set({ loading: true, error: null });
       const res = await fetch("/api/messages", {

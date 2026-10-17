@@ -4,6 +4,7 @@ import useCartStore from "@/lib/cartStore";
 import { useSession, signOut } from "next-auth/react";
 import {
   ShoppingCart,
+  Search,
   ChevronDown,
   User,
   Package,
@@ -23,7 +24,11 @@ import useNotificationStore from "@/lib/notificationStore";
 import Link from "next/link";
 import Image from "next/image";
 
-const RightSection = () => {
+const RightSection = ({
+  onOpenMobileSearch,
+  isMobileSearchOpen,
+  mobileSearchButtonRef,
+}) => {
   const { getTotalItems, openCart, clearCartLocal } = useCartStore();
   const { openNotifications, unreadCount } = useNotificationStore();
   const { data: session } = useSession();
@@ -76,10 +81,24 @@ const RightSection = () => {
         </div>
       )}
 
+      {/* Mobile Search Button (visible below md breakpoint, positioned immediately before Cart button) */}
+      {!isRestaurantAdmin && !isSuperadmin && onOpenMobileSearch && (
+        <button
+          ref={mobileSearchButtonRef}
+          type="button"
+          onClick={onOpenMobileSearch}
+          aria-label="Search dishes and menu"
+          aria-expanded={Boolean(isMobileSearchOpen)}
+          className="md:hidden relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none"
+        >
+          <Search size={21} />
+        </button>
+      )}
+
       {/* Cart Icon Button */}
       {!isRestaurantAdmin && !isSuperadmin && (
         <button
-          className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px]"
+          className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
           onClick={() => openCart()}
           aria-label="Open Cart"
         >

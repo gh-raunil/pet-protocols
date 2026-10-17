@@ -13,6 +13,7 @@ export default function SearchBar({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [recentSearches, setRecentSearches] = useState([]);
@@ -88,20 +89,25 @@ export default function SearchBar({
     if (!query.trim()) {
       setResults([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
+        setError(null);
         const categoryParam = activeCategory !== "All" ? `&category=${encodeURIComponent(activeCategory)}` : "";
         const res = await fetch(`/api/products?search=${encodeURIComponent(query.trim())}${categoryParam}`);
         const data = await res.json();
         if (data.success) {
           setResults(data.products || []);
+        } else {
+          setError(data.message || "Failed to search dishes");
         }
       } catch (err) {
         console.error("Search error:", err);
+        setError("Unable to connect to search service");
       } finally {
         setLoading(false);
       }
@@ -256,6 +262,11 @@ export default function SearchBar({
               <Loader2 size={24} className="animate-spin text-[var(--brand-accent)]" />
               <span>Searching active kitchen menus...</span>
             </div>
+          ) : error ? (
+            <div className="py-12 text-center">
+              <p className="text-sm font-bold text-rose-500">{error}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Please check your connection or try again.</p>
+            </div>
           ) : results.length > 0 ? (
             results.map((product) => (
               <div
@@ -276,7 +287,7 @@ export default function SearchBar({
                   <div className="flex items-center gap-1.5">
                     <span
                       className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ${
-                        product.foodType === "veg" ? "bg-emerald-500" : "bg-red-500"
+                        (product.type || product.foodType) === "veg" ? "bg-emerald-500" : "bg-red-500"
                       }`}
                     />
                     <h4 className="text-sm font-bold text-[var(--text-main)] truncate">
@@ -444,6 +455,11 @@ export default function SearchBar({
                 <Loader2 size={20} className="animate-spin text-[var(--brand-accent)]" />
                 <span>Searching active kitchen menus...</span>
               </div>
+            ) : error ? (
+              <div className="p-6 text-center">
+                <p className="text-xs font-bold text-rose-500">{error}</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Please check your connection or try again.</p>
+              </div>
             ) : results.length > 0 ? (
               results.map((product) => (
                 <div
@@ -462,7 +478,7 @@ export default function SearchBar({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${product.foodType === 'veg' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${(product.type || product.foodType) === 'veg' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                       <h4 className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate group-hover:text-[var(--brand-accent)] transition">
                         {product.name}
                       </h4>

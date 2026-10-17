@@ -5,6 +5,7 @@ import {
   PackageCheck,
   ChefHat,
   Truck,
+  ShoppingBag,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -47,9 +48,50 @@ export const ORDER_STEPS = [
   },
 ];
 
+export function getOrderSteps(isPickup = false) {
+  if (isPickup) {
+    return [
+      {
+        id: "pending",
+        label: "Order Placed",
+        shortLabel: "Placed",
+        description: "Kitchen accepted order",
+        statusMessage: "Your order is confirmed and waiting in the kitchen queue.",
+        icon: PackageCheck,
+      },
+      {
+        id: "preparing",
+        label: "Preparing",
+        shortLabel: "Cooking",
+        description: "Chef is crafting your meal",
+        statusMessage: "The culinary team is preparing your fresh dishes right now.",
+        icon: ChefHat,
+      },
+      {
+        id: "ready",
+        label: "Ready for Pickup",
+        shortLabel: "Ready",
+        description: "Waiting at kitchen counter",
+        statusMessage: "Your order is freshly prepared and ready for pickup at the kitchen counter.",
+        icon: ShoppingBag,
+      },
+      {
+        id: "delivered",
+        label: "Picked Up",
+        shortLabel: "Collected",
+        description: "Order collected from kitchen",
+        statusMessage: "Order collected! Enjoy your delicious meal.",
+        icon: CheckCircle2,
+      },
+    ];
+  }
+  return ORDER_STEPS;
+}
+
 export function getActiveStepIndex(status) {
   switch (status?.toLowerCase()) {
     case "pending":
+    case "confirmed":
       return 0;
     case "preparing":
       return 1;
@@ -63,11 +105,17 @@ export function getActiveStepIndex(status) {
   }
 }
 
-export default function OrderStatusTracker({ status = "pending", paymentStatus = "paid" }) {
+export default function OrderStatusTracker({
+  status = "pending",
+  paymentStatus = "paid",
+  isPickup = false,
+  cancellationReason = "",
+}) {
   const isCancelled = status?.toLowerCase() === "cancelled";
   const isFailed = paymentStatus?.toLowerCase() === "failed";
   const activeIndex = getActiveStepIndex(status);
-  const currentStep = ORDER_STEPS[activeIndex] || ORDER_STEPS[0];
+  const steps = getOrderSteps(isPickup);
+  const currentStep = steps[activeIndex] || steps[0];
 
   // 1. Cancelled or Failed Order State
   if (isCancelled || isFailed) {
@@ -77,16 +125,18 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
           <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
             {isCancelled ? <XCircle size={24} /> : <AlertTriangle size={24} />}
           </div>
-          <div>
-            <span className="inline-block text-xs font-black uppercase tracking-wider bg-red-500/20 text-red-500 px-3 py-1 rounded-full border border-red-500/30 mb-2">
+          <div className="space-y-1">
+            <span className="inline-block text-xs font-black uppercase tracking-wider bg-red-500/20 text-red-500 px-3 py-1 rounded-full border border-red-500/30 mb-1">
               {isCancelled ? "Order Cancelled" : "Payment Declined"}
             </span>
             <h4 className="text-base font-bold text-[var(--text-main)]">
               {isCancelled ? "This order will not be fulfilled" : "Payment could not be processed"}
             </h4>
-            <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
               {isCancelled
-                ? "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method."
+                ? (cancellationReason
+                    ? `Cancellation reason: ${cancellationReason}. If any payment was captured, the full refund is initiated to the source payment method.`
+                    : "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method.")
                 : "The payment transaction failed. Please retry your order using Cash on Delivery or another digital payment method."}
             </p>
           </div>
@@ -96,7 +146,7 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
   }
 
   // Calculate percentage for progress line
-  const progressPercent = (activeIndex / (ORDER_STEPS.length - 1)) * 100;
+  const progressPercent = (activeIndex / (steps.length - 1)) * 100;
 
   // 2. Normal Active Order Progress Tracker
   return (
@@ -141,7 +191,7 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
           />
 
           {/* Stepper Nodes */}
-          {ORDER_STEPS.map((step, idx) => {
+          {steps.map((step, idx) => {
             const Icon = step.icon;
             const isCompleted = idx < activeIndex;
             const isCurrent = idx === activeIndex;
@@ -193,14 +243,14 @@ export default function OrderStatusTracker({ status = "pending", paymentStatus =
 
       {/* Mobile Stepper View */}
       <div className="sm:hidden pt-6 space-y-4">
-        {ORDER_STEPS.map((step, idx) => {
+        {steps.map((step, idx) => {
           const Icon = step.icon;
           const isCompleted = idx < activeIndex;
           const isCurrent = idx === activeIndex;
 
           return (
             <div key={step.id} className="relative flex items-start gap-3.5">
-              {idx < ORDER_STEPS.length - 1 && (
+              {idx < steps.length - 1 && (
                 <div
                   className={`absolute top-9 left-4 -ml-0.5 w-1 h-9 rounded-full transition-colors ${
                     isCompleted ? "bg-emerald-500" : "bg-[var(--border-color)]"

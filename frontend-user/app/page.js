@@ -15,10 +15,9 @@ import {
   CheckCircle2,
   ShieldCheck,
   Zap,
-  ShoppingBag,
   Star,
-  Flame,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
@@ -134,192 +133,242 @@ export default function HomePage() {
     }
   };
 
-  const popularDishes = products.slice(0, 8);
-
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors w-full max-w-full overflow-x-hidden min-w-0">
-      {/* ── SECTION A: HERO (TYPOGRAPHY-LED) ───────────────────────── */}
-      <section className="pt-28 pb-14 sm:pt-40 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center w-full min-w-0">
-        {/* Subtle pill tag */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold uppercase tracking-wider mb-6 animate-[fadeIn_0.5s_ease]">
-          <Sparkles size={14} /> Certified Kitchen Partners
+      {/* ── SECTION A: COMPACT DISCOVERY HERO ───────────────────────── */}
+      <section className="pt-28 pb-8 sm:pt-36 sm:pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center w-full min-w-0">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] text-xs font-semibold tracking-wide mb-4">
+          <Sparkles size={13} /> Multi-Kitchen Dining Platform
         </div>
 
-        {/* Brand headline */}
-        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.08] text-[var(--text-main)] mb-6 break-words">
-          पेट Protocols
-          <span className="block text-[var(--brand-accent)] mt-1 sm:mt-2 text-2xl sm:text-4xl md:text-6xl font-extrabold break-words">
-            Fresh food. Zero compromises.
-          </span>
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-[var(--text-main)] mb-3 leading-[1.12]">
+          Fresh food, <span className="text-[var(--brand-accent)]">zero compromises.</span>
         </h1>
 
-        {/* Clear mission description */}
-        <p className="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-[var(--text-muted)] font-normal leading-relaxed mb-10 break-words px-2">
+        <p className="max-w-xl mx-auto text-xs sm:text-sm md:text-base text-[var(--text-muted)] font-normal leading-relaxed mb-8 px-2">
           Discover vetted partner kitchens, explore chef-crafted menus, and order freshly prepared meals with seamless multi-restaurant ordering.
         </p>
 
-        {/* Primary and secondary call-to-actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md mx-auto">
-          <Link
-            href="/menu"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-[var(--brand-accent)]/25 transition flex items-center justify-center gap-2 group"
-          >
-            Explore Food
-            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <Link
-            href="/offers"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 text-[var(--text-main)] font-semibold text-sm transition flex items-center justify-center gap-2"
-          >
-            <Tag size={15} className="text-[var(--brand-accent)]" />
-            View Offers
-          </Link>
-        </div>
-      </section>
-
-      {/* ── SECTION B: DISCOVER & QUICK SEARCH ───────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto -mt-4 mb-16">
+        {/* Integrated Clean Search Box */}
         <form
           onSubmit={handleSearchSubmit}
-          className="flex items-center gap-2 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl shadow-black/5 focus-within:border-[var(--brand-accent)] transition"
+          className="flex items-center gap-2 p-1.5 sm:p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm focus-within:border-[var(--brand-accent)] focus-within:ring-2 focus-within:ring-[var(--brand-accent)]/20 transition max-w-xl mx-auto"
         >
-          <div className="pl-3 text-[var(--text-muted)]">
-            <Search size={20} />
+          <div className="pl-3 text-[var(--text-muted)] shrink-0">
+            <Search size={18} />
           </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by dish name, cuisine, or restaurant..."
-            className="flex-1 bg-transparent px-2 py-2 text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none"
+            placeholder="Search dishes, cuisines, or partner kitchens..."
+            className="flex-1 bg-transparent px-2 py-2 text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none min-w-0"
           />
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] text-white text-xs font-bold hover:opacity-90 transition shrink-0"
+            className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold transition shrink-0 cursor-pointer shadow-xs active:scale-97"
           >
             Search
           </button>
         </form>
+
+        {/* Quick Cravings Pill Bar */}
+        {categories.length > 0 && (
+          <div className="flex items-center justify-center gap-2 flex-wrap mt-4 text-xs">
+            <span className="text-[11px] text-[var(--text-muted)] font-medium">Quick explore:</span>
+            {categories.slice(0, 6).map((cat) => (
+              <Link
+                key={cat._id || cat.name}
+                href={`/menu?category=${encodeURIComponent(cat.name)}`}
+                className="px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)] text-[11px] font-medium transition shadow-2xs"
+              >
+                {cat.name}
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* ── SECTION C: BROWSE CATEGORIES ───────────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-        <div className="flex items-center justify-between mb-8">
+      {/* ── SECTION B: BROWSE FOOD CATEGORIES ───────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
-              Browse Categories
+            <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight">
+              Explore Categories
             </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Select your craving for instant menu filtering
             </p>
           </div>
           <Link
             href="/menu"
-            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
+            className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0"
           >
             All Dishes <ChevronRight size={14} />
           </Link>
         </div>
 
         {categories.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
             {categories.map((cat) => (
               <Link
                 key={cat._id || cat.name}
                 href={`/menu?category=${encodeURIComponent(cat.name)}`}
-                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-1 transition-all group flex flex-col items-center text-center shadow-sm"
+                className="p-3.5 sm:p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:-translate-y-0.5 transition-all group flex flex-col items-center text-center shadow-2xs"
               >
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mb-3 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800/80 border border-[var(--border-color)] flex items-center justify-center shadow-xs group-hover:scale-105 group-hover:shadow-md transition-all duration-300 relative">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mb-2.5 rounded-xl overflow-hidden bg-[var(--bg-sub)] border border-[var(--border-color)] flex items-center justify-center relative">
                   {cat.image ? (
                     <img
                       src={cat.image}
                       alt={cat.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">
+                    <span className="text-2xl group-hover:scale-110 transition-transform">
                       {cat.icon || "🍽️"}
                     </span>
                   )}
                 </div>
-                <span className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition line-clamp-1">
+                <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition line-clamp-1">
                   {cat.name}
                 </span>
-                <span className="text-[11px] text-[var(--text-muted)] mt-1">
-                  {cat.dishCount > 0 ? `${cat.dishCount} ${cat.dishCount === 1 ? "dish" : "dishes"}` : "Explore menu"}
+                <span className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                  {cat.dishCount > 0 ? `${cat.dishCount} ${cat.dishCount === 1 ? "dish" : "dishes"}` : "Explore"}
                 </span>
               </Link>
             ))}
           </div>
         ) : loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5 sm:gap-4">
-            {[1, 2, 3, 4, 5].map((i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="h-28 rounded-2xl bg-[var(--bg-card)] animate-pulse border border-[var(--border-color)]" />
             ))}
           </div>
         ) : null}
       </section>
 
-      {/* ── SECTION D: CURATED CAROUSELS (FLIPKART STYLE) ───────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20 space-y-10">
+      {/* ── SECTION C: SPECIAL OFFERS STRIP ─────────────────────────── */}
+      {offers.length > 0 && (
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+                <Tag className="text-[var(--brand-accent)] w-4 h-4" />
+                Active Special Offers
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Verified discounts and kitchen promotions
+              </p>
+            </div>
+            <Link
+              href="/offers"
+              className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1 shrink-0"
+            >
+              All Offers <ChevronRight size={14} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {offers.slice(0, 3).map((offer) => (
+              <div
+                key={offer._id}
+                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-col justify-between shadow-2xs hover:border-[var(--brand-accent)]/40 transition"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] uppercase tracking-wider">
+                      {offer.discountType === "percentage" ? `${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`}
+                    </span>
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)]">
+                      {offer.code}
+                    </span>
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-[var(--text-main)] mt-1">
+                    {offer.title || "Kitchen Special"}
+                  </h3>
+                  {offer.description && (
+                    <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">
+                      {offer.description}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-[var(--text-muted)]">
+                    {offer.minOrderAmount ? `Min order ₹${offer.minOrderAmount}` : "No minimum"}
+                  </span>
+                  <Link
+                    href={`/menu?coupon=${encodeURIComponent(offer.code || "")}`}
+                    className="font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-0.5"
+                  >
+                    Apply <ChevronRight size={12} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── SECTION D: CURATED FOOD DISCOVERY CAROUSELS ─────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16 space-y-8">
         {loading ? (
-          <div className="space-y-8">
-            <div className="h-64 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
-            <div className="h-64 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
+          <div className="space-y-6">
+            <div className="h-60 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
+            <div className="h-60 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse" />
           </div>
         ) : products.length === 0 ? (
-          <div className="text-center py-16 px-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)]">
-            <UtensilsCrossed size={36} className="mx-auto text-[var(--text-muted)] mb-3" />
-            <h3 className="text-base font-bold text-[var(--text-main)]">Menu Catalog Updating</h3>
+          <div className="text-center py-12 px-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <UtensilsCrossed size={32} className="mx-auto text-[var(--text-muted)] mb-2" />
+            <h3 className="text-sm font-bold text-[var(--text-main)]">Menu Catalog Updating</h3>
             <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto mt-1">
               Fresh dishes from our partnered kitchens are currently being prepared. Check back shortly!
             </p>
           </div>
         ) : (
           <>
-            {/* 0. Newly Arrived Dishes (Admin controlled window; completely hidden if no dishes qualify) */}
+            {/* Newly Arrived Dishes (Admin window calculation; rendered only if dishes qualify) */}
             {newArrivalsList.length > 0 && (
               <ProductCarousel
                 title="Newly Arrived Dishes"
                 subtitle="Fresh culinary additions recently prepared by our partner kitchens"
-                badge="✨ Newly Arrived"
-                icon={<Sparkles size={20} className="text-amber-500 fill-amber-500/20" />}
+                badge="New"
+                icon={<Sparkles size={18} className="text-amber-500 fill-amber-500/20" />}
                 products={newArrivalsList}
                 offers={offers}
                 viewAllHref="/menu"
               />
             )}
 
-            {/* 1. Recommended For You (Personalized - Only if user has interaction/search history) */}
+            {/* Recommended For You (Personalized - Only if user has interaction/search history) */}
             {userHasHistory && recommendedList.length > 0 && (
               <ProductCarousel
                 title="Recommended For You"
-                subtitle="Dishes curated based on your searches and dining preferences"
+                subtitle="Dishes curated based on your dining preferences"
                 badge="For You"
-                icon={<Sparkles size={20} />}
+                icon={<Sparkles size={18} />}
                 products={recommendedList}
                 offers={offers}
                 viewAllHref="/menu"
               />
             )}
 
-            {/* 2. Our Best Selling Products */}
+            {/* Best Selling Dishes */}
             <ProductCarousel
-              title="Our Best Selling Products"
-              subtitle="Most popular and frequently ordered dishes by foodies"
-              badge="Hot Sellers"
-              icon={<Flame size={20} />}
+              title="Popular & Best Selling"
+              subtitle="Frequently ordered favorites across all kitchens"
+              badge="Popular"
+              icon={<Star size={18} className="text-[var(--brand-accent)]" />}
               products={bestSellingList}
               offers={offers}
               viewAllHref="/menu"
             />
 
-            {/* 3. Top Rated Food */}
+            {/* Top Rated Food */}
             <ProductCarousel
-              title="Top Rated Food"
-              subtitle="Exceptional quality with highest customer reviews and ratings"
+              title="Top Rated Dishes"
+              subtitle="Highest customer ratings and reviews"
               badge="Top Rated"
-              icon={<Star size={20} className="fill-orange-500 text-orange-500" />}
+              icon={<Star size={18} className="fill-amber-400 text-amber-400" />}
               products={topRatedList}
               offers={offers}
               viewAllHref="/menu"
@@ -329,38 +378,38 @@ export default function HomePage() {
       </section>
 
       {/* ── SECTION E: PARTNERED RESTAURANTS ───────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-        <div className="flex items-center justify-between mb-8">
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
-              <Building2 className="text-[var(--brand-accent)] w-5 h-5" />
-              Partnered Kitchens & Restaurants
+            <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+              <Building2 className="text-[var(--brand-accent)] w-4 h-4" />
+              Partnered Kitchens & Cloud Restaurants
             </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-              Verified dining kitchens preparing food to the highest hygiene standards
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Verified dining kitchens preparing food to high hygiene standards
             </p>
           </div>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-44 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse"
+                className="h-40 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-pulse"
               />
             ))}
           </div>
         ) : restaurants.length === 0 ? (
-          <div className="text-center py-14 px-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)]">
-            <Building2 size={36} className="mx-auto text-[var(--text-muted)] mb-3" />
-            <h3 className="text-base font-bold text-[var(--text-main)]">Kitchen Onboarding in Progress</h3>
+          <div className="text-center py-12 px-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <Building2 size={32} className="mx-auto text-[var(--text-muted)] mb-2" />
+            <h3 className="text-sm font-bold text-[var(--text-main)]">Kitchen Onboarding in Progress</h3>
             <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto mt-1">
               We are connecting new verified kitchens in your area.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {restaurants.map((rest) => {
               const opStatus = getRestaurantOperationalStatus(rest);
               const flatFee = rest.chargeSettings?.flatDeliveryFee ?? 40;
@@ -372,15 +421,15 @@ export default function HomePage() {
                 <Link
                   key={rest._id}
                   href={`/menu?restaurant=${rest._id}`}
-                  className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-sm hover:shadow-md"
+                  className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 transition-all flex flex-col justify-between group shadow-2xs hover:shadow-xs"
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-start justify-between gap-3 mb-2.5">
                       <div>
-                        <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition flex items-center gap-1.5">
+                        <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition flex items-center gap-1.5">
                           {rest.name}
                         </h3>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">
                           {typeof rest.address === "string" && rest.address
                             ? rest.address
                             : rest.address && typeof rest.address === "object"
@@ -389,18 +438,17 @@ export default function HomePage() {
                         </p>
                       </div>
                       {opStatus.isOpen ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
                           Open Now
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 border border-amber-500/30 whitespace-nowrap" title={opStatus.reason}>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap" title={opStatus.reason}>
                           Closed
                         </span>
                       )}
                     </div>
 
-                    {/* Operational Hours & Delivery Badge Row */}
-                    <div className="flex items-center gap-2 flex-wrap mb-3 text-[11px] text-[var(--text-muted)]">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-2.5 text-[11px] text-[var(--text-muted)]">
                       <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)]">
                         <Clock size={11} className="text-[var(--brand-accent)]" />
                         {opStatus.hoursText || rest.openingHours || "10 AM - 11 PM"}
@@ -409,25 +457,25 @@ export default function HomePage() {
                         📍 {radiusKm} km radius
                       </span>
                       {minOrder > 0 && (
-                        <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] text-amber-500">
+                        <span className="inline-flex items-center gap-1 bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] text-amber-600 dark:text-amber-400">
                           Min ₹{minOrder}
                         </span>
                       )}
                     </div>
 
                     {rest.description && (
-                      <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-4">
+                      <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed mb-3">
                         {rest.description}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
-                    <span className="flex items-center gap-1 font-medium">
+                  <div className="flex items-center justify-between pt-2.5 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
+                    <span className="font-medium">
                       Delivery: ₹{flatFee} {freeThreshold > 0 ? `(Free > ₹${freeThreshold})` : ""}
                     </span>
                     <span className="font-bold text-[var(--brand-accent)] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                      View Menu <ChevronRight size={14} />
+                      Menu <ChevronRight size={13} />
                     </span>
                   </div>
                 </Link>
@@ -437,83 +485,23 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── SECTION F: CURRENT OFFERS ───────────────────────────────── */}
-      {offers.length > 0 && (
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
-                <Tag className="text-[var(--brand-accent)] w-5 h-5" />
-                Active Special Offers
-              </h2>
-              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-                Exclusive verified discounts on your favorite dishes
-              </p>
-            </div>
-            <Link
-              href="/offers"
-              className="text-xs font-bold text-[var(--brand-accent)] hover:underline flex items-center gap-1"
-            >
-              All Deals <ChevronRight size={14} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {offers.slice(0, 3).map((offer) => (
-              <div
-                key={offer._id}
-                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-col justify-between shadow-sm relative overflow-hidden"
-              >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-black bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 uppercase tracking-wider">
-                    {offer.discountType === "percentage" ? `${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`}
-                  </span>
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)]">
-                    {offer.code}
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-[var(--text-main)] mt-2">
-                  {offer.title || "Kitchen Special"}
-                </h3>
-                {offer.description && (
-                  <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">
-                    {offer.description}
-                  </p>
-                )}
-                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
-                  <span className="text-[11px] text-[var(--text-muted)]">
-                    {offer.minOrderAmount ? `Min order ₹${offer.minOrderAmount}` : "No min order"}
-                  </span>
-                  <Link
-                    href="/menu"
-                    className="text-xs font-bold text-[var(--brand-accent)] hover:underline"
-                  >
-                    Apply on Menu →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── SECTION G: WHY ORDER THROUGH पेट PROTOCOLS ──────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-main)]">
-            Why Order Through पेट Protocols
+      {/* ── SECTION F: QUALITY STANDARDS ───────────────────────────── */}
+      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div className="text-center max-w-xl mx-auto mb-8">
+          <h2 className="text-lg sm:text-2xl font-black text-[var(--text-main)] tracking-tight">
+            Built for Transparent Dining
           </h2>
-          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 leading-relaxed">
-            Built from the ground up for food lovers who value quality, transparency, and speed.
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
+            Zero fake delivery promises. Just great food prepared with care.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] flex items-center justify-center">
-              <Zap size={22} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center">
+              <Layers size={20} />
             </div>
-            <h3 className="text-base font-bold text-[var(--text-main)]">
+            <h3 className="text-sm font-bold text-[var(--text-main)]">
               Multi-Kitchen Cart
             </h3>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
@@ -521,11 +509,11 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center">
-              <ShieldCheck size={22} />
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <ShieldCheck size={20} />
             </div>
-            <h3 className="text-base font-bold text-[var(--text-main)]">
+            <h3 className="text-sm font-bold text-[var(--text-main)]">
               Verified Hygiene
             </h3>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
@@ -533,59 +521,47 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center">
-              <Clock size={22} />
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Clock size={20} />
             </div>
-            <h3 className="text-base font-bold text-[var(--text-main)]">
-              Real Order Stages
+            <h3 className="text-sm font-bold text-[var(--text-main)]">
+              Honest Order Stages
             </h3>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Honest status updates directly from kitchen prep stations without misleading fake GPS claims.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-500 flex items-center justify-center">
-              <CheckCircle2 size={22} />
-            </div>
-            <h3 className="text-base font-bold text-[var(--text-main)]">
-              Zero Compromises
-            </h3>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Freshly packed, sealed, and handled with care to ensure the food arrives exactly as the chef intended.
+              Transparent live status directly from kitchen prep stations without misleading fake GPS graphics.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION H: CUSTOMER REVIEWS (GENUINE DATA ONLY) ──────────── */}
+      {/* ── SECTION G: CUSTOMER EXPERIENCES (GENUINE DATA ONLY) ──────── */}
       {ratings.length > 0 && (
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-24">
-          <div className="flex items-center justify-between mb-8">
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)] flex items-center gap-2">
-                <Star className="text-amber-400 fill-amber-400 w-5 h-5" />
-                Customer Experiences
+              <h2 className="text-lg sm:text-xl font-black text-[var(--text-main)] tracking-tight flex items-center gap-2">
+                <Star className="text-amber-400 fill-amber-400 w-4 h-4" />
+                Diner Feedback
               </h2>
-              <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Authentic feedback from verified diners
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {ratings.slice(0, 3).map((rate, i) => (
               <div
                 key={rate._id || i}
-                className="p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm space-y-3"
+                className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2.5"
               >
                 <div className="flex items-center gap-1 text-amber-400">
                   {Array.from({ length: 5 }).map((_, s) => (
                     <Star
                       key={s}
-                      size={14}
-                      className={s < (rate.rating || 5) ? "fill-amber-400" : "text-gray-500"}
+                      size={13}
+                      className={s < (rate.rating || 5) ? "fill-amber-400" : "text-gray-300 dark:text-gray-600"}
                     />
                   ))}
                 </div>
@@ -593,7 +569,7 @@ export default function HomePage() {
                   &ldquo;{rate.comment || rate.review || "Delicious food and prompt delivery!"}&rdquo;
                 </p>
                 <div className="pt-2 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)]">
-                  {rate.userName || rate.user?.name || "Verified Foodie"}
+                  {rate.userName || rate.user?.name || "Verified Diner"}
                 </div>
               </div>
             ))}

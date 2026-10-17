@@ -21,6 +21,7 @@ import {
   LogIn,
   ChevronRight,
   Sparkles,
+  ShoppingCart,
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
 import useCartStore from "@/lib/cartStore";
@@ -31,7 +32,8 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { unreadCount } = useNotificationStore();
-  const { clearCartLocal } = useCartStore();
+  const { clearCartLocal, getTotalItems } = useCartStore();
+  const totalItems = getTotalItems();
   const {
     menuBadge,
     offersBadge,
@@ -88,6 +90,12 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
       icon: UtensilsCrossed,
       badge: menuBadge > 0 ? menuBadge : null,
       onClear: clearMenuBadge,
+    },
+    {
+      href: "/cart",
+      label: "My Cart",
+      icon: ShoppingCart,
+      badge: totalItems > 0 ? totalItems : null,
     },
     {
       href: "/offers",

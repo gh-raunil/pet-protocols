@@ -6,13 +6,13 @@
 @theme {
   --color-brand-orange: var(--brand-accent, #ea580c);
   --color-brand-accent: var(--brand-accent, #ea580c);
-  --color-brand-dark: var(--bg-main, #141518);
-  --color-brand-sub: var(--bg-sub, #1b1d22);
-  --color-brand-card: var(--bg-card, #20232a);
-  --color-brand-card-hover: var(--bg-card-hover, #282c35);
-  --color-brand-border: var(--border-color, rgba(255, 255, 255, 0.1));
-  --color-brand-muted: var(--text-muted, #94a3b8);
-  --color-brand-text: var(--text-main, #f8fafc);
+  --color-brand-dark: var(--bg-main, #FAF7F2);
+  --color-brand-sub: var(--bg-sub, #F3EFE8);
+  --color-brand-card: var(--bg-card, #FFFFFF);
+  --color-brand-card-hover: var(--bg-card-hover, #F7F3EC);
+  --color-brand-border: var(--border-color, rgba(44, 34, 25, 0.12));
+  --color-brand-muted: var(--text-muted, #6B645C);
+  --color-brand-text: var(--text-main, #1C1917);
   --color-brand-success: var(--color-success, #10b981);
   --color-brand-warning: var(--color-warning, #f59e0b);
   --color-brand-error: var(--color-error, #ef4444);

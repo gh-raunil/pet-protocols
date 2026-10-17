@@ -1,19 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 
 import Link from "next/link";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { signIn } from "next-auth/react";
-
+import { UtensilsCrossed } from "lucide-react";
 import { Chrome, Eye, EyeOff } from "@deemlol/next-icons";
 
+export function getSafeCallbackUrl(rawUrl, fallback = "/menu") {
+  if (!rawUrl || typeof rawUrl !== "string") return fallback;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return fallback;
 
+  // Reject protocol-relative or backslash-tricked paths
+  if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.startsWith("\\")) {
+    return fallback;
+  }
 
-export default function LoginPage() {
+  // Must begin with a single slash
+  if (!trimmed.startsWith("/")) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(trimmed, "https://petprotocols.internal");
+    if (parsed.origin !== "https://petprotocols.internal") {
+      return fallback;
+    }
+    if (!parsed.pathname.startsWith("/") || parsed.pathname.startsWith("//")) {
+      return fallback;
+    }
+    // Reject control characters
+    if (/[\u0000-\u001F\u007F]/.test(trimmed)) {
+      return fallback;
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawCallback = searchParams?.get("callbackUrl");
+  const callbackUrl = getSafeCallbackUrl(rawCallback, "/menu");
 
   const [formData, setFormData] = useState({
     email: "",
@@ -58,7 +92,9 @@ export default function LoginPage() {
       }
 
       // Success
-      router.push("/menu");
+      if (result?.ok) {
+        router.push(callbackUrl);
+      }
     } catch (error) {
       console.log(error);
 
@@ -71,7 +107,7 @@ export default function LoginPage() {
   // Google Login
   async function handleGoogleLogin() {
     await signIn("google", {
-      callbackUrl: "/menu",
+      callbackUrl,
     });
   }
 
@@ -106,8 +142,8 @@ export default function LoginPage() {
       >
         {/* Heading */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] mb-3 text-xl font-black">
-            🍔
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] mb-3">
+            <UtensilsCrossed size={22} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
             Welcome Back
@@ -273,3 +309,18 @@ export default function LoginPage() {
     </main>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-[var(--bg-main)]">
+          <div className="w-8 h-8 border-2 border-[var(--brand-accent)] border-t-transparent rounded-full animate-spin" />
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
+

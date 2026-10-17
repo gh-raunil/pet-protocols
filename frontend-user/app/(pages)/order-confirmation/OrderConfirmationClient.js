@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,6 +26,45 @@ import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { toast } from "@/components/ui/ToastProvider";
 
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
+
+function ConfirmedOrderDishItem({ item }) {
+  const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
+
+  useEffect(() => {
+    setImgSrc(item.image || FALLBACK_IMAGE);
+  }, [item.image]);
+
+  return (
+    <div className="pt-3 first:pt-0 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-[var(--bg-sub)] shrink-0 border border-[var(--border-color)]">
+          <Image
+            src={imgSrc}
+            alt={item.name || "Dish item"}
+            fill
+            className="object-cover"
+            sizes="48px"
+            onError={() => setImgSrc(FALLBACK_IMAGE)}
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate">
+            {item.name}
+          </p>
+          <p className="text-[11px] text-[var(--text-muted)] font-mono mt-0.5">
+            ₹{item.price} × {item.quantity}
+          </p>
+        </div>
+      </div>
+
+      <span className="text-xs sm:text-sm font-mono font-bold text-[var(--brand-accent)] shrink-0">
+        ₹{(item.price || 0) * (item.quantity || 1)}
+      </span>
+    </div>
+  );
+}
+
 const POLL_INTERVAL = 15000; // Poll status every 15s to keep UI lightweight
 
 export default function OrderConfirmationClient() {
@@ -43,12 +82,94 @@ export default function OrderConfirmationClient() {
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const modalRef = useRef(null);
+  const triggerRef = useRef(null);
 
   useEffect(() => {
     setCurrentTime(Date.now());
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Handle focus trapping, focus restoration, Escape key, and body scroll lock for cancellation modal
+  useEffect(() => {
+    if (showCancelModal) {
+      if (!triggerRef.current && typeof document !== "undefined") {
+        triggerRef.current = document.activeElement;
+      }
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      // Move focus into dialog upon opening
+      const focusTimer = setTimeout(() => {
+        if (modalRef.current) {
+          const focusable = modalRef.current.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusable.length > 0) {
+            focusable[0].focus();
+          } else {
+            modalRef.current.focus();
+          }
+        }
+      }, 50);
+
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape" && !isCancelling) {
+          e.preventDefault();
+          setShowCancelModal(false);
+          return;
+        }
+
+        if (e.key === "Tab" && modalRef.current) {
+          const focusable = Array.from(
+            modalRef.current.querySelectorAll(
+              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+          );
+
+          if (focusable.length === 0) {
+            e.preventDefault();
+            modalRef.current.focus();
+            return;
+          }
+
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === first || !modalRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last || !modalRef.current.contains(document.activeElement)) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        clearTimeout(focusTimer);
+        document.body.style.overflow = prevOverflow;
+        window.removeEventListener("keydown", handleKeyDown);
+
+        // Restore focus to trigger element if it remains mounted and focusable
+        const trigger = triggerRef.current;
+        if (trigger && typeof trigger.focus === "function") {
+          try {
+            if (document.body.contains(trigger)) {
+              trigger.focus();
+            }
+          } catch {}
+          triggerRef.current = null;
+        }
+      };
+    }
+  }, [showCancelModal, isCancelling]);
 
   const fetchOrder = useCallback(
     async (isManual = false) => {
@@ -88,14 +209,33 @@ export default function OrderConfirmationClient() {
   useEffect(() => {
     fetchOrder(false);
 
-    // Stop polling if order reaches a final state
+    // Stop polling if order reaches a final state or if window is hidden
     const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       if (order?.status !== "delivered" && order?.status !== "cancelled") {
         fetchOrder(false);
       }
     }, POLL_INTERVAL);
 
-    return () => clearInterval(intervalId);
+    const handleVisibilityChange = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible" &&
+        order?.status !== "delivered" &&
+        order?.status !== "cancelled"
+      ) {
+        fetchOrder(false);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [fetchOrder, order?.status]);
 
   useEffect(() => {
@@ -168,6 +308,11 @@ export default function OrderConfirmationClient() {
   const orderIdDisplay = order.orderId || order._id?.slice(-8) || "N/A";
   const activeRest = restaurantDetails || (typeof order.restaurant === "object" ? order.restaurant : null);
   const restaurantName = activeRest?.name || (typeof order.restaurant === "object" ? order.restaurant?.name : "पेट Protocols Kitchen") || "Partner Kitchen";
+
+  const isPickup =
+    Boolean(order.notes?.includes("[PICKUP]")) ||
+    Boolean(order.paymentMethod?.toLowerCase().includes("pickup")) ||
+    order.deliveryFee === 0;
 
   const rawRestAddr = activeRest?.address;
   const restaurantAddressStr = typeof rawRestAddr === "object" && rawRestAddr
@@ -254,7 +399,8 @@ export default function OrderConfirmationClient() {
           {canCancel && (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                triggerRef.current = e.currentTarget;
                 setShowCancelModal(true);
                 setCancelReason("");
                 setCancelError("");
@@ -274,6 +420,8 @@ export default function OrderConfirmationClient() {
         <OrderStatusTracker
           status={order.status}
           paymentStatus={order.paymentStatus}
+          isPickup={isPickup}
+          cancellationReason={order.cancellationReason || order.cancelReason || ""}
         />
         <DeliveryPushPrompt />
 
@@ -306,7 +454,8 @@ export default function OrderConfirmationClient() {
             {canCancel ? (
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  triggerRef.current = e.currentTarget;
                   setShowCancelModal(true);
                   setCancelReason("");
                   setCancelError("");
@@ -347,31 +496,7 @@ export default function OrderConfirmationClient() {
             {/* Dishes list */}
             <div className="space-y-3 divide-y divide-[var(--border-color)]">
               {order.items?.map((item, idx) => (
-                <div key={idx} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-[var(--bg-sub)] shrink-0 border border-[var(--border-color)]">
-                      <Image
-                        src={item.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200"}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                        sizes="48px"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate">
-                        {item.name}
-                      </p>
-                      <p className="text-[11px] text-[var(--text-muted)] font-mono mt-0.5">
-                        ₹{item.price} × {item.quantity}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-xs sm:text-sm font-mono font-bold text-[var(--brand-accent)] shrink-0">
-                    ₹{(item.price || 0) * (item.quantity || 1)}
-                  </span>
-                </div>
+                <ConfirmedOrderDishItem key={idx} item={item} />
               ))}
             </div>
 
@@ -484,12 +609,37 @@ export default function OrderConfirmationClient() {
             </div>
           </div>
 
-          {/* Destination Address */}
+          {/* Destination Address / Pickup Details */}
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-6 shadow-xl space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-              <MapPin size={14} className="text-[var(--brand-accent)]" /> Delivery Destination
+              {isPickup ? (
+                <>
+                  <ShoppingBag size={14} className="text-[var(--brand-accent)]" /> Self Pickup Counter
+                </>
+              ) : (
+                <>
+                  <MapPin size={14} className="text-[var(--brand-accent)]" /> Delivery Destination
+                </>
+              )}
             </h3>
-            {order.address ? (
+            {isPickup ? (
+              <div className="text-xs text-[var(--text-muted)] space-y-1.5">
+                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-500 border border-blue-500/30">
+                  Pick Up In Person
+                </span>
+                <p className="font-bold text-[var(--text-main)]">
+                  Customer: {order.address?.fullName || "Guest Customer"}
+                </p>
+                {restaurantAddressStr && (
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    Collect at: <strong className="text-[var(--text-main)]">{restaurantName}</strong> ({restaurantAddressStr})
+                  </p>
+                )}
+                {order.address?.phone && (
+                  <p className="font-mono pt-0.5 text-[11px]">📞 {order.address.phone}</p>
+                )}
+              </div>
+            ) : order.address ? (
               <div className="text-xs text-[var(--text-muted)] space-y-1">
                 <p className="font-bold text-[var(--text-main)]">{order.address.fullName}</p>
                 <p>{order.address.street}</p>
@@ -524,10 +674,18 @@ export default function OrderConfirmationClient() {
 
       {/* Cancellation Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+        <div
+          ref={modalRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-dialog-title"
+          aria-describedby="cancel-dialog-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn outline-none focus:outline-hidden"
+        >
           <div className="w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
-              <div className="flex items-center gap-2 text-rose-500 font-bold text-sm">
+              <div id="cancel-dialog-title" className="flex items-center gap-2 text-rose-500 font-bold text-sm">
                 <AlertTriangle size={18} />
                 <span>Cancel Order</span>
               </div>
@@ -536,7 +694,7 @@ export default function OrderConfirmationClient() {
               </span>
             </div>
 
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p id="cancel-dialog-desc" className="text-xs text-[var(--text-muted)] leading-relaxed">
               Are you sure you want to cancel this order? The restaurant has not started preparing your food yet.
             </p>
 
@@ -547,7 +705,7 @@ export default function OrderConfirmationClient() {
             )}
 
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+              <label htmlFor="cancel-reason-input" className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
                 Quick Reason:
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -561,7 +719,7 @@ export default function OrderConfirmationClient() {
                     key={reason}
                     type="button"
                     onClick={() => setCancelReason(reason)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                       cancelReason === reason
                         ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
                         : "bg-[var(--bg-sub)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
@@ -572,11 +730,12 @@ export default function OrderConfirmationClient() {
                 ))}
               </div>
               <input
+                id="cancel-reason-input"
                 type="text"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Or type cancellation reason..."
-                className="w-full mt-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
+                className="w-full mt-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-hidden focus:border-rose-500 focus-visible:ring-2 focus-visible:ring-rose-500"
               />
             </div>
 
@@ -585,7 +744,7 @@ export default function OrderConfirmationClient() {
                 type="button"
                 onClick={() => setShowCancelModal(false)}
                 disabled={isCancelling}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
               >
                 Keep Order
               </button>
@@ -593,7 +752,7 @@ export default function OrderConfirmationClient() {
                 type="button"
                 onClick={handleCancelOrder}
                 disabled={isCancelling}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
               >
                 {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
               </button>

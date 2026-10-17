@@ -16,10 +16,23 @@ export default function NotificationBell() {
 
     // Poll periodically for any new broadcasts (every 60 seconds)
     const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       fetchNotifications();
     }, 60000);
 
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [fetchNotifications, session]);
 
   if (!isMounted) {

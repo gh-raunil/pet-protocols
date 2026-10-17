@@ -446,7 +446,7 @@ export function ThemeScript() {
                 getCookie("${SHARED_KEY}") ||
                 localStorage.getItem("${THEME_KEY}") ||
                 localStorage.getItem("${SHARED_KEY}") ||
-                "dark";
+                "light";
 
     var palette = getCookie("${PALETTE_KEY}") ||
                   localStorage.getItem("${PALETTE_KEY}") ||
@@ -540,8 +540,8 @@ export function ThemeScript() {
 }
 
 const ThemeContext = createContext({
-  theme: "dark",
-  resolvedTheme: "dark",
+  theme: "light",
+  resolvedTheme: "light",
   palette: "fresh-orange",
   setTheme: () => {},
   setPalette: () => {},
@@ -551,14 +551,14 @@ const ThemeContext = createContext({
 });
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState("dark");
+  const [theme, setThemeState] = useState("light");
   const [palette, setPaletteState] = useState("fresh-orange");
-  const [resolvedTheme, setResolvedTheme] = useState("dark");
+  const [resolvedTheme, setResolvedTheme] = useState("light");
   const [mounted, setMounted] = useState(false);
 
   // Initialize theme from storage
   useEffect(() => {
-    let savedTheme = "dark";
+    let savedTheme = "light";
     let savedPalette = "fresh-orange";
 
     try {

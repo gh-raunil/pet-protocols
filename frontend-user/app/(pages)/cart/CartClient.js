@@ -27,7 +27,7 @@ import { calculateCartDiscounts } from "@/lib/offersHelper";
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
 export default function CartClient() {
-  const { items, increaseQty, decreaseQty, removeItem, getTotalPrice } = useCartStore();
+  const { items, increaseQty, decreaseQty, removeItem, getTotalPrice, isSyncing } = useCartStore();
   const [isMounted, setIsMounted] = useState(false);
   const [orderType, setOrderType] = useState("delivery"); // "delivery" | "pickup"
   const [offers, setOffers] = useState([]);
@@ -43,6 +43,12 @@ export default function CartClient() {
       })
       .catch(() => {});
   }, []);
+
+  // Helper to remove all items from a single kitchen
+  const removeKitchenItems = (restName) => {
+    const kitchenItems = groupedItems[restName]?.items || [];
+    kitchenItems.forEach((i) => removeItem(i._id));
+  };
 
   // Group items by restaurant if restaurant data exists
   const groupedItems = useMemo(() => {
@@ -155,9 +161,17 @@ export default function CartClient() {
           <h1 className="text-2xl sm:text-4xl font-black text-[var(--text-main)] tracking-tight">
             Review Your <span className="text-[var(--brand-accent)]">Feast Cart</span>
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
-            {items.reduce((acc, i) => acc + (i.quantity || 1), 0)} items ready for kitchen preparation
-          </p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <p className="text-xs sm:text-sm text-[var(--text-muted)]">
+              {items.reduce((acc, i) => acc + (i.quantity || 1), 0)} items ready for kitchen preparation
+            </p>
+            {isSyncing && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] text-[11px] font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-accent)] animate-pulse" />
+                Syncing cart...
+              </span>
+            )}
+          </div>
         </div>
 
         <Link
@@ -215,13 +229,22 @@ export default function CartClient() {
                   </div>
                 </div>
 
-                {/* Closed Alert Notice */}
+                {/* Closed Alert Notice with One-Click Cleanup */}
                 {!op.isOpen && (
-                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs font-semibold flex items-center gap-2">
-                    <AlertCircle size={16} className="shrink-0" />
-                    <span>
-                      {restName} is currently closed or not taking online orders. Please remove dishes from this kitchen to proceed.
-                    </span>
+                  <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={16} className="shrink-0" />
+                      <span>
+                        {restName} is currently closed ({op.reason || "Closed"}). Remove dishes from this kitchen to proceed.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeKitchenItems(restName)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition cursor-pointer shadow-xs shrink-0"
+                    >
+                      Remove Dishes
+                    </button>
                   </div>
                 )}
 
@@ -237,74 +260,15 @@ export default function CartClient() {
 
                 {/* Items in this kitchen */}
                 <div className="space-y-4 divide-y divide-[var(--border-color)]">
-                  {group.items.map((item) => {
-                    const qty = item.quantity || 1;
-                    const itemTotal = item.price * qty;
-
-                    return (
-                      <div
-                        key={item._id}
-                        className="pt-4 first:pt-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                      >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-[var(--bg-sub)] shrink-0 border border-[var(--border-color)]">
-                            <Image
-                              src={item.image || FALLBACK_IMAGE}
-                              alt={item.name}
-                              fill
-                              sizes="80px"
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] truncate">
-                              {item.name}
-                            </h3>
-                            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                              ₹{item.price} each
-                            </p>
-                            <p className="text-xs font-extrabold text-[var(--brand-accent)] mt-1">
-                              Total: ₹{itemTotal}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Controls Row */}
-                        <div className="flex items-center justify-between w-full sm:w-auto gap-4 self-end sm:self-center">
-                          <div className="flex items-center gap-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1">
-                            <button
-                              type="button"
-                              onClick={() => decreaseQty(item._id)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer"
-                              aria-label="Decrease quantity"
-                            >
-                              <Minus size={13} />
-                            </button>
-                            <span className="w-6 text-center text-xs font-bold text-[var(--text-main)]">
-                              {qty}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => increaseQty(item._id)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer"
-                              aria-label="Increase quantity"
-                            >
-                              <Plus size={13} />
-                            </button>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item._id)}
-                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                            aria-label={`Remove ${item.name} from cart`}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {group.items.map((item) => (
+                    <CartPageItemRow
+                      key={item._id}
+                      item={item}
+                      decreaseQty={decreaseQty}
+                      increaseQty={increaseQty}
+                      removeItem={removeItem}
+                    />
+                  ))}
                 </div>
               </div>
             );
@@ -326,7 +290,7 @@ export default function CartClient() {
               <button
                 type="button"
                 onClick={() => setOrderType("delivery")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                   orderType === "delivery"
                     ? "bg-[var(--brand-accent)] text-white shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
@@ -337,7 +301,7 @@ export default function CartClient() {
               <button
                 type="button"
                 onClick={() => setOrderType("pickup")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                   orderType === "pickup"
                     ? "bg-[var(--brand-accent)] text-white shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
@@ -430,7 +394,7 @@ export default function CartClient() {
               type="button"
               onClick={handleCheckout}
               disabled={hasBlockingIssues}
-              className={`w-full py-4 rounded-2xl font-extrabold text-sm shadow-xl transition flex items-center justify-center gap-2 ${
+              className={`w-full py-4 rounded-2xl font-extrabold text-sm shadow-xl transition flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                 hasBlockingIssues
                   ? "bg-stone-300 dark:bg-stone-800 text-stone-500 cursor-not-allowed border border-[var(--border-color)]"
                   : "bg-[var(--brand-accent)] hover:opacity-95 text-white shadow-[var(--brand-accent)]/25 active:scale-98 cursor-pointer"
@@ -442,7 +406,7 @@ export default function CartClient() {
 
             <Link
               href="/menu"
-              className="w-full py-3 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/40 font-semibold text-xs transition flex items-center justify-center"
+              className="w-full py-3 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/40 font-semibold text-xs transition flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
               Add More Dishes
             </Link>
@@ -455,5 +419,78 @@ export default function CartClient() {
         </div>
       </div>
     </main>
+  );
+}
+
+function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
+  const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
+  const qty = item.quantity || 1;
+  const itemTotal = (item.price || 0) * qty;
+
+  useEffect(() => {
+    setImgSrc(item.image || FALLBACK_IMAGE);
+  }, [item.image]);
+
+  return (
+    <div className="pt-4 first:pt-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-[var(--bg-sub)] shrink-0 border border-[var(--border-color)]">
+          <Image
+            src={imgSrc}
+            alt={item.name}
+            fill
+            sizes="80px"
+            className="object-cover"
+            onError={() => setImgSrc(FALLBACK_IMAGE)}
+          />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] truncate">
+            {item.name}
+          </h3>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            ₹{item.price} each
+          </p>
+          <p className="text-xs font-extrabold text-[var(--brand-accent)] mt-1">
+            Total: ₹{itemTotal}
+          </p>
+        </div>
+      </div>
+
+      {/* Controls Row */}
+      <div className="flex items-center justify-between w-full sm:w-auto gap-4 self-end sm:self-center">
+        <div className="flex items-center gap-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1">
+          <button
+            type="button"
+            onClick={() => decreaseQty(item._id)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            aria-label={`Decrease quantity of ${item.name}`}
+          >
+            <Minus size={13} />
+          </button>
+          <span className="w-6 text-center text-xs font-bold text-[var(--text-main)]">
+            {qty}
+          </span>
+          <button
+            type="button"
+            onClick={() => increaseQty(item._id)}
+            disabled={qty >= 20}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            aria-label={`Increase quantity of ${item.name}`}
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => removeItem(item._id)}
+          className="p-2 rounded-xl text-rose-500 hover:bg-rose-500/10 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
+          aria-label={`Remove ${item.name} from cart`}
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </div>
   );
 }

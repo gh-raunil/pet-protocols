@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -10,135 +10,281 @@ const STORAGE_KEYS = {
   ORDERS: "pet_protocols_seen_orders_time",
 };
 
+// Module-level shared state & deduplication
+let sharedBadges = {
+  menuBadge: 0,
+  offersBadge: 0,
+  ordersBadge: 0,
+};
+
+const listeners = new Set();
+
+function notifyListeners() {
+  for (const listener of listeners) {
+    listener({ ...sharedBadges });
+  }
+}
+
+// 3-minute catalog & offers cache
+const CACHE_TTL_MS = 180000;
+let cachedProducts = null;
+let cachedProductsTime = 0;
+let cachedOffers = null;
+let cachedOffersTime = 0;
+
+let inFlightPromise = null;
+let globalTimer = null;
+let activeSubscriberCount = 0;
+
+async function fetchProductsCached() {
+  const now = Date.now();
+  if (cachedProducts && now - cachedProductsTime < CACHE_TTL_MS) {
+    return cachedProducts;
+  }
+  try {
+    const res = await fetch("/api/products").then((r) => r.json());
+    if (res?.success && Array.isArray(res.products)) {
+      cachedProducts = res.products;
+      cachedProductsTime = now;
+      return cachedProducts;
+    }
+  } catch {}
+  return cachedProducts || [];
+}
+
+async function fetchOffersCached() {
+  const now = Date.now();
+  if (cachedOffers && now - cachedOffersTime < CACHE_TTL_MS) {
+    return cachedOffers;
+  }
+  try {
+    const res = await fetch("/api/offers").then((r) => r.json());
+    if (res?.success && Array.isArray(res.offers)) {
+      cachedOffers = res.offers;
+      cachedOffersTime = now;
+      return cachedOffers;
+    }
+  } catch {}
+  return cachedOffers || [];
+}
+
+async function evaluateSharedBadges(pathname = "", session = null) {
+  if (typeof window === "undefined") return;
+
+  // Pause polling when browser tab is hidden
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return;
+  }
+
+  if (inFlightPromise) {
+    return inFlightPromise;
+  }
+
+  inFlightPromise = (async () => {
+    try {
+      const lastSeenMenu = Number(localStorage.getItem(STORAGE_KEYS.MENU) || 0);
+      const lastSeenOffers = Number(localStorage.getItem(STORAGE_KEYS.OFFERS) || 0);
+      const lastSeenOrders = Number(localStorage.getItem(STORAGE_KEYS.ORDERS) || 0);
+
+      const isFirstMenuVisit = !localStorage.getItem(STORAGE_KEYS.MENU);
+      const isFirstOffersVisit = !localStorage.getItem(STORAGE_KEYS.OFFERS);
+
+      const [products, offers] = await Promise.all([
+        fetchProductsCached(),
+        fetchOffersCached(),
+      ]);
+
+      let newMenuBadge = 0;
+      if (!pathname.startsWith("/menu")) {
+        if (isFirstMenuVisit) {
+          const sevenDaysAgo = Date.now() - 7 * 86400000;
+          const freshCount = products.filter(
+            (p) => new Date(p.createdAt || 0).getTime() > sevenDaysAgo
+          ).length;
+          newMenuBadge = Math.min(freshCount, 9);
+        } else {
+          const newSinceVisit = products.filter(
+            (p) => new Date(p.createdAt || 0).getTime() > lastSeenMenu
+          ).length;
+          newMenuBadge = Math.min(newSinceVisit, 9);
+        }
+      }
+
+      let newOffersBadge = 0;
+      if (!pathname.startsWith("/offers")) {
+        if (isFirstOffersVisit) {
+          newOffersBadge = Math.min(offers.length, 9);
+        } else {
+          const newOffers = offers.filter(
+            (o) => new Date(o.createdAt || 0).getTime() > lastSeenOffers
+          ).length;
+          newOffersBadge = Math.min(newOffers, 9);
+        }
+      }
+
+      let newOrdersBadge = 0;
+      if (session?.user && !pathname.startsWith("/orders")) {
+        try {
+          const ordRes = await fetch("/api/orders").then((r) => r.json());
+          if (ordRes?.success && Array.isArray(ordRes.orders)) {
+            const activeStatuses = ["pending", "placed", "confirmed", "preparing", "ready", "out_for_delivery"];
+            const activeOrders = ordRes.orders.filter((o) => activeStatuses.includes(o.status));
+            const unacknowledged = activeOrders.filter(
+              (o) => new Date(o.updatedAt || o.createdAt || 0).getTime() > lastSeenOrders
+            );
+            const count = unacknowledged.length > 0 ? unacknowledged.length : activeOrders.length;
+            newOrdersBadge = Math.min(count, 9);
+          }
+        } catch {}
+      }
+
+      // Only notify listeners if state changed to prevent unnecessary re-renders
+      if (
+        sharedBadges.menuBadge !== newMenuBadge ||
+        sharedBadges.offersBadge !== newOffersBadge ||
+        sharedBadges.ordersBadge !== newOrdersBadge
+      ) {
+        sharedBadges = {
+          menuBadge: newMenuBadge,
+          offersBadge: newOffersBadge,
+          ordersBadge: newOrdersBadge,
+        };
+        notifyListeners();
+      }
+    } catch (err) {
+      console.warn("Could not evaluate nav notification badges:", err);
+    } finally {
+      inFlightPromise = null;
+    }
+  })();
+
+  return inFlightPromise;
+}
+
 export function useNavBadges() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const [menuBadge, setMenuBadge] = useState(0);
-  const [offersBadge, setOffersBadge] = useState(0);
-  const [ordersBadge, setOrdersBadge] = useState(0);
+  const [badges, setBadges] = useState(sharedBadges);
+  const pathnameRef = useRef(pathname);
+  const sessionRef = useRef(session);
+
+  pathnameRef.current = pathname;
+  sessionRef.current = session;
 
   // Clear badge when user opens/navigates to that section
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let changed = false;
     if (pathname === "/menu" || pathname.startsWith("/menu/")) {
       localStorage.setItem(STORAGE_KEYS.MENU, String(Date.now()));
-      setMenuBadge(0);
+      if (sharedBadges.menuBadge !== 0) {
+        sharedBadges.menuBadge = 0;
+        changed = true;
+      }
     }
     if (pathname === "/offers" || pathname.startsWith("/offers/")) {
       localStorage.setItem(STORAGE_KEYS.OFFERS, String(Date.now()));
-      setOffersBadge(0);
+      if (sharedBadges.offersBadge !== 0) {
+        sharedBadges.offersBadge = 0;
+        changed = true;
+      }
     }
     if (pathname === "/orders" || pathname.startsWith("/orders/")) {
       localStorage.setItem(STORAGE_KEYS.ORDERS, String(Date.now()));
-      setOrdersBadge(0);
+      if (sharedBadges.ordersBadge !== 0) {
+        sharedBadges.ordersBadge = 0;
+        changed = true;
+      }
     }
-  }, [pathname]);
 
-  // Compute unseen badges based on timestamps
-  const evaluateBadges = useCallback(async () => {
-    if (typeof window === "undefined") return;
-
-    const lastSeenMenu = Number(localStorage.getItem(STORAGE_KEYS.MENU) || 0);
-    const lastSeenOffers = Number(localStorage.getItem(STORAGE_KEYS.OFFERS) || 0);
-    const lastSeenOrders = Number(localStorage.getItem(STORAGE_KEYS.ORDERS) || 0);
-
-    // 1. Explore Menu Badge: count dishes added since last visit
-    // If user has never visited, default to newly arrived dishes in past 14 days
-    const isFirstMenuVisit = !localStorage.getItem(STORAGE_KEYS.MENU);
-
-    try {
-      const [prodRes, offRes] = await Promise.allSettled([
-        fetch("/api/products").then((r) => r.json()),
-        fetch("/api/offers").then((r) => r.json()),
-      ]);
-
-      if (prodRes.status === "fulfilled" && prodRes.value?.success && Array.isArray(prodRes.value.products)) {
-        const products = prodRes.value.products;
-        if (pathname.startsWith("/menu")) {
-          setMenuBadge(0);
-        } else if (isFirstMenuVisit) {
-          // Highlight up to 5 newest dishes created in past 7 days
-          const sevenDaysAgo = Date.now() - 7 * 86400000;
-          const freshCount = products.filter((p) => new Date(p.createdAt || 0).getTime() > sevenDaysAgo).length;
-          setMenuBadge(Math.min(freshCount, 9));
-        } else {
-          const newSinceVisit = products.filter(
-            (p) => new Date(p.createdAt || 0).getTime() > lastSeenMenu
-          ).length;
-          setMenuBadge(Math.min(newSinceVisit, 9));
-        }
-      }
-
-      // 2. Offers Badge: count active offers created since last visit
-      const isFirstOffersVisit = !localStorage.getItem(STORAGE_KEYS.OFFERS);
-      if (offRes.status === "fulfilled" && offRes.value?.success && Array.isArray(offRes.value.offers)) {
-        const offers = offRes.value.offers;
-        if (pathname.startsWith("/offers")) {
-          setOffersBadge(0);
-        } else if (isFirstOffersVisit) {
-          setOffersBadge(Math.min(offers.length, 9));
-        } else {
-          const newOffers = offers.filter(
-            (o) => new Date(o.createdAt || 0).getTime() > lastSeenOffers
-          ).length;
-          setOffersBadge(Math.min(newOffers, 9));
-        }
-      }
-
-      // 3. Orders Badge: count active in-progress orders
-      if (session?.user) {
-        if (pathname.startsWith("/orders")) {
-          setOrdersBadge(0);
-        } else {
-          const ordRes = await fetch("/api/orders").then((r) => r.json()).catch(() => null);
-          if (ordRes?.success && Array.isArray(ordRes.orders)) {
-            const activeStatuses = ["placed", "confirmed", "preparing", "out_for_delivery"];
-            const activeOrders = ordRes.orders.filter((o) => activeStatuses.includes(o.status));
-            // Badge shows active in-flight orders, or any updated since last visit
-            const unacknowledged = activeOrders.filter(
-              (o) => new Date(o.updatedAt || o.createdAt || 0).getTime() > lastSeenOrders
-            );
-            const count = unacknowledged.length > 0 ? unacknowledged.length : activeOrders.length;
-            setOrdersBadge(Math.min(count, 9));
-          }
-        }
-      } else {
-        setOrdersBadge(0);
-      }
-    } catch (err) {
-      console.warn("Could not evaluate nav notification badges:", err);
+    if (changed) {
+      notifyListeners();
     }
+
+    evaluateSharedBadges(pathname, session);
   }, [pathname, session]);
 
+  // Subscribe to shared badge updates & maintain single global polling timer
   useEffect(() => {
-    evaluateBadges();
-    const interval = setInterval(evaluateBadges, 30000);
-    return () => clearInterval(interval);
-  }, [evaluateBadges]);
+    const handleUpdate = (updated) => {
+      setBadges(updated);
+    };
+
+    listeners.add(handleUpdate);
+    activeSubscriberCount++;
+
+    if (activeSubscriberCount === 1) {
+      evaluateSharedBadges(pathnameRef.current, sessionRef.current);
+
+      globalTimer = setInterval(() => {
+        evaluateSharedBadges(pathnameRef.current, sessionRef.current);
+      }, 45000);
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          evaluateSharedBadges(pathnameRef.current, sessionRef.current);
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        listeners.delete(handleUpdate);
+        activeSubscriberCount--;
+        if (activeSubscriberCount === 0) {
+          if (globalTimer) {
+            clearInterval(globalTimer);
+            globalTimer = null;
+          }
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+        }
+      };
+    }
+
+    return () => {
+      listeners.delete(handleUpdate);
+      activeSubscriberCount--;
+      if (activeSubscriberCount === 0) {
+        if (globalTimer) {
+          clearInterval(globalTimer);
+          globalTimer = null;
+        }
+      }
+    };
+  }, []);
+
+  const clearMenuBadge = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEYS.MENU, String(Date.now()));
+    }
+    sharedBadges.menuBadge = 0;
+    notifyListeners();
+  }, []);
+
+  const clearOffersBadge = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEYS.OFFERS, String(Date.now()));
+    }
+    sharedBadges.offersBadge = 0;
+    notifyListeners();
+  }, []);
+
+  const clearOrdersBadge = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEYS.ORDERS, String(Date.now()));
+    }
+    sharedBadges.ordersBadge = 0;
+    notifyListeners();
+  }, []);
 
   return {
-    menuBadge,
-    offersBadge,
-    ordersBadge,
-    clearMenuBadge: () => {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.MENU, String(Date.now()));
-      }
-      setMenuBadge(0);
-    },
-    clearOffersBadge: () => {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.OFFERS, String(Date.now()));
-      }
-      setOffersBadge(0);
-    },
-    clearOrdersBadge: () => {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.ORDERS, String(Date.now()));
-      }
-      setOrdersBadge(0);
-    },
+    menuBadge: badges.menuBadge,
+    offersBadge: badges.offersBadge,
+    ordersBadge: badges.ordersBadge,
+    clearMenuBadge,
+    clearOffersBadge,
+    clearOrdersBadge,
   };
 }

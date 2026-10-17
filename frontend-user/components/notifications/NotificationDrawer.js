@@ -337,7 +337,7 @@ export default function NotificationDrawer() {
                   <p className="text-xs text-gray-400 max-w-xs">
                     {activeFilter === "unread"
                       ? "There are no unread messages waiting for your attention."
-                      : "Broadcast messages, kitchen alerts, and exclusive pet promotions will appear here."}
+                      : "Broadcast messages, kitchen alerts, and exclusive dining promotions will appear here."}
                   </p>
                 </div>
               ) : (

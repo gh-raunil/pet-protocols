@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useCartStore from "@/lib/cartStore";
@@ -34,6 +34,38 @@ import {
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
+
+function CheckoutItemRow({ item }) {
+  const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
+
+  useEffect(() => {
+    setImgSrc(item.image || FALLBACK_IMAGE);
+  }, [item.image]);
+
+  return (
+    <div className="flex items-center gap-3 bg-[var(--bg-sub)] p-2.5 rounded-2xl border border-[var(--border-color)]">
+      <Image
+        src={imgSrc}
+        alt={item.name || "Dish item"}
+        width={48}
+        height={48}
+        onError={() => setImgSrc(FALLBACK_IMAGE)}
+        className="w-12 h-12 rounded-xl object-cover shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold text-[var(--text-main)] truncate">{item.name}</p>
+        <p className="text-[11px] text-[var(--text-muted)]">
+          Qty: {item.quantity} × ₹{item.price}
+        </p>
+      </div>
+      <span className="text-xs font-mono font-extrabold text-[var(--brand-accent)] shrink-0">
+        ₹{(item.price || 0) * (item.quantity || 1)}
+      </span>
+    </div>
+  );
+}
 
 // Dynamically load Razorpay standard checkout script
 const loadRazorpayScript = () => {
@@ -84,6 +116,15 @@ export default function CheckoutClient() {
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [saveAddressToProfile, setSaveAddressToProfile] = useState(false);
   const [newAddressLabel, setNewAddressLabel] = useState("Home");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [draftNewAddress, setDraftNewAddress] = useState({
+    fullName: "",
+    phone: "",
+    street: "",
+    city: "New Delhi",
+    state: "Delhi",
+    pincode: "110001",
+  });
 
   const [address, setAddress] = useState({
     fullName: "",
@@ -94,6 +135,16 @@ export default function CheckoutClient() {
     pincode: "110001",
   });
   const [notes, setNotes] = useState("");
+  const idempotencyKeyRef = useRef(null);
+  const addressCardRefs = useRef({});
+
+  const addressOptions = useMemo(
+    () => [...savedAddresses.map((a) => a._id), "new"],
+    [savedAddresses]
+  );
+  const activeAddressTabIndexId = addressOptions.includes(selectedAddressId)
+    ? selectedAddressId
+    : addressOptions[0];
 
   useEffect(() => {
     setIsMounted(true);
@@ -193,6 +244,9 @@ export default function CheckoutClient() {
   };
 
   const handleSelectSavedAddress = (saved) => {
+    if (selectedAddressId === "new") {
+      setDraftNewAddress(address);
+    }
     setSelectedAddressId(saved._id);
     setAddress({
       fullName: saved.fullName || session?.user?.name || "",
@@ -203,26 +257,75 @@ export default function CheckoutClient() {
       pincode: saved.pincode || "110001",
     });
     setSaveAddressToProfile(false);
+    setFieldErrors({});
+    setError("");
   };
 
   const handleSelectCustomAddress = () => {
     setSelectedAddressId("new");
     setAddress({
-      fullName: session?.user?.name || "",
-      phone: session?.user?.phone || "",
-      street: "",
-      city: "New Delhi",
-      state: "Delhi",
-      pincode: "110001",
+      fullName: draftNewAddress.fullName || session?.user?.name || "",
+      phone: draftNewAddress.phone || session?.user?.phone || "",
+      street: draftNewAddress.street || "",
+      city: draftNewAddress.city || "New Delhi",
+      state: draftNewAddress.state || "Delhi",
+      pincode: draftNewAddress.pincode || "110001",
     });
     setSaveAddressToProfile(true);
+    setFieldErrors({});
+    setError("");
+  };
+
+  const handleAddressKeyDown = (e, currentId) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (currentId === "new") {
+        handleSelectCustomAddress();
+      } else {
+        const addr = savedAddresses.find((a) => a._id === currentId);
+        if (addr) handleSelectSavedAddress(addr);
+      }
+      return;
+    }
+
+    if (["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"].includes(e.key)) {
+      e.preventDefault();
+      const currentIndex = addressOptions.indexOf(currentId);
+      if (currentIndex === -1) return;
+
+      let nextIndex;
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        nextIndex = (currentIndex + 1) % addressOptions.length;
+      } else {
+        nextIndex = (currentIndex - 1 + addressOptions.length) % addressOptions.length;
+      }
+
+      const nextId = addressOptions[nextIndex];
+      if (nextId === "new") {
+        handleSelectCustomAddress();
+      } else {
+        const nextAddr = savedAddresses.find((a) => a._id === nextId);
+        if (nextAddr) handleSelectSavedAddress(nextAddr);
+      }
+
+      setTimeout(() => {
+        addressCardRefs.current[nextId]?.focus();
+      }, 0);
+    }
   };
 
   const handleChange = (e) => {
-    setAddress({
-      ...address,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+    setAddress((prev) => {
+      const next = { ...prev, [name]: value };
+      if (selectedAddressId === "new") {
+        setDraftNewAddress(next);
+      }
+      return next;
     });
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
+    }
     setError("");
   };
 
@@ -373,24 +476,40 @@ export default function CheckoutClient() {
   };
 
   const validateDetails = () => {
-    if (!address.fullName.trim()) {
-      setError("Please enter your recipient full name.");
-      return false;
+    const errors = {};
+    const trimmedName = (address.fullName || "").trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      errors.fullName = "Please enter your recipient full name (at least 2 characters).";
     }
-    if (!address.phone.trim() || address.phone.trim().length < 8) {
-      setError("Please enter a valid 10-digit contact number.");
-      return false;
+
+    const cleanPhone = (address.phone || "").replace(/[\s-]/g, "");
+    if (!cleanPhone || !/^\d{10}$/.test(cleanPhone)) {
+      errors.phone = "Please enter a valid 10-digit mobile contact number.";
     }
+
     if (orderType === "delivery") {
-      if (!address.street.trim()) {
-        setError("Please provide your delivery street, house, or apartment address.");
-        return false;
+      const trimmedStreet = (address.street || "").trim();
+      if (!trimmedStreet || trimmedStreet.length < 5) {
+        errors.street = "Please provide your delivery street, house, or apartment address.";
       }
-      if (!address.pincode.trim()) {
-        setError("Please provide a valid delivery area pincode.");
-        return false;
+      const trimmedCity = (address.city || "").trim();
+      if (!trimmedCity) {
+        errors.city = "Please provide your delivery city.";
+      }
+      const trimmedPin = (address.pincode || "").trim();
+      if (!trimmedPin || !/^\d{6}$/.test(trimmedPin)) {
+        errors.pincode = "Please provide a valid 6-digit delivery area pincode.";
       }
     }
+
+    setFieldErrors(errors);
+
+    const firstError = Object.values(errors)[0];
+    if (firstError) {
+      setError(firstError);
+      return false;
+    }
+
     if (hasBlockingIssues) {
       setError("Please resolve the operational kitchen issues before placing the order.");
       return false;
@@ -423,6 +542,7 @@ export default function CheckoutClient() {
 
   // 1. Razorpay Real / Sandbox Checkout Flow
   const handleRazorpayCheckout = async () => {
+    if (loading) return;
     if (!validateDetails()) return;
 
     setLoading(true);
@@ -546,16 +666,27 @@ export default function CheckoutClient() {
 
   // 2. Instant Simulator Checkout Flow (Demo/Dev)
   const handleSimulatorCheckout = async () => {
+    if (loading) return;
     if (!validateDetails()) return;
 
     setLoading(true);
     setLoadingStep("Placing instant simulation order...");
     setError("");
 
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `client_idem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
+    const currentIdempotencyKey = idempotencyKeyRef.current;
+
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-idempotency-key": currentIdempotencyKey,
+        },
         body: JSON.stringify({
           items,
           address: orderType === "pickup" ? { ...address, street: "Self Pickup at Kitchen Counter" } : address,
@@ -564,6 +695,7 @@ export default function CheckoutClient() {
           discount: discountAmount,
           couponCode: appliedOffer?.code || "",
           paymentMethod: "Instant Simulator (Test Mode)",
+          idempotencyKey: currentIdempotencyKey,
         }),
       });
 
@@ -574,6 +706,7 @@ export default function CheckoutClient() {
         return;
       }
 
+      idempotencyKeyRef.current = null;
       await saveAddressIfRequested();
       try {
         localStorage.removeItem("pet_protocols_applied_coupon");
@@ -590,6 +723,7 @@ export default function CheckoutClient() {
 
   // 3. Cash on Delivery (COD) / Cash on Pickup (COP) Checkout Flow
   const handleCashCheckout = async () => {
+    if (loading) return;
     if (!validateDetails()) return;
 
     const isPickup = orderType === "pickup";
@@ -599,10 +733,20 @@ export default function CheckoutClient() {
     setLoadingStep(isPickup ? "Confirming Cash on Pickup order..." : "Confirming Cash on Delivery order...");
     setError("");
 
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `client_idem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    }
+    const currentIdempotencyKey = idempotencyKeyRef.current;
+
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-idempotency-key": currentIdempotencyKey,
+        },
         body: JSON.stringify({
           items,
           address: isPickup ? { ...address, street: "Self Pickup at Kitchen Counter" } : address,
@@ -611,6 +755,7 @@ export default function CheckoutClient() {
           discount: discountAmount,
           couponCode: appliedOffer?.code || "",
           paymentMethod: paymentMethodLabel,
+          idempotencyKey: currentIdempotencyKey,
         }),
       });
 
@@ -621,6 +766,7 @@ export default function CheckoutClient() {
         return;
       }
 
+      idempotencyKeyRef.current = null;
       await saveAddressIfRequested();
       try {
         localStorage.removeItem("pet_protocols_applied_coupon");
@@ -820,14 +966,22 @@ export default function CheckoutClient() {
                     Select a Saved Location
                   </span>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" role="radiogroup" aria-label="Delivery address selection">
                     {savedAddresses.map((addr) => {
                       const isSelected = selectedAddressId === addr._id;
+                      const isTabTarget = activeAddressTabIndexId === addr._id;
                       return (
                         <div
                           key={addr._id}
+                          ref={(el) => {
+                            if (el) addressCardRefs.current[addr._id] = el;
+                          }}
+                          role="radio"
+                          aria-checked={isSelected}
+                          tabIndex={isTabTarget ? 0 : -1}
                           onClick={() => handleSelectSavedAddress(addr)}
-                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                          onKeyDown={(e) => handleAddressKeyDown(e, addr._id)}
+                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                             isSelected
                               ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
                               : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
@@ -844,8 +998,12 @@ export default function CheckoutClient() {
                               )}
                               {addr.label || "Home"}
                             </span>
-                            {isSelected && (
-                              <span className="w-2 h-2 rounded-full bg-[var(--brand-accent)] animate-pulse" />
+                            {isSelected ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--brand-accent)] text-white flex items-center gap-1 shadow-xs">
+                                <Check size={10} strokeWidth={3} /> Selected
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-[var(--text-muted)] hover:text-[var(--brand-accent)]">Select</span>
                             )}
                           </div>
                           <p className="text-xs font-semibold text-[var(--text-main)] truncate">
@@ -862,15 +1020,27 @@ export default function CheckoutClient() {
                     })}
 
                     <div
+                      ref={(el) => {
+                        if (el) addressCardRefs.current["new"] = el;
+                      }}
+                      role="radio"
+                      aria-checked={selectedAddressId === "new"}
+                      tabIndex={activeAddressTabIndexId === "new" ? 0 : -1}
                       onClick={handleSelectCustomAddress}
-                      className={`p-3.5 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                      onKeyDown={(e) => handleAddressKeyDown(e, "new")}
+                      className={`p-3.5 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                         selectedAddressId === "new"
                           ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]"
                           : "border-[var(--border-color)] bg-[var(--bg-sub)] text-[var(--text-muted)] hover:border-[var(--brand-accent)]/40 hover:text-[var(--text-main)]"
                       }`}
                     >
                       <Plus size={16} className="mb-1 text-[var(--brand-accent)]" />
-                      <span className="text-xs font-bold">New Address</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-bold">New Address</span>
+                        {selectedAddressId === "new" && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[var(--brand-accent)] text-white">Active</span>
+                        )}
+                      </div>
                       <span className="text-[10px] opacity-75">Deliver to a new place</span>
                     </div>
                   </div>
@@ -880,84 +1050,145 @@ export default function CheckoutClient() {
               {/* Form Input Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                  <label htmlFor="checkout-fullName" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                     Recipient Full Name *
                   </label>
                   <input
+                    id="checkout-fullName"
                     name="fullName"
                     placeholder="e.g. Rahul Roy"
                     value={address.fullName}
                     onChange={handleChange}
+                    autoComplete="name"
                     required
-                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                    aria-invalid={Boolean(fieldErrors.fullName)}
+                    aria-describedby={fieldErrors.fullName ? "fullName-error" : undefined}
+                    className={`w-full bg-[var(--bg-sub)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                      fieldErrors.fullName ? "border-rose-500" : "border-[var(--border-color)]"
+                    }`}
                   />
+                  {fieldErrors.fullName && (
+                    <p id="fullName-error" className="text-[11px] text-rose-500 font-medium mt-1">
+                      {fieldErrors.fullName}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                  <label htmlFor="checkout-phone" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                     Contact Phone Number *
                   </label>
                   <input
+                    id="checkout-phone"
                     name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
                     placeholder="e.g. 9876543210"
                     value={address.phone}
                     onChange={handleChange}
                     required
-                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                    aria-invalid={Boolean(fieldErrors.phone)}
+                    aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
+                    className={`w-full bg-[var(--bg-sub)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                      fieldErrors.phone ? "border-rose-500" : "border-[var(--border-color)]"
+                    }`}
                   />
+                  {fieldErrors.phone && (
+                    <p id="phone-error" className="text-[11px] text-rose-500 font-medium mt-1">
+                      {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
 
                 {orderType === "delivery" && (
                   <>
                     <div className="md:col-span-2">
-                      <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                      <label htmlFor="checkout-street" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                         House / Flat / Street / Landmark *
                       </label>
                       <input
+                        id="checkout-street"
                         name="street"
                         placeholder="e.g. Flat 302, Green Valley Apartments"
                         value={address.street}
                         onChange={handleChange}
+                        autoComplete="street-address"
                         required
-                        className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                        aria-invalid={Boolean(fieldErrors.street)}
+                        aria-describedby={fieldErrors.street ? "street-error" : undefined}
+                        className={`w-full bg-[var(--bg-sub)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                          fieldErrors.street ? "border-rose-500" : "border-[var(--border-color)]"
+                        }`}
                       />
+                      {fieldErrors.street && (
+                        <p id="street-error" className="text-[11px] text-rose-500 font-medium mt-1">
+                          {fieldErrors.street}
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                      <label htmlFor="checkout-city" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                         City *
                       </label>
                       <input
+                        id="checkout-city"
                         name="city"
                         placeholder="New Delhi"
                         value={address.city}
                         onChange={handleChange}
+                        autoComplete="address-level2"
                         required
-                        className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                        aria-invalid={Boolean(fieldErrors.city)}
+                        aria-describedby={fieldErrors.city ? "city-error" : undefined}
+                        className={`w-full bg-[var(--bg-sub)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                          fieldErrors.city ? "border-rose-500" : "border-[var(--border-color)]"
+                        }`}
                       />
+                      {fieldErrors.city && (
+                        <p id="city-error" className="text-[11px] text-rose-500 font-medium mt-1">
+                          {fieldErrors.city}
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                      <label htmlFor="checkout-pincode" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                         Pincode *
                       </label>
                       <input
+                        id="checkout-pincode"
                         name="pincode"
                         placeholder="110001"
+                        maxLength={6}
+                        inputMode="numeric"
+                        autoComplete="postal-code"
                         value={address.pincode}
                         onChange={handleChange}
                         required
-                        className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                        aria-invalid={Boolean(fieldErrors.pincode)}
+                        aria-describedby={fieldErrors.pincode ? "pincode-error" : undefined}
+                        className={`w-full bg-[var(--bg-sub)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                          fieldErrors.pincode ? "border-rose-500" : "border-[var(--border-color)]"
+                        }`}
                       />
+                      {fieldErrors.pincode && (
+                        <p id="pincode-error" className="text-[11px] text-rose-500 font-medium mt-1">
+                          {fieldErrors.pincode}
+                        </p>
+                      )}
                     </div>
                   </>
                 )}
 
                 <div className="md:col-span-2">
-                  <label className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                  <label htmlFor="checkout-notes" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
                     {orderType === "pickup" ? "Kitchen Pickup Notes" : "Kitchen / Delivery Instructions"}
                   </label>
                   <input
+                    id="checkout-notes"
+                    name="notes"
                     placeholder={
                       orderType === "pickup"
                         ? "e.g. Arriving at 7:30 PM, extra spicy, separate bag"
@@ -965,7 +1196,7 @@ export default function CheckoutClient() {
                     }
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] transition shadow-sm"
+                    className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm"
                   />
                 </div>
 
@@ -1013,12 +1244,21 @@ export default function CheckoutClient() {
                 Select Payment Method
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5" role="radiogroup" aria-label="Payment method selection">
                 {/* 1. Cash on Delivery (COD) OR Cash on Pickup (COP) */}
                 {orderType === "delivery" ? (
                   <div
+                    role="radio"
+                    aria-checked={paymentMode === "cod"}
+                    tabIndex={0}
                     onClick={() => setPaymentMode("cod")}
-                    className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setPaymentMode("cod");
+                      }
+                    }}
+                    className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus:outline-hidden ${
                       paymentMode === "cod"
                         ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
                         : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
@@ -1052,8 +1292,17 @@ export default function CheckoutClient() {
                   </div>
                 ) : (
                   <div
+                    role="radio"
+                    aria-checked={paymentMode === "cop"}
+                    tabIndex={0}
                     onClick={() => setPaymentMode("cop")}
-                    className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setPaymentMode("cop");
+                      }
+                    }}
+                    className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus:outline-hidden ${
                       paymentMode === "cop"
                         ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
                         : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
@@ -1089,8 +1338,17 @@ export default function CheckoutClient() {
 
                 {/* 2. Razorpay Payment Gateway */}
                 <div
+                  role="radio"
+                  aria-checked={paymentMode === "razorpay"}
+                  tabIndex={0}
                   onClick={() => setPaymentMode("razorpay")}
-                  className={`relative p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPaymentMode("razorpay");
+                    }
+                  }}
+                  className={`relative p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                     paymentMode === "razorpay"
                       ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
                       : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
@@ -1125,8 +1383,17 @@ export default function CheckoutClient() {
 
                 {/* 3. Dev Simulator */}
                 <div
+                  role="radio"
+                  aria-checked={paymentMode === "simulator"}
+                  tabIndex={0}
                   onClick={() => setPaymentMode("simulator")}
-                  className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPaymentMode("simulator");
+                    }
+                  }}
+                  className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-hidden ${
                     paymentMode === "simulator"
                       ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40"
                       : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
@@ -1290,7 +1557,8 @@ export default function CheckoutClient() {
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  className="p-1 rounded-lg text-rose-500 hover:bg-rose-500/15 transition cursor-pointer"
+                  aria-label="Remove promo code"
+                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/15 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
                   title="Remove coupon"
                 >
                   <X size={16} />
@@ -1301,18 +1569,19 @@ export default function CheckoutClient() {
                 <div className="flex gap-2">
                   <input
                     type="text"
+                    aria-label="Promo code"
                     placeholder="Enter coupon code"
                     value={couponInput}
                     onChange={(e) => {
                       setCouponInput(e.target.value.toUpperCase());
                       setCouponError("");
                     }}
-                    className="flex-1 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-main)] font-mono uppercase focus:border-[var(--brand-accent)] outline-none"
+                    className="flex-1 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-main)] font-mono uppercase focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] outline-hidden"
                   />
                   <button
                     type="button"
                     onClick={() => handleApplyCoupon(couponInput)}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-[var(--brand-accent)]/20 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-[var(--brand-accent)]/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                   >
                     Apply
                   </button>
@@ -1398,27 +1667,7 @@ export default function CheckoutClient() {
             {/* Items List */}
             <div className="space-y-3 mb-6 max-h-72 overflow-y-auto pr-1">
               {items.map((item) => (
-                <div
-                  key={item._id}
-                  className="flex items-center gap-3 bg-[var(--bg-sub)] p-2.5 rounded-2xl border border-[var(--border-color)]"
-                >
-                  <Image
-                    src={item.image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200"}
-                    alt={item.name}
-                    width={48}
-                    height={48}
-                    className="w-12 h-12 rounded-xl object-cover shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-[var(--text-main)] truncate">{item.name}</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Qty: {item.quantity} × ₹{item.price}
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono font-extrabold text-[var(--brand-accent)] shrink-0">
-                    ₹{item.price * item.quantity}
-                  </span>
-                </div>
+                <CheckoutItemRow key={item._id} item={item} />
               ))}
             </div>
 

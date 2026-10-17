@@ -12,10 +12,45 @@ import {
   AlertTriangle,
   Flame,
   ArrowLeft,
+  ArrowRight,
   ChevronDown,
   Sparkles,
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
+
+/**
+ * Validates and extracts a safe internal order URL from a notification message.
+ * Strictly prevents open-redirect vulnerabilities (no external protocols, no '//' or '/\').
+ */
+function getSafeOrderUrl(message) {
+  if (!message) return null;
+  const rawUrl = message.url;
+
+  if (
+    typeof rawUrl === "string" &&
+    rawUrl.startsWith("/") &&
+    !rawUrl.startsWith("//") &&
+    !rawUrl.startsWith("/\\")
+  ) {
+    const isOrderRelated =
+      message.isInAppOrderNotif ||
+      message.messageType === "order" ||
+      Boolean(message.orderId) ||
+      rawUrl.startsWith("/order-confirmation") ||
+      rawUrl.startsWith("/orders");
+
+    if (isOrderRelated) {
+      return rawUrl;
+    }
+  } else if (
+    message.orderId &&
+    typeof message.orderId === "string" &&
+    /^[a-zA-Z0-9_-]+$/.test(message.orderId)
+  ) {
+    return `/order-confirmation?orderId=${encodeURIComponent(message.orderId)}`;
+  }
+  return null;
+}
 
 export default function NotificationsClient() {
   const {
@@ -263,19 +298,42 @@ export default function NotificationsClient() {
                   {msg.content}
                 </p>
 
-                {msg.senderName && (
-                  <div className="mt-3 pt-3 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex items-center justify-between">
-                    <span>Sent by: <strong className="text-[var(--text-main)]">{msg.senderName}</strong></span>
-                    {!isRead && (
-                      <button
-                        onClick={() => markAsRead(msgId)}
-                        className="text-xs font-bold text-[var(--brand-accent)] hover:underline"
-                      >
-                        Mark as read
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* Card Action Footer */}
+                {(() => {
+                  const safeOrderUrl = getSafeOrderUrl(msg);
+                  return (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        {msg.senderName ? (
+                          <span>Sent by: <strong className="text-[var(--text-main)]">{msg.senderName}</strong></span>
+                        ) : (
+                          <span>Type: <strong className="text-[var(--text-main)]">{msg.tag || "ORDER UPDATE"}</strong></span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {safeOrderUrl && (
+                          <Link
+                            href={safeOrderUrl}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[var(--brand-accent)] hover:underline"
+                          >
+                            <span>View Order</span>
+                            <ArrowRight size={12} />
+                          </Link>
+                        )}
+                        {!isRead && (
+                          <button
+                            type="button"
+                            onClick={() => markAsRead(msgId)}
+                            className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--brand-accent)] hover:underline cursor-pointer"
+                          >
+                            Mark as read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

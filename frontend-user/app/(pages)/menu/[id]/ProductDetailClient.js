@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Building,
   Clock,
   Heart,
@@ -14,7 +13,6 @@ import {
   ShoppingBag,
   Sparkles,
   CheckCircle2,
-  XCircle,
   Share2,
   Star,
   ShieldCheck,
@@ -23,7 +21,6 @@ import {
   Truck,
   ThumbsUp,
   MessageSquare,
-  Award,
   ChevronRight,
   X,
   Flame,
@@ -47,22 +44,28 @@ export default function ProductDetailClient({ product }) {
   const [currentRating, setCurrentRating] = useState(product?.rating || 4.5);
   const [numRatings, setNumRatings] = useState(product?.numRatings || 18);
   const [offers, setOffers] = useState([]);
+  const [imgSrc, setImgSrc] = useState(product?.image || FALLBACK_IMAGE);
 
-  // Rate Modal State
+  // Rate Modal State & Accessibility Refs
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [userStars, setUserStars] = useState(5);
   const [hoverStars, setHoverStars] = useState(0);
   const [reviewerName, setReviewerName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [submittingRating, setSubmittingRating] = useState(false);
+  const modalRef = useRef(null);
+  const triggerRef = useRef(null);
 
   const addItem = useCartStore((s) => s.addItem);
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   const addRecentDish = useRecentStore((s) => s.addRecentDish);
 
-  const isFav = isFavorite(product._id);
-  const imageSrc = product.image || FALLBACK_IMAGE;
-  const restStatus = useOperationalStatus(product.restaurant);
+  const isFav = product?._id ? isFavorite(product._id) : false;
+  const restStatus = useOperationalStatus(product?.restaurant);
+
+  useEffect(() => {
+    setImgSrc(product?.image || FALLBACK_IMAGE);
+  }, [product?.image]);
 
   // Check if product qualifies as Newly Arrived (within 14 days)
   const isNew = isProductNewArrival(product, 14);
@@ -74,19 +77,36 @@ export default function ProductDetailClient({ product }) {
 
   // Option B: discount directly reduces the price automatically
   let autoDiscount = 0;
-  let displayPrice = product.price;
+  let displayPrice = product?.price || 0;
   if (isAutoDiscount) {
     autoDiscount = calculateItemDiscount(product, matchedOffer);
-    displayPrice = Math.max(0, product.price - autoDiscount);
+    displayPrice = Math.max(0, (product?.price || 0) - autoDiscount);
   }
 
   // Option A: catalog price is NOT reduced; coupon code is displayed
-  const hasStrikethrough = isAutoDiscount ? true : Boolean(product.originalPrice && product.originalPrice > product.price);
-  const struckPrice = isAutoDiscount ? product.price : product.originalPrice;
+  const hasStrikethrough = isAutoDiscount ? true : Boolean(product?.originalPrice && product.originalPrice > product.price);
+  const struckPrice = isAutoDiscount ? product?.price : product?.originalPrice;
   const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
-  const deliveryFee = product.restaurant?.chargeSettings?.flatDeliveryFee ?? 40;
-  const freeThreshold = product.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
-  const prepTime = product.preparationTime ? `${product.preparationTime} mins` : "15–20 mins";
+  const deliveryFee = product?.restaurant?.chargeSettings?.flatDeliveryFee ?? 40;
+  const freeThreshold = product?.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
+  const prepTime = product?.preparationTime ? `${product.preparationTime} mins` : "15–20 mins";
+
+  // Dynamic review distribution calculated honestly from reviewsList
+  const starDistribution = useMemo(() => {
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviewsList.forEach((r) => {
+      const s = Math.min(5, Math.max(1, Math.round(r.rating || 5)));
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    const total = reviewsList.length || 1;
+    return [
+      { star: "5 ★", pct: Math.round((counts[5] / total) * 100), color: "bg-emerald-600 dark:bg-emerald-500" },
+      { star: "4 ★", pct: Math.round((counts[4] / total) * 100), color: "bg-emerald-600 dark:bg-emerald-500" },
+      { star: "3 ★", pct: Math.round((counts[3] / total) * 100), color: "bg-amber-500" },
+      { star: "2 ★", pct: Math.round((counts[2] / total) * 100), color: "bg-orange-500" },
+      { star: "1 ★", pct: Math.round((counts[1] / total) * 100), color: "bg-rose-500" },
+    ];
+  }, [reviewsList]);
 
   // Track product view for personalization algorithm
   useEffect(() => {
@@ -99,6 +119,7 @@ export default function ProductDetailClient({ product }) {
   // Fetch live reviews and similar products
   useEffect(() => {
     async function loadExtraData() {
+      if (!product?._id) return;
       try {
         // Fetch reviews
         const rateRes = await fetch(`/api/ratings?targetType=product&targetId=${product._id}`).then((r) => r.json());
@@ -120,7 +141,8 @@ export default function ProductDetailClient({ product }) {
           );
           setSimilarProducts(related.length >= 3 ? related : others.slice(0, 10));
         }
-        // Fetch offers
+
+        // Fetch active offers
         fetch("/api/offers")
           .then((r) => r.json())
           .then((d) => {
@@ -142,9 +164,7 @@ export default function ProductDetailClient({ product }) {
       );
       return;
     }
-    for (let i = 0; i < quantity; i++) {
-      addItem({ ...product, _id: product._id.toString() });
-    }
+    addItem({ ...product, _id: product._id.toString() }, quantity);
     trackAddToCart(product);
     toast.success(`Added ${quantity} × ${product.name} to cart!`);
   };
@@ -157,9 +177,7 @@ export default function ProductDetailClient({ product }) {
       );
       return;
     }
-    for (let i = 0; i < quantity; i++) {
-      addItem({ ...product, _id: product._id.toString() });
-    }
+    addItem({ ...product, _id: product._id.toString() }, quantity);
     trackAddToCart(product);
     router.push("/cart");
   };
@@ -209,12 +227,79 @@ export default function ProductDetailClient({ product }) {
     }
   };
 
+  // Review Modal Accessibility (Focus trap, Escape listener, Body scroll lock, Focus restoration)
+  useEffect(() => {
+    if (!isRateModalOpen) return;
+
+    // 1. Lock background body scrolling preserving existing inline overflow
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // 2. Focus first interactive element inside dialog
+    const modalEl = modalRef.current;
+    if (modalEl) {
+      const focusableSelector =
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const focusableElements = modalEl.querySelectorAll(focusableSelector);
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus();
+      } else {
+        modalEl.focus();
+      }
+    }
+
+    // 3. Handle Escape key to close and Tab key trapping
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsRateModalOpen(false);
+        return;
+      }
+
+      if (e.key === "Tab") {
+        const modal = modalRef.current;
+        if (!modal) return;
+
+        const focusableSelector =
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const focusables = Array.from(modal.querySelectorAll(focusableSelector)).filter(
+          (el) => el.offsetParent !== null || el === document.activeElement
+        );
+
+        if (focusables.length === 0) return;
+
+        const firstEl = focusables[0];
+        const lastEl = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            lastEl.focus();
+          }
+        } else {
+          if (document.activeElement === lastEl || !modal.contains(document.activeElement)) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      triggerRef.current?.focus?.();
+    };
+  }, [isRateModalOpen]);
+
   const starLabels = ["Terrible", "Poor", "Average", "Good", "Excellent"];
 
   return (
     <main className="min-h-screen pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
-      {/* ── BREADCRUMBS (FLIPKART STYLE) ─────────────────────────── */}
-      <nav className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-6 overflow-x-auto pb-1 scrollbar-none">
+      {/* ── BREADCRUMBS ─────────────────────────────────────────── */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-6 overflow-x-auto pb-1 scrollbar-none">
         <Link href="/" className="hover:text-[var(--brand-accent)] transition font-medium">
           Home
         </Link>
@@ -245,12 +330,13 @@ export default function ProductDetailClient({ product }) {
         <div className="lg:col-span-5 lg:sticky lg:top-28 space-y-4">
           <div className="relative aspect-square w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-color)] shadow-md">
             <Image
-              src={imageSrc}
+              src={imgSrc}
               alt={product.name}
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 40vw"
               className={`object-cover ${!product.isAvailable ? "grayscale-[40%]" : ""}`}
+              onError={() => setImgSrc(FALLBACK_IMAGE)}
             />
 
             {/* Out of Stock Overlay */}
@@ -291,8 +377,8 @@ export default function ProductDetailClient({ product }) {
 
             {/* Bestseller Badge */}
             {product.isFeatured && (
-              <div className="absolute top-3.5 right-14 z-20 bg-amber-500 text-black text-[11px] font-black px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1">
-                <Flame size={12} className="fill-black" /> Bestseller
+              <div className="absolute top-3.5 right-14 z-20 bg-amber-500 text-zinc-950 text-[11px] font-black px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1">
+                <Flame size={12} className="fill-zinc-950" /> Bestseller
               </div>
             )}
 
@@ -303,7 +389,7 @@ export default function ProductDetailClient({ product }) {
                 toast.info(isFav ? "Removed from favorites" : "Saved to favorites!");
               }}
               aria-label={isFav ? "Remove favorite" : "Add favorite"}
-              className={`absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full border border-[var(--border-color)] flex items-center justify-center transition shadow-xs cursor-pointer ${
+              className={`absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full border border-[var(--border-color)] flex items-center justify-center transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                 isFav
                   ? "bg-rose-500 text-white border-rose-500"
                   : "bg-[var(--bg-card)]/90 text-[var(--text-muted)] hover:text-rose-500"
@@ -313,13 +399,13 @@ export default function ProductDetailClient({ product }) {
             </button>
           </div>
 
-          {/* Flipkart-Style Action Buttons: ADD TO CART & BUY NOW */}
+          {/* Action Buttons: ADD TO CART & ORDER NOW */}
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               type="button"
               onClick={handleAddToCart}
               disabled={!product.isAvailable || !restStatus.isOpen}
-              className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[#ff9f00] hover:bg-[#f39700] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
             >
               <ShoppingBag size={17} />
               <span>Add To Cart</span>
@@ -329,7 +415,7 @@ export default function ProductDetailClient({ product }) {
               type="button"
               onClick={handleBuyNow}
               disabled={!product.isAvailable || !restStatus.isOpen}
-              className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[#fb641b] hover:bg-[#e95a12] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
             >
               <Zap size={17} />
               <span>Order Now</span>
@@ -353,27 +439,39 @@ export default function ProductDetailClient({ product }) {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Product Information & Flipkart Features (7 Columns) */}
+        {/* RIGHT COLUMN: Product Information (7 Columns) */}
         <div className="lg:col-span-7 space-y-6">
           {/* Header & Kitchen */}
           <div>
-            {product.restaurant?.name && (
-              <Link
-                href={`/menu?restaurant=${product.restaurant._id || product.restaurant}`}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] hover:underline mb-1"
+            <div className="flex items-center justify-between gap-3">
+              {product.restaurant?.name ? (
+                <Link
+                  href={`/menu?restaurant=${product.restaurant._id || product.restaurant}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] hover:underline mb-1"
+                >
+                  <Building size={13} />
+                  <span>{product.restaurant.name}</span>
+                </Link>
+              ) : <div />}
+
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label="Share dish link"
+                className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition cursor-pointer p-1"
               >
-                <Building size={13} />
-                <span>{product.restaurant.name}</span>
-              </Link>
-            )}
+                <Share2 size={13} />
+                <span>Share</span>
+              </button>
+            </div>
 
             <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">
               {product.name}
             </h1>
 
-            {/* Flipkart-Style Rating Badge & Reviews Count */}
+            {/* Rating Badge & Reviews Count */}
             <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <div className="inline-flex items-center gap-1 bg-[#388e3c] text-white px-2 py-0.5 rounded-[4px] text-xs font-black shadow-2xs">
+              <div className="inline-flex items-center gap-1 bg-emerald-600 dark:bg-emerald-500 text-white px-2 py-0.5 rounded-[4px] text-xs font-black shadow-2xs">
                 <span>{currentRating.toFixed(1)}</span>
                 <Star size={11} className="fill-white" />
               </div>
@@ -387,7 +485,7 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Pricing Section (Flipkart Style) */}
+          {/* Pricing Section */}
           <div className="p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
@@ -399,13 +497,13 @@ export default function ProductDetailClient({ product }) {
                 </span>
               )}
               {discountPercent > 0 && (
-                <span className="text-sm font-bold text-[#388e3c]">
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                   {discountPercent}% off
                 </span>
               )}
             </div>
             {isAutoDiscount && (
-              <p className="text-xs font-bold text-emerald-600 mt-1 flex items-center gap-1">
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
                 ⚡ Auto Discount Applied: Save ₹{autoDiscount} instantly!
               </p>
             )}
@@ -414,16 +512,16 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Available Offers Box (Flipkart Style) */}
+          {/* Available Offers Box */}
           <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
             <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
-              <Tag size={14} className="text-emerald-600" /> Available Offers
+              <Tag size={14} className="text-emerald-600 dark:text-emerald-400" /> Available Deals & Offers
             </h3>
             <div className="space-y-2 text-xs text-[var(--text-main)]">
               {/* Option B Highlight */}
               {isAutoDiscount && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
-                  <span className="text-emerald-600 font-black text-sm">⚡</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">⚡</span>
                   <div>
                     <p className="font-extrabold text-emerald-700 dark:text-emerald-400">
                       Automatic Kitchen Discount: {matchedOffer.discountType === "percentage" ? `${matchedOffer.discountValue}% OFF` : `₹${matchedOffer.discountValue} OFF`}
@@ -451,11 +549,7 @@ export default function ProductDetailClient({ product }) {
               )}
 
               <div className="flex items-start gap-2">
-                <span className="text-emerald-600 font-bold shrink-0">🏷️ Bank Offer:</span>
-                <span className="text-[var(--text-muted)]">5% Unlimited Cashback on पेट Protocols Axis or ICICI Cards</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-emerald-600 font-bold shrink-0">🏷️ Partner Deal:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0">🛵 Delivery Deal:</span>
                 <span className="text-[var(--text-muted)]">
                   Free delivery for orders above ₹{freeThreshold} (Standard fee ₹{deliveryFee})
                 </span>
@@ -463,7 +557,7 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Kitchen Operational Banner & Details */}
+          {/* Kitchen Operational Banner */}
           {!restStatus.isOpen && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-start gap-3">
               <Clock size={18} className="shrink-0 mt-0.5" />
@@ -489,7 +583,7 @@ export default function ProductDetailClient({ product }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 disabled={quantity <= 1}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                 aria-label="Decrease quantity"
               >
                 <Minus size={14} />
@@ -501,7 +595,7 @@ export default function ProductDetailClient({ product }) {
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(20, q + 1))}
                 disabled={quantity >= 20}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                 aria-label="Increase quantity"
               >
                 <Plus size={14} />
@@ -509,7 +603,7 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Specifications Table (Flipkart Style) */}
+          {/* Specifications Table */}
           <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
             <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">
               Dish Specifications & Highlights
@@ -554,7 +648,7 @@ export default function ProductDetailClient({ product }) {
             </div>
           )}
 
-          {/* ── RATINGS & REVIEWS SECTION (FLIPKART STYLE) ───────────── */}
+          {/* ── RATINGS & REVIEWS SECTION ───────────────────────────── */}
           <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-5">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
@@ -562,15 +656,16 @@ export default function ProductDetailClient({ product }) {
                   Ratings & Reviews
                 </h3>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Authentic reviews from verified foodies
+                  Customer ratings and dining feedback
                 </p>
               </div>
 
               {/* Rate Product Trigger Button */}
               <button
+                ref={triggerRef}
                 type="button"
                 onClick={() => setIsRateModalOpen(true)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-accent)] hover:opacity-90 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
               >
                 <Star size={13} className="fill-white" />
                 Rate Product
@@ -584,7 +679,7 @@ export default function ProductDetailClient({ product }) {
                   <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
                     {currentRating.toFixed(1)}
                   </span>
-                  <Star size={24} className="fill-[#388e3c] text-[#388e3c]" />
+                  <Star size={24} className="fill-emerald-600 dark:fill-emerald-500 text-emerald-600 dark:text-emerald-500" />
                 </div>
                 <div className="text-xs text-[var(--text-muted)] font-medium mt-1">
                   {numRatings} Ratings & {reviewsList.length} Reviews
@@ -592,13 +687,7 @@ export default function ProductDetailClient({ product }) {
               </div>
 
               <div className="sm:col-span-8 space-y-1.5 text-xs">
-                {[
-                  { star: "5 ★", pct: 72, color: "bg-[#388e3c]" },
-                  { star: "4 ★", pct: 18, color: "bg-[#388e3c]" },
-                  { star: "3 ★", pct: 6, color: "bg-amber-400" },
-                  { star: "2 ★", pct: 3, color: "bg-orange-400" },
-                  { star: "1 ★", pct: 1, color: "bg-rose-500" },
-                ].map((row) => (
+                {starDistribution.map((row) => (
                   <div key={row.star} className="flex items-center gap-2">
                     <span className="w-7 text-right font-bold text-[var(--text-muted)]">
                       {row.star}
@@ -628,15 +717,21 @@ export default function ProductDetailClient({ product }) {
                 {reviewsList.slice(0, 5).map((rev, idx) => (
                   <div key={rev._id || idx} className="pt-4 first:pt-0 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-0.5 bg-[#388e3c] text-white px-1.5 py-0.5 rounded-[3px] text-[10px] font-black">
+                      <span className="inline-flex items-center gap-0.5 bg-emerald-600 dark:bg-emerald-500 text-white px-1.5 py-0.5 rounded-[3px] text-[10px] font-black">
                         {rev.rating || 5} <Star size={9} className="fill-white" />
                       </span>
                       <span className="text-xs font-bold text-[var(--text-main)]">
-                        {rev.userName || "Verified Foodie"}
+                        {rev.userName || "Customer"}
                       </span>
-                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5 ml-auto">
-                        <CheckCircle2 size={11} /> Certified Buyer
-                      </span>
+                      {rev.isVerifiedPurchase === true ? (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 ml-auto">
+                          <CheckCircle2 size={11} /> Verified Buyer
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-0.5 ml-auto">
+                          Customer Review
+                        </span>
+                      )}
                     </div>
                     {rev.comment && (
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed">
@@ -657,7 +752,7 @@ export default function ProductDetailClient({ product }) {
         </div>
       </div>
 
-      {/* ── SIMILAR DISHES CAROUSEL (FLIPKART STYLE) ──────────────── */}
+      {/* ── SIMILAR DISHES CAROUSEL ───────────────────────────────── */}
       {similarProducts.length > 0 && (
         <div className="mt-16 sm:mt-20">
           <ProductCarousel
@@ -672,16 +767,29 @@ export default function ProductDetailClient({ product }) {
 
       {/* ── INTERACTIVE RATE PRODUCT MODAL ───────────────────────── */}
       {isRateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-md bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-2xl animate-[fadeIn_0.2s_ease]">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRateModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rate-review-title"
+            tabIndex={-1}
+            className="relative w-full max-w-md bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-2xl animate-[fadeIn_0.2s_ease]"
+          >
             <button
               onClick={() => setIsRateModalOpen(false)}
-              className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer"
+              aria-label="Close review dialog"
+              className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
               <X size={18} />
             </button>
 
-            <h3 className="text-lg font-black text-[var(--text-main)] mb-1">
+            <h3 id="rate-review-title" className="text-lg font-black text-[var(--text-main)] mb-1">
               Rate & Review {product.name}
             </h3>
             <p className="text-xs text-[var(--text-muted)] mb-4">
@@ -699,6 +807,7 @@ export default function ProductDetailClient({ product }) {
                       onMouseEnter={() => setHoverStars(star)}
                       onMouseLeave={() => setHoverStars(0)}
                       onClick={() => setUserStars(star)}
+                      aria-label={`Rate ${star} star`}
                       className="p-1 transition-transform hover:scale-125 focus:outline-hidden cursor-pointer"
                     >
                       <Star
@@ -758,7 +867,7 @@ export default function ProductDetailClient({ product }) {
                 <button
                   type="submit"
                   disabled={submittingRating}
-                  className="flex-1 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white text-xs font-bold shadow-md transition disabled:opacity-50 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
                   {submittingRating ? "Submitting..." : "Submit Review"}
                 </button>
