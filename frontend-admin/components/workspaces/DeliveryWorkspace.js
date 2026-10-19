@@ -55,11 +55,6 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     userRole === "lead_admin" ||
     userRole === "superadmin";
   const isManager = isLeadAdmin || staffRoles.includes("Manager");
-  const isDeliveryOnlyStaff =
-    userRole === "staff" &&
-    staffRoles.includes("Delivery") &&
-    !staffRoles.includes("Kitchen") &&
-    !staffRoles.includes("Manager");
   const currentStaffName = session?.user?.name || "Delivery Staff";
   const currentStaffPhone = session?.user?.phone || "";
   const currentStaffId = session?.user?.id || session?.user?._id;
@@ -1293,7 +1288,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           <>
                             <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
                               <AlertTriangle size={13} className="shrink-0" />
-                              <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash at Doorstep</span>
+                              <span>Cash Pending Collection</span>
                             </span>
                             <button
                               type="button"
@@ -1373,65 +1368,35 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                   return (
                     <div className="border-t border-stone-200/80 dark:border-white/10 p-3 sm:p-5 bg-stone-100/60 dark:bg-black/25 w-full transition-all space-y-3">
-                      {/* Destination Wayfinding Banner */}
-                      <div className="bg-white dark:bg-[#151926] p-3.5 sm:p-4 rounded-2xl border border-stone-200/80 dark:border-white/10 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md border border-blue-500/20">
-                              📍 Delivery Destination
-                            </span>
-                            <span className="font-bold text-sm text-stone-900 dark:text-white truncate">
-                              {customerName}
-                            </span>
-                          </div>
-                          <p className="text-xs text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
-                            {fullAddress || "Address details on file"}
-                          </p>
-                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (typeof navigator !== "undefined" && navigator.clipboard) {
-                                  navigator.clipboard.writeText(`${navLat}, ${navLng}`);
-                                  toast.success("GPS coordinates copied to clipboard!");
-                                }
-                              }}
-                              className="inline-flex items-center gap-1 font-mono text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 px-2 py-0.5 rounded transition cursor-pointer"
-                              title="Click to copy GPS coordinates"
-                            >
-                              <Copy size={11} />
-                              <span>{Number(navLat).toFixed(5)}, {Number(navLng).toFixed(5)}</span>
-                            </button>
-                            {order.customerLocation?.accuracy && (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                                ● GPS ±{Math.round(order.customerLocation.accuracy)}m accuracy
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                          {customerPhone && (
-                            <a
-                              href={`tel:${customerPhone}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition cursor-pointer border border-emerald-500/25"
-                            >
-                              <Phone size={13} />
-                              <span>Call ({customerPhone})</span>
-                            </a>
-                          )}
-                          <a
-                            href={`https://mappls.com/direction?dest=${navLat},${navLng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-xs cursor-pointer active:scale-98"
-                            title="Open native Mappls voice turn-by-turn navigation"
+                      {/* Clean Map Toolbar (prevents repeating customer contact/address already shown in the card above) */}
+                      <div className="flex items-center justify-between px-1 py-0.5 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                            <MapPin size={13} className="text-blue-500" />
+                            <span>Interactive Route Map</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                                navigator.clipboard.writeText(`${navLat}, ${navLng}`);
+                                toast.success("GPS coordinates copied to clipboard!");
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 font-mono text-[10px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 bg-white dark:bg-white/10 px-2 py-0.5 rounded border border-stone-200 dark:border-white/10 transition cursor-pointer"
+                            title="Click to copy GPS coordinates"
                           >
-                            <Navigation size={13} />
-                            <span>🚀 Mappls Navigation</span>
-                            <ExternalLink size={11} className="opacity-75" />
-                          </a>
+                            <Copy size={10} />
+                            <span>{Number(navLat).toFixed(4)}, {Number(navLng).toFixed(4)}</span>
+                          </button>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleDoorstepMap(order._id)}
+                          className="text-[11px] font-bold text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer px-2.5 py-1 rounded-lg hover:bg-stone-200/60 dark:hover:bg-white/10 transition"
+                        >
+                          ✕ Close Map
+                        </button>
                       </div>
 
                       <DeliveryRouteMap
@@ -1660,185 +1625,189 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             );
           })()}
 
-          {/* Reconciliation Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
-                Total COD Cash Collected
-              </span>
-              <div className="text-2xl font-black text-stone-900 dark:text-white">
-                ₹{codSummary.totalCollected.toFixed(2)}
-              </div>
-              <span className="text-[11px] text-stone-400">{codSummary.collectedOrders.length} orders recorded</span>
-            </div>
+          {isManager && (
+            <>
+              {/* Reconciliation Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
+                    Total COD Cash Collected
+                  </span>
+                  <div className="text-2xl font-black text-stone-900 dark:text-white">
+                    ₹{codSummary.totalCollected.toFixed(2)}
+                  </div>
+                  <span className="text-[11px] text-stone-400">{codSummary.collectedOrders.length} orders recorded</span>
+                </div>
 
-            <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-200 dark:border-amber-500/30 shadow-xs space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
-                Pending Manager Handover
-              </span>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                ₹{codSummary.totalUnsettled.toFixed(2)}
-              </div>
-              <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
-                {codSummary.unsettledOrders.length} orders in drivers' hands
-              </span>
-            </div>
+                <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-200 dark:border-amber-500/30 shadow-xs space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
+                    Pending Manager Handover
+                  </span>
+                  <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                    ₹{codSummary.totalUnsettled.toFixed(2)}
+                  </div>
+                  <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                    {codSummary.unsettledOrders.length} orders in drivers' hands
+                  </span>
+                </div>
 
-            <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 shadow-xs space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 block">
-                Settled with Manager
-              </span>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                ₹{codSummary.totalSettled.toFixed(2)}
-              </div>
-              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
-                {codSummary.settledOrders.length} orders settled & deposited
-              </span>
-            </div>
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 shadow-xs space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 block">
+                    Settled with Manager
+                  </span>
+                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    ₹{codSummary.totalSettled.toFixed(2)}
+                  </div>
+                  <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                    {codSummary.settledOrders.length} orders settled & deposited
+                  </span>
+                </div>
 
-            <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
-                {isManager ? "Active Drivers with Cash" : "My Handover Status"}
-              </span>
-              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {isManager ? (
-                  codSummary.staffList.filter((s) => s.unsettledAmount > 0).length
-                ) : codSummary.totalUnsettled > 0 ? (
-                  <span className="text-xl text-amber-600 dark:text-amber-400">Pending Deposit</span>
+                <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
+                    Active Drivers with Cash
+                  </span>
+                  <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                    {codSummary.staffList.filter((s) => s.unsettledAmount > 0).length}
+                  </div>
+                  <span className="text-[11px] text-stone-400">
+                    across {codSummary.staffList.length} staff members
+                  </span>
+                </div>
+              </div>
+
+              {/* Staff Breakdown Table / Cards */}
+              <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
+                <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-extrabold text-base text-stone-900 dark:text-white flex items-center gap-2">
+                      <Wallet size={18} className="text-amber-500" />
+                      <span>Delivery Staff Cash Balances & Handover</span>
+                    </h3>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                      Real-time record of which delivery boy collected what cash amount and handover status.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    {codSummary.totalUnsettled > 0 && (
+                      <button
+                        onClick={() =>
+                          handleSettleCash(
+                            codSummary.unsettledOrders.map((o) => o._id),
+                            "All Active Drivers"
+                          )
+                        }
+                        disabled={updatingId !== null}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <Check size={14} />
+                        <span>Settle All Pending (₹{codSummary.totalUnsettled.toFixed(2)})</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={downloadCodReport}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer"
+                    >
+                      <FileSpreadsheet size={14} className="text-emerald-500" />
+                      <span>Export CSV Report</span>
+                    </button>
+                  </div>
+                </div>
+
+                {codSummary.staffList.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-stone-400">
+                    No COD cash collections recorded yet today.
+                  </div>
                 ) : (
-                  <span className="text-xl text-emerald-600 dark:text-emerald-400">All Handed Over</span>
-                )}
-              </div>
-              <span className="text-[11px] text-stone-400">
-                {isManager
-                  ? `across ${codSummary.staffList.length} staff members`
-                  : codSummary.totalUnsettled > 0
-                  ? `₹${codSummary.totalUnsettled.toFixed(2)} cash in hand`
-                  : "Your cash balance is completely clear"}
-              </span>
-            </div>
-          </div>
+                  <div className="divide-y divide-stone-100 dark:divide-white/5">
+                    {codSummary.staffList.map((staff, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-stone-50/50 dark:hover:bg-white/[0.01] transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center shrink-0">
+                            <User size={18} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-sm text-stone-900 dark:text-white">
+                                {staff.staffName}
+                              </span>
+                              {staff.staffPhone && (
+                                <span className="text-xs text-stone-400 font-mono">
+                                  ({staff.staffPhone})
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-stone-500 dark:text-stone-400">
+                              Handled {staff.orderIds.length} COD orders • Total Collected: ₹{staff.totalCollected.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
 
-          {/* Staff Breakdown Table / Cards */}
-          <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
-            <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-extrabold text-base text-stone-900 dark:text-white flex items-center gap-2">
-                  <Wallet size={18} className="text-amber-500" />
-                  <span>{isManager ? "Delivery Staff Cash Balances & Handover" : "My Cash Balance & Handover Status"}</span>
-                </h3>
-                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                  {isManager
-                    ? "Real-time record of which delivery boy collected what cash amount and handover status."
-                    : "Your real-time record of cash collected and handover status with manager."}
-                </p>
-              </div>
+                        <div className="flex items-center gap-4 self-end md:self-auto">
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                              Cash in Hand
+                            </span>
+                            <span
+                              className={`text-base font-black ${
+                                staff.unsettledAmount > 0
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-emerald-600 dark:text-emerald-400"
+                              }`}
+                            >
+                              ₹{staff.unsettledAmount.toFixed(2)}
+                            </span>
+                          </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                {isManager && codSummary.totalUnsettled > 0 && (
-                  <button
-                    onClick={() =>
-                      handleSettleCash(
-                        codSummary.unsettledOrders.map((o) => o._id),
-                        "All Active Drivers"
-                      )
-                    }
-                    disabled={updatingId !== null}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    <Check size={14} />
-                    <span>Settle All Pending (₹{codSummary.totalUnsettled.toFixed(2)})</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={downloadCodReport}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer"
-                >
-                  <FileSpreadsheet size={14} className="text-emerald-500" />
-                  <span>Export CSV Report</span>
-                </button>
-              </div>
-            </div>
-
-            {codSummary.staffList.length === 0 ? (
-              <div className="p-8 text-center text-xs text-stone-400">
-                No COD cash collections recorded yet today.
-              </div>
-            ) : (
-              <div className="divide-y divide-stone-100 dark:divide-white/5">
-                {codSummary.staffList.map((staff, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-stone-50/50 dark:hover:bg-white/[0.01] transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center shrink-0">
-                        <User size={18} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm text-stone-900 dark:text-white">
-                            {staff.staffName}
-                          </span>
-                          {staff.staffPhone && (
-                            <span className="text-xs text-stone-400 font-mono">
-                              ({staff.staffPhone})
+                          {staff.unsettledAmount > 0 ? (
+                            <button
+                              onClick={() => handleSettleCash(staff.orderIds, staff.staffName)}
+                              disabled={updatingId !== null}
+                              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <Check size={14} />
+                              <span>Confirm Handover & Settle (₹{staff.unsettledAmount.toFixed(2)})</span>
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                              <Check size={14} className="text-emerald-500" />
+                              <span>All Cash Handed Over</span>
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-stone-500 dark:text-stone-400">
-                          Handled {staff.orderIds.length} COD orders • Total Collected: ₹{staff.totalCollected.toFixed(2)}
-                        </span>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 self-end md:self-auto">
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
-                          Cash in Hand
-                        </span>
-                        <span
-                          className={`text-base font-black ${
-                            staff.unsettledAmount > 0
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
-                          ₹{staff.unsettledAmount.toFixed(2)}
-                        </span>
-                      </div>
-
-                      {isManager && staff.unsettledAmount > 0 ? (
-                        <button
-                          onClick={() => handleSettleCash(staff.orderIds, staff.staffName)}
-                          disabled={updatingId !== null}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                        >
-                          <Check size={14} />
-                          <span>Confirm Handover & Settle (₹{staff.unsettledAmount.toFixed(2)})</span>
-                        </button>
-                      ) : (
-                        staff.unsettledAmount === 0 && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
-                            <Check size={14} className="text-emerald-500" />
-                            <span>All Cash Handed Over</span>
-                          </span>
-                        )
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Order-by-Order COD Cash Log */}
           <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
-            <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10">
-              <h3 className="font-extrabold text-sm text-stone-900 dark:text-white uppercase tracking-wider">
-                {isManager ? "Individual COD Orders Cash Audit Log" : "My COD Orders Cash Audit Log"} ({codSummary.collectedOrders.length})
-              </h3>
+            <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-stone-900 dark:text-white uppercase tracking-wider">
+                  {isManager ? "Individual COD Orders Cash Audit Log" : "My COD Orders Cash Audit Log"} ({codSummary.collectedOrders.length})
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  {isManager
+                    ? "Order-by-order breakdown of collected cash and settlement status."
+                    : "Order-by-order history of cash collected by you and manager verification."}
+                </p>
+              </div>
+              <button
+                onClick={downloadCodReport}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer self-start sm:self-auto"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-500" />
+                <span>Export CSV Report</span>
+              </button>
             </div>
 
             <div className="divide-y divide-stone-100 dark:divide-white/5">

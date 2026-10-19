@@ -134,7 +134,7 @@ export default function LiveDeliveryMap({
   deliveryTracking = null,
   origin = null, // live staff transmitter location
   recipientName = "",
-  isStaffView = true,
+  isStaffView = false,
   onStatusUpdate = null,
 }) {
   const [tracking, setTracking] = useState(null);
@@ -1115,122 +1115,156 @@ export default function LiveDeliveryMap({
           </div>
         )}
 
-        {/* Floating Campus / Destination Hint Pill at bottom-left */}
-        <div className="absolute bottom-3 left-3 bg-stone-900/95 border border-white/20 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md flex items-center gap-2.5 z-20 max-w-sm">
-          <MapPin size={15} className="text-emerald-400 shrink-0" />
-          <div className="text-[11px] text-stone-200 leading-tight">
-            <span className="font-bold text-white block">
-              {destObj?.street ? destObj.street.slice(0, 36) : "Customer Destination"}
-            </span>
-            <span className="text-stone-400 text-[10px]">
-              Tap "Mappls Navigation" to launch live voice turn-by-turn guidance
-            </span>
+        {/* Floating Campus / Destination Hint Pill at bottom-left (Customer view only) */}
+        {!isStaffView && (
+          <div className="absolute bottom-3 left-3 bg-stone-900/95 border border-white/20 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md flex items-center gap-2.5 z-20 max-w-sm">
+            <MapPin size={15} className="text-emerald-400 shrink-0" />
+            <div className="text-[11px] text-stone-200 leading-tight">
+              <span className="font-bold text-white block">
+                {destObj?.street ? destObj.street.slice(0, 36) : "Customer Destination"}
+              </span>
+              <span className="text-stone-400 text-[10px]">
+                Tap "Mappls Navigation" to launch live voice turn-by-turn guidance
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
 
       {/* ── DRIVER & DESTINATION TELEMETRY FOOTER ───────────────────────── */}
-      <div className="p-3.5 sm:p-4 bg-[var(--bg-sub)]/30 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-          {/* Driver Information Card */}
-          <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3 shadow-2xs h-full">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-bold text-base border border-blue-500/15">
-                🛵
+      <div className="p-3 sm:p-3.5 bg-[var(--bg-sub)]/30 space-y-2">
+        {!isStaffView ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+            {/* Driver Information Card */}
+            <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3 shadow-2xs h-full">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-bold text-base border border-blue-500/15">
+                  🛵
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                    Delivery Partner
+                  </span>
+                  <p
+                    className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate"
+                    title={driver?.name || "Assigned Driver"}
+                  >
+                    {driver?.name || "Active Delivery Staff"}
+                  </p>
+                  {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5">
+                      <Gauge size={11} />
+                      <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">
+                      Active Delivery Transit
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                  Delivery Partner
-                </span>
-                <p
-                  className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate"
-                  title={driver?.name || "Assigned Driver"}
+
+              {driver?.phone && (
+                <a
+                  href={`tel:${driver.phone}`}
+                  className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
+                  title={`Call driver: ${driver.phone}`}
                 >
-                  {driver?.name || "Active Delivery Staff"}
-                </p>
-                {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
-                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5">
-                    <Gauge size={11} />
-                    <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">
-                    Active Delivery Transit
-                  </span>
-                )}
-              </div>
+                  <Phone size={13} />
+                  <span>Call Driver</span>
+                </a>
+              )}
             </div>
 
-            {driver?.phone && (
-              <a
-                href={`tel:${driver.phone}`}
-                className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
-                title={`Call driver: ${driver.phone}`}
-              >
-                <Phone size={13} />
-                <span>Call Driver</span>
-              </a>
+            {/* Destination Notice Card */}
+            {(() => {
+              const streetText = destObj?.street || "Customer Address";
+              const cityPinText = destObj?.city ? `${destObj.city}${destObj.pincode ? ` - ${destObj.pincode}` : ""}` : "Destination on file";
+              const fullAddress = [destObj?.street, destObj?.city, destObj?.pincode].filter(Boolean).join(", ") || "Customer Address";
+
+              return (
+                <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-start gap-3 shadow-2xs h-full">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/15">
+                    <MapPin size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1 text-xs">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                      Delivering To
+                    </span>
+                    <p
+                      className="font-bold text-xs sm:text-sm text-[var(--text-main)] line-clamp-1 break-words"
+                      title={fullAddress}
+                    >
+                      {streetText}
+                    </p>
+                    <p
+                      className="text-[11px] text-[var(--text-muted)] line-clamp-1 break-words mt-0.5"
+                      title={fullAddress}
+                    >
+                      {cityPinText}
+                    </p>
+                    {hasValidDestCoords ? (
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                        <CheckCircle2 size={11} className="shrink-0" />
+                        <span>Doorstep GPS Pin Set ({Number(destLat).toFixed(4)}, {Number(destLng).toFixed(4)})</span>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                        <Info size={11} className="shrink-0 text-stone-400" />
+                        <span>Destination pin pending</span>
+                      </div>
+                    )}
+
+                    {(destObj?.recipientPhone || destObj?.phone) && (
+                      <div className="mt-1.5 pt-1.5 border-t border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand-accent)] flex-wrap">
+                        <span>Recipient: {recipientName || destObj.recipientName || destObj.fullName || "Customer"}</span>
+                        <span>•</span>
+                        <a
+                          href={`tel:${destObj.recipientPhone || destObj.phone}`}
+                          className="hover:underline flex items-center gap-1 font-mono"
+                        >
+                          <Phone size={10} />
+                          <span>{destObj.recipientPhone || destObj.phone}</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        ) : (
+          /* Staff View: Clean telemetry row without repetitive customer/driver cards */
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-[var(--bg-card)] p-2.5 sm:p-3 rounded-xl border border-[var(--border-color)] text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
+                <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                  <Gauge size={12} />
+                  <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
+                </span>
+              ) : (
+                <span className="font-semibold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded-lg flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Vehicle Ready</span>
+                </span>
+              )}
+
+              {hasValidDestCoords && (
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                  <CheckCircle2 size={11} />
+                  <span>Doorstep GPS Active</span>
+                </span>
+              )}
+            </div>
+
+            {routeStats.distanceKm && (
+              <span className="font-bold text-stone-700 dark:text-stone-200">
+                Route: {routeStats.distanceKm} km {routeStats.etaMins ? `(~${routeStats.etaMins} mins ETA)` : ""}
+              </span>
             )}
           </div>
-
-          {/* Destination Notice Card */}
-          {(() => {
-            const streetText = destObj?.street || "Customer Address";
-            const cityPinText = destObj?.city ? `${destObj.city}${destObj.pincode ? ` - ${destObj.pincode}` : ""}` : "Destination on file";
-            const fullAddress = [destObj?.street, destObj?.city, destObj?.pincode].filter(Boolean).join(", ") || "Customer Address";
-
-            return (
-              <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-start gap-3 shadow-2xs h-full">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/15">
-                  <MapPin size={18} />
-                </div>
-                <div className="min-w-0 flex-1 text-xs">
-                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                    Delivering To
-                  </span>
-                  <p
-                    className="font-bold text-xs sm:text-sm text-[var(--text-main)] line-clamp-1 break-words"
-                    title={fullAddress}
-                  >
-                    {streetText}
-                  </p>
-                  <p
-                    className="text-[11px] text-[var(--text-muted)] line-clamp-1 break-words mt-0.5"
-                    title={fullAddress}
-                  >
-                    {cityPinText}
-                  </p>
-                  {hasValidDestCoords ? (
-                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
-                      <CheckCircle2 size={11} className="shrink-0" />
-                      <span>Doorstep GPS Pin Set ({Number(destLat).toFixed(4)}, {Number(destLng).toFixed(4)})</span>
-                    </div>
-                  ) : (
-                    <div className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
-                      <Info size={11} className="shrink-0 text-stone-400" />
-                      <span>Destination pin pending</span>
-                    </div>
-                  )}
-
-                  {(destObj?.recipientPhone || destObj?.phone) && (
-                    <div className="mt-1.5 pt-1.5 border-t border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand-accent)] flex-wrap">
-                      <span>Recipient: {recipientName || destObj.recipientName || destObj.fullName || "Customer"}</span>
-                      <span>•</span>
-                      <a
-                        href={`tel:${destObj.recipientPhone || destObj.phone}`}
-                        className="hover:underline flex items-center gap-1 font-mono"
-                      >
-                        <Phone size={10} />
-                        <span>{destObj.recipientPhone || destObj.phone}</span>
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        )}
 
         {/* Real GPS Telemetry Chips */}
         <div className="flex items-center gap-2 flex-wrap text-xs pt-2 border-t border-[var(--border-color)]/60">
