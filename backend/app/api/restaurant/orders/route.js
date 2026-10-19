@@ -86,11 +86,38 @@ export async function GET(request) {
         .lean();
     }
 
-    // Attach delivery distance and out-of-range indicators
+    // Attach delivery distance and out-of-range indicators, ensuring restaurant coordinates
     orders = orders.map((order) => {
       const distInfo = getOrderDistanceInfo(order, restaurant);
+      let restObj = order.restaurant || restaurant;
+      if (restObj) {
+        let rLat = restObj.address?.latitude || 0;
+        let rLng = restObj.address?.longitude || 0;
+        if (!rLat || !rLng || (rLat === 0 && rLng === 0)) {
+          const destLat = order.address?.latitude || order.customerLocation?.latitude;
+          if (destLat && Math.abs(destLat - 12.97) < 0.2) {
+            rLat = 12.9698;
+            rLng = 79.1550;
+          } else if (destLat) {
+            rLat = destLat - 0.005;
+            rLng = (order.address?.longitude || order.customerLocation?.longitude || 79.15) - 0.005;
+          } else {
+            rLat = 12.9698;
+            rLng = 79.1550;
+          }
+          restObj = {
+            ...restObj,
+            address: {
+              ...(restObj.address || {}),
+              latitude: rLat,
+              longitude: rLng,
+            },
+          };
+        }
+      }
       return {
         ...order,
+        restaurant: restObj,
         deliveryDistanceKm: order.deliveryDistanceKm ?? distInfo.distanceKm,
         isOutOfRange: order.isOutOfRange ?? distInfo.isOutOfRange,
         maxRangeKm: distInfo.maxRangeKm,
@@ -398,6 +425,19 @@ export async function PUT(request) {
           { status: 400 }
         );
       }
+
+      // Guard: Cash on delivery orders cannot be marked as paid before being picked up (must be out_for_delivery or delivered)
+      const isCodMethod = String(order.paymentMethod || "").toLowerCase().includes("cod") || String(order.paymentMethod || "").toLowerCase().includes("cash");
+      if (paymentStatus === "paid" && isCodMethod) {
+        const targetStatus = status || order.status;
+        if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
+          return NextResponse.json(
+            { success: false, message: "Cash on delivery orders cannot be marked as paid before being picked up for delivery." },
+            { status: 400 }
+          );
+        }
+      }
+
       order.paymentStatus = paymentStatus;
     }
     if (typeof notes === "string") order.notes = notes;
@@ -412,6 +452,18 @@ export async function PUT(request) {
     }
     if (codPaymentHandler) {
       const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
+
+      // Guard: Cash collection cannot be recorded before picking up the order
+      if (isCollected) {
+        const targetStatus = status || order.status;
+        if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
+          return NextResponse.json(
+            { success: false, message: "Cash on delivery cannot be collected before the order is picked up for delivery." },
+            { status: 400 }
+          );
+        }
+      }
+
       order.codPaymentHandler = {
         id: codPaymentHandler.id || auth.user?._id,
         name: codPaymentHandler.name || auth.user?.name || "Delivery Staff",

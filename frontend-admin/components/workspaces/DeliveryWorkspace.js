@@ -36,6 +36,7 @@ import {
   Wallet,
   FileSpreadsheet,
   BadgeCheck,
+  Copy,
 } from "lucide-react";
 import {
   useDeliveryGpsTransmitter,
@@ -97,7 +98,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
   const isCashCollected = (order) => {
     if (!order) return false;
-    return Boolean(order.codPaymentHandler?.collected || order.paymentStatus === "paid");
+    if (isOrderCod(order)) {
+      return (order.status === "out_for_delivery" || order.status === "delivered") && Boolean(order.codPaymentHandler?.collected || order.paymentStatus === "paid");
+    }
+    return Boolean(order.paymentStatus === "paid" || order.paymentStatus === "test_paid");
   };
 
   async function loadOrders(isSilent = false) {
@@ -220,7 +224,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     }
   }
 
+
   async function handleCollectCash(order) {
+    if (order.status !== "out_for_delivery") {
+      toast.error("Cash collection cannot be recorded before picking up the order.");
+      return;
+    }
     const amount = Number(order.totalAmount || 0);
     if (!confirm(`Confirm collecting ₹${amount.toFixed(2)} in cash from customer for order #${order.orderId || order._id}?`)) {
       return;
@@ -246,7 +255,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`₹${amount.toFixed(2)} cash collected! "Mark Handed Over / Delivered" is now unlocked.`);
+        toast.success(`₹${amount.toFixed(2)} cash collected! Cash recorded in hand.`);
         setOrders((prev) =>
           prev.map((o) =>
             o._id === order._id
@@ -439,7 +448,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     // When viewing as staff (not manager), restrict COD dataset strictly to orders collected by this staff member
     const codOrders = isManager ? allCodOrders : allCodOrders.filter(isMyOrder);
 
-    const collectedOrders = codOrders.filter((o) => o.codPaymentHandler?.collected || o.paymentStatus === "paid");
+    const collectedOrders = codOrders.filter((o) => o.status === "delivered" && (o.codPaymentHandler?.collected || o.paymentStatus === "paid"));
     const totalCollected = collectedOrders.reduce(
       (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
       0
@@ -892,8 +901,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         <div className="space-y-4">
           {filteredOrders.map((order) => {
             const isExpanded = expandedOrderId === order._id;
-            const isCOD = order.paymentMethod?.toLowerCase().includes("cash") || order.paymentMethod?.toLowerCase().includes("cod");
-            const isPaid = order.paymentStatus === "paid" || order.paymentStatus === "test_paid";
+            const isCOD = isOrderCod(order);
+            const isPaid = isCOD
+              ? (order.status === "out_for_delivery" || order.status === "delivered") && (order.paymentStatus === "paid" || order.codPaymentHandler?.collected)
+              : (order.paymentStatus === "paid" || order.paymentStatus === "test_paid");
             const isUpdating = updatingId === order._id;
             const isPickup = isPickupOrder(order);
             const isOrderTracking =
@@ -967,12 +978,26 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         {/* Payment Status Pill */}
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
-                            isPaid
+                            isCOD
+                              ? isPaid
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                : order.status === "out_for_delivery"
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 animate-pulse"
+                                : "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/30"
+                              : isPaid
                               ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                               : "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
                           }`}
                         >
-                          {isPaid ? "✓ PAID ONLINE" : "⚠️ COLLECT PAYMENT (COD)"}
+                          {isCOD
+                            ? isPaid
+                              ? "✓ CASH COLLECTED"
+                              : order.status === "out_for_delivery"
+                              ? "⚠️ COLLECT CASH AT DOORSTEP"
+                              : "💵 CASH ON DELIVERY"
+                            : isPaid
+                            ? "✓ PAID ONLINE"
+                            : "⚠️ PAYMENT PENDING"}
                         </span>
                       </div>
 
@@ -1138,7 +1163,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                       </p>
                     </div>
 
-                    {/* GPS Coordinates & Google Maps Navigation */}
+                    {/* GPS Coordinates & Mappls Navigation */}
                     {(() => {
                       const hasCustomerLiveGps = Boolean(order.customerLocation?.latitude && order.customerLocation?.longitude);
                       const hasPinnedGps = Boolean(order.address?.latitude && order.address?.longitude);
@@ -1179,58 +1204,36 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             </span>
                           </div>
 
-                          {/* Toggle Inline Doorstep Map */}
-                          <button
-                            type="button"
-                            onClick={() => toggleDoorstepMap(order._id)}
-                            className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer ${
-                              isMapOpen
-                                ? "bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white border border-stone-600/30"
-                                : "bg-blue-600 hover:bg-blue-700 text-white"
-                            }`}
-                          >
-                            <Navigation size={13} className={isMapOpen ? "text-blue-400" : ""} />
-                            <span>{isMapOpen ? "🗺️ Hide Doorstep Map" : "🗺️ Navigate to Doorstep (Google Maps)"}</span>
-                            <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
-                          </button>
+                          {/* Action Buttons: 1-Tap Mappls Navigation & Toggle Full-Width Map */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            {/* Primary: Turn-by-Turn Voice Navigation in Native Mappls */}
+                            <a
+                              href={`https://mappls.com/direction?dest=${navLat},${navLng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98"
+                              title="Launch turn-by-turn voice directions directly in Mappls"
+                            >
+                              <Navigation size={13} />
+                              <span>🚀 Start Mappls Navigation</span>
+                              <ExternalLink size={11} className="opacity-75" />
+                            </a>
 
-                          {/* Interactive Route Map Window Below Section on Same Page */}
-                          {isMapOpen && (
-                            <DeliveryRouteMap
-                              origin={
-                                gpsTransmitter.lastLocation?.latitude
-                                  ? {
-                                      lat: gpsTransmitter.lastLocation.latitude,
-                                      lng: gpsTransmitter.lastLocation.longitude,
-                                      heading: gpsTransmitter.lastLocation.heading,
-                                    }
-                                  : order.deliveryTracking?.currentLocation?.latitude
-                                  ? {
-                                      lat: order.deliveryTracking.currentLocation.latitude,
-                                      lng: order.deliveryTracking.currentLocation.longitude,
-                                      heading: order.deliveryTracking.currentLocation.heading,
-                                    }
-                                  : null
-                              }
-                              restaurant={order.restaurant}
-                              deliveryTracking={order.deliveryTracking}
-                              destination={{
-                                lat: navLat,
-                                lng: navLng,
-                                latitude: navLat,
-                                longitude: navLng,
-                                street: order.address?.street,
-                                city: order.address?.city,
-                                pincode: order.address?.pincode,
-                                phone: order.address?.phone,
-                                recipientPhone: order.address?.recipientPhone,
-                              }}
-                              customerLocation={order.customerLocation}
-                              orderId={order.orderId || order._id}
-                              initialStatus={order.status}
-                              recipientName={order.address?.recipientName || order.address?.fullName}
-                            />
-                          )}
+                            {/* Secondary: Toggle Full-Width Screen Map */}
+                            <button
+                              type="button"
+                              onClick={() => toggleDoorstepMap(order._id)}
+                              className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer ${
+                                isMapOpen
+                                  ? "bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white border border-stone-600/30"
+                                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                              }`}
+                            >
+                              <MapPin size={13} className={isMapOpen ? "text-blue-400" : ""} />
+                              <span>{isMapOpen ? "🗺️ Hide Doorstep Map" : "🗺️ View Live Map (Mappls)"}</span>
+                              <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
+                            </button>
+                          </div>
                         </div>
                       );
                     })()}
@@ -1257,10 +1260,20 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           className={`text-xs font-bold ${
                             isPaid
                               ? "text-emerald-600 dark:text-emerald-400"
+                              : isCOD
+                              ? "text-amber-600 dark:text-amber-400"
                               : "text-rose-600 dark:text-rose-400"
                           }`}
                         >
-                          {isPaid ? "Fully Paid (No Cash Required)" : "Unpaid / Cash on Delivery"}
+                          {isCOD
+                            ? isPaid
+                              ? "Fully Paid (Cash Collected)"
+                              : order.status === "out_for_delivery"
+                              ? "Due at Doorstep"
+                              : "Cash on Delivery (Pending Handover)"
+                            : isPaid
+                            ? "Fully Paid (No Cash Required)"
+                            : "Unpaid / Payment Pending"}
                         </span>
                       </div>
 
@@ -1274,16 +1287,43 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                       </div>
                     </div>
 
-                    {!isPaid && (
+                    {isCOD && !isPaid && (
+                      <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between gap-2 flex-wrap">
+                        {order.status === "out_for_delivery" ? (
+                          <>
+                            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
+                              <AlertTriangle size={13} className="shrink-0" />
+                              <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash at Doorstep</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCollectCash(order)}
+                              disabled={updatingId !== null}
+                              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                            >
+                              <Banknote size={14} />
+                              <span>Record Cash Collection</span>
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-stone-500 dark:text-stone-400 font-semibold flex items-center gap-1.5">
+                            <Receipt size={13} className="text-stone-400 shrink-0" />
+                            <span>Cash collection available upon doorstep delivery (After pickup)</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {!isCOD && !isPaid && (
                       <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between">
-                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                        <span className="text-[11px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
                           <AlertTriangle size={13} />
-                          <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash at Doorstep</span>
+                          <span>Online payment incomplete</span>
                         </span>
                       </div>
                     )}
 
-                    {isPaid && isOrderCod(order) && order.codPaymentHandler?.collected && (
+                    {isPaid && isOrderCod(order) && (order.status === "out_for_delivery" || order.status === "delivered") && order.codPaymentHandler?.collected && (
                       <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
                         <span className="text-stone-600 dark:text-stone-300 flex items-center gap-1 text-[11px]">
                           <BadgeCheck size={13} className="text-emerald-500 shrink-0" />
@@ -1311,6 +1351,126 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     )}
                   </div>
                 </div>
+
+                {/* ── FULL-WIDTH BIG DOORSTEP NAVIGATION MAP SCREEN ────── */}
+                {(() => {
+                  const navLat = order.address?.latitude || order.customerLocation?.latitude;
+                  const navLng = order.address?.longitude || order.customerLocation?.longitude;
+                  const isMapOpen = expandedMapOrderIds.has(order._id);
+
+                  if (!isMapOpen || !navLat || !navLng) return null;
+
+                  const customerPhone = order.address?.recipientPhone || order.address?.phone;
+                  const customerName = order.address?.recipientName || order.address?.fullName || "Customer";
+                  const fullAddress = [
+                    order.address?.street,
+                    order.address?.city,
+                    order.address?.state,
+                    order.address?.pincode ? `- ${order.address.pincode}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
+
+                  return (
+                    <div className="border-t border-stone-200/80 dark:border-white/10 p-3 sm:p-5 bg-stone-100/60 dark:bg-black/25 w-full transition-all space-y-3">
+                      {/* Destination Wayfinding Banner */}
+                      <div className="bg-white dark:bg-[#151926] p-3.5 sm:p-4 rounded-2xl border border-stone-200/80 dark:border-white/10 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md border border-blue-500/20">
+                              📍 Delivery Destination
+                            </span>
+                            <span className="font-bold text-sm text-stone-900 dark:text-white truncate">
+                              {customerName}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-600 dark:text-stone-300 font-medium leading-relaxed">
+                            {fullAddress || "Address details on file"}
+                          </p>
+                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                                  navigator.clipboard.writeText(`${navLat}, ${navLng}`);
+                                  toast.success("GPS coordinates copied to clipboard!");
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 font-mono text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 px-2 py-0.5 rounded transition cursor-pointer"
+                              title="Click to copy GPS coordinates"
+                            >
+                              <Copy size={11} />
+                              <span>{Number(navLat).toFixed(5)}, {Number(navLng).toFixed(5)}</span>
+                            </button>
+                            {order.customerLocation?.accuracy && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                ● GPS ±{Math.round(order.customerLocation.accuracy)}m accuracy
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          {customerPhone && (
+                            <a
+                              href={`tel:${customerPhone}`}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition cursor-pointer border border-emerald-500/25"
+                            >
+                              <Phone size={13} />
+                              <span>Call ({customerPhone})</span>
+                            </a>
+                          )}
+                          <a
+                            href={`https://mappls.com/direction?dest=${navLat},${navLng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-xs cursor-pointer active:scale-98"
+                            title="Open native Mappls voice turn-by-turn navigation"
+                          >
+                            <Navigation size={13} />
+                            <span>🚀 Mappls Navigation</span>
+                            <ExternalLink size={11} className="opacity-75" />
+                          </a>
+                        </div>
+                      </div>
+
+                      <DeliveryRouteMap
+                        origin={
+                          gpsTransmitter.lastLocation?.latitude
+                            ? {
+                                lat: gpsTransmitter.lastLocation.latitude,
+                                lng: gpsTransmitter.lastLocation.longitude,
+                                heading: gpsTransmitter.lastLocation.heading,
+                              }
+                            : order.deliveryTracking?.currentLocation?.latitude
+                            ? {
+                                lat: order.deliveryTracking.currentLocation.latitude,
+                                lng: order.deliveryTracking.currentLocation.longitude,
+                                heading: order.deliveryTracking.currentLocation.heading,
+                              }
+                            : null
+                        }
+                        restaurant={order.restaurant}
+                        deliveryTracking={order.deliveryTracking}
+                        destination={{
+                          lat: navLat,
+                          lng: navLng,
+                          latitude: navLat,
+                          longitude: navLng,
+                          street: order.address?.street,
+                          city: order.address?.city,
+                          pincode: order.address?.pincode,
+                          phone: order.address?.phone,
+                          recipientPhone: order.address?.recipientPhone,
+                        }}
+                        customerLocation={order.customerLocation}
+                        orderId={order.orderId || order._id}
+                        initialStatus={order.status}
+                        recipientName={order.address?.recipientName || order.address?.fullName}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* ── EXPANDED FULL DETAILS (Order items & Instructions) ─── */}
                 {isExpanded && (

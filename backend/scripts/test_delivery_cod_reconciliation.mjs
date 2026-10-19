@@ -125,12 +125,33 @@ try {
   assert.strictEqual(resCancel.status, 403, "Delivery staff should receive 403 when updating to cancelled");
   console.log("  ✅ Delivery staff transition to 'cancelled' correctly rejected with 403.");
 
-  // --- TEST 2: Delivery Staff Can Transition to out_for_delivery and delivered ---
-  console.log("\n--- Test 2: Delivery staff can transition orders to 'out_for_delivery' ---");
+  // --- TEST 2A: Early COD cash collection before pickup is rejected ---
+  console.log("\n--- Test 2A: Cash collection before picking up the order is strictly rejected ---");
   // Simulate kitchen staff preparing the order
   testOrder1.status = "preparing";
   await testOrder1.save();
 
+  const reqEarlyCash = new Request("http://localhost:4000/api/restaurant/orders", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orderId: testOrder1._id.toString(),
+      codPaymentHandler: {
+        id: deliveryStaffUser._id.toString(),
+        name: deliveryStaffUser.name,
+        collected: true,
+        amount: 398,
+      },
+    }),
+  });
+  const resEarlyCash = await ordersPUT(reqEarlyCash);
+  const dataEarlyCash = await resEarlyCash.json();
+  assert.strictEqual(resEarlyCash.status, 400, "Cash collection before pickup should be rejected with 400");
+  assert.strictEqual(dataEarlyCash.success, false);
+  console.log("  ✅ Premature cash collection before pickup correctly rejected with 400.");
+
+  // --- TEST 2B: Delivery staff can transition orders to 'out_for_delivery' ---
+  console.log("\n--- Test 2B: Delivery staff can transition orders to 'out_for_delivery' ---");
   const reqTransit = new Request("http://localhost:4000/api/restaurant/orders", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

@@ -20,7 +20,7 @@ export default function DeliveryRouteMap({
   initialStatus = "out_for_delivery",
 }) {
   return (
-    <div className="mt-3">
+    <div className="w-full">
       <LiveDeliveryMap
         orderId={orderId}
         initialStatus={initialStatus}

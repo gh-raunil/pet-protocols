@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/server') {
-    return nextResolve('next/server.js', context);
+    return nextResolve('next/server', context);
   }
 
   if (specifier.startsWith('@/')) {

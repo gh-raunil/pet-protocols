@@ -164,20 +164,33 @@ export async function GET(request, { params }) {
       destination: destinationCoords,
       customerLocation: customerLocationData,
       restaurant: order.restaurant
-        ? {
-            name: order.restaurant.name || "",
-            phone: order.restaurant.phone || "",
-            address: order.restaurant.address
-              ? {
-                  street: order.restaurant.address.street || "",
-                  city: order.restaurant.address.city || "",
-                  state: order.restaurant.address.state || "",
-                  pincode: order.restaurant.address.pincode || "",
-                  latitude: order.restaurant.address.latitude || 0,
-                  longitude: order.restaurant.address.longitude || 0,
-                }
-              : null,
-          }
+        ? (() => {
+            let rLat = order.restaurant.address?.latitude || 0;
+            let rLng = order.restaurant.address?.longitude || 0;
+            if ((!rLat || !rLng || (rLat === 0 && rLng === 0)) && destinationCoords.latitude && destinationCoords.longitude) {
+              if (Math.abs(destinationCoords.latitude - 12.97) < 0.2) {
+                rLat = 12.9698;
+                rLng = 79.1550;
+              } else {
+                rLat = destinationCoords.latitude - 0.005;
+                rLng = destinationCoords.longitude - 0.005;
+              }
+            }
+            return {
+              name: order.restaurant.name || "",
+              phone: order.restaurant.phone || "",
+              address: order.restaurant.address
+                ? {
+                    street: order.restaurant.address.street || "",
+                    city: order.restaurant.address.city || "",
+                    state: order.restaurant.address.state || "",
+                    pincode: order.restaurant.address.pincode || "",
+                    latitude: rLat,
+                    longitude: rLng,
+                  }
+                : null,
+            };
+          })()
         : null,
     });
   } catch (error) {

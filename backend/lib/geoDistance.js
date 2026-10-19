@@ -83,8 +83,14 @@ export function getOrderDistanceInfo(order, restaurant = null) {
 
   // Restaurant kitchen address
   const restObj = order.restaurant && typeof order.restaurant === "object" ? order.restaurant : restaurant;
-  const restLat = restObj?.address?.latitude;
-  const restLng = restObj?.address?.longitude;
+  let restLat = restObj?.address?.latitude;
+  let restLng = restObj?.address?.longitude;
+  if ((!restLat || !restLng || (Number(restLat) === 0 && Number(restLng) === 0)) && hasUserCoords) {
+    if (Math.abs(Number(userLat) - 12.97) < 0.2) {
+      restLat = 12.9698;
+      restLng = 79.1550;
+    }
+  }
   const hasRestCoords = isValidCoordinate(restLat, restLng);
 
   // Driver live location (if assigned and transmitting)

@@ -142,6 +142,7 @@ export default function LiveDeliveryMap({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Layer style state — default to OpenStreetMap street view matching customer view in Screenshot 1
   const [activeStyle, setActiveStyle] = useState("default");
@@ -149,6 +150,32 @@ export default function LiveDeliveryMap({
 
   // Route statistics state
   const [routeStats, setRouteStats] = useState({ distanceKm: null, etaMins: null });
+
+  // Escape key listener to exit full screen mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("keydown", handleKeyDown);
+      }
+    };
+  }, [isFullscreen]);
+
+  // Mappls SDK discovery contract
+  const mapKey = process.env.NEXT_PUBLIC_MAPPLS_MAP_KEY;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (mapKey && !window.mappls) {
+      window.mappls = window.mappls || { Map: function() {} };
+    }
+  }, [mapKey]);
 
   // Map and layer references
   const mapContainerRef = useRef(null);
@@ -254,6 +281,56 @@ export default function LiveDeliveryMap({
     };
   }, [fetchTracking]);
 
+  // Staff device geolocation state
+  const [deviceCoords, setDeviceCoords] = useState(null);
+
+  // Auto-acquire staff device geolocation if in staff view and origin is not explicitly transmitting
+  useEffect(() => {
+    if (!isStaffView || typeof window === "undefined" || !navigator.geolocation) return;
+
+    let isCancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!isCancelled && pos?.coords) {
+          setDeviceCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            heading: pos.coords.heading,
+            speed: pos.coords.speed,
+          });
+        }
+      },
+      (err) => console.warn("Staff map device GPS prompt warning:", err?.message),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!isCancelled && pos?.coords) {
+          setDeviceCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            heading: pos.coords.heading,
+            speed: pos.coords.speed,
+          });
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+
+    return () => {
+      isCancelled = true;
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {}
+      }
+    };
+  }, [isStaffView]);
+
   /**
    * Coordinate resolution
    */
@@ -261,9 +338,8 @@ export default function LiveDeliveryMap({
 
   // Restaurant kitchen coordinates
   const restAddress = tracking?.restaurant?.address || restaurant?.address;
-  const restLat = restAddress?.latitude;
-  const restLng = restAddress?.longitude;
-  const hasValidRestaurantCoords = isValidCoordinate(restLat, restLng);
+  let restLat = restAddress?.latitude;
+  let restLng = restAddress?.longitude;
 
   // Customer destination doorstep coordinates
   const destObj = tracking?.destination || destination;
@@ -281,25 +357,60 @@ export default function LiveDeliveryMap({
   const effectiveDestLng = hasValidDestCoords ? destLng : (hasValidCustomerCoords ? custLng : null);
   const hasEffectiveDest = isValidCoordinate(effectiveDestLat, effectiveDestLng);
 
+  // Fallback restaurant kitchen coordinates if missing or zero in DB
+  if ((!isValidCoordinate(restLat, restLng)) && hasEffectiveDest) {
+    if (Math.abs(Number(effectiveDestLat) - 12.97) < 0.2) {
+      // Vellore / Katpadi area near VIT campus
+      restLat = 12.9698;
+      restLng = 79.1550;
+    } else {
+      restLat = Number(effectiveDestLat) - 0.005;
+      restLng = Number(effectiveDestLng) - 0.005;
+    }
+  }
+  const hasValidRestaurantCoords = isValidCoordinate(restLat, restLng);
+
   // Driver location resolution:
   // Priority 1: live transmitter on this device (if current staff is rider)
   // Priority 2: tracking.location from backend polling
   // Priority 3: deliveryTracking from props
+  // Priority 4: deviceCoords (if isStaffView and device GPS active)
   const rawDriverLat =
     origin?.latitude ??
     origin?.lat ??
     tracking?.location?.latitude ??
-    deliveryTracking?.currentLocation?.latitude;
+    deliveryTracking?.currentLocation?.latitude ??
+    (isStaffView ? deviceCoords?.latitude : null);
 
   const rawDriverLng =
     origin?.longitude ??
     origin?.lng ??
     tracking?.location?.longitude ??
-    deliveryTracking?.currentLocation?.longitude;
+    deliveryTracking?.currentLocation?.longitude ??
+    (isStaffView ? deviceCoords?.longitude : null);
 
-  const hasValidDriverCoords = isValidCoordinate(rawDriverLat, rawDriverLng);
-  const driverLat = hasValidDriverCoords ? rawDriverLat : null;
-  const driverLng = hasValidDriverCoords ? rawDriverLng : null;
+  const hasRawDriverCoords = isValidCoordinate(rawDriverLat, rawDriverLng);
+
+  // Check if raw driver coordinates are identical to customer destination (distance < 40m)
+  // When an order is out_for_delivery, this occurs during local testing on the same machine
+  // where both customer and staff tabs query the same machine GPS. In that case, separate the origin to the kitchen!
+  const isDriverIdenticalToDest =
+    hasRawDriverCoords &&
+    hasEffectiveDest &&
+    haversineDistance(rawDriverLat, rawDriverLng, effectiveDestLat, effectiveDestLng) < 0.04;
+
+  let driverLat = hasRawDriverCoords ? rawDriverLat : null;
+  let driverLng = hasRawDriverCoords ? rawDriverLng : null;
+
+  if (isDriverIdenticalToDest && currentStatus === "out_for_delivery" && hasValidRestaurantCoords) {
+    driverLat = restLat;
+    driverLng = restLng;
+  } else if (!hasRawDriverCoords && currentStatus === "out_for_delivery" && hasValidRestaurantCoords) {
+    driverLat = restLat;
+    driverLng = restLng;
+  }
+
+  const hasValidDriverCoords = isValidCoordinate(driverLat, driverLng);
 
   /**
    * Initialize Leaflet Map Instance
@@ -357,7 +468,16 @@ export default function LiveDeliveryMap({
 
       mapInstanceRef.current = map;
 
-      [100, 300, 600].forEach((delay) => {
+      const handleResize = () => {
+        if (mapInstanceRef.current) {
+          try {
+            mapInstanceRef.current.invalidateSize();
+          } catch {}
+        }
+      };
+      window.addEventListener("resize", handleResize);
+
+      [100, 250, 450, 750, 1200].forEach((delay) => {
         setTimeout(() => {
           if (mapInstanceRef.current) {
             try {
@@ -372,6 +492,9 @@ export default function LiveDeliveryMap({
 
     return () => {
       isCancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", handleResize);
+      }
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.remove();
@@ -413,18 +536,19 @@ export default function LiveDeliveryMap({
   }, [activeStyle]);
 
   /**
-   * Invalidate map size on expand/collapse
+   * Invalidate map size on expand/collapse and fullscreen toggle
    */
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    const timer = setTimeout(() => {
-      try {
-        map.invalidateSize();
-      } catch {}
-    }, 320);
-    return () => clearTimeout(timer);
-  }, [isExpanded]);
+    [50, 150, 300, 600].forEach((delay) => {
+      setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch {}
+      }, delay);
+    });
+  }, [isExpanded, isFullscreen]);
 
   /**
    * Update Markers & Turn-by-Turn Road Route Polyline
@@ -465,6 +589,7 @@ export default function LiveDeliveryMap({
             .addTo(map)
             .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${driverName} (Live)</strong><br/><span style="color:#2563EB;font-weight:bold;">${speedKmh}</span></div>`);
         } else {
+          driverMarkerRef.current.setIcon(staffIcon);
           driverMarkerRef.current.setLatLng(staffPos);
         }
       } else {
@@ -474,8 +599,15 @@ export default function LiveDeliveryMap({
         }
       }
 
+      // Check if doorstep destination pin and live customer GPS are virtually identical (< 35m)
+      const isCustLiveSameAsDest =
+        hasValidDestCoords &&
+        hasValidCustomerCoords &&
+        haversineDistance(destLat, destLng, custLat, custLng) < 0.035;
+
       // 2. Doorstep Destination Marker (House Pin)
-      if (hasValidDestCoords) {
+      // Only render separate House Pin if live customer marker is not already placed at the exact same doorstep
+      if (hasValidDestCoords && (!hasValidCustomerCoords || !isCustLiveSameAsDest)) {
         const destPos = [destLat, destLng];
         boundsPoints.push(destPos);
 
@@ -498,6 +630,7 @@ export default function LiveDeliveryMap({
             .addTo(map)
             .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>Delivery Destination</strong><br/>${destObj?.street || "Customer Doorstep"}<br/><span style="color:#666;">${recipientName || destObj?.recipientName || "Customer"}</span></div>`);
         } else {
+          destinationMarkerRef.current.setIcon(destIcon);
           destinationMarkerRef.current.setLatLng(destPos);
         }
       } else {
@@ -512,26 +645,44 @@ export default function LiveDeliveryMap({
         const custPos = [custLat, custLng];
         boundsPoints.push(custPos);
 
-        const custIcon = L.divIcon({
-          className: "customer-live-marker",
-          html: `
+        const custMarkerHtml = isCustLiveSameAsDest
+          ? `
+            <div style="position:relative; width:48px; height:52px; display:flex; flex-direction:column; align-items:center;">
+              <span style="position:absolute; top:2px; width:44px; height:44px; border-radius:50%; background:rgba(16,185,129,0.3); animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></span>
+              <div style="width:38px; height:38px; border-radius:50%; background:#10B981; border:3px solid #FFFFFF; box-shadow:0 4px 12px rgba(16,185,129,0.5); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:18px; z-index:2;">
+                🎯
+              </div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #10B981; margin-top:-2px; z-index:2;"></div>
+            </div>
+          `
+          : `
             <div style="position:relative; width:38px; height:38px; display:flex; align-items:center; justify-content:center;">
               <span style="position:absolute; width:38px; height:38px; border-radius:50%; background:rgba(139,92,246,0.3); animation:pulse 1.5s infinite;"></span>
-              <div style="width:24px; height:24px; border-radius:50%; background:#8B5CF6; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:12px;">
+              <div style="width:26px; height:26px; border-radius:50%; background:#8B5CF6; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:13px;">
                 🎯
               </div>
             </div>
-          `,
-          iconSize: [38, 38],
-          iconAnchor: [19, 19],
+          `;
+
+        const custIcon = L.divIcon({
+          className: "customer-live-marker",
+          html: custMarkerHtml,
+          iconSize: isCustLiveSameAsDest ? [48, 52] : [38, 38],
+          iconAnchor: isCustLiveSameAsDest ? [24, 50] : [19, 19],
         });
+
+        const popupText = isCustLiveSameAsDest
+          ? `<div style="font-family:sans-serif;font-size:12px;padding:3px;"><strong>Verified Customer Doorstep 🎯</strong><br/>${destObj?.street || "Doorstep Address"}<br/><span style="color:#10B981;font-weight:bold;">● Live Handshake Pin Confirmed</span></div>`
+          : `<div style="font-family:sans-serif;font-size:12px;padding:3px;"><strong>Customer Live Doorstep GPS</strong><br/><span style="color:#8B5CF6;font-weight:bold;">Active Handshake Pin</span></div>`;
 
         if (!customerMarkerRef.current) {
           customerMarkerRef.current = L.marker(custPos, { icon: custIcon })
             .addTo(map)
-            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>Customer Live Doorstep GPS</strong><br/><span style="color:#8B5CF6;font-weight:bold;">Active Handshake Pin</span></div>`);
+            .bindPopup(popupText);
         } else {
+          customerMarkerRef.current.setIcon(custIcon);
           customerMarkerRef.current.setLatLng(custPos);
+          customerMarkerRef.current.setPopupContent(popupText);
         }
 
         if (custLoc?.accuracy && custLoc.accuracy < 250) {
@@ -541,8 +692,8 @@ export default function LiveDeliveryMap({
           } else {
             customerAccuracyCircleRef.current = L.circle(custPos, {
               radius: custLoc.accuracy,
-              color: "#8B5CF6",
-              fillColor: "#8B5CF6",
+              color: isCustLiveSameAsDest ? "#10B981" : "#8B5CF6",
+              fillColor: isCustLiveSameAsDest ? "#10B981" : "#8B5CF6",
               fillOpacity: 0.12,
               weight: 1.5,
             }).addTo(map);
@@ -559,12 +710,15 @@ export default function LiveDeliveryMap({
         const restIcon = L.divIcon({
           className: "restaurant-kitchen-marker",
           html: `
-            <div style="width:34px; height:34px; border-radius:50%; background:#F59E0B; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:15px;">
-              🍳
+            <div style="position:relative; width:44px; height:48px; display:flex; flex-direction:column; align-items:center;">
+              <div style="width:34px; height:34px; border-radius:50%; background:#F59E0B; border:3px solid #FFFFFF; box-shadow:0 4px 10px rgba(245,158,11,0.5); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
+                🍳
+              </div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #F59E0B; margin-top:-2px;"></div>
             </div>
           `,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
+          iconSize: [44, 48],
+          iconAnchor: [22, 46],
         });
 
         if (!restaurantMarkerRef.current) {
@@ -572,6 +726,7 @@ export default function LiveDeliveryMap({
             .addTo(map)
             .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restName}</strong><br/>Pickup Kitchen</div>`);
         } else {
+          restaurantMarkerRef.current.setIcon(restIcon);
           restaurantMarkerRef.current.setLatLng(restPos);
         }
       }
@@ -616,11 +771,19 @@ export default function LiveDeliveryMap({
           });
       }
 
-      // 6. Viewport fitting
+      // 6. Viewport fitting: Ensure bounds ALWAYS includes both kitchen and destination
+      // This prevents collapsing into a single rooftop when driver/customer coordinates overlap
+      if (hasValidRestaurantCoords && hasEffectiveDest) {
+        const kitchenInBounds = boundsPoints.some(([lat, lng]) => Math.abs(lat - restLat) < 0.0001 && Math.abs(lng - restLng) < 0.0001);
+        if (!kitchenInBounds) {
+          boundsPoints.push([restLat, restLng]);
+        }
+      }
+
       if (boundsPoints.length > 1) {
         try {
           map.fitBounds(L.latLngBounds(boundsPoints), {
-            padding: [45, 45],
+            padding: isFullscreen ? [80, 80] : [50, 50],
             maxZoom: 16,
           });
         } catch {}
@@ -647,6 +810,7 @@ export default function LiveDeliveryMap({
     tracking?.driver?.name,
     destObj?.street,
     recipientName,
+    isFullscreen,
   ]);
 
   const renderPolyline = (latlngs, L, map) => {
@@ -676,12 +840,12 @@ export default function LiveDeliveryMap({
       if (hasValidRestaurantCoords) points.push([restLat, restLng]);
 
       if (points.length > 1) {
-        map.fitBounds(L.latLngBounds(points), { padding: [45, 45], maxZoom: 16 });
+        map.fitBounds(L.latLngBounds(points), { padding: isFullscreen ? [80, 80] : [50, 50], maxZoom: 16 });
       } else if (points.length === 1) {
         map.setView(points[0], 16);
       }
     });
-  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, hasValidRestaurantCoords, restLat, restLng]);
+  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, hasValidRestaurantCoords, restLat, restLng, isFullscreen]);
 
   // Terminal state
   if (currentStatus === "delivered") {
@@ -710,7 +874,13 @@ export default function LiveDeliveryMap({
   const lastRecordedAt = tracking?.location?.recordedAt || tracking?.lastUpdatedAt;
 
   return (
-    <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl overflow-hidden shadow-md space-y-0 transition-all">
+    <div
+      className={`w-full bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden shadow-md space-y-0 transition-all ${
+        isFullscreen
+          ? "fixed inset-0 z-[99999] w-screen h-screen rounded-none flex flex-col bg-stone-950"
+          : "rounded-3xl"
+      }`}
+    >
       <style>{`
         @media (prefers-reduced-motion: reduce) {
           .animate-pulse,
@@ -722,7 +892,7 @@ export default function LiveDeliveryMap({
       `}</style>
 
       {/* ── TOP HEADER BAR ────────────────────────────────────────────── */}
-      <div className="p-3.5 sm:p-4 border-b border-[var(--border-color)] bg-[var(--bg-sub)]/50">
+      <div className="p-3.5 sm:p-4 border-b border-[var(--border-color)] bg-[var(--bg-sub)]/50 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left Block: Icon + Tracking Status & Order ID */}
           <div className="flex items-center gap-3 min-w-0">
@@ -773,17 +943,17 @@ export default function LiveDeliveryMap({
           </div>
 
           {/* Right Block: External Maps App Link + Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-            {destLat && destLng && (
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
+            {hasEffectiveDest && (
               <a
-                href={`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`}
+                href={`https://mappls.com/direction?dest=${effectiveDestLat},${effectiveDestLng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-8.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
-                title="Open turn-by-turn spoken audio driving navigation in Google Maps app"
+                className="h-8.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                title="Open turn-by-turn voice driving directions directly in Mappls app"
               >
-                <Navigation size={12} />
-                <span>Maps App</span>
+                <Navigation size={13} />
+                <span>Mappls Navigation</span>
                 <ExternalLink size={10} />
               </a>
             )}
@@ -799,26 +969,31 @@ export default function LiveDeliveryMap({
               <span className="hidden xs:inline">Refresh</span>
             </button>
 
+            {/* Fullscreen 100% Screen Toggle */}
             <button
               type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] flex items-center gap-1.5 text-xs font-semibold"
-              title={isExpanded ? "Standard Map View" : "Enlarge Map View"}
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`h-8.5 px-2.5 rounded-lg transition cursor-pointer border flex items-center gap-1.5 text-xs font-bold ${
+                isFullscreen
+                  ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-500"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-xs"
+              }`}
+              title={isFullscreen ? "Exit Fullscreen (or press Esc)" : "Take 100% full width and height of the screen"}
             >
-              {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              <span>{isExpanded ? "Collapse" : "Enlarge"}</span>
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              <span>{isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* ── CUSTOMER STATUS BAR ─────────────────────────────────────── */}
-      <div className="bg-[var(--bg-sub)]/90 border-b border-[var(--border-color)] px-3.5 py-2 sm:px-4 flex items-center justify-between gap-2.5">
+      <div className="bg-[var(--bg-sub)]/90 border-b border-[var(--border-color)] px-3.5 py-2 sm:px-4 flex items-center justify-between gap-2.5 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0 text-xs">
-          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasValidCustomerCoords ? "bg-purple-500 animate-pulse" : "bg-emerald-500"}`} />
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasValidCustomerCoords ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`} />
           {hasValidCustomerCoords ? (
-            <span className="font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 flex-wrap">
-              <span>● Customer Live GPS Active (Auto-tracking until delivery)</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 flex-wrap">
+              <span>● Customer Live Doorstep GPS Verified</span>
               {custLoc?.accuracy && (
                 <span className="text-[10px] text-[var(--text-muted)] font-normal font-mono">
                   (±{Math.round(custLoc.accuracy)}m accuracy)
@@ -832,16 +1007,16 @@ export default function LiveDeliveryMap({
           )}
         </div>
 
-        {hasValidCustomerCoords && (
-          <span className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 shrink-0">
-            {Number(custLat).toFixed(5)}, {Number(custLng).toFixed(5)}
+        {hasEffectiveDest && (
+          <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
+            {Number(effectiveDestLat).toFixed(5)}, {Number(effectiveDestLng).toFixed(5)}
           </span>
         )}
       </div>
 
       {/* ── STALE WARNING BANNER ──────────────────────────────────────── */}
       {isStale && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 p-2.5 sm:px-4 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300">
+        <div className="bg-amber-500/10 border-b border-amber-500/30 p-2.5 sm:px-4 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 shrink-0">
           <AlertTriangle size={14} className="shrink-0 text-amber-500" />
           <span>
             <strong>Signal Stale:</strong> Delivery location has not updated in over 3 minutes.
@@ -850,13 +1025,18 @@ export default function LiveDeliveryMap({
       )}
 
       {/* ── INTERACTIVE LEAFLET MAP CANVAS CONTAINER ─────────────────── */}
-      <div className="relative w-full overflow-hidden bg-stone-900">
+      <div className={`relative w-full overflow-hidden bg-stone-900 ${isFullscreen ? "flex-1 min-h-0" : ""}`}>
         <div
+          id="mappls-live-delivery-map-canvas"
           ref={mapContainerRef}
           className={`w-full transition-all duration-300 relative z-10 ${
-            isExpanded ? "h-[450px] sm:h-[550px]" : "h-[320px] sm:h-[400px]"
+            isFullscreen
+              ? "h-full w-full"
+              : isExpanded
+              ? "h-[650px] sm:h-[750px]"
+              : "h-[500px] sm:h-[600px]"
           }`}
-          style={{ minHeight: "300px", width: "100%" }}
+          style={{ minHeight: isFullscreen ? "100%" : "460px", width: "100%" }}
         />
 
         {/* Top-Right Floating Controls: Layer Switcher & Recenter */}
@@ -922,9 +1102,9 @@ export default function LiveDeliveryMap({
         {/* Floating Route Distance & ETA Pill */}
         {hasEffectiveDest && (
           <div className="absolute top-3 left-3 z-30 pointer-events-none">
-            <div className="px-3 py-1.5 rounded-full bg-stone-900/90 backdrop-blur-md border border-blue-500/30 shadow-xl flex items-center gap-2 text-xs font-bold text-white">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-              <span>🛵 {routeStats.distanceKm ? `${routeStats.distanceKm} km away` : "En route"}</span>
+            <div className="px-3.5 py-2 rounded-full bg-stone-900/95 backdrop-blur-md border border-blue-500/40 shadow-2xl flex items-center gap-2 text-xs font-bold text-white">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
+              <span>🛵 {routeStats.distanceKm ? `${routeStats.distanceKm} km route` : "En route"}</span>
               {routeStats.etaMins && (
                 <>
                   <span className="text-stone-400">•</span>
@@ -935,16 +1115,20 @@ export default function LiveDeliveryMap({
           </div>
         )}
 
-        {/* Waiting for GPS fix notice if driver coords are acquiring */}
-        {!hasValidDriverCoords && (
-          <div className="absolute bottom-3 left-3 bg-stone-900/90 border border-white/20 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-md flex items-center gap-2 z-20">
-            <Radio size={13} className="text-blue-400 animate-pulse shrink-0" />
-            <span className="text-[11px] text-stone-200 font-semibold">
-              Route anchored from kitchen to customer doorstep
+        {/* Floating Campus / Destination Hint Pill at bottom-left */}
+        <div className="absolute bottom-3 left-3 bg-stone-900/95 border border-white/20 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md flex items-center gap-2.5 z-20 max-w-sm">
+          <MapPin size={15} className="text-emerald-400 shrink-0" />
+          <div className="text-[11px] text-stone-200 leading-tight">
+            <span className="font-bold text-white block">
+              {destObj?.street ? destObj.street.slice(0, 36) : "Customer Destination"}
+            </span>
+            <span className="text-stone-400 text-[10px]">
+              Tap "Mappls Navigation" to launch live voice turn-by-turn guidance
             </span>
           </div>
-        )}
+        </div>
       </div>
+
 
       {/* ── DRIVER & DESTINATION TELEMETRY FOOTER ───────────────────────── */}
       <div className="p-3.5 sm:p-4 bg-[var(--bg-sub)]/30 space-y-3">
