@@ -445,7 +445,7 @@ export default function LiveDeliveryMap({
    * Initialize Leaflet Map Instance
    */
   useEffect(() => {
-    if (!mapContainerRef.current || mapInstanceRef.current || typeof window === "undefined") {
+    if (!mapContainerRef.current || typeof window === "undefined") {
       return;
     }
 
@@ -453,7 +453,19 @@ export default function LiveDeliveryMap({
 
     async function initLeaflet() {
       const L = (await import("leaflet")).default;
-      if (isCancelled || !mapContainerRef.current || mapInstanceRef.current) return;
+      if (isCancelled || !mapContainerRef.current) return;
+
+      // Ensure no leftover leaflet instance or ID exists on the DOM node
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch {}
+        mapInstanceRef.current = null;
+      }
+
+      if (mapContainerRef.current._leaflet_id) {
+        delete mapContainerRef.current._leaflet_id;
+      }
 
       const initialCenter = [
         driverLat || effectiveDestLat || restLat || 12.97,
@@ -490,7 +502,13 @@ export default function LiveDeliveryMap({
         try {
           map.invalidateSize();
         } catch {}
-      }, 300);
+      }, 150);
+
+      setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch {}
+      }, 500);
     }
 
     initLeaflet();
@@ -498,11 +516,13 @@ export default function LiveDeliveryMap({
     return () => {
       isCancelled = true;
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch {}
         mapInstanceRef.current = null;
       }
     };
-  }, []);
+  }, [currentStatus]);
 
   /**
    * Update Tile Layer when activeStyle changes
@@ -698,21 +718,30 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 5. Draw Turn-by-Turn Route Polyline from Staff to Doorstep (Requirement 2 & 3)
-      if (hasValidDriverCoords && hasEffectiveDest) {
-        const directDist = haversineDistance(driverLat, driverLng, effectiveDestLat, effectiveDestLng);
+      // 5. Draw Turn-by-Turn Route Polyline from Staff/Kitchen to Doorstep (Requirement 2 & 3)
+      const routeOriginLat = hasValidDriverCoords ? driverLat : (hasValidRestaurantCoords ? restLat : null);
+      const routeOriginLng = hasValidDriverCoords ? driverLng : (hasValidRestaurantCoords ? restLng : null);
+
+      if (routeOriginLat && routeOriginLng && hasEffectiveDest) {
+        const directDist = haversineDistance(routeOriginLat, routeOriginLng, effectiveDestLat, effectiveDestLng);
         const estMinutes = Math.max(1, Math.round((directDist / 22) * 60 + 2));
         setRouteStats({ distanceKm: directDist.toFixed(1), etaMins: estMinutes });
 
+        // Immediate fallback straight line so the road line is never invisible
+        const fallbackLine = [
+          [routeOriginLat, routeOriginLng],
+          [effectiveDestLat, effectiveDestLng],
+        ];
+        renderPolyline(fallbackLine, L, map);
+
         // Query OSRM driving route
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${driverLng},${driverLat};${effectiveDestLng},${effectiveDestLat}?overview=full&geometries=geojson`;
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${routeOriginLng},${routeOriginLat};${effectiveDestLng},${effectiveDestLat}?overview=full&geometries=geojson`;
 
         fetch(osrmUrl)
           .then((res) => res.json())
           .then((data) => {
-            let latlngs = [];
             if (data?.routes?.[0]?.geometry?.coordinates) {
-              latlngs = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+              const roadCoords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
               if (data.routes[0].distance) {
                 const roadDist = data.routes[0].distance / 1000;
                 const roadDuration = Math.round(data.routes[0].duration / 60);
@@ -721,20 +750,11 @@ export default function LiveDeliveryMap({
                   etaMins: Math.max(1, roadDuration),
                 });
               }
-            } else {
-              latlngs = [
-                [driverLat, driverLng],
-                [effectiveDestLat, effectiveDestLng],
-              ];
+              renderPolyline(roadCoords, L, map);
             }
-            renderPolyline(latlngs, L, map);
           })
           .catch(() => {
-            const latlngs = [
-              [driverLat, driverLng],
-              [effectiveDestLat, effectiveDestLng],
-            ];
-            renderPolyline(latlngs, L, map);
+            // Keep fallbackLine
           });
       }
 
@@ -751,6 +771,7 @@ export default function LiveDeliveryMap({
       }
     });
   }, [
+    sdkStatus,
     driverLat,
     driverLng,
     hasValidDriverCoords,

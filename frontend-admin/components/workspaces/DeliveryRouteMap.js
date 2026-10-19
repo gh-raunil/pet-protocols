@@ -80,6 +80,8 @@ export default function DeliveryRouteMap({
   origin = null, // { lat, lng, heading } (staff location)
   destination = null, // { lat, lng } (doorstep pin)
   customerLocation = null, // optional { latitude, longitude, accuracy }
+  restaurant = null, // optional { name, address: { latitude, longitude, street } }
+  deliveryTracking = null, // optional { currentLocation }
   orderId = "",
   recipientName = "",
 }) {
@@ -90,6 +92,7 @@ export default function DeliveryRouteMap({
   const staffMarkerRef = useRef(null);
   const destMarkerRef = useRef(null);
   const customerMarkerRef = useRef(null);
+  const restaurantMarkerRef = useRef(null);
   const routeLineRef = useRef(null);
 
   const [activeStyle, setActiveStyle] = useState("hybrid");
@@ -97,6 +100,7 @@ export default function DeliveryRouteMap({
   const [routeStats, setRouteStats] = useState({ distanceKm: null, etaMins: null });
   const [mapReady, setMapReady] = useState(false);
   const [deviceCoords, setDeviceCoords] = useState(null);
+  const [backendDriverCoords, setBackendDriverCoords] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [menuCoords, setMenuCoords] = useState(null);
   const layerButtonRef = useRef(null);
@@ -106,6 +110,37 @@ export default function DeliveryRouteMap({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Poll backend tracking endpoint for live updates
+  useEffect(() => {
+    if (!orderId || typeof window === "undefined") return;
+
+    let isCancelled = false;
+    const fetchOrderTracking = async () => {
+      try {
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/tracking`);
+        const data = await res.json().catch(() => ({}));
+        if (!isCancelled && res.ok && data.success) {
+          if (data.location?.latitude && data.location?.longitude) {
+            setBackendDriverCoords({
+              lat: data.location.latitude,
+              lng: data.location.longitude,
+              heading: data.location.heading,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Staff map tracking fetch error:", err);
+      }
+    };
+
+    fetchOrderTracking();
+    const interval = setInterval(fetchOrderTracking, 8000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [orderId]);
 
   const updateMenuPosition = useCallback(() => {
     const target = layerButtonRef.current || mapLayerBtnRef.current;
@@ -168,8 +203,31 @@ export default function DeliveryRouteMap({
 
   const destLat = destination?.lat || destination?.latitude;
   const destLng = destination?.lng || destination?.longitude;
-  const staffLat = origin?.lat || origin?.latitude || deviceCoords?.lat;
-  const staffLng = origin?.lng || origin?.longitude || deviceCoords?.lng;
+
+  const restLat = restaurant?.address?.latitude || restaurant?.latitude;
+  const restLng = restaurant?.address?.longitude || restaurant?.longitude;
+
+  // Multi-tier origin resolution:
+  // 1. Live transmitter on this device
+  // 2. Real-time backend tracking poll
+  // 3. deliveryTracking prop from order
+  // 4. Device GPS (navigator.geolocation)
+  // 5. Restaurant kitchen fallback
+  const staffLat =
+    origin?.lat ||
+    origin?.latitude ||
+    backendDriverCoords?.lat ||
+    deliveryTracking?.currentLocation?.latitude ||
+    deviceCoords?.lat ||
+    (restLat && destLat ? restLat : null);
+
+  const staffLng =
+    origin?.lng ||
+    origin?.longitude ||
+    backendDriverCoords?.lng ||
+    deliveryTracking?.currentLocation?.longitude ||
+    deviceCoords?.lng ||
+    (restLng && destLng ? restLng : null);
 
   // Auto-acquire staff device GPS location if origin is not provided
   useEffect(() => {
@@ -399,21 +457,51 @@ export default function DeliveryRouteMap({
         }
       }
 
-      // 4. Draw Route Polyline from Staff to Destination
-      if (staffLat && staffLng && destLat && destLng) {
-        const directDist = haversineDistance(staffLat, staffLng, destLat, destLng);
+      // 4. Restaurant Kitchen Marker (if present)
+      if (restLat && restLng) {
+        const restPos = [restLat, restLng];
+        boundsCoords.push(restPos);
+
+        const restIcon = L.divIcon({
+          className: "restaurant-kitchen-marker",
+          html: `
+            <div style="width:34px; height:34px; border-radius:50%; background:#F59E0B; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:15px;">
+              🍳
+            </div>
+          `,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+        });
+
+        if (!restaurantMarkerRef.current) {
+          restaurantMarkerRef.current = L.marker(restPos, { icon: restIcon })
+            .addTo(map)
+            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restaurant?.name || "Kitchen"}</strong><br/>Pickup Kitchen</div>`);
+        } else {
+          restaurantMarkerRef.current.setLatLng(restPos);
+        }
+      }
+
+      // 5. Draw Turn-by-Turn Road Route from Staff/Kitchen to Doorstep Destination
+      const routeStartLat = staffLat || restLat;
+      const routeStartLng = staffLng || restLng;
+      const routeEndLat = destLat || custLat;
+      const routeEndLng = destLng || custLng;
+
+      if (routeStartLat && routeStartLng && routeEndLat && routeEndLng) {
+        const directDist = haversineDistance(routeStartLat, routeStartLng, routeEndLat, routeEndLng);
         const estMinutes = Math.max(1, Math.round((directDist / 22) * 60 + 2)); // ~22km/h city bike avg
         setRouteStats({ distanceKm: directDist.toFixed(1), etaMins: estMinutes });
 
         // Immediate straight-line route fallback so the route is NEVER invisible
         const immediateLine = [
-          [staffLat, staffLng],
-          [destLat, destLng],
+          [routeStartLat, routeStartLng],
+          [routeEndLat, routeEndLng],
         ];
         renderRoute(immediateLine, L, map);
 
         // Fetch OSRM turn-by-turn driving polyline
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${staffLng},${staffLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${routeStartLng},${routeStartLat};${routeEndLng},${routeEndLat}?overview=full&geometries=geojson`;
 
         fetch(osrmUrl)
           .then((res) => res.json())
@@ -431,12 +519,12 @@ export default function DeliveryRouteMap({
               renderRoute(roadCoords, L, map);
             }
           })
-          .catch(() => {
-            // Keep immediate fallback
+          .catch((err) => {
+            console.warn("OSRM road route fetch fallback:", err);
           });
       }
 
-      // 5. Fit bounds with padding
+      // 6. Fit bounds with padding
       if (boundsCoords.length > 1) {
         try {
           map.fitBounds(L.latLngBounds(boundsCoords), {
@@ -448,7 +536,7 @@ export default function DeliveryRouteMap({
         map.setView(boundsCoords[0], 16);
       }
     });
-  }, [mapReady, staffLat, staffLng, destLat, destLng, customerLocation, recipientName]);
+  }, [mapReady, staffLat, staffLng, destLat, destLng, restLat, restLng, customerLocation, recipientName]);
 
   const renderRoute = (latlngs, L, map) => {
     if (routeLineRef.current) {
@@ -473,6 +561,7 @@ export default function DeliveryRouteMap({
       const points = [];
       if (staffLat && staffLng) points.push([staffLat, staffLng]);
       if (destLat && destLng) points.push([destLat, destLng]);
+      if (restLat && restLng) points.push([restLat, restLng]);
       if (customerLocation?.latitude && customerLocation?.longitude) {
         points.push([customerLocation.latitude, customerLocation.longitude]);
       }
@@ -483,7 +572,7 @@ export default function DeliveryRouteMap({
         map.setView(points[0], 16);
       }
     });
-  }, [staffLat, staffLng, destLat, destLng, customerLocation]);
+  }, [staffLat, staffLng, destLat, destLng, restLat, restLng, customerLocation]);
 
   return (
     <div className="mt-2.5 rounded-2xl border border-blue-500/30 bg-stone-950 shadow-xl relative" style={{ overflow: "visible" }}>

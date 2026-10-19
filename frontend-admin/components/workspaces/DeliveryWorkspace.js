@@ -1191,8 +1191,16 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                       lng: gpsTransmitter.lastLocation.longitude,
                                       heading: gpsTransmitter.lastLocation.heading,
                                     }
+                                  : order.deliveryTracking?.currentLocation?.latitude
+                                  ? {
+                                      lat: order.deliveryTracking.currentLocation.latitude,
+                                      lng: order.deliveryTracking.currentLocation.longitude,
+                                      heading: order.deliveryTracking.currentLocation.heading,
+                                    }
                                   : null
                               }
+                              restaurant={order.restaurant}
+                              deliveryTracking={order.deliveryTracking}
                               destination={{ lat: navLat, lng: navLng }}
                               customerLocation={order.customerLocation}
                               orderId={order.orderId || order._id}
