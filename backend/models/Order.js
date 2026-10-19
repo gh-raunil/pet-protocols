@@ -386,6 +386,28 @@ const OrderSchema = new mongoose.Schema(
         lastUpdatedAt: null,
       }),
     },
+    deliveryDistanceKm: {
+      type: Number,
+      default: null,
+    },
+    isOutOfRange: {
+      type: Boolean,
+      default: false,
+    },
+    acceptedOutOfRange: {
+      type: Boolean,
+      default: false,
+    },
+    acceptedOutOfRangeBy: {
+      userId: { type: String, default: null },
+      name: { type: String, default: "" },
+      role: { type: String, default: "" },
+      acceptedAt: { type: Date, default: null },
+    },
+    cancellationReason: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

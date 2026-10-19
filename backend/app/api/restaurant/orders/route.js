@@ -5,6 +5,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
 import { executeOrderRefund, retryFailedDeduction } from "@/lib/refundService";
 import { notifyOrderEvent, sendPushToUser } from "@/lib/pushService";
+import { getOrderDistanceInfo } from "@/lib/geoDistance";
 
 let _requireRestaurantAdmin = requireRestaurantAdmin;
 export function _setTestRequireRestaurantAdmin(fn) {
@@ -70,6 +71,7 @@ export async function GET(request) {
 
     let orders = await Order.find(filter)
       .populate("user", "name email phone")
+      .populate("restaurant", "name slug phone address deliverySettings")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -79,15 +81,28 @@ export async function GET(request) {
       delete fallbackFilter.createdAt;
       orders = await Order.find(fallbackFilter)
         .populate("user", "name email phone")
+        .populate("restaurant", "name slug phone address deliverySettings")
         .sort({ createdAt: -1 })
         .lean();
     }
+
+    // Attach delivery distance and out-of-range indicators
+    orders = orders.map((order) => {
+      const distInfo = getOrderDistanceInfo(order, restaurant);
+      return {
+        ...order,
+        deliveryDistanceKm: order.deliveryDistanceKm ?? distInfo.distanceKm,
+        isOutOfRange: order.isOutOfRange ?? distInfo.isOutOfRange,
+        maxRangeKm: distInfo.maxRangeKm,
+      };
+    });
 
     return NextResponse.json({
       success: true,
       orders,
       restaurantCreatedAt: restaurant?.createdAt || null,
       restaurantName: restaurant?.name || "",
+      restaurant,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -104,7 +119,19 @@ export async function PUT(request) {
 
     const { restaurantId } = auth;
     const body = await request.json();
-    const { orderId, orderIds, status, paymentStatus, notes, assignedDeliveryStaff, codPaymentHandler, action } = body;
+    const {
+      orderId,
+      orderIds,
+      status,
+      paymentStatus,
+      notes,
+      assignedDeliveryStaff,
+      codPaymentHandler,
+      action,
+      acceptedOutOfRange,
+      deliveryDistanceKm,
+      cancellationReason,
+    } = body;
 
     if (!orderId && (!orderIds || !orderIds.length)) {
       return NextResponse.json({ success: false, message: "Order ID is required." }, { status: 400 });
@@ -210,7 +237,7 @@ export async function PUT(request) {
       }, { status: retryResult.success ? 200 : 400 });
     }
 
-    if (!status && !paymentStatus && notes === undefined && !assignedDeliveryStaff && !codPaymentHandler) {
+    if (!status && !paymentStatus && notes === undefined && !assignedDeliveryStaff && !codPaymentHandler && !acceptedOutOfRange) {
       return NextResponse.json({ success: false, message: "At least one field must be provided." }, { status: 400 });
     }
 
@@ -282,6 +309,31 @@ export async function PUT(request) {
         );
       }
 
+      const distInfo = getOrderDistanceInfo(order, auth.restaurant);
+      const effectiveDistance = deliveryDistanceKm ?? distInfo.distanceKm;
+
+      if (acceptedOutOfRange) {
+        order.acceptedOutOfRange = true;
+        order.isOutOfRange = true;
+        order.deliveryDistanceKm = effectiveDistance ?? order.deliveryDistanceKm;
+        order.acceptedOutOfRangeBy = {
+          userId: auth.user?._id ? String(auth.user._id) : null,
+          name: auth.user?.name || "Manager",
+          role: auth.user?.role || "restaurant_admin",
+          acceptedAt: new Date(),
+        };
+      }
+
+      if (cancellationReason) {
+        order.cancellationReason = cancellationReason;
+      }
+
+      const transitionNote =
+        notes ||
+        (acceptedOutOfRange
+          ? `Accepted out-of-range order (${effectiveDistance ? effectiveDistance.toFixed(1) : "10+"} km > 10 km limit) by ${auth.user?.name || "Manager"}`
+          : (status === "cancelled" ? (cancellationReason || "Cancelled by restaurant staff") : ""));
+
       if (typeof order.addStatusTransition === "function") {
         order.addStatusTransition(
           status,
@@ -290,7 +342,7 @@ export async function PUT(request) {
             role: auth.user?.role || "restaurant_admin",
             name: auth.user?.name || "Restaurant Staff",
           },
-          notes || (status === "cancelled" ? "Cancelled by restaurant staff" : "")
+          transitionNote
         );
       } else {
         order.status = status;

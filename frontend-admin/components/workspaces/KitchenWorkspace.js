@@ -13,7 +13,10 @@ import {
   PackageCheck,
   Timer,
   Info,
+  AlertTriangle,
 } from "lucide-react";
+import { getOrderDistanceInfo } from "@/lib/geoDistance";
+import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
 
 export default function KitchenWorkspace({ restaurantName = "" }) {
   const [orders, setOrders] = useState([]);
@@ -22,6 +25,8 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
   const [viewTab, setViewTab] = useState("all_kds"); // "all_kds", "pending", "preparing", "ready"
+  const [outOfRangePrompt, setOutOfRangePrompt] = useState(null);
+  const [restaurantObj, setRestaurantObj] = useState(null);
 
   async function loadOrders(isSilent = false) {
     try {
@@ -33,6 +38,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
       const data = await res.json();
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
+        if (data.restaurant) {
+          setRestaurantObj(data.restaurant);
+        }
       } else {
         setError(data.message || data.error || "Failed to load kitchen tickets.");
       }
@@ -51,18 +59,18 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
     return () => clearInterval(interval);
   }, []);
 
-  async function updateStatus(orderId, newStatus) {
+  async function updateStatus(orderId, newStatus, extra = {}) {
     try {
       setUpdatingId(orderId);
       const res = await fetch("/api/restaurant/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: newStatus }),
+        body: JSON.stringify({ orderId, status: newStatus, ...extra }),
       });
       const data = await res.json();
       if (data.success) {
         setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, status: newStatus } : o))
+          prev.map((o) => (o._id === orderId ? { ...o, status: newStatus, ...extra } : o))
         );
       } else {
         alert(data.message || "Failed to advance ticket status.");
@@ -72,6 +80,30 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  function handleStartCooking(order) {
+    const distInfo = getOrderDistanceInfo(order, restaurantObj);
+    const maxRange =
+      order.restaurant?.deliverySettings?.deliveryRadiusKm ||
+      restaurantObj?.deliverySettings?.deliveryRadiusKm ||
+      10;
+
+    const effectiveDist = order.deliveryDistanceKm ?? distInfo?.distanceKm;
+    const isOutOfRange =
+      (order.isOutOfRange || (effectiveDist !== null && effectiveDist > maxRange)) &&
+      !(String(order.paymentMethod || "").toLowerCase().includes("pickup"));
+
+    if (isOutOfRange && !order.acceptedOutOfRange) {
+      setOutOfRangePrompt({
+        order,
+        distanceKm: effectiveDist || 10.1,
+        maxRangeKm: maxRange,
+      });
+      return;
+    }
+
+    updateStatus(order._id, "preparing");
   }
 
   // Filter kitchen-relevant orders
@@ -247,6 +279,18 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                     >
                       {isPending ? "NEW TICKET" : isPreparing ? "COOKING" : "READY"}
                     </span>
+                    {order.isOutOfRange && (
+                      <span
+                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                          order.acceptedOutOfRange
+                            ? "bg-blue-500/20 text-blue-700 dark:text-blue-300"
+                            : "bg-rose-500 text-white animate-pulse"
+                        }`}
+                      >
+                        <AlertTriangle size={9} />
+                        <span>{order.acceptedOutOfRange ? `Out of Range (${order.deliveryDistanceKm}k)` : `⚠️ Out of Range (${order.deliveryDistanceKm}k)`}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs font-bold">
@@ -311,7 +355,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                 <div className="p-3 border-t border-stone-100 dark:border-white/5 bg-stone-50/50 dark:bg-white/[0.01]">
                   {isPending && (
                     <button
-                      onClick={() => updateStatus(order._id, "preparing")}
+                      onClick={() => handleStartCooking(order)}
                       disabled={isUpdating}
                       className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
@@ -342,6 +386,30 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
             );
           })}
         </div>
+      )}
+      {/* Explicit Out-of-Range Order Manager Confirmation Dialog */}
+      {outOfRangePrompt && (
+        <OutOfRangeOrderModal
+          isOpen={Boolean(outOfRangePrompt)}
+          order={outOfRangePrompt.order}
+          distanceKm={outOfRangePrompt.distanceKm}
+          maxRangeKm={outOfRangePrompt.maxRangeKm}
+          updating={updatingId === outOfRangePrompt.order._id}
+          onAccept={() => {
+            updateStatus(outOfRangePrompt.order._id, "preparing", {
+              acceptedOutOfRange: true,
+              deliveryDistanceKm: outOfRangePrompt.distanceKm,
+            });
+            setOutOfRangePrompt(null);
+          }}
+          onReject={() => {
+            updateStatus(outOfRangePrompt.order._id, "cancelled", {
+              cancellationReason: `Rejected by manager: Out of delivery range (${outOfRangePrompt.distanceKm} km > ${outOfRangePrompt.maxRangeKm} km limit)`,
+            });
+            setOutOfRangePrompt(null);
+          }}
+          onClose={() => setOutOfRangePrompt(null)}
+        />
       )}
     </div>
   );

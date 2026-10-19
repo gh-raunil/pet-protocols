@@ -41,6 +41,7 @@ import {
   useDeliveryGpsTransmitter,
   isPickupOrder,
 } from "@/hooks/useDeliveryGpsTransmitter";
+import { getOrderDistanceInfo } from "@/lib/geoDistance";
 import DeliveryRouteMap from "./DeliveryRouteMap";
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
@@ -1147,6 +1148,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                       if (!navLat || !navLng) return null;
 
                       const isMapOpen = expandedMapOrderIds.has(order._id);
+                      const distInfo = getOrderDistanceInfo(order);
 
                       return (
                         <div className="pt-2 border-t border-stone-100 dark:border-white/5 space-y-2">
@@ -1161,6 +1163,17 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                 📍 Pinned Doorstep GPS
                               </span>
                             )}
+
+                            {distInfo?.isOutOfRange ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                ⚠️ Out of Range: {distInfo.distanceKm} km
+                              </span>
+                            ) : distInfo?.distanceKm ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 dark:bg-white/10 text-stone-600 dark:text-stone-300">
+                                🛵 {distInfo.distanceKm} km away
+                              </span>
+                            ) : null}
+
                             <span className="font-mono text-[11px] text-stone-500 dark:text-stone-400">
                               {Number(navLat).toFixed(5)}, {Number(navLng).toFixed(5)}
                             </span>
@@ -1201,9 +1214,20 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               }
                               restaurant={order.restaurant}
                               deliveryTracking={order.deliveryTracking}
-                              destination={{ lat: navLat, lng: navLng }}
+                              destination={{
+                                lat: navLat,
+                                lng: navLng,
+                                latitude: navLat,
+                                longitude: navLng,
+                                street: order.address?.street,
+                                city: order.address?.city,
+                                pincode: order.address?.pincode,
+                                phone: order.address?.phone,
+                                recipientPhone: order.address?.recipientPhone,
+                              }}
                               customerLocation={order.customerLocation}
                               orderId={order.orderId || order._id}
+                              initialStatus={order.status}
                               recipientName={order.address?.recipientName || order.address?.fullName}
                             />
                           )}

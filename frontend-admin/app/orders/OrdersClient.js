@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
+import { getOrderDistanceInfo } from "@/lib/geoDistance";
+import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
 
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
 
@@ -257,6 +259,8 @@ export default function OrdersClient() {
   const [selectedDate, setSelectedDate] = useState(todayStr); // Default to current date
   const [searchQuery, setSearchQuery] = useState("");
   const [restaurantCreatedAt, setRestaurantCreatedAt] = useState(null);
+  const [currentRestaurant, setCurrentRestaurant] = useState(null);
+  const [outOfRangePrompt, setOutOfRangePrompt] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
 
@@ -314,6 +318,9 @@ export default function OrdersClient() {
           const incomingOrders = data.orders;
           if (data.restaurantCreatedAt) {
             setRestaurantCreatedAt(data.restaurantCreatedAt);
+          }
+          if (data.restaurant) {
+            setCurrentRestaurant(data.restaurant);
           }
 
           if (isInitialLoadRef.current) {
@@ -394,13 +401,13 @@ export default function OrdersClient() {
     };
   }, [session, filterStatus, selectedDate, fetchOrders]);
 
-  async function handleUpdateStatus(orderId, nextStatus) {
+  async function handleUpdateStatus(orderId, nextStatus, extra = {}) {
     try {
       setUpdatingOrderId(orderId);
       const res = await fetch("/api/restaurant/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: nextStatus }),
+        body: JSON.stringify({ orderId, status: nextStatus, ...extra }),
       });
 
       const data = await res.json();
@@ -409,10 +416,12 @@ export default function OrdersClient() {
         const displayId = formatOrderId(orderObj || { _id: orderId });
         setFeedback({
           type: "success",
-          message: `Order ${displayId} updated to ${nextStatus.toUpperCase()}`,
+          message: extra.acceptedOutOfRange
+            ? `Out-of-range order ${displayId} (${extra.deliveryDistanceKm} km) ACCEPTED by Manager!`
+            : `Order ${displayId} updated to ${nextStatus.toUpperCase()}`,
         });
         setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus, updatedAt: new Date().toISOString() } : o))
+          prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus, ...extra, updatedAt: new Date().toISOString() } : o))
         );
         setHighlightedOrderIds((prev) => {
           const next = new Set(prev);
@@ -428,6 +437,30 @@ export default function OrdersClient() {
     } finally {
       setUpdatingOrderId(null);
     }
+  }
+
+  function handleAcceptOrderWithRangeCheck(order) {
+    const distInfo = getOrderDistanceInfo(order, currentRestaurant);
+    const maxRange =
+      order.restaurant?.deliverySettings?.deliveryRadiusKm ||
+      currentRestaurant?.deliverySettings?.deliveryRadiusKm ||
+      10;
+
+    const effectiveDist = order.deliveryDistanceKm ?? distInfo?.distanceKm;
+    const isOutOfRange =
+      (order.isOutOfRange || (effectiveDist !== null && effectiveDist > maxRange)) &&
+      !checkIsPickup(order);
+
+    if (isOutOfRange && !order.acceptedOutOfRange) {
+      setOutOfRangePrompt({
+        order,
+        distanceKm: effectiveDist || 10.1,
+        maxRangeKm: maxRange,
+      });
+      return;
+    }
+
+    handleUpdateStatus(order._id, "preparing");
   }
 
   async function handleSettleCodCash(orderId) {
@@ -975,6 +1008,23 @@ export default function OrdersClient() {
                                 Pickup
                               </span>
                             )}
+                            {order.isOutOfRange && (
+                              <span
+                                className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${
+                                  order.acceptedOutOfRange
+                                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
+                                    : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
+                                }`}
+                                title={`Customer is ${order.deliveryDistanceKm || ">10"} km away`}
+                              >
+                                <AlertTriangle size={10} />
+                                <span>
+                                  {order.acceptedOutOfRange
+                                    ? `Out of Range (${order.deliveryDistanceKm}k)`
+                                    : `⚠️ ${order.deliveryDistanceKm || ">10"}km`}
+                                </span>
+                              </span>
+                            )}
                             {isCod ? (
                               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
                                 COD ₹{order.totalAmount}
@@ -1048,7 +1098,7 @@ export default function OrdersClient() {
                             <button
                               type="button"
                               disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "preparing")}
+                              onClick={() => handleAcceptOrderWithRangeCheck(order)}
                               className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                             >
                               <ChefHat size={13} />
@@ -1229,6 +1279,24 @@ export default function OrdersClient() {
                             <span>{order.status.replace("_", " ")}</span>
                           </span>
 
+                          {/* Out of Range Notice Badge */}
+                          {order.isOutOfRange && (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider border ${
+                                order.acceptedOutOfRange
+                                  ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
+                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
+                              }`}
+                            >
+                              <AlertTriangle size={12} />
+                              <span>
+                                {order.acceptedOutOfRange
+                                  ? `✓ Out of Range (${order.deliveryDistanceKm} km)`
+                                  : `⚠️ Out of Range (${order.deliveryDistanceKm} km)`}
+                              </span>
+                            </span>
+                          )}
+
                           {/* Order Total */}
                           <span className="text-base sm:text-lg font-black text-stone-900 dark:text-white font-mono ml-1">
                             ₹{order.totalAmount}
@@ -1373,7 +1441,7 @@ export default function OrdersClient() {
                               <button
                                 type="button"
                                 disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "preparing")}
+                                onClick={() => handleAcceptOrderWithRangeCheck(order)}
                                 className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                               >
                                 <ChefHat size={14} />
@@ -1488,6 +1556,31 @@ export default function OrdersClient() {
         )}
 
       </main>
+
+      {/* Explicit Out-of-Range Order Manager Confirmation Dialog */}
+      {outOfRangePrompt && (
+        <OutOfRangeOrderModal
+          isOpen={Boolean(outOfRangePrompt)}
+          order={outOfRangePrompt.order}
+          distanceKm={outOfRangePrompt.distanceKm}
+          maxRangeKm={outOfRangePrompt.maxRangeKm}
+          updating={updatingOrderId === outOfRangePrompt.order._id}
+          onAccept={() => {
+            handleUpdateStatus(outOfRangePrompt.order._id, "preparing", {
+              acceptedOutOfRange: true,
+              deliveryDistanceKm: outOfRangePrompt.distanceKm,
+            });
+            setOutOfRangePrompt(null);
+          }}
+          onReject={() => {
+            handleUpdateStatus(outOfRangePrompt.order._id, "cancelled", {
+              cancellationReason: `Rejected by manager: Out of delivery range (${outOfRangePrompt.distanceKm} km > ${outOfRangePrompt.maxRangeKm} km limit)`,
+            });
+            setOutOfRangePrompt(null);
+          }}
+          onClose={() => setOutOfRangePrompt(null)}
+        />
+      )}
     </div>
   );
 }
