@@ -17,6 +17,9 @@ const PRECACHE_ASSETS = [
   '/icons/icon-maskable-512x512.png',
   '/icons/apple-touch-icon.png',
   '/icons/favicon-32x32.png',
+  '/icons/badge-96x96.png',
+  '/icons/badge-72x72.png',
+  '/icons/badge.png',
   '/screenshots/desktop-home.png',
   '/screenshots/mobile-home.png',
   '/images/logo1.png',
@@ -192,10 +195,17 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'पेट Protocols Update 🔔';
+  const iconUrl = data.icon
+    ? new URL(data.icon, self.location.origin).href
+    : new URL('/icons/icon-192x192.png', self.location.origin).href;
+  const badgeUrl = data.badge
+    ? new URL(data.badge, self.location.origin).href
+    : new URL('/icons/badge-96x96.png', self.location.origin).href;
+
   const options = {
     body: data.body || 'You have an update on your order.',
-    icon: data.icon || '/icons/icon-192x192.png',
-    badge: data.badge || '/icons/favicon-32x32.png',
+    icon: iconUrl,
+    badge: badgeUrl,
     data: data.data || { url: data.url || '/orders' },
     tag: data.tag || 'pet-protocols-notification',
     renotify: true,

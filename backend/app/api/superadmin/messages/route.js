@@ -157,7 +157,7 @@ export async function POST(request) {
             title: `📢 ${title.trim()}`,
             body: content.trim().slice(0, 140),
             icon: "/icons/icon-192x192.png",
-            badge: "/icons/favicon-32x32.png",
+            badge: "/icons/badge-96x96.png",
             data: {
               url: recipientType === "restaurants" ? "/updates" : "/notifications",
               type: "superadmin_broadcast",

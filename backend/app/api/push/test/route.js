@@ -13,7 +13,7 @@ export async function POST(req) {
       title: 'पेट Protocols Alert 🔔',
       body: 'Web Push is active! You will now receive instant updates on your order status and kitchen specials.',
       icon: '/icons/icon-192x192.png',
-      badge: '/icons/favicon-32x32.png',
+      badge: '/icons/badge-96x96.png',
       url: '/orders',
       tag: 'test-notification',
       data: {

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -72,8 +73,8 @@ export default function RestaurantAdminNav() {
             <p className="text-[11px] text-gray-400">{session?.user?.email}</p>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/restaurant/login" })}
-            className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
+            onClick={() => performLogout({ callbackUrl: "/restaurant/login" })}
+            className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <LogOut size={14} />
             <span className="hidden sm:inline">Logout</span>

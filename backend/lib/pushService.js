@@ -314,7 +314,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
         title: 'Order Placed! 🍽️',
         body: `Your order #${orderShortId} has been received by ${restaurantName}.`,
         icon: '/icons/icon-192x192.png',
-        badge: '/icons/favicon-32x32.png',
+        badge: '/icons/badge-96x96.png',
         url: `/order-confirmation?orderId=${orderId}`,
         tag: `order-${orderId}`,
         data: {
@@ -331,7 +331,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           title: 'New Order Received! 🔔',
           body: `Order #${orderShortId} (${itemCount} item${itemCount > 1 ? 's' : ''} • ${totalFormatted}) placed by ${customerName}.`,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/favicon-32x32.png',
+          badge: '/icons/badge-96x96.png',
           url: `/orders?orderId=${orderId}`,
           tag: `restaurant-order-${orderId}`,
           data: {
@@ -348,7 +348,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           title: 'New Delivery Dispatch Order! 🛵',
           body: `Order #${orderShortId} (${itemCount} item${itemCount > 1 ? 's' : ''} • ${totalFormatted}) to ${deliveryArea || recipientDisplay} is ready for dispatch.`,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/favicon-32x32.png',
+          badge: '/icons/badge-96x96.png',
           url: `/delivery`,
           tag: `restaurant-order-delivery-${orderId}`,
           data: {
@@ -416,7 +416,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
         title: pushTitle,
         body: pushBody,
         icon: '/icons/icon-192x192.png',
-        badge: '/icons/favicon-32x32.png',
+        badge: '/icons/badge-96x96.png',
         url: `/order-confirmation?orderId=${orderId}`,
         tag: `order-${orderId}`,
         data: {
@@ -440,7 +440,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           title: 'Order Delivered! 🎉',
           body: `Order #${orderShortId} was marked delivered by ${handlerName}${codSuffix}.`,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/favicon-32x32.png',
+          badge: '/icons/badge-96x96.png',
           url: `/delivery`,
           tag: `restaurant-order-delivered-${orderId}`,
           data: {
@@ -461,7 +461,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           title: 'Order Cancelled ⚠️',
           body: `Order #${orderShortId} was marked cancelled.${extraData.reason ? ` Reason: ${extraData.reason}` : ''}`,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/favicon-32x32.png',
+          badge: '/icons/badge-96x96.png',
           url: `/orders?orderId=${orderId}`,
           tag: `restaurant-order-${orderId}`,
           data: {
@@ -478,7 +478,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
         title: 'Order Cancelled ❌',
         body: `Your order #${orderShortId} has been cancelled.`,
         icon: '/icons/icon-192x192.png',
-        badge: '/icons/favicon-32x32.png',
+        badge: '/icons/badge-96x96.png',
         url: `/orders`,
         tag: `order-${orderId}`,
         data: {
@@ -495,7 +495,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
           title: 'Order Cancelled by Customer ⚠️',
           body: `Order #${orderShortId} was cancelled by ${customerName}.${extraData.reason ? ` Reason: ${extraData.reason}` : ''}`,
           icon: '/icons/icon-192x192.png',
-          badge: '/icons/favicon-32x32.png',
+          badge: '/icons/badge-96x96.png',
           url: `/orders?orderId=${orderId}`,
           tag: `restaurant-order-${orderId}`,
           data: {

@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 import {
   LayoutDashboard,
@@ -60,7 +61,7 @@ export default function RestaurantAdminNav() {
       if (session?.user?.id || session?.user?.email) {
         localStorage.removeItem(`pet_protocols_staff_profile_${session.user.id || session.user.email}`);
       }
-      await signOut({ redirect: false });
+      await performLogout({ redirect: false });
     } catch (e) {}
     window.location.href = isStaff ? "/login/staff" : "/login";
   };

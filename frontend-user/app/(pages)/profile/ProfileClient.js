@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -307,8 +308,8 @@ export default function CustomerProfileClient() {
               <span>Settings</span>
             </Link>
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs uppercase tracking-wider transition"
+              onClick={() => performLogout({ callbackUrl: "/" })}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs uppercase tracking-wider transition cursor-pointer"
             >
               <LogOut size={14} /> Sign Out
             </button>

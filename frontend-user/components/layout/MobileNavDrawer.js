@@ -4,7 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import Image from "next/image";
 import {
   X,
@@ -76,10 +77,10 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
     }
   }, [isOpen, onClose]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     clearCartLocal();
     onClose();
-    signOut({ callbackUrl: "/" });
+    await performLogout({ callbackUrl: "/" });
   };
 
   const navLinks = [

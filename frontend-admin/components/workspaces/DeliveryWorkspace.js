@@ -69,8 +69,21 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("active"); // "active", "preparing", "out_for_delivery", "delivered", "all"
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
   const [updatingId, setUpdatingId] = useState(null);
   const [deliveryNote, setDeliveryNote] = useState({});
+
+  const toggleDoorstepMap = (orderId) => {
+    setExpandedMapOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
 
   const gpsTransmitter = useDeliveryGpsTransmitter();
 
@@ -1079,6 +1092,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                       if (!navLat || !navLng) return null;
 
+                      const isMapOpen = expandedMapOrderIds.has(order._id);
+
                       return (
                         <div className="pt-2 border-t border-stone-100 dark:border-white/5 space-y-2">
                           <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -1097,16 +1112,62 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             </span>
                           </div>
 
-                          <a
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${navLat},${navLng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-xs transition cursor-pointer"
+                          {/* Toggle Inline Doorstep Map */}
+                          <button
+                            type="button"
+                            onClick={() => toggleDoorstepMap(order._id)}
+                            className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer ${
+                              isMapOpen
+                                ? "bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white border border-stone-600/30"
+                                : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
                           >
-                            <Navigation size={13} />
-                            <span>🗺️ Navigate to Doorstep (Google Maps)</span>
-                            <ExternalLink size={12} className="opacity-70" />
-                          </a>
+                            <Navigation size={13} className={isMapOpen ? "text-blue-400" : ""} />
+                            <span>{isMapOpen ? "🗺️ Hide Doorstep Map" : "🗺️ Navigate to Doorstep (Google Maps)"}</span>
+                            <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
+                          </button>
+
+                          {/* Inline Map Window Below Section on Same Page */}
+                          {isMapOpen && (
+                            <div className="mt-2.5 rounded-2xl overflow-hidden border border-blue-500/30 bg-stone-950 shadow-lg">
+                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-stone-900/95 border-b border-white/10 text-xs">
+                                <div className="flex items-center gap-2 font-bold text-white text-[11px]">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                  </span>
+                                  <span>Accurate Doorstep Location</span>
+                                </div>
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${navLat},${navLng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[11px] font-extrabold text-blue-400 hover:text-blue-300 transition underline underline-offset-2"
+                                >
+                                  <span>Open Maps App</span>
+                                  <ExternalLink size={11} />
+                                </a>
+                              </div>
+
+                              <div className="relative w-full h-[280px] bg-stone-900">
+                                <iframe
+                                  title={`Doorstep Map for Order ${order.orderId || order._id}`}
+                                  width="100%"
+                                  height="100%"
+                                  style={{ border: 0 }}
+                                  loading="lazy"
+                                  allowFullScreen
+                                  referrerPolicy="no-referrer-when-downgrade"
+                                  src={`https://maps.google.com/maps?q=${navLat},${navLng}&hl=en&z=17&output=embed`}
+                                />
+                              </div>
+
+                              <div className="px-3 py-1.5 bg-stone-900/95 border-t border-white/5 flex items-center justify-between text-[10px] text-stone-400">
+                                <span className="font-mono">Lat: {Number(navLat).toFixed(5)}, Lng: {Number(navLng).toFixed(5)}</span>
+                                <span className="text-emerald-400 font-bold">Interactive • Zoomable</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}

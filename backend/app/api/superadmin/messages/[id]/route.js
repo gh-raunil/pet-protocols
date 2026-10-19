@@ -90,7 +90,7 @@ export async function PUT(request, { params }) {
             title: `📢 ${updated.title.trim()}`,
             body: updated.content.trim().slice(0, 140),
             icon: "/icons/icon-192x192.png",
-            badge: "/icons/favicon-32x32.png",
+            badge: "/icons/badge-96x96.png",
             data: {
               url: updated.recipientType === "restaurants" ? "/updates" : "/notifications",
               type: "superadmin_broadcast",

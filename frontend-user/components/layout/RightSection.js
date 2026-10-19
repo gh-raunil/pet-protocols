@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import {
   ShoppingCart,
   Search,
@@ -50,9 +51,9 @@ const RightSection = ({
 
   const totalItems = getTotalItems();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     clearCartLocal();
-    signOut({ callbackUrl: "/" });
+    await performLogout({ callbackUrl: "/" });
   };
 
   const role = session?.user?.role;

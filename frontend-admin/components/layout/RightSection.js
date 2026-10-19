@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import { 
   ShoppingCart, 
   ChevronDown, 
@@ -44,7 +45,7 @@ const RightSection = () => {
   const handleLogout = async () => {
     clearCartLocal();
     try {
-      await signOut({ redirect: false });
+      await performLogout({ redirect: false });
     } catch (e) {}
     window.location.href = "/login";
   };

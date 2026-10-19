@@ -332,7 +332,14 @@ export const authOptions = {
   },
 
   pages: { signIn: "/auth/login" },
-  session: { strategy: "jwt", maxAge: 30 * 60 },
+  session: {
+    strategy: "jwt",
+    maxAge: 90 * 24 * 60 * 60, // 90 days persistent session - only logout explicitly
+    updateAge: 24 * 60 * 60,   // Slide session expiration forward on daily activity
+  },
+  jwt: {
+    maxAge: 90 * 24 * 60 * 60, // 90 days
+  },
   secret: process.env.NEXTAUTH_SECRET,
 };
 

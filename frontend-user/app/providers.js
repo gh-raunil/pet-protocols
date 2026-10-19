@@ -1,16 +1,14 @@
 "use client";
-import { SessionProvider, useSession, signOut } from "next-auth/react";
+import { SessionProvider, useSession } from "next-auth/react";
 import { useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 
 function AuthHandler() {
   const { data: session, status } = useSession();
-  const { clearCartLocal, loadCart, clearCart } = useCartStore();
+  const { clearCartLocal, loadCart } = useCartStore();
   const { loadFavorites, clearFavoritesLocal } = useFavoritesStore();
   const prevEmailRef = useRef(null);
-  const timer = useRef(null);
-  const TIMEOUT = 30 * 60 * 1000;
 
   useEffect(() => {
     if (session?.user?.email) {
@@ -32,27 +30,6 @@ function AuthHandler() {
       }
     }
   }, [session?.user?.email, status]);
-
-  const resetTimer = () => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      if (session) {
-        clearCart();
-        signOut({ callbackUrl: "/" });
-      }
-    }, TIMEOUT);
-  };
-
-  useEffect(() => {
-    if (!session) return;
-    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    events.forEach((e) => window.addEventListener(e, resetTimer));
-    resetTimer();
-    return () => {
-      clearTimeout(timer.current);
-      events.forEach((e) => window.removeEventListener(e, resetTimer));
-    };
-  }, [session]);
 
   return null;
 }

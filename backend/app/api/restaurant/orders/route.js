@@ -170,6 +170,8 @@ export async function PUT(request) {
           sendPushToUser(staffId, {
             title: "Cash Handover Confirmed! 💰",
             body: `Manager ${managerInfo.name} confirmed handover of ₹${totalAmt.toFixed(2)} cash for ${staffOrders.length} order(s). Your balance is cleared!`,
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/badge-96x96.png",
             url: "/delivery",
             data: { url: "/delivery", type: "cod_settlement" },
           });

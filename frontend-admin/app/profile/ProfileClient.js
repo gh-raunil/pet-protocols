@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -370,7 +371,7 @@ export default function RestaurantAdminProfileClient() {
             <button
               onClick={async () => {
                 try {
-                  await signOut({ redirect: false });
+                  await performLogout({ redirect: false });
                 } catch (e) {}
                 window.location.href = "/login";
               }}

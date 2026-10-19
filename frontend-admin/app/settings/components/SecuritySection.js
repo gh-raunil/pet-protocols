@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { performLogout } from "@/lib/logoutHelper";
 import {
   KeyRound,
   Lock,
@@ -193,7 +194,7 @@ export default function SecuritySection() {
           <button
             onClick={async () => {
               try {
-                await signOut({ redirect: false });
+                await performLogout({ redirect: false });
               } catch (e) {}
               window.location.href = "/login";
             }}

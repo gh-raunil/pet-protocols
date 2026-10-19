@@ -27,10 +27,17 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'Restaurant Alert 🔔';
+  const iconUrl = data.icon
+    ? new URL(data.icon, self.location.origin).href
+    : new URL('/icons/icon-192x192.png', self.location.origin).href;
+  const badgeUrl = data.badge
+    ? new URL(data.badge, self.location.origin).href
+    : new URL('/icons/badge-96x96.png', self.location.origin).href;
+
   const options = {
     body: data.body || 'You have a new restaurant order or status update.',
-    icon: data.icon || '/icons/icon-192x192.png',
-    badge: data.badge || '/icons/favicon-32x32.png',
+    icon: iconUrl,
+    badge: badgeUrl,
     data: data.data || { url: data.url || '/orders' },
     tag: data.tag || 'pet-admin-order-alert',
     renotify: true,
