@@ -265,17 +265,6 @@ export default function OrdersClient() {
   const [newOrderAlert, setNewOrderAlert] = useState(null);
   const [highlightedOrderIds, setHighlightedOrderIds] = useState(new Set());
   const [rushMode, setRushMode] = useState(false);
-  const [packedItems, setPackedItems] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("restaurant_packed_items");
-        return saved ? JSON.parse(saved) : {};
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
-  });
   const [currentTimeTick, setCurrentTimeTick] = useState(0);
   const [kitchenActive, setKitchenActive] = useState(() => {
     if (typeof window !== "undefined") {
@@ -290,60 +279,6 @@ export default function OrdersClient() {
     const timer = setInterval(() => setCurrentTimeTick(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
-
-  // Check if a dish is packed
-  const isDishPacked = (order, idx) => {
-    if (order.status === "cancelled") {
-      return false;
-    }
-    if (order.status === "out_for_delivery" || order.status === "delivered") {
-      return true;
-    }
-    return Boolean(packedItems[`${order._id}_${idx}`]);
-  };
-
-  // Dish checklist toggle: freely toggleable in pending and preparing stages
-  const toggleItemPacked = (order, idx) => {
-    if (order.status === "out_for_delivery" || order.status === "delivered" || order.status === "cancelled") {
-      return;
-    }
-    const key = `${order._id}_${idx}`;
-    setPackedItems((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      try {
-        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  };
-
-  // Pack all dishes in an order
-  const packAllDishes = (order) => {
-    setPackedItems((prev) => {
-      const next = { ...prev };
-      (order.items || []).forEach((_, idx) => {
-        next[`${order._id}_${idx}`] = true;
-      });
-      try {
-        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  };
-
-  // Reset/unpack all dishes in an order
-  const resetAllDishes = (order) => {
-    setPackedItems((prev) => {
-      const next = { ...prev };
-      (order.items || []).forEach((_, idx) => {
-        delete next[`${order._id}_${idx}`];
-      });
-      try {
-        localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  };
 
   // Refs for polling and concurrency management
   const isFetchingRef = useRef(false);
@@ -479,19 +414,6 @@ export default function OrdersClient() {
         setOrders((prev) =>
           prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus, updatedAt: new Date().toISOString() } : o))
         );
-        if (nextStatus === "out_for_delivery" || nextStatus === "delivered") {
-          setPackedItems((prev) => {
-            const next = { ...prev };
-            const orderObj = orders.find((o) => o._id === orderId);
-            (orderObj?.items || []).forEach((_, idx) => {
-              next[`${orderId}_${idx}`] = true;
-            });
-            try {
-              localStorage.setItem("restaurant_packed_items", JSON.stringify(next));
-            } catch (e) {}
-            return next;
-          });
-        }
         setHighlightedOrderIds((prev) => {
           const next = new Set(prev);
           next.delete(orderId);

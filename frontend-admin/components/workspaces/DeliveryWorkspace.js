@@ -143,11 +143,26 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     try {
       const currentOrder = orders.find((o) => o._id === orderId);
 
-      // Lock delivered status for unpaid COD orders
+      // Handle COD cash collection when marking delivered
+      let codExtra = {};
       if (newStatus === "delivered") {
         if (currentOrder && isOrderCod(currentOrder) && !isCashCollected(currentOrder)) {
-          toast.error("Cash on Delivery must be collected before marking order delivered!");
-          return;
+          const amount = Number(currentOrder.totalAmount || 0);
+          if (!confirm(`Confirm collecting ₹${amount.toFixed(2)} in cash from customer and marking order delivered?`)) {
+            return;
+          }
+          codExtra = {
+            paymentStatus: "paid",
+            codPaymentHandler: {
+              id: currentStaffId,
+              name: currentStaffName,
+              phone: currentStaffPhone,
+              amount: amount,
+              collected: true,
+              collectedAt: new Date(),
+              settledWithManager: false,
+            },
+          };
         }
       }
 
@@ -158,6 +173,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         body: JSON.stringify({
           orderId,
           status: newStatus,
+          ...codExtra,
           ...extra,
         }),
       });
@@ -165,7 +181,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       if (data.success) {
         // Update locally
         setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, status: newStatus, ...extra } : o))
+          prev.map((o) => (o._id === orderId ? { ...o, status: newStatus, ...codExtra, ...extra } : o))
         );
 
         if (newStatus === "delivered") {
@@ -1022,46 +1038,15 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           )
                         )}
 
-                        {/* COD Cash Collection requirement check */}
-                        {isOrderCod(order) && !isCashCollected(order) ? (
-                          <>
-                            <button
-                              onClick={() => handleCollectCash(order)}
-                              disabled={isUpdating}
-                              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow-md shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer animate-pulse"
-                            >
-                              <Banknote size={14} />
-                              <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} Cash</span>
-                            </button>
-
-                            <button
-                              disabled={true}
-                              title={`Please collect ₹${(order.totalAmount || 0).toFixed(2)} cash from customer first`}
-                              className="bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-500 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed border border-stone-300 dark:border-white/5 opacity-70"
-                            >
-                              <Lock size={14} className="text-amber-500" />
-                              <span>Mark Handed Over / Delivered</span>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {isOrderCod(order) && (
-                              <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs font-bold">
-                                <Check size={12} className="text-emerald-500" />
-                                <span>₹{(order.codPaymentHandler?.amount || order.totalAmount || 0).toFixed(2)} Cash Collected</span>
-                              </div>
-                            )}
-
-                            <button
-                              onClick={() => updateOrderStatus(order._id, "delivered")}
-                              disabled={isUpdating}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <CheckCircle2 size={14} />
-                              <span>Mark Handed Over / Delivered</span>
-                            </button>
-                          </>
-                        )}
+                        {/* Delivery Handover Action (automatically handles COD collection upon delivery confirmation) */}
+                        <button
+                          onClick={() => updateOrderStatus(order._id, "delivered")}
+                          disabled={isUpdating}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Mark Handed Over / Delivered</span>
+                        </button>
                       </>
                     )}
 
@@ -1156,8 +1141,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     {(() => {
                       const hasCustomerLiveGps = Boolean(order.customerLocation?.latitude && order.customerLocation?.longitude);
                       const hasPinnedGps = Boolean(order.address?.latitude && order.address?.longitude);
-                      const navLat = order.customerLocation?.latitude || order.address?.latitude;
-                      const navLng = order.customerLocation?.longitude || order.address?.longitude;
+                      const navLat = order.address?.latitude || order.customerLocation?.latitude;
+                      const navLng = order.address?.longitude || order.customerLocation?.longitude;
 
                       if (!navLat || !navLng) return null;
 
@@ -1200,11 +1185,11 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           {isMapOpen && (
                             <DeliveryRouteMap
                               origin={
-                                gpsTransmitter.currentCoords?.latitude
+                                gpsTransmitter.lastLocation?.latitude
                                   ? {
-                                      lat: gpsTransmitter.currentCoords.latitude,
-                                      lng: gpsTransmitter.currentCoords.longitude,
-                                      heading: gpsTransmitter.currentCoords.heading,
+                                      lat: gpsTransmitter.lastLocation.latitude,
+                                      lng: gpsTransmitter.lastLocation.longitude,
+                                      heading: gpsTransmitter.lastLocation.heading,
                                     }
                                   : null
                               }
@@ -1261,16 +1246,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                       <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between">
                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
                           <AlertTriangle size={13} />
-                          <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash</span>
+                          <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash at Doorstep</span>
                         </span>
-                        <button
-                          onClick={() => handleCollectCash(order)}
-                          disabled={isUpdating}
-                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1"
-                        >
-                          <Banknote size={13} />
-                          <span>Record Cash Collection</span>
-                        </button>
                       </div>
                     )}
 

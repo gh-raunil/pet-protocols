@@ -95,11 +95,53 @@ export default function DeliveryRouteMap({
   const [styleMenuOpen, setStyleMenuOpen] = useState(false);
   const [routeStats, setRouteStats] = useState({ distanceKm: null, etaMins: null });
   const [mapReady, setMapReady] = useState(false);
+  const [deviceCoords, setDeviceCoords] = useState(null);
 
   const destLat = destination?.lat || destination?.latitude;
   const destLng = destination?.lng || destination?.longitude;
-  const staffLat = origin?.lat || origin?.latitude;
-  const staffLng = origin?.lng || origin?.longitude;
+  const staffLat = origin?.lat || origin?.latitude || deviceCoords?.lat;
+  const staffLng = origin?.lng || origin?.longitude || deviceCoords?.lng;
+
+  // Auto-acquire staff device GPS location if origin is not provided
+  useEffect(() => {
+    if (typeof window === "undefined" || !navigator.geolocation) return;
+
+    // Fast initial position fix
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDeviceCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        console.warn("Could not acquire initial staff GPS position:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+
+    // Watch position for continuous updates as delivery staff rides
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setDeviceCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        console.warn("Staff live GPS watch warning:", err.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -141,6 +183,17 @@ export default function DeliveryRouteMap({
 
       mapRef.current = map;
       setMapReady(true);
+
+      // Invalidate size on mount & transitions
+      [50, 150, 300, 600].forEach((delay) => {
+        setTimeout(() => {
+          if (mapRef.current) {
+            try {
+              mapRef.current.invalidateSize();
+            } catch {}
+          }
+        }, delay);
+      });
     }
 
     initMap();
@@ -283,15 +336,21 @@ export default function DeliveryRouteMap({
         const estMinutes = Math.max(1, Math.round((directDist / 22) * 60 + 2)); // ~22km/h city bike avg
         setRouteStats({ distanceKm: directDist.toFixed(1), etaMins: estMinutes });
 
-        // Fetch OSRM driving polyline, with fallback to direct line
+        // Immediate straight-line route fallback so the route is NEVER invisible
+        const immediateLine = [
+          [staffLat, staffLng],
+          [destLat, destLng],
+        ];
+        renderRoute(immediateLine, L, map);
+
+        // Fetch OSRM turn-by-turn driving polyline
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${staffLng},${staffLat};${destLng},${destLat}?overview=full&geometries=geojson`;
 
         fetch(osrmUrl)
           .then((res) => res.json())
           .then((data) => {
-            let latlngs = [];
             if (data?.routes?.[0]?.geometry?.coordinates) {
-              latlngs = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+              const roadCoords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
               if (data.routes[0].distance) {
                 const roadDist = data.routes[0].distance / 1000;
                 const roadDuration = Math.round(data.routes[0].duration / 60);
@@ -300,22 +359,11 @@ export default function DeliveryRouteMap({
                   etaMins: Math.max(1, roadDuration),
                 });
               }
-            } else {
-              latlngs = [
-                [staffLat, staffLng],
-                [destLat, destLng],
-              ];
+              renderRoute(roadCoords, L, map);
             }
-
-            renderRoute(latlngs, L, map);
           })
           .catch(() => {
-            // Safe fallback line
-            const latlngs = [
-              [staffLat, staffLng],
-              [destLat, destLng],
-            ];
-            renderRoute(latlngs, L, map);
+            // Keep immediate fallback
           });
       }
 
@@ -369,9 +417,12 @@ export default function DeliveryRouteMap({
   }, [staffLat, staffLng, destLat, destLng, customerLocation]);
 
   return (
-    <div className="mt-2.5 rounded-2xl overflow-hidden border border-blue-500/30 bg-stone-950 shadow-xl relative">
+    <div className="mt-2.5 rounded-2xl border border-blue-500/30 bg-stone-950 shadow-xl relative" style={{ overflow: "visible" }}>
       {/* Top Map Toolbar */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-stone-900/95 border-b border-white/10 text-xs">
+      <div
+        className="flex items-center justify-between px-3.5 py-2.5 bg-stone-900/95 border-b border-white/10 text-xs rounded-t-2xl relative"
+        style={{ zIndex: 1100 }}
+      >
         <div className="flex items-center gap-2 font-bold text-white text-[11px]">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -387,7 +438,7 @@ export default function DeliveryRouteMap({
 
         <div className="flex items-center gap-2">
           {/* Layer Switcher Button */}
-          <div className="relative">
+          <div className="relative" style={{ zIndex: 1100 }}>
             <button
               type="button"
               onClick={() => setStyleMenuOpen(!styleMenuOpen)}
@@ -399,9 +450,12 @@ export default function DeliveryRouteMap({
               <ChevronDown size={11} className={`transition-transform duration-200 ${styleMenuOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {/* Layer Switcher Popup Menu (Screenshot 2 design) */}
+            {/* Layer Switcher Popup Menu (elevated above map canvas) */}
             {styleMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-stone-900 border border-white/15 p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div
+                className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-stone-900 border border-white/15 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+                style={{ zIndex: 1200 }}
+              >
                 <div className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-white/10 mb-1">
                   Map Style
                 </div>
@@ -452,11 +506,11 @@ export default function DeliveryRouteMap({
       </div>
 
       {/* Interactive Map Viewport */}
-      <div className="relative w-full h-[320px] bg-stone-900">
+      <div className="relative w-full h-[320px] bg-stone-900 rounded-b-2xl overflow-hidden" style={{ zIndex: 1 }}>
         <div ref={containerRef} className="w-full h-full" />
 
         {/* Quick Map Overlay Action Buttons */}
-        <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5">
+        <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5" style={{ zIndex: 10 }}>
           <button
             type="button"
             onClick={handleFitRoute}
