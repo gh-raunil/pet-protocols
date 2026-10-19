@@ -22,6 +22,7 @@ import {
   Truck,
   Tag,
   RefreshCw,
+  Calendar,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
@@ -92,6 +93,59 @@ export default function OrdersClient() {
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState("");
   const [submittingCancel, setSubmittingCancel] = useState(false);
+
+  // Date filter state: "today" (default) | "date" | "all" (Requirement 7)
+  const [dateFilterMode, setDateFilterMode] = useState("today");
+  const [selectedDate, setSelectedDate] = useState(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  });
+
+  const getOrderDateStr = useCallback((dateStr) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "";
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    } catch {
+      return "";
+    }
+  }, []);
+
+  const todayDateStr = useMemo(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+
+  const todayOrdersCount = useMemo(() => {
+    return orders.filter((o) => getOrderDateStr(o.createdAt) === todayDateStr).length;
+  }, [orders, todayDateStr, getOrderDateStr]);
+
+  const filteredOrders = useMemo(() => {
+    if (dateFilterMode === "all") {
+      return orders;
+    }
+    if (dateFilterMode === "today") {
+      return orders.filter((o) => getOrderDateStr(o.createdAt) === todayDateStr);
+    }
+    if (dateFilterMode === "date" && selectedDate) {
+      return orders.filter((o) => getOrderDateStr(o.createdAt) === selectedDate);
+    }
+    return orders;
+  }, [orders, dateFilterMode, todayDateStr, selectedDate, getOrderDateStr]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -405,9 +459,88 @@ export default function OrdersClient() {
       {/* Closed-Tab Delivery Alerts Permission Prompt */}
       <DeliveryPushPrompt className="mb-6" />
 
+      {/* Date Filter Toolbar (Requirement 7: show only today's orders by default, other by selecting date) */}
+      <div className="mb-6 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Today Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setDateFilterMode("today");
+              setSelectedDate(todayDateStr);
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              dateFilterMode === "today"
+                ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/20"
+                : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)]"
+            }`}
+          >
+            <Calendar size={13} />
+            <span>Today ({todayOrdersCount})</span>
+          </button>
+
+          {/* All Orders Button */}
+          <button
+            type="button"
+            onClick={() => setDateFilterMode("all")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              dateFilterMode === "all"
+                ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/20"
+                : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)]"
+            }`}
+          >
+            <span>All Orders ({orders.length})</span>
+          </button>
+        </div>
+
+        {/* Date Selector */}
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+          <label className="text-[11px] font-semibold text-[var(--text-muted)] flex items-center gap-1">
+            <span>Filter by Date:</span>
+          </label>
+          <input
+            type="date"
+            value={selectedDate}
+            max={todayDateStr}
+            onChange={(e) => {
+              if (e.target.value) {
+                setSelectedDate(e.target.value);
+                setDateFilterMode("date");
+              }
+            }}
+            className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-accent)] cursor-pointer"
+            title="Pick a specific date to view orders"
+          />
+        </div>
+      </div>
+
       {/* Orders List */}
-      <div className="space-y-6">
-        {orders.map((order) => {
+      {filteredOrders.length === 0 ? (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-8 sm:p-10 text-center space-y-3 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] flex items-center justify-center mx-auto">
+            <Calendar size={26} />
+          </div>
+          <h3 className="text-lg font-bold text-[var(--text-main)]">
+            {dateFilterMode === "today"
+              ? "No orders placed today"
+              : `No orders on ${selectedDate}`}
+          </h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
+            {dateFilterMode === "today"
+              ? `You haven't placed any orders today. You have ${orders.length} total orders across other dates.`
+              : `No orders match this date. Select another date or view all your orders.`}
+          </p>
+          <button
+            type="button"
+            onClick={() => setDateFilterMode("all")}
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--brand-accent)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 hover:opacity-90 transition cursor-pointer"
+          >
+            <span>View All Orders ({orders.length})</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredOrders.map((order) => {
           const isDelivered = order.status === "delivered";
           const isCancelled = order.status === "cancelled";
           const isPending = order.status === "pending";
@@ -660,7 +793,8 @@ export default function OrdersClient() {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       <div className="mt-12 text-center">
         <Link

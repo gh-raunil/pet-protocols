@@ -41,6 +41,7 @@ import {
   useDeliveryGpsTransmitter,
   isPickupOrder,
 } from "@/hooks/useDeliveryGpsTransmitter";
+import DeliveryRouteMap from "./DeliveryRouteMap";
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
   const { data: session } = useSession();
@@ -1127,46 +1128,23 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
                           </button>
 
-                          {/* Inline Map Window Below Section on Same Page */}
+                          {/* Interactive Route Map Window Below Section on Same Page */}
                           {isMapOpen && (
-                            <div className="mt-2.5 rounded-2xl overflow-hidden border border-blue-500/30 bg-stone-950 shadow-lg">
-                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-stone-900/95 border-b border-white/10 text-xs">
-                                <div className="flex items-center gap-2 font-bold text-white text-[11px]">
-                                  <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                                  </span>
-                                  <span>Accurate Doorstep Location</span>
-                                </div>
-                                <a
-                                  href={`https://www.google.com/maps/dir/?api=1&destination=${navLat},${navLng}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] font-extrabold text-blue-400 hover:text-blue-300 transition underline underline-offset-2"
-                                >
-                                  <span>Open Maps App</span>
-                                  <ExternalLink size={11} />
-                                </a>
-                              </div>
-
-                              <div className="relative w-full h-[280px] bg-stone-900">
-                                <iframe
-                                  title={`Doorstep Map for Order ${order.orderId || order._id}`}
-                                  width="100%"
-                                  height="100%"
-                                  style={{ border: 0 }}
-                                  loading="lazy"
-                                  allowFullScreen
-                                  referrerPolicy="no-referrer-when-downgrade"
-                                  src={`https://maps.google.com/maps?q=${navLat},${navLng}&hl=en&z=17&output=embed`}
-                                />
-                              </div>
-
-                              <div className="px-3 py-1.5 bg-stone-900/95 border-t border-white/5 flex items-center justify-between text-[10px] text-stone-400">
-                                <span className="font-mono">Lat: {Number(navLat).toFixed(5)}, Lng: {Number(navLng).toFixed(5)}</span>
-                                <span className="text-emerald-400 font-bold">Interactive • Zoomable</span>
-                              </div>
-                            </div>
+                            <DeliveryRouteMap
+                              origin={
+                                gpsTransmitter.currentCoords?.latitude
+                                  ? {
+                                      lat: gpsTransmitter.currentCoords.latitude,
+                                      lng: gpsTransmitter.currentCoords.longitude,
+                                      heading: gpsTransmitter.currentCoords.heading,
+                                    }
+                                  : null
+                              }
+                              destination={{ lat: navLat, lng: navLng }}
+                              customerLocation={order.customerLocation}
+                              orderId={order.orderId || order._id}
+                              recipientName={order.address?.recipientName || order.address?.fullName}
+                            />
                           )}
                         </div>
                       );
