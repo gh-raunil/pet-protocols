@@ -1089,7 +1089,6 @@ export default function OrdersClient() {
                             ))}
                           </div>
                         </div>
-                        </div>
                       </div>
                       {/* Primary Action Button Stepper */}
                       <div className="pt-2 border-t border-stone-100 dark:border-white/10 flex items-center gap-2">
