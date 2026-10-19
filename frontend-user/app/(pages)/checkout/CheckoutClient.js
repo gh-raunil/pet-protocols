@@ -19,6 +19,8 @@ import {
   Info,
   Lock,
   MapPin,
+  MapPinned,
+  Crosshair,
   Home,
   Briefcase,
   Plus,
@@ -34,6 +36,7 @@ import {
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
+import DeliveryLocationMapPicker from "@/components/checkout/DeliveryLocationMapPicker";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -124,6 +127,11 @@ export default function CheckoutClient() {
     city: "New Delhi",
     state: "Delhi",
     pincode: "110001",
+    latitude: null,
+    longitude: null,
+    recipientName: "",
+    recipientPhone: "",
+    isDifferentRecipient: false,
   });
 
   const [address, setAddress] = useState({
@@ -133,7 +141,15 @@ export default function CheckoutClient() {
     city: "New Delhi",
     state: "Delhi",
     pincode: "110001",
+    latitude: null,
+    longitude: null,
+    recipientName: "",
+    recipientPhone: "",
+    isDifferentRecipient: false,
   });
+
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
+  const [isLocatingDevice, setIsLocatingDevice] = useState(false);
   const [notes, setNotes] = useState("");
   const idempotencyKeyRef = useRef(null);
   const addressCardRefs = useRef({});
@@ -255,6 +271,11 @@ export default function CheckoutClient() {
       city: saved.city || "New Delhi",
       state: saved.state || "Delhi",
       pincode: saved.pincode || "110001",
+      latitude: saved.latitude || null,
+      longitude: saved.longitude || null,
+      recipientName: "",
+      recipientPhone: "",
+      isDifferentRecipient: false,
     });
     setSaveAddressToProfile(false);
     setFieldErrors({});
@@ -270,10 +291,82 @@ export default function CheckoutClient() {
       city: draftNewAddress.city || "New Delhi",
       state: draftNewAddress.state || "Delhi",
       pincode: draftNewAddress.pincode || "110001",
+      latitude: draftNewAddress.latitude || null,
+      longitude: draftNewAddress.longitude || null,
+      recipientName: draftNewAddress.recipientName || "",
+      recipientPhone: draftNewAddress.recipientPhone || "",
+      isDifferentRecipient: draftNewAddress.isDifferentRecipient || false,
     });
     setSaveAddressToProfile(true);
     setFieldErrors({});
     setError("");
+  };
+
+  const handleSelectMapLocation = (coords) => {
+    if (!coords) return;
+    setAddress((prev) => ({
+      ...prev,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    }));
+    if (selectedAddressId === "new") {
+      setDraftNewAddress((prev) => ({
+        ...prev,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      }));
+    }
+  };
+
+  const handleQuickGps = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsLocatingDevice(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocatingDevice(false);
+        const { latitude, longitude } = pos.coords;
+        setAddress((prev) => ({
+          ...prev,
+          latitude,
+          longitude,
+        }));
+        if (selectedAddressId === "new") {
+          setDraftNewAddress((prev) => ({
+            ...prev,
+            latitude,
+            longitude,
+          }));
+        }
+      },
+      (err) => {
+        setIsLocatingDevice(false);
+        if (err.code === 1) {
+          setError("Location access denied. Please allow location permissions in your browser.");
+        } else {
+          setError("Unable to retrieve device GPS. Please choose location on the map.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
+    );
+  };
+
+  const handleClearPin = () => {
+    setAddress((prev) => ({
+      ...prev,
+      latitude: null,
+      longitude: null,
+    }));
+    if (selectedAddressId === "new") {
+      setDraftNewAddress((prev) => ({
+        ...prev,
+        latitude: null,
+        longitude: null,
+      }));
+    }
   };
 
   const handleAddressKeyDown = (e, currentId) => {
@@ -500,6 +593,17 @@ export default function CheckoutClient() {
       if (!trimmedPin || !/^\d{6}$/.test(trimmedPin)) {
         errors.pincode = "Please provide a valid 6-digit delivery area pincode.";
       }
+
+      if (address.isDifferentRecipient) {
+        const trimmedRecipName = (address.recipientName || "").trim();
+        if (!trimmedRecipName || trimmedRecipName.length < 2) {
+          errors.recipientName = "Please enter the recipient's name (at least 2 characters).";
+        }
+        const cleanRecipPhone = (address.recipientPhone || "").replace(/[\s-]/g, "");
+        if (!cleanRecipPhone || !/^\d{10}$/.test(cleanRecipPhone)) {
+          errors.recipientPhone = "Please enter a valid 10-digit mobile number for the recipient.";
+        }
+      }
     }
 
     setFieldErrors(errors);
@@ -532,6 +636,8 @@ export default function CheckoutClient() {
           city: address.city,
           state: address.state,
           pincode: address.pincode,
+          latitude: address.latitude,
+          longitude: address.longitude,
           isDefault: savedAddresses.length === 0,
         }),
       });
@@ -1179,6 +1285,142 @@ export default function CheckoutClient() {
                         </p>
                       )}
                     </div>
+
+                    {/* Doorstep Pin on Map (Optional) */}
+                    <div className="md:col-span-2 p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
+                            <MapPin size={15} className="text-emerald-500" />
+                            Doorstep Location Pin on Map <span className="text-[10px] text-[var(--text-muted)] font-normal bg-[var(--bg-card)] px-2 py-0.5 rounded-full border border-[var(--border-color)]">Optional</span>
+                          </span>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                            Pinning on the map gives our delivery partner exact coordinates so they don&apos;t have to call for directions
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsMapPickerOpen(true)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                          >
+                            <MapPinned size={14} />
+                            <span>{address.latitude ? "Change Pin" : "Choose on Map"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleQuickGps}
+                            disabled={isLocatingDevice}
+                            className="px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Use my device current location"
+                          >
+                            <Crosshair size={14} className="text-emerald-500" />
+                            <span>{isLocatingDevice ? "Locating..." : "Use My GPS"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {address.latitude && address.longitude && (
+                        <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
+                            <CheckCircle2 size={15} className="shrink-0" />
+                            <span>
+                              Exact Delivery Pin Set: <span className="font-mono text-[11px] font-bold">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</span>
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearPin}
+                            className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                          >
+                            Remove Pin
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Alternate Recipient / Another Location Option */}
+                    <div className="md:col-span-2 pt-2 border-t border-[var(--border-color)]">
+                      <label className="flex items-start gap-3 cursor-pointer select-none group">
+                        <input
+                          type="checkbox"
+                          checked={address.isDifferentRecipient}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setAddress((prev) => ({
+                              ...prev,
+                              isDifferentRecipient: checked,
+                              recipientName: checked ? prev.recipientName : "",
+                              recipientPhone: checked ? prev.recipientPhone : "",
+                            }));
+                          }}
+                          className="mt-0.5 w-4 h-4 rounded text-[var(--brand-accent)] border-[var(--border-color)] focus:ring-[var(--brand-accent)] cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
+                            Delivering to another location or ordering for someone else?
+                          </span>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                            Order from anywhere (office, travelling, etc.) and send to family, friend, or coworker with their direct contact details
+                          </p>
+                        </div>
+                      </label>
+
+                      {address.isDifferentRecipient && (
+                        <div className="mt-3 p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--brand-accent)]/30 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                          <div>
+                            <label htmlFor="checkout-recipientName" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                              Recipient Name at Destination *
+                            </label>
+                            <input
+                              id="checkout-recipientName"
+                              name="recipientName"
+                              placeholder="e.g. Priya Sharma / Roommate Name"
+                              value={address.recipientName}
+                              onChange={handleChange}
+                              required={address.isDifferentRecipient}
+                              className={`w-full bg-[var(--bg-card)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                                fieldErrors.recipientName ? "border-rose-500" : "border-[var(--border-color)]"
+                              }`}
+                            />
+                            {fieldErrors.recipientName && (
+                              <p className="text-[11px] text-rose-500 font-medium mt-1">
+                                {fieldErrors.recipientName}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label htmlFor="checkout-recipientPhone" className="text-[var(--text-muted)] text-xs font-semibold uppercase mb-1 block">
+                              Recipient Direct Phone Number *
+                            </label>
+                            <input
+                              id="checkout-recipientPhone"
+                              name="recipientPhone"
+                              type="tel"
+                              inputMode="numeric"
+                              placeholder="e.g. 9876543210"
+                              value={address.recipientPhone}
+                              onChange={handleChange}
+                              required={address.isDifferentRecipient}
+                              className={`w-full bg-[var(--bg-card)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
+                                fieldErrors.recipientPhone ? "border-rose-500" : "border-[var(--border-color)]"
+                              }`}
+                            />
+                            {fieldErrors.recipientPhone && (
+                              <p className="text-[11px] text-rose-500 font-medium mt-1">
+                                {fieldErrors.recipientPhone}
+                              </p>
+                            )}
+                            <span className="text-[10px] text-[var(--text-muted)] block mt-1">
+                              📞 Delivery partner will call this direct recipient number upon arrival.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -1733,6 +1975,18 @@ export default function CheckoutClient() {
           </div>
         </div>
       </div>
+
+      {/* Interactive Delivery Location Map Picker Modal */}
+      <DeliveryLocationMapPicker
+        isOpen={isMapPickerOpen}
+        onClose={() => setIsMapPickerOpen(false)}
+        onSelectLocation={handleSelectMapLocation}
+        initialCoordinates={
+          address.latitude && address.longitude
+            ? { latitude: address.latitude, longitude: address.longitude }
+            : null
+        }
+      />
     </main>
   );
 }

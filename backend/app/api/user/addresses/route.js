@@ -36,8 +36,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { label, fullName, phone, street, city, state, pincode, isDefault } = body;
+    const { label, fullName, phone, street, city, state, pincode, isDefault, latitude, longitude } = body;
 
     if (!fullName || !phone || !street || !city || !state || !pincode) {
       return NextResponse.json(
@@ -71,6 +70,8 @@ export async function POST(request) {
       city: city.trim(),
       state: state.trim(),
       pincode: pincode.trim(),
+      latitude: typeof latitude === 'number' ? latitude : null,
+      longitude: typeof longitude === 'number' ? longitude : null,
       isDefault: shouldBeDefault,
     };
 
@@ -98,7 +99,7 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
-    const { addressId, action, label, fullName, phone, street, city, state, pincode, isDefault } = body;
+    const { addressId, action, label, fullName, phone, street, city, state, pincode, isDefault, latitude, longitude } = body;
 
     if (!addressId) {
       return NextResponse.json({ success: false, message: 'Address ID is required' }, { status: 400 });
@@ -130,6 +131,8 @@ export async function PUT(request) {
     if (city !== undefined) targetAddr.city = city.trim();
     if (state !== undefined) targetAddr.state = state.trim();
     if (pincode !== undefined) targetAddr.pincode = pincode.trim();
+    if (latitude !== undefined) targetAddr.latitude = typeof latitude === 'number' ? latitude : null;
+    if (longitude !== undefined) targetAddr.longitude = typeof longitude === 'number' ? longitude : null;
 
     await user.save();
 

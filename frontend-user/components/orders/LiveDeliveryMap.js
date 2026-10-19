@@ -19,6 +19,8 @@ import {
   Radio,
   CheckCircle2,
   Info,
+  Crosshair,
+  UserCheck,
 } from "lucide-react";
 
 const TRACKING_POLL_INTERVAL_MS = 9000; // 9 seconds (in the 8-10s range)
@@ -31,6 +33,9 @@ const RESTAURANT_ICON_SVG = `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.
 
 // SVG data URI for destination marker (used only if valid coordinates exist)
 const DESTINATION_ICON_SVG = `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="%2310B981" stroke="%23FFFFFF" stroke-width="3"/><path d="M24 13c-4.4 0-8 3.6-8 8 0 5.3 8 14 8 14s8-8.7 8-14c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="%23FFFFFF"/></svg>`;
+
+// SVG data URI for customer live location marker
+const CUSTOMER_LOCATION_ICON_SVG = `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="%238B5CF6" stroke="%23FFFFFF" stroke-width="3"/><circle cx="24" cy="18" r="6" fill="%23FFFFFF"/><path d="M14 36c0-5.5 4.5-8 10-8s10 2.5 10 8" fill="%23FFFFFF"/></svg>`;
 
 function isValidCoordinate(lat, lng) {
   return (
@@ -82,8 +87,14 @@ export default function LiveDeliveryMap({
   const driverMarkerRef = useRef(null);
   const restaurantMarkerRef = useRef(null);
   const destinationMarkerRef = useRef(null);
+  const customerMarkerRef = useRef(null);
   const isFetchingRef = useRef(false);
   const pollTimerRef = useRef(null);
+
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [sharingLocationLoading, setSharingLocationLoading] = useState(false);
+  const [customerCoords, setCustomerCoords] = useState(null);
+  const [shareMsg, setShareMsg] = useState("");
 
   const mapKey = process.env.NEXT_PUBLIC_MAPPLS_MAP_KEY;
 
@@ -126,6 +137,56 @@ export default function LiveDeliveryMap({
     },
     [orderId, onStatusUpdate]
   );
+
+  /**
+   * Share / update customer live GPS coordinates with delivery partner
+   */
+  const handleShareLocation = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setShareMsg("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setSharingLocationLoading(true);
+    setShareMsg("");
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        setCustomerCoords({ latitude, longitude });
+
+        try {
+          const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/customer-location`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latitude, longitude, accuracy }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.success) {
+            setIsSharingLocation(true);
+            setShareMsg("Live location shared! Driver can now navigate straight to your doorstep.");
+            fetchTracking(false);
+          } else {
+            setShareMsg(data.message || "Could not update location with delivery server.");
+          }
+        } catch (err) {
+          console.warn("Location sharing network failure:", err);
+          setShareMsg("Network issue while sending location to driver.");
+        } finally {
+          setSharingLocationLoading(false);
+        }
+      },
+      (err) => {
+        setSharingLocationLoading(false);
+        if (err.code === 1) {
+          setShareMsg("Location access denied. Please allow location permissions in your browser.");
+        } else {
+          setShareMsg("Unable to retrieve device GPS coordinates.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
+    );
+  }, [orderId, fetchTracking]);
 
   /**
    * Initial tracking fetch & visibility-aware polling
@@ -345,6 +406,15 @@ export default function LiveDeliveryMap({
   const destLng = destObj?.longitude;
   const hasValidDestCoords = isValidCoordinate(destLat, destLng);
 
+  const customerLoc = customerCoords || tracking?.customerLocation;
+  const customerLat = customerLoc?.latitude;
+  const customerLng = customerLoc?.longitude;
+  const hasValidCustomerCoords = isValidCoordinate(customerLat, customerLng);
+
+  const effectiveDestLat = hasValidDestCoords ? destLat : (hasValidCustomerCoords ? customerLat : null);
+  const effectiveDestLng = hasValidDestCoords ? destLng : (hasValidCustomerCoords ? customerLng : null);
+  const hasEffectiveDest = isValidCoordinate(effectiveDestLat, effectiveDestLng);
+
   /**
    * Initialize or update Mappls Map instance and markers
    */
@@ -357,6 +427,8 @@ export default function LiveDeliveryMap({
     let initialCenter = [28.6139, 77.209]; // Default New Delhi fallback
     if (hasValidDriverCoords) {
       initialCenter = [driverLat, driverLng];
+    } else if (hasEffectiveDest) {
+      initialCenter = [effectiveDestLat, effectiveDestLng];
     } else if (hasValidRestaurantCoords) {
       initialCenter = [restLat, restLng];
     }
@@ -371,7 +443,7 @@ export default function LiveDeliveryMap({
 
         const map = new window.mappls.Map(container.id, {
           center: initialCenter,
-          zoom: hasValidDriverCoords ? 15 : 14,
+          zoom: hasValidDriverCoords ? 15 : (hasEffectiveDest ? 15 : 14),
           placemark: false,
           zoomControl: true,
           hybrid: false,
@@ -484,11 +556,60 @@ export default function LiveDeliveryMap({
         } catch (e) {
           console.warn("Could not create destination marker:", e?.message);
         }
+      } else {
+        try {
+          destinationMarkerRef.current.setPosition(destPos);
+        } catch {}
+      }
+    }
+
+    // 4b. Manage Customer Live Shared Location Marker
+    if (hasValidCustomerCoords) {
+      const custPos = { lat: customerLat, lng: customerLng };
+      const popupContent = `<div style="font-family:sans-serif;font-size:12px;padding:4px;"><strong>Your Shared Live Location</strong><br/>Doorstep GPS Pin</div>`;
+
+      if (!customerMarkerRef.current) {
+        try {
+          customerMarkerRef.current = new window.mappls.Marker({
+            map,
+            position: custPos,
+            icon: CUSTOMER_LOCATION_ICON_SVG,
+            width: 38,
+            height: 38,
+            popupHtml: popupContent,
+          });
+        } catch (e) {
+          console.warn("Could not create customer marker:", e?.message);
+        }
+      } else {
+        try {
+          customerMarkerRef.current.setPosition(custPos);
+        } catch {}
       }
     }
 
     // 5. Adjust Viewport Bounds
-    if (hasValidDriverCoords && hasValidRestaurantCoords) {
+    if (hasValidDriverCoords && hasEffectiveDest) {
+      try {
+        const bounds = [
+          [Math.min(driverLat, effectiveDestLat), Math.min(driverLng, effectiveDestLng)],
+          [Math.max(driverLat, effectiveDestLat), Math.max(driverLng, effectiveDestLng)],
+        ];
+        if (typeof window.mappls.fitBounds === "function") {
+          new window.mappls.fitBounds({
+            map,
+            bounds,
+            options: { padding: 80, duration: 800 },
+          });
+        } else if (typeof map.fitBounds === "function") {
+          map.fitBounds(bounds, { padding: 80 });
+        }
+      } catch {
+        try {
+          map.setCenter([driverLat, driverLng]);
+        } catch {}
+      }
+    } else if (hasValidDriverCoords && hasValidRestaurantCoords) {
       try {
         const bounds = [
           [Math.min(driverLat, restLat), Math.min(driverLng, restLng)],
@@ -511,10 +632,17 @@ export default function LiveDeliveryMap({
     } else if (hasValidDriverCoords) {
       try {
         map.setCenter([driverLat, driverLng]);
+        map.setZoom(15);
+      } catch {}
+    } else if (hasEffectiveDest) {
+      try {
+        map.setCenter([effectiveDestLat, effectiveDestLng]);
+        map.setZoom(15);
       } catch {}
     } else if (hasValidRestaurantCoords) {
       try {
         map.setCenter([restLat, restLng]);
+        map.setZoom(14);
       } catch {}
     }
   }, [
@@ -528,6 +656,12 @@ export default function LiveDeliveryMap({
     hasValidDestCoords,
     destLat,
     destLng,
+    hasValidCustomerCoords,
+    customerLat,
+    customerLng,
+    effectiveDestLat,
+    effectiveDestLng,
+    hasEffectiveDest,
     tracking,
     restaurant,
     destObj,
@@ -551,6 +685,11 @@ export default function LiveDeliveryMap({
       if (destinationMarkerRef.current && typeof destinationMarkerRef.current.remove === "function") {
         try {
           destinationMarkerRef.current.remove();
+        } catch {}
+      }
+      if (customerMarkerRef.current && typeof customerMarkerRef.current.remove === "function") {
+        try {
+          customerMarkerRef.current.remove();
         } catch {}
       }
       if (mapInstanceRef.current && typeof mapInstanceRef.current.remove === "function") {
@@ -773,6 +912,62 @@ export default function LiveDeliveryMap({
         </div>
       </div>
 
+      {/* ── CUSTOMER LIVE LOCATION SHARING BAR ─────────────────────────── */}
+      <div className="bg-[var(--bg-sub)]/90 border-b border-[var(--border-color)] px-3.5 py-2.5 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSharingLocation || hasValidCustomerCoords ? "bg-purple-500 animate-pulse" : "bg-stone-400"}`} />
+          <div className="text-xs min-w-0">
+            {isSharingLocation || hasValidCustomerCoords ? (
+              <span className="font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 flex-wrap">
+                <span>● Customer Live GPS Active</span>
+                {customerLoc?.accuracy && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-normal font-mono">
+                    (±{Math.round(customerLoc.accuracy)}m accuracy)
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[var(--text-muted)]">
+                Share your live GPS so the delivery partner can navigate straight to your doorstep
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={handleShareLocation}
+            disabled={sharingLocationLoading}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 ${
+              isSharingLocation || hasValidCustomerCoords
+                ? "bg-purple-600/10 hover:bg-purple-600/20 text-purple-600 dark:text-purple-400 border border-purple-500/30"
+                : "bg-purple-600 hover:bg-purple-700 text-white"
+            }`}
+          >
+            {sharingLocationLoading ? (
+              <RefreshCw size={13} className="animate-spin" />
+            ) : (
+              <Crosshair size={13} />
+            )}
+            <span>
+              {sharingLocationLoading
+                ? "Acquiring GPS..."
+                : isSharingLocation || hasValidCustomerCoords
+                ? "Update Live GPS"
+                : "Share My Live Location"}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {shareMsg && (
+        <div className="bg-purple-500/10 border-b border-purple-500/25 px-4 py-2 text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 size={14} className="shrink-0 text-purple-500" />
+          <span>{shareMsg}</span>
+        </div>
+      )}
+
       {/* ── STALE GPS WARNING BANNER ───────────────────────────────────── */}
       {isStale && (
         <div className="bg-amber-500/10 border-b border-amber-500/30 p-3 sm:px-5 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
@@ -948,12 +1143,31 @@ export default function LiveDeliveryMap({
                   >
                     {cityPinText}
                   </p>
-                  {!hasValidDestCoords && (
+                  {hasValidDestCoords ? (
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                      <CheckCircle2 size={11} className="shrink-0" />
+                      <span>Doorstep GPS Pin Set ({destLat.toFixed(4)}, {destLng.toFixed(4)})</span>
+                    </div>
+                  ) : (
                     <div className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
                       <Info size={11} className="shrink-0 text-stone-400 dark:text-stone-500" />
                       <span className="line-clamp-1" title="Destination pin omitted without GPS geocoding">
                         Destination pin omitted without GPS geocoding
                       </span>
+                    </div>
+                  )}
+
+                  {destObj?.recipientPhone && (
+                    <div className="mt-1.5 pt-1.5 border-t border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand-accent)] flex-wrap">
+                      <span>Recipient: {destObj.recipientName || "Friend / Contact"}</span>
+                      <span>•</span>
+                      <a
+                        href={`tel:${destObj.recipientPhone}`}
+                        className="hover:underline flex items-center gap-1 font-mono"
+                      >
+                        <Phone size={10} />
+                        <span>{destObj.recipientPhone}</span>
+                      </a>
                     </div>
                   )}
                 </div>

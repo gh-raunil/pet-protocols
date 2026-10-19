@@ -46,7 +46,9 @@ export async function GET(request) {
 
       const orConditions = [
         { "address.fullName": { $regex: escapeRegex(searchQuery), $options: "i" } },
+        { "address.recipientName": { $regex: escapeRegex(searchQuery), $options: "i" } },
         { "address.phone": { $regex: escapeRegex(stripped), $options: "i" } },
+        { "address.recipientPhone": { $regex: escapeRegex(stripped), $options: "i" } },
         { orderId: { $regex: escapeRegex(stripped), $options: "i" } },
       ];
 
@@ -251,6 +253,43 @@ export async function PUT(request) {
         );
       } else {
         order.status = status;
+      }
+
+      // Explicit guarantee: activate live tracking and assign driver on out_for_delivery
+      if (status === "out_for_delivery") {
+        const isPickup = typeof order.isPickupOrder === "function" ? order.isPickupOrder() : false;
+        if (!isPickup) {
+          if (typeof order.startDeliveryTracking === "function") {
+            order.startDeliveryTracking({
+              userId: auth.user?._id,
+              role: auth.user?.role || "restaurant_staff",
+              name: auth.user?.name || "Delivery Staff",
+            });
+          } else {
+            order.deliveryTracking = order.deliveryTracking || {};
+            order.deliveryTracking.isLive = true;
+            order.deliveryTracking.startedAt = order.deliveryTracking.startedAt || new Date();
+            order.deliveryTracking.endedAt = null;
+            order.deliveryTracking.endReason = null;
+          }
+        }
+        if (!order.assignedDeliveryStaff?.id && auth.user?._id) {
+          order.assignedDeliveryStaff = {
+            id: auth.user._id,
+            name: auth.user.name || "Delivery Staff",
+            phone: auth.user.phone || "",
+            email: auth.user.email || "",
+            assignedAt: new Date(),
+          };
+        }
+      } else if (["delivered", "cancelled"].includes(status)) {
+        if (typeof order.stopDeliveryTracking === "function") {
+          order.stopDeliveryTracking(status === "delivered" ? "delivered" : "cancelled");
+        } else if (order.deliveryTracking) {
+          order.deliveryTracking.isLive = false;
+          order.deliveryTracking.endedAt = new Date();
+          order.deliveryTracking.endReason = status === "delivered" ? "delivered" : "cancelled";
+        }
       }
     }
     if (paymentStatus) {

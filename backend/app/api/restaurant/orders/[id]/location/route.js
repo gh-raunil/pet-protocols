@@ -104,12 +104,47 @@ export async function PUT(request, { params }) {
       }, { status: 400 });
     }
 
-    // Tracking session must be live
+    // If driver is not assigned yet, assign the reporting staff member
+    if (!order.assignedDeliveryStaff?.id) {
+      order.assignedDeliveryStaff = {
+        id: user._id,
+        name: user.name || "Delivery Staff",
+        phone: user.phone || "",
+        email: user.email || "",
+        assignedAt: new Date(),
+      };
+      await Order.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            assignedDeliveryStaff: order.assignedDeliveryStaff,
+          },
+        }
+      );
+    }
+
+    // Auto-heal / activate tracking session if order is actively out for delivery
     if (!order.deliveryTracking?.isLive) {
-      return NextResponse.json({
-        success: false,
-        message: "Delivery tracking session is not active for this order.",
-      }, { status: 400 });
+      if (typeof order.startDeliveryTracking === "function") {
+        order.startDeliveryTracking({
+          userId: user._id,
+          role: user.role,
+          name: user.name || "Delivery Staff",
+        });
+      } else {
+        order.deliveryTracking = order.deliveryTracking || {};
+        order.deliveryTracking.isLive = true;
+        order.deliveryTracking.startedAt = order.deliveryTracking.startedAt || new Date();
+      }
+      await Order.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            "deliveryTracking.isLive": true,
+            "deliveryTracking.startedAt": order.deliveryTracking.startedAt || new Date(),
+          },
+        }
+      );
     }
 
     // Quick reject if incoming recordedAt is older than or equal to current snapshot
@@ -131,9 +166,10 @@ export async function PUT(request, { params }) {
     // 3. deliveryTracking.isLive remains strictly true
     // 4. Stored recordedAt is older than incoming recordedAt (newer wins, stale/duplicate rejected)
     // 5. Staff member remains authorized (not reassigned to another driver concurrently)
+    const targetRestId = order.restaurant?._id || order.restaurant;
     const atomicConditions = [
       { _id: order._id },
-      { restaurant: order.restaurant },
+      { restaurant: targetRestId },
       { status: "out_for_delivery" },
       { "deliveryTracking.isLive": true },
       {

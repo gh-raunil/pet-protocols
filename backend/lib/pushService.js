@@ -160,11 +160,16 @@ export async function sendPushToRestaurantAdmins(restaurantId, payload, options 
       restaurant: restaurantId,
       status: 'active',
       role: { $in: ['restaurant_admin', 'admin', 'staff'] },
-    }).select('_id email role');
+    }).select('_id email role staffRoles');
 
     if (!staffAndAdmins || staffAndAdmins.length === 0) {
       return { success: true, sentCount: 0, reason: 'No active staff or admins found for restaurant' };
     }
+
+    const userRoleMap = new Map();
+    staffAndAdmins.forEach((u) => {
+      userRoleMap.set(u._id.toString(), u);
+    });
 
     const adminUserIds = staffAndAdmins.map((u) => u._id);
 
@@ -178,7 +183,34 @@ export async function sendPushToRestaurantAdmins(restaurantId, payload, options 
     }
 
     const results = await Promise.allSettled(
-      subscriptions.map((sub) => sendPushNotification(sub, payload))
+      subscriptions.map((sub) => {
+        const u = userRoleMap.get(sub.user?.toString());
+        const isDeliveryStaff =
+          u?.role === 'staff' &&
+          Array.isArray(u?.staffRoles) &&
+          u.staffRoles.includes('Delivery') &&
+          !u.staffRoles.includes('Kitchen') &&
+          !u.staffRoles.includes('Manager');
+
+        let userPayload = payload;
+        if (options.deliveryPayload && isDeliveryStaff) {
+          userPayload = options.deliveryPayload;
+        } else if (isDeliveryStaff && typeof payload === 'object' && payload !== null) {
+          userPayload = {
+            ...payload,
+            title:
+              payload.title?.replace('New Order Received! 🔔', 'New Delivery Dispatch Order! 🛵') ||
+              'New Delivery Dispatch Order! 🛵',
+            url: '/delivery',
+            data: {
+              ...(payload.data || {}),
+              url: '/delivery',
+            },
+          };
+        }
+
+        return sendPushNotification(sub, userPayload);
+      })
     );
 
     const sentCount = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
@@ -293,7 +325,7 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
       };
       notifications.push(sendPushForOrder(order, customerPayload, 'orderUpdates'));
 
-      // 2. Restaurant admin notification
+      // 2. Restaurant admin & delivery staff notification
       if (restaurantId) {
         const adminPayload = {
           title: 'New Order Received! 🔔',
@@ -309,7 +341,30 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
             type: 'new_order',
           },
         };
-        notifications.push(sendPushToRestaurantAdmins(restaurantId, adminPayload, { settingKey: 'restaurantNewOrder' }));
+
+        const deliveryArea = [order.address?.street, order.address?.city].filter(Boolean).join(', ');
+        const recipientDisplay = order.address?.recipientName || order.address?.fullName || customerName;
+        const deliveryPayload = {
+          title: 'New Delivery Dispatch Order! 🛵',
+          body: `Order #${orderShortId} (${itemCount} item${itemCount > 1 ? 's' : ''} • ${totalFormatted}) to ${deliveryArea || recipientDisplay} is ready for dispatch.`,
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/favicon-32x32.png',
+          url: `/delivery`,
+          tag: `restaurant-order-delivery-${orderId}`,
+          data: {
+            orderId,
+            status: 'pending',
+            url: `/delivery`,
+            type: 'new_delivery_order',
+          },
+        };
+
+        notifications.push(
+          sendPushToRestaurantAdmins(restaurantId, adminPayload, {
+            settingKey: 'restaurantNewOrder',
+            deliveryPayload,
+          })
+        );
       }
     } else if (eventType === 'status_update') {
       const status = extraData.status || order.status;

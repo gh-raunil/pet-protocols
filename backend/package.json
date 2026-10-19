@@ -2,6 +2,9 @@
   "name": "pet-protocols-backend",
   "version": "0.1.0",
   "private": true,
+  "imports": {
+    "@/*": "./*"
+  },
   "scripts": {
     "dev": "next dev -p 4000 --webpack",
     "build": "next build",

@@ -283,7 +283,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     return orders.filter((o) => {
       // Status filter
       if (statusFilter === "active") {
-        if (o.status !== "preparing" && o.status !== "out_for_delivery") return false;
+        if (o.status !== "preparing" && o.status !== "ready" && o.status !== "out_for_delivery") return false;
       } else if (statusFilter !== "all" && o.status !== statusFilter) {
         return false;
       }
@@ -293,16 +293,26 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = o.address?.fullName?.toLowerCase().includes(q);
       const matchPhone = o.address?.phone?.includes(q);
+      const matchRecipientName = o.address?.recipientName?.toLowerCase().includes(q);
+      const matchRecipientPhone = o.address?.recipientPhone?.includes(q);
       const matchOrderId = o.orderId?.toLowerCase().includes(q);
       const matchCity = o.address?.city?.toLowerCase().includes(q);
       const matchStreet = o.address?.street?.toLowerCase().includes(q);
-      return matchName || matchPhone || matchOrderId || matchCity || matchStreet;
+      return (
+        matchName ||
+        matchPhone ||
+        matchRecipientName ||
+        matchRecipientPhone ||
+        matchOrderId ||
+        matchCity ||
+        matchStreet
+      );
     });
   }, [orders, statusFilter, searchQuery]);
 
   // Operational metrics
   const metrics = useMemo(() => {
-    const ready = orders.filter((o) => o.status === "preparing").length;
+    const ready = orders.filter((o) => o.status === "preparing" || o.status === "ready").length;
     const inTransit = orders.filter((o) => o.status === "out_for_delivery").length;
     const deliveredToday = orders.filter((o) => o.status === "delivered").length;
     const codToCollect = orders
@@ -870,9 +880,17 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                   {/* Quick Action Button for Delivery Flow */}
                   <div className="flex items-center gap-2 self-end md:self-auto flex-wrap justify-end">
-                    {order.status === "preparing" && (
+                    {(order.status === "preparing" || order.status === "ready") && (
                       <button
-                        onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
+                        onClick={() =>
+                          updateOrderStatus(order._id, "out_for_delivery", {
+                            assignedDeliveryStaff: {
+                              id: currentStaffId,
+                              name: currentStaffName,
+                              phone: currentStaffPhone,
+                            },
+                          })
+                        }
                         disabled={isUpdating}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
@@ -961,38 +979,120 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 {/* ── CARD SUMMARY ROW ──────────────────────────────── */}
                 <div className="p-4 sm:p-5 bg-stone-50/50 dark:bg-white/[0.02] grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Delivery Location & Contact */}
-                  <div className="bg-white dark:bg-[#151926] p-4 rounded-xl border border-stone-200/80 dark:border-white/5 space-y-2">
-                    <div className="flex items-center justify-between">
+                  <div className="bg-white dark:bg-[#151926] p-4 rounded-xl border border-stone-200/80 dark:border-white/5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 font-bold text-xs text-stone-900 dark:text-white">
                         <MapPin size={14} className="text-blue-500" />
                         <span>Delivery Destination</span>
                       </div>
-                      {order.address?.phone && (
-                        <a
-                          href={`tel:${order.address.phone}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/20 transition"
-                        >
-                          <Phone size={11} />
-                          <span>Call Customer</span>
-                        </a>
+
+                      {/* Alternate Recipient Badge if applicable */}
+                      {(order.address?.isDifferentRecipient || order.address?.recipientPhone) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1">
+                          🎁 Alternate Recipient
+                        </span>
                       )}
                     </div>
 
-                    <div className="text-xs text-stone-700 dark:text-stone-300">
-                      <div className="font-bold text-stone-900 dark:text-white">
-                        {order.address?.fullName || "Valued Customer"}
+                    {/* Recipient Details & Quick Call */}
+                    {(order.address?.isDifferentRecipient || order.address?.recipientPhone) ? (
+                      <div className="p-2.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-800/30 space-y-2 text-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <span className="text-[10px] uppercase font-extrabold text-purple-800 dark:text-purple-300 block">
+                              Deliver To Recipient:
+                            </span>
+                            <span className="font-black text-sm text-stone-900 dark:text-white">
+                              {order.address?.recipientName || order.address?.fullName || "Recipient"}
+                            </span>
+                          </div>
+
+                          {order.address?.recipientPhone && (
+                            <a
+                              href={`tel:${order.address.recipientPhone}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs transition"
+                            >
+                              <Phone size={12} />
+                              <span>Call Recipient ({order.address.recipientPhone})</span>
+                            </a>
+                          )}
+                        </div>
+
+                        {order.address?.phone && order.address.phone !== order.address.recipientPhone && (
+                          <div className="pt-1.5 border-t border-purple-200/50 dark:border-purple-800/20 flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400">
+                            <span>Ordered by: <strong>{order.address.fullName || "Customer"}</strong></span>
+                            <a href={`tel:${order.address.phone}`} className="hover:underline text-stone-600 dark:text-stone-300">
+                              📞 {order.address.phone}
+                            </a>
+                          </div>
+                        )}
                       </div>
-                      <p className="mt-0.5 leading-relaxed">
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-xs text-stone-900 dark:text-white">
+                          {order.address?.fullName || "Valued Customer"}
+                        </div>
+                        {order.address?.phone && (
+                          <a
+                            href={`tel:${order.address.phone}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/20 transition"
+                          >
+                            <Phone size={11} />
+                            <span>Call ({order.address.phone})</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Street Address */}
+                    <div className="text-xs text-stone-700 dark:text-stone-300">
+                      <p className="leading-relaxed">
                         {order.address?.street}, {order.address?.city}
                         {order.address?.state ? `, ${order.address?.state}` : ""}
                         {order.address?.pincode ? ` - ${order.address?.pincode}` : ""}
                       </p>
-                      {order.address?.phone && (
-                        <div className="mt-1 font-semibold text-stone-600 dark:text-stone-400">
-                          📞 {order.address.phone}
-                        </div>
-                      )}
                     </div>
+
+                    {/* GPS Coordinates & Google Maps Navigation */}
+                    {(() => {
+                      const hasCustomerLiveGps = Boolean(order.customerLocation?.latitude && order.customerLocation?.longitude);
+                      const hasPinnedGps = Boolean(order.address?.latitude && order.address?.longitude);
+                      const navLat = order.customerLocation?.latitude || order.address?.latitude;
+                      const navLng = order.customerLocation?.longitude || order.address?.longitude;
+
+                      if (!navLat || !navLng) return null;
+
+                      return (
+                        <div className="pt-2 border-t border-stone-100 dark:border-white/5 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap text-xs">
+                            {hasCustomerLiveGps ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                🎯 Customer Live GPS (±{Math.round(order.customerLocation.accuracy || 10)}m)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                                📍 Pinned Doorstep GPS
+                              </span>
+                            )}
+                            <span className="font-mono text-[11px] text-stone-500 dark:text-stone-400">
+                              {Number(navLat).toFixed(5)}, {Number(navLng).toFixed(5)}
+                            </span>
+                          </div>
+
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${navLat},${navLng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-xs transition cursor-pointer"
+                          >
+                            <Navigation size={13} />
+                            <span>🗺️ Navigate to Doorstep (Google Maps)</span>
+                            <ExternalLink size={12} className="opacity-70" />
+                          </a>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Payment Details (Mandatory for Delivery as specified) */}

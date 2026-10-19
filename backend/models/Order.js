@@ -149,6 +149,17 @@ const OrderSchema = new mongoose.Schema(
       city: String,
       state: String,
       pincode: String,
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      recipientName: { type: String, default: "" },
+      recipientPhone: { type: String, default: "" },
+      isDifferentRecipient: { type: Boolean, default: false },
+    },
+    customerLocation: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
+      updatedAt: { type: Date, default: null },
     },
     subtotal: {
       type: Number,
@@ -634,6 +645,29 @@ OrderSchema.methods.getCustomerTrackingView = function () {
   const tracking = this.deliveryTracking || {};
   const isActivelyDelivering = this.status === "out_for_delivery" && Boolean(tracking.isLive);
 
+  const destination = {
+    fullName: this.address?.fullName || "",
+    phone: this.address?.phone || "",
+    street: this.address?.street || "",
+    city: this.address?.city || "",
+    state: this.address?.state || "",
+    pincode: this.address?.pincode || "",
+    latitude: typeof this.address?.latitude === "number" ? this.address.latitude : null,
+    longitude: typeof this.address?.longitude === "number" ? this.address.longitude : null,
+    recipientName: this.address?.recipientName || null,
+    recipientPhone: this.address?.recipientPhone || null,
+    isDifferentRecipient: Boolean(this.address?.isDifferentRecipient),
+  };
+
+  const customerLocation = this.customerLocation && typeof this.customerLocation.latitude === "number"
+    ? {
+        latitude: this.customerLocation.latitude,
+        longitude: this.customerLocation.longitude,
+        accuracy: this.customerLocation.accuracy ?? null,
+        updatedAt: this.customerLocation.updatedAt || null,
+      }
+    : null;
+
   if (!isActivelyDelivering) {
     return {
       isLive: false,
@@ -643,6 +677,8 @@ OrderSchema.methods.getCustomerTrackingView = function () {
       endReason: tracking.endReason || null,
       lastUpdatedAt: tracking.lastUpdatedAt || null,
       status: this.status,
+      destination,
+      customerLocation,
     };
   }
 
@@ -663,6 +699,8 @@ OrderSchema.methods.getCustomerTrackingView = function () {
     endReason: null,
     lastUpdatedAt: tracking.lastUpdatedAt || null,
     status: this.status,
+    destination,
+    customerLocation,
   };
 };
 
@@ -673,6 +711,29 @@ OrderSchema.statics.sanitizeTrackingForCustomer = function (orderObj) {
   const tracking = orderObj.deliveryTracking || {};
   const isActivelyDelivering = status === "out_for_delivery" && Boolean(tracking.isLive);
 
+  const destination = {
+    fullName: orderObj.address?.fullName || "",
+    phone: orderObj.address?.phone || "",
+    street: orderObj.address?.street || "",
+    city: orderObj.address?.city || "",
+    state: orderObj.address?.state || "",
+    pincode: orderObj.address?.pincode || "",
+    latitude: typeof orderObj.address?.latitude === "number" ? orderObj.address.latitude : null,
+    longitude: typeof orderObj.address?.longitude === "number" ? orderObj.address.longitude : null,
+    recipientName: orderObj.address?.recipientName || null,
+    recipientPhone: orderObj.address?.recipientPhone || null,
+    isDifferentRecipient: Boolean(orderObj.address?.isDifferentRecipient),
+  };
+
+  const customerLocation = orderObj.customerLocation && typeof orderObj.customerLocation.latitude === "number"
+    ? {
+        latitude: orderObj.customerLocation.latitude,
+        longitude: orderObj.customerLocation.longitude,
+        accuracy: orderObj.customerLocation.accuracy ?? null,
+        updatedAt: orderObj.customerLocation.updatedAt || null,
+      }
+    : null;
+
   if (!isActivelyDelivering) {
     return {
       isLive: false,
@@ -682,6 +743,8 @@ OrderSchema.statics.sanitizeTrackingForCustomer = function (orderObj) {
       endReason: tracking.endReason || null,
       lastUpdatedAt: tracking.lastUpdatedAt || null,
       status,
+      destination,
+      customerLocation,
     };
   }
 
@@ -702,6 +765,8 @@ OrderSchema.statics.sanitizeTrackingForCustomer = function (orderObj) {
     endReason: null,
     lastUpdatedAt: tracking.lastUpdatedAt || null,
     status,
+    destination,
+    customerLocation,
   };
 };
 

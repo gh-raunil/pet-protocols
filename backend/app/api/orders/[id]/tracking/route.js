@@ -104,9 +104,9 @@ export async function GET(request, { params }) {
     const lastUpdatedMs = lastUpdateDate ? new Date(lastUpdateDate).getTime() : null;
     const isStale = Boolean(lastUpdatedMs && (now - lastUpdatedMs > 180 * 1000)); // 180 seconds threshold
 
-    // Minimum driver display information
+    // Driver display information for transit
     let driverInfo = null;
-    if (isActivelyDelivering && order.assignedDeliveryStaff?.name) {
+    if (order.status === "out_for_delivery" && order.assignedDeliveryStaff?.name) {
       driverInfo = {
         name: order.assignedDeliveryStaff.name,
         phone: order.assignedDeliveryStaff.phone || null,
@@ -126,6 +126,29 @@ export async function GET(request, { params }) {
       };
     }
 
+    const destinationCoords = {
+      fullName: order.address?.fullName || "",
+      phone: order.address?.phone || "",
+      street: order.address?.street || "",
+      city: order.address?.city || "",
+      state: order.address?.state || "",
+      pincode: order.address?.pincode || "",
+      latitude: typeof order.address?.latitude === "number" ? order.address.latitude : null,
+      longitude: typeof order.address?.longitude === "number" ? order.address.longitude : null,
+      recipientName: order.address?.recipientName || null,
+      recipientPhone: order.address?.recipientPhone || null,
+      isDifferentRecipient: Boolean(order.address?.isDifferentRecipient),
+    };
+
+    const customerLocationData = order.customerLocation && typeof order.customerLocation.latitude === "number"
+      ? {
+          latitude: order.customerLocation.latitude,
+          longitude: order.customerLocation.longitude,
+          accuracy: order.customerLocation.accuracy ?? null,
+          updatedAt: order.customerLocation.updatedAt || null,
+        }
+      : null;
+
     return NextResponse.json({
       success: true,
       orderId: order.orderId,
@@ -138,12 +161,8 @@ export async function GET(request, { params }) {
       startedAt: tracking.startedAt || null,
       endedAt: tracking.endedAt || null,
       lastUpdatedAt: tracking.lastUpdatedAt || null,
-      destination: {
-        street: order.address?.street || "",
-        city: order.address?.city || "",
-        state: order.address?.state || "",
-        pincode: order.address?.pincode || "",
-      },
+      destination: destinationCoords,
+      customerLocation: customerLocationData,
       restaurant: order.restaurant
         ? {
             name: order.restaurant.name || "",
