@@ -262,3 +262,19 @@ html.dark body .scrollbar-thin-accent::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, var(--brand-accent, #f97316), #c084fc);
   box-shadow: 0 0 20px var(--brand-accent, #f97316);
 }
+
+/* ── Leaflet Map & Tile Rendering Fixes (Tailwind Override) ── */
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile {
+  visibility: inherit !important;
+}
+
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #141518 !important;
+}

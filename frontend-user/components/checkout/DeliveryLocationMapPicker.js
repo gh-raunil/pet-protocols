@@ -21,6 +21,7 @@ const MAP_STYLES = [
     subtext: "Standard Street View",
     icon: "🗺️",
     base: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: "abc",
     overlay: null,
     maxZoom: 19,
   },
@@ -30,6 +31,7 @@ const MAP_STYLES = [
     subtext: "Satellite Imagery & Roads",
     icon: "🛰️",
     base: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "abc",
     overlay: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     maxZoom: 19,
   },
@@ -39,6 +41,7 @@ const MAP_STYLES = [
     subtext: "Dark High-Contrast",
     icon: "🌙",
     base: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    subdomains: "abcd",
     overlay: null,
     maxZoom: 19,
   },
@@ -48,6 +51,7 @@ const MAP_STYLES = [
     subtext: "Sublime Minimal Grey",
     icon: "🏙️",
     base: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    subdomains: "abcd",
     overlay: null,
     maxZoom: 19,
   },
@@ -72,6 +76,7 @@ export default function DeliveryLocationMapPicker({
   const baseLayerRef = useRef(null);
   const overlayLayerRef = useRef(null);
   const accuracyCircleRef = useRef(null);
+  const resizeObserverRef = useRef(null);
 
   // Sync initial coordinates when modal opens
   useEffect(() => {
@@ -111,12 +116,13 @@ export default function DeliveryLocationMapPicker({
       const styleConfig = MAP_STYLES.find((s) => s.id === activeStyle) || MAP_STYLES[0];
       baseLayerRef.current = L.tileLayer(styleConfig.base, {
         maxZoom: styleConfig.maxZoom,
-        subdomains: "abcd",
+        subdomains: styleConfig.subdomains || "abc",
       }).addTo(map);
 
       if (styleConfig.overlay) {
         overlayLayerRef.current = L.tileLayer(styleConfig.overlay, {
           maxZoom: styleConfig.maxZoom,
+          subdomains: styleConfig.subdomains || "abc",
         }).addTo(map);
       }
 
@@ -160,18 +166,39 @@ export default function DeliveryLocationMapPicker({
         handleLocateMe();
       }
 
-      // Ensure proper sizing after modal animation
-      setTimeout(() => {
-        try {
-          map.invalidateSize();
-        } catch {}
-      }, 250);
+      // Attach ResizeObserver to handle modal transitions smoothly
+      if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+        const ro = new ResizeObserver(() => {
+          if (mapRef.current) {
+            try {
+              mapRef.current.invalidateSize();
+            } catch {}
+          }
+        });
+        ro.observe(containerRef.current);
+        resizeObserverRef.current = ro;
+      }
+
+      // Staggered invalidateSize passes to guarantee full tile coverage
+      [50, 150, 300, 600].forEach((delay) => {
+        setTimeout(() => {
+          if (mapRef.current) {
+            try {
+              mapRef.current.invalidateSize();
+            } catch {}
+          }
+        }, delay);
+      });
     }
 
     initMap();
 
     return () => {
       isCancelled = true;
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -197,12 +224,13 @@ export default function DeliveryLocationMapPicker({
       const styleConfig = MAP_STYLES.find((s) => s.id === activeStyle) || MAP_STYLES[0];
       baseLayerRef.current = L.tileLayer(styleConfig.base, {
         maxZoom: styleConfig.maxZoom,
-        subdomains: "abcd",
+        subdomains: styleConfig.subdomains || "abc",
       }).addTo(map);
 
       if (styleConfig.overlay) {
         overlayLayerRef.current = L.tileLayer(styleConfig.overlay, {
           maxZoom: styleConfig.maxZoom,
+          subdomains: styleConfig.subdomains || "abc",
         }).addTo(map);
       }
     });
@@ -302,29 +330,58 @@ export default function DeliveryLocationMapPicker({
         <div className="relative w-full h-[360px] sm:h-[420px] bg-stone-900 overflow-hidden">
           <div ref={containerRef} className="w-full h-full" />
 
-          {/* Fixed Center Pin Overlay (Point 5: Marked doorstep pin) */}
-          <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center">
-            <div className={`relative flex flex-col items-center transition-transform duration-200 ${isMapMoving ? "-translate-y-3 scale-105" : "translate-y-0"}`}>
+          {/* Fixed Center Pin Overlay (Point 5: Marked doorstep pin with exact 50% anchor) */}
+          <div
+            className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-visible"
+            style={{ zIndex: 1000 }}
+          >
+            {/* The pin itself: anchored so its bottom tip is at 50% 50% */}
+            <div
+              className="flex flex-col items-center pointer-events-none select-none transition-transform duration-150 ease-out"
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: isMapMoving
+                  ? "translate(-50%, -108%) scale(1.05)"
+                  : "translate(-50%, -100%)",
+              }}
+            >
               {/* Floating label */}
-              <div className="mb-1 px-2.5 py-1 rounded-full bg-stone-900/95 border border-emerald-500/40 text-[10px] font-extrabold text-white shadow-xl flex items-center gap-1.5 whitespace-nowrap animate-in fade-in">
+              <div className="mb-1 px-2.5 py-1 rounded-full bg-stone-900/95 border border-emerald-500/40 text-[10px] font-extrabold text-white shadow-xl flex items-center gap-1.5 whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 <span>Delivery Doorstep Pin</span>
               </div>
 
               {/* Pin Graphics */}
-              <div className="relative flex flex-col items-center">
-                <div className="w-9 h-9 rounded-full bg-emerald-500 border-3 border-white shadow-2xl flex items-center justify-center text-white text-sm font-black">
+              <div className="flex flex-col items-center">
+                <div className="w-9 h-9 rounded-full bg-emerald-500 border-2 border-white shadow-2xl flex items-center justify-center text-white text-sm font-black">
                   🏠
                 </div>
-                <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[12px] border-t-emerald-500 -mt-1" />
-                {/* Shadow at pin base */}
-                <div className={`w-3 h-1.5 rounded-full bg-black/50 blur-[1px] transition-all duration-200 ${isMapMoving ? "scale-75 opacity-40 mt-2" : "scale-100 opacity-80 mt-0.5"}`} />
+                <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[11px] border-t-emerald-500 -mt-0.5" />
               </div>
             </div>
+
+            {/* Shadow at pin base: stays anchored on the ground at (50%, 50%) */}
+            <div
+              className="rounded-full bg-black/60 blur-[1px] transition-all duration-150 pointer-events-none"
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: isMapMoving ? "8px" : "14px",
+                height: isMapMoving ? "3px" : "5px",
+                transform: "translate(-50%, -50%)",
+                opacity: isMapMoving ? 0.35 : 0.8,
+              }}
+            />
           </div>
 
           {/* Top-Right Control Buttons: GPS & Layer Switcher */}
-          <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
+          <div
+            className="absolute top-3 right-3 flex flex-col gap-2"
+            style={{ zIndex: 1000 }}
+          >
             {/* Use My GPS Button (Point 6) */}
             <button
               type="button"
@@ -353,7 +410,10 @@ export default function DeliveryLocationMapPicker({
 
               {/* Layer Menu Popup */}
               {styleMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-stone-900 border border-white/15 p-2 shadow-2xl z-50">
+                <div
+                  className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-stone-900 border border-white/15 p-2 shadow-2xl"
+                  style={{ zIndex: 1050 }}
+                >
                   <div className="px-2 py-1 text-[10px] font-extrabold uppercase text-stone-400 border-b border-white/10 mb-1">
                     Map Style
                   </div>
@@ -387,7 +447,10 @@ export default function DeliveryLocationMapPicker({
           </div>
 
           {/* Instructions banner */}
-          <div className="absolute bottom-2 left-3 z-30 pointer-events-none">
+          <div
+            className="absolute bottom-2 left-3 pointer-events-none"
+            style={{ zIndex: 1000 }}
+          >
             <span className="px-2.5 py-1 rounded-lg bg-stone-900/85 backdrop-blur-xs text-[10px] font-semibold text-stone-300 border border-white/10 shadow-sm">
               💡 Move map or tap to align the doorstep pin
             </span>

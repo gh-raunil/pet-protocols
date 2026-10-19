@@ -37,6 +37,7 @@ const MAP_STYLES = [
     subtext: "Standard Street View",
     icon: "🗺️",
     base: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: "abc",
     overlay: null,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
@@ -47,6 +48,7 @@ const MAP_STYLES = [
     subtext: "Satellite Imagery & Roads",
     icon: "🛰️",
     base: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "abc",
     overlay: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ",
     maxZoom: 19,
@@ -57,6 +59,7 @@ const MAP_STYLES = [
     subtext: "Dark High-Contrast",
     icon: "🌙",
     base: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    subdomains: "abcd",
     overlay: null,
     attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
     maxZoom: 19,
@@ -67,6 +70,7 @@ const MAP_STYLES = [
     subtext: "Sublime Minimal Grey",
     icon: "🏙️",
     base: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    subdomains: "abcd",
     overlay: null,
     attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
     maxZoom: 19,
@@ -469,12 +473,13 @@ export default function LiveDeliveryMap({
       const styleConfig = MAP_STYLES.find((s) => s.id === activeStyle) || MAP_STYLES[0];
       baseLayerRef.current = L.tileLayer(styleConfig.base, {
         maxZoom: styleConfig.maxZoom,
-        subdomains: "abcd",
+        subdomains: styleConfig.subdomains || "abc",
       }).addTo(map);
 
       if (styleConfig.overlay) {
         overlayLayerRef.current = L.tileLayer(styleConfig.overlay, {
           maxZoom: styleConfig.maxZoom,
+          subdomains: styleConfig.subdomains || "abc",
         }).addTo(map);
       }
 
@@ -518,12 +523,13 @@ export default function LiveDeliveryMap({
       const styleConfig = MAP_STYLES.find((s) => s.id === activeStyle) || MAP_STYLES[0];
       baseLayerRef.current = L.tileLayer(styleConfig.base, {
         maxZoom: styleConfig.maxZoom,
-        subdomains: "abcd",
+        subdomains: styleConfig.subdomains || "abc",
       }).addTo(map);
 
       if (styleConfig.overlay) {
         overlayLayerRef.current = L.tileLayer(styleConfig.overlay, {
           maxZoom: styleConfig.maxZoom,
+          subdomains: styleConfig.subdomains || "abc",
         }).addTo(map);
       }
     });

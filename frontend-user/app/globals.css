@@ -154,3 +154,19 @@ select:-webkit-autofill:focus {
     transform: translateY(-8px) scale(0.94);
   }
 }
+
+/* ── Leaflet Map & Tile Rendering Fixes (Tailwind Override) ── */
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile {
+  visibility: inherit !important;
+}
+
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #141518 !important;
+}
