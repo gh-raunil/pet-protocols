@@ -6,7 +6,7 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 // GET — Fetch restaurant profile & all settings
 export async function GET() {
   try {
-    const auth = await requireRestaurantAdmin();
+    const auth = await requireRestaurantAdmin({ allowStaff: true });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }

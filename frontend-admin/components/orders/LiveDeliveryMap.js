@@ -421,6 +421,7 @@ export default function LiveDeliveryMap({
     }
 
     let isCancelled = false;
+    let handleResize = null;
 
     async function initLeaflet() {
       const L = (await import("leaflet")).default;
@@ -468,7 +469,7 @@ export default function LiveDeliveryMap({
 
       mapInstanceRef.current = map;
 
-      const handleResize = () => {
+      handleResize = () => {
         if (mapInstanceRef.current) {
           try {
             mapInstanceRef.current.invalidateSize();
@@ -492,7 +493,7 @@ export default function LiveDeliveryMap({
 
     return () => {
       isCancelled = true;
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && handleResize) {
         window.removeEventListener("resize", handleResize);
       }
       if (mapInstanceRef.current) {
