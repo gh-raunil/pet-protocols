@@ -44,9 +44,19 @@ import {
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
   const { data: session } = useSession();
-  const isLeadAdmin = session?.user?.role === "lead_admin" || session?.user?.role === "admin";
+  const userRole = session?.user?.role;
   const staffRoles = Array.isArray(session?.user?.staffRoles) ? session.user.staffRoles : [];
+  const isLeadAdmin =
+    userRole === "restaurant_admin" ||
+    userRole === "admin" ||
+    userRole === "lead_admin" ||
+    userRole === "superadmin";
   const isManager = isLeadAdmin || staffRoles.includes("Manager");
+  const isDeliveryOnlyStaff =
+    userRole === "staff" &&
+    staffRoles.includes("Delivery") &&
+    !staffRoles.includes("Kitchen") &&
+    !staffRoles.includes("Manager");
   const currentStaffName = session?.user?.name || "Delivery Staff";
   const currentStaffPhone = session?.user?.phone || "";
   const currentStaffId = session?.user?.id || session?.user?._id;
@@ -236,10 +246,13 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     }
   }
 
-  async function handleSettleCash(orderIds) {
+  async function handleSettleCash(orderIds, staffName = "") {
     const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
     if (!ids.length) return;
-    if (!confirm(`Confirm settling COD cash for ${ids.length} order(s) with manager?`)) return;
+    const promptMsg = staffName
+      ? `Confirm receiving cash handover from ${staffName} for ${ids.length} order(s)? This will mark the cash as settled and clear the driver's pending cash balance.`
+      : `Confirm receiving cash handover for ${ids.length} order(s)?`;
+    if (!confirm(promptMsg)) return;
     try {
       setUpdatingId(ids[0]);
       const res = await fetch("/api/restaurant/orders", {
@@ -252,7 +265,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(data.message || "COD cash marked as settled with manager.");
+        toast.success(data.message || "COD cash marked as settled with manager.", { icon: "🤝" });
         setOrders((prev) =>
           prev.map((o) =>
             ids.includes(o._id)
@@ -262,6 +275,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     ...(o.codPaymentHandler || {}),
                     settledWithManager: true,
                     settledAt: new Date().toISOString(),
+                    settledBy: {
+                      id: currentStaffId,
+                      name: currentStaffName,
+                    },
                   },
                 }
               : o
@@ -1268,6 +1285,105 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       {/* ── TAB 2: COD CASH RECONCILIATION & MANAGER REGISTER ───────── */}
       {activeTab === "cod_register" && (
         <div className="space-y-6">
+          {/* ── DELIVERY STAFF PERSONAL HANDOVER STATUS CARD ────────── */}
+          {(() => {
+            const myCollectedOrders = codSummary.collectedOrders.filter(
+              (o) =>
+                (currentStaffId && String(o.codPaymentHandler?.id) === String(currentStaffId)) ||
+                (currentStaffPhone && o.codPaymentHandler?.phone === currentStaffPhone) ||
+                (currentStaffName && o.codPaymentHandler?.name === currentStaffName)
+            );
+
+            const myUnsettledOrders = myCollectedOrders.filter((o) => !o.codPaymentHandler?.settledWithManager);
+            const myUnsettledTotal = myUnsettledOrders.reduce(
+              (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+              0
+            );
+            const mySettledOrders = myCollectedOrders.filter((o) => o.codPaymentHandler?.settledWithManager);
+            const mySettledTotal = mySettledOrders.reduce(
+              (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+              0
+            );
+
+            if (myCollectedOrders.length === 0 && isManager) return null;
+
+            return (
+              <div
+                className={`p-4 sm:p-5 rounded-2xl border transition shadow-sm ${
+                  myUnsettledTotal > 0
+                    ? "bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border-amber-500/30"
+                    : "bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border-emerald-500/30"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        myUnsettledTotal > 0
+                          ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                          : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      <Wallet size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-stone-900 dark:text-white">
+                          My Cash Collection & Handover Status
+                        </span>
+                        <span className="text-xs text-stone-400">•</span>
+                        <span className="text-xs text-stone-500 dark:text-stone-300 font-semibold">
+                          Staff: <strong>{currentStaffName}</strong>
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-600 dark:text-stone-400 mt-1 max-w-xl leading-relaxed">
+                        {myUnsettledTotal > 0
+                          ? `You currently hold ₹${myUnsettledTotal.toFixed(2)} cash in hand from ${myUnsettledOrders.length} COD order(s). Please deposit this cash with the manager at the counter to clear your balance.`
+                          : `All cash collected by you today (₹${mySettledTotal.toFixed(2)}) has been handed over and confirmed settled by the manager! Your cash balance is completely clear.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                        {myUnsettledTotal > 0 ? "Cash to Hand Over" : "Balance in Hand"}
+                      </span>
+                      <span
+                        className={`text-xl font-black ${
+                          myUnsettledTotal > 0
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-emerald-600 dark:text-emerald-400"
+                        }`}
+                      >
+                        ₹{myUnsettledTotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 border ${
+                        myUnsettledTotal > 0
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                      }`}
+                    >
+                      {myUnsettledTotal > 0 ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                          <span>Pending Handover</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} className="text-emerald-500" />
+                          <span>All Handed Over</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Reconciliation Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
@@ -1328,13 +1444,31 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 </p>
               </div>
 
-              <button
-                onClick={downloadCodReport}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer self-start sm:self-auto"
-              >
-                <FileSpreadsheet size={14} className="text-emerald-500" />
-                <span>Export CSV Report</span>
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {isManager && codSummary.totalUnsettled > 0 && (
+                  <button
+                    onClick={() =>
+                      handleSettleCash(
+                        codSummary.unsettledOrders.map((o) => o._id),
+                        "All Active Drivers"
+                      )
+                    }
+                    disabled={updatingId !== null}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Check size={14} />
+                    <span>Settle All Pending (₹{codSummary.totalUnsettled.toFixed(2)})</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={downloadCodReport}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer"
+                >
+                  <FileSpreadsheet size={14} className="text-emerald-500" />
+                  <span>Export CSV Report</span>
+                </button>
+              </div>
             </div>
 
             {codSummary.staffList.length === 0 ? (
@@ -1385,21 +1519,22 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         </span>
                       </div>
 
-                      {isManager && staff.unsettledAmount > 0 && (
+                      {isManager && staff.unsettledAmount > 0 ? (
                         <button
-                          onClick={() => handleSettleCash(staff.orderIds)}
+                          onClick={() => handleSettleCash(staff.orderIds, staff.staffName)}
                           disabled={updatingId !== null}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                         >
-                          Settle All (₹{staff.unsettledAmount.toFixed(2)})
+                          <Check size={14} />
+                          <span>Confirm Handover & Settle (₹{staff.unsettledAmount.toFixed(2)})</span>
                         </button>
-                      )}
-
-                      {staff.unsettledAmount === 0 && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg">
-                          <Check size={13} />
-                          <span>All Settled</span>
-                        </span>
+                      ) : (
+                        staff.unsettledAmount === 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                            <Check size={14} className="text-emerald-500" />
+                            <span>All Cash Handed Over</span>
+                          </span>
+                        )
                       )}
                     </div>
                   </div>
@@ -1452,32 +1587,41 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               • {new Date(handler.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           )}
+                          {isSettled && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              • Settled with Manager {handler.settledAt ? `at ${new Date(handler.settledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 self-end md:self-auto">
+                      <div className="flex items-center gap-3 self-end md:self-auto flex-wrap justify-end">
                         <div className="text-right">
                           <span className="text-sm font-black text-stone-900 dark:text-white">
                             ₹{(handler.amount || o.totalAmount || 0).toFixed(2)}
                           </span>
-                          <span
-                            className={`block text-[10px] font-bold ${
-                              isSettled
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-amber-600 dark:text-amber-400"
-                            }`}
-                          >
-                            {isSettled ? "✓ Settled with Manager" : "⚠️ In Driver's Wallet"}
-                          </span>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {isSettled ? (
+                              <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1">
+                                <Check size={11} />
+                                <span>Handed Over & Settled</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                                ⚠️ In Driver's Wallet (Pending Handover)
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {isManager && !isSettled && (
                           <button
-                            onClick={() => handleSettleCash(o._id)}
+                            onClick={() => handleSettleCash(o._id, handler.name || "Delivery Staff")}
                             disabled={updatingId !== null}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer transition disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs cursor-pointer transition shadow-xs disabled:opacity-50 flex items-center gap-1"
                           >
-                            Settle Cash
+                            <Check size={13} />
+                            <span>Confirm Handover</span>
                           </button>
                         )}
                       </div>

@@ -243,6 +243,20 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       default: "Mock Test Payment",
     },
+    codPaymentHandler: {
+      id: { type: String, default: null },
+      name: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      amount: { type: Number, default: 0 },
+      collected: { type: Boolean, default: false },
+      collectedAt: { type: Date, default: null },
+      settledWithManager: { type: Boolean, default: false },
+      settledAt: { type: Date, default: null },
+      settledBy: {
+        id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        name: { type: String, default: "" },
+      },
+    },
     status: {
       type: String,
       enum: ["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"],

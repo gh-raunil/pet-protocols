@@ -4,7 +4,7 @@ import Order from "@/models/Order";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
 import { executeOrderRefund, retryFailedDeduction } from "@/lib/refundService";
-import { notifyOrderEvent } from "@/lib/pushService";
+import { notifyOrderEvent, sendPushToUser } from "@/lib/pushService";
 
 let _requireRestaurantAdmin = requireRestaurantAdmin;
 export function _setTestRequireRestaurantAdmin(fn) {
@@ -129,15 +129,54 @@ export async function PUT(request) {
         return NextResponse.json({ success: false, message: "Order ID(s) required." }, { status: 400 });
       }
 
+      const ordersToSettle = await Order.find({ _id: { $in: targetOrderIds }, restaurant: restaurantId });
+      if (!ordersToSettle || ordersToSettle.length === 0) {
+        return NextResponse.json({ success: false, message: "No matching orders found to settle." }, { status: 404 });
+      }
+
+      const settledAtTime = new Date();
+      const managerInfo = {
+        id: auth.user?._id,
+        name: auth.user?.name || "Manager",
+      };
+
       await Order.updateMany(
         { _id: { $in: targetOrderIds }, restaurant: restaurantId },
         {
           $set: {
             "codPaymentHandler.settledWithManager": true,
-            "codPaymentHandler.settledAt": new Date(),
+            "codPaymentHandler.settledAt": settledAtTime,
+            "codPaymentHandler.settledBy": managerInfo,
           },
         }
       );
+
+      // Notify delivery staff member(s) that their cash handover was received & confirmed
+      try {
+        const staffMap = {};
+        ordersToSettle.forEach((o) => {
+          const handlerId = o.codPaymentHandler?.id;
+          if (handlerId) {
+            if (!staffMap[handlerId]) staffMap[handlerId] = [];
+            staffMap[handlerId].push(o);
+          }
+        });
+
+        for (const [staffId, staffOrders] of Object.entries(staffMap)) {
+          const totalAmt = staffOrders.reduce(
+            (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+            0
+          );
+          sendPushToUser(staffId, {
+            title: "Cash Handover Confirmed! 💰",
+            body: `Manager ${managerInfo.name} confirmed handover of ₹${totalAmt.toFixed(2)} cash for ${staffOrders.length} order(s). Your balance is cleared!`,
+            url: "/delivery",
+            data: { url: "/delivery", type: "cod_settlement" },
+          });
+        }
+      } catch (pushErr) {
+        console.warn("[Cash Settlement Push Error]", pushErr.message);
+      }
 
       const refreshedOrder = orderId ? await Order.findById(orderId) : null;
       return NextResponse.json({
