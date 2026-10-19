@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Layers,
   Crosshair,
@@ -96,6 +97,74 @@ export default function DeliveryRouteMap({
   const [routeStats, setRouteStats] = useState({ distanceKm: null, etaMins: null });
   const [mapReady, setMapReady] = useState(false);
   const [deviceCoords, setDeviceCoords] = useState(null);
+  const [mounted, setMounted] = useState(false);
+  const [menuCoords, setMenuCoords] = useState(null);
+  const layerButtonRef = useRef(null);
+  const mapLayerBtnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updateMenuPosition = useCallback(() => {
+    const target = layerButtonRef.current || mapLayerBtnRef.current;
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+      setStyleMenuOpen(false);
+      return;
+    }
+    setMenuCoords({
+      top: Math.round(rect.bottom + 8),
+      right: Math.max(12, Math.round(window.innerWidth - rect.right)),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (styleMenuOpen) {
+      updateMenuPosition();
+      const handleScrollOrResize = () => updateMenuPosition();
+      window.addEventListener("scroll", handleScrollOrResize, true);
+      window.addEventListener("resize", handleScrollOrResize);
+      return () => {
+        window.removeEventListener("scroll", handleScrollOrResize, true);
+        window.removeEventListener("resize", handleScrollOrResize);
+      };
+    }
+  }, [styleMenuOpen, updateMenuPosition]);
+
+  // Handle outside click & ESC key to close layer dropdown
+  useEffect(() => {
+    if (!styleMenuOpen) return;
+
+    const handleClickOutside = (e) => {
+      if (
+        (layerButtonRef.current && layerButtonRef.current.contains(e.target)) ||
+        (mapLayerBtnRef.current && mapLayerBtnRef.current.contains(e.target))
+      ) {
+        return;
+      }
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setStyleMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setStyleMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [styleMenuOpen]);
 
   const destLat = destination?.lat || destination?.latitude;
   const destLng = destination?.lng || destination?.longitude;
@@ -421,7 +490,7 @@ export default function DeliveryRouteMap({
       {/* Top Map Toolbar */}
       <div
         className="flex items-center justify-between px-3.5 py-2.5 bg-stone-900/95 border-b border-white/10 text-xs rounded-t-2xl relative"
-        style={{ zIndex: 1100 }}
+        style={{ zIndex: 30 }}
       >
         <div className="flex items-center gap-2 font-bold text-white text-[11px]">
           <span className="relative flex h-2 w-2">
@@ -437,56 +506,32 @@ export default function DeliveryRouteMap({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Layer Switcher Button */}
-          <div className="relative" style={{ zIndex: 1100 }}>
+          {/* Layer Switcher Button (Toolbar) */}
+          <div className="relative">
             <button
+              ref={layerButtonRef}
               type="button"
-              onClick={() => setStyleMenuOpen(!styleMenuOpen)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-white/10 text-[11px] font-bold transition cursor-pointer"
+              onClick={() => {
+                if (!styleMenuOpen && layerButtonRef.current) {
+                  const rect = layerButtonRef.current.getBoundingClientRect();
+                  setMenuCoords({
+                    top: Math.round(rect.bottom + 8),
+                    right: Math.max(12, Math.round(window.innerWidth - rect.right)),
+                  });
+                }
+                setStyleMenuOpen(!styleMenuOpen);
+              }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-stone-200 border text-[11px] font-bold transition cursor-pointer ${
+                styleMenuOpen
+                  ? "bg-stone-700 border-blue-400/50 text-white shadow-xs"
+                  : "bg-stone-800 hover:bg-stone-700 border-white/10"
+              }`}
               title="Change Map Layer Style"
             >
               <Layers size={12} className="text-blue-400" />
               <span>Layers</span>
               <ChevronDown size={11} className={`transition-transform duration-200 ${styleMenuOpen ? "rotate-180" : ""}`} />
             </button>
-
-            {/* Layer Switcher Popup Menu (elevated above map canvas) */}
-            {styleMenuOpen && (
-              <div
-                className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-stone-900 border border-white/15 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-                style={{ zIndex: 1200 }}
-              >
-                <div className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-white/10 mb-1">
-                  Map Style
-                </div>
-                <div className="space-y-1">
-                  {MAP_STYLES.map((style) => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveStyle(style.id);
-                        setStyleMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
-                        activeStyle === style.id
-                          ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                          : "text-stone-300 hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{style.icon}</span>
-                        <div>
-                          <div className="leading-tight">{style.name}</div>
-                          <div className="text-[10px] text-stone-400 font-normal leading-tight">{style.subtext}</div>
-                        </div>
-                      </div>
-                      {activeStyle === style.id && <Check size={14} className="text-blue-400 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* External Google Maps app button */}
@@ -506,11 +551,11 @@ export default function DeliveryRouteMap({
       </div>
 
       {/* Interactive Map Viewport */}
-      <div className="relative w-full h-[320px] bg-stone-900 rounded-b-2xl overflow-hidden" style={{ zIndex: 1 }}>
+      <div className="relative w-full h-[320px] bg-stone-900 rounded-b-2xl overflow-hidden" style={{ zIndex: 0 }}>
         <div ref={containerRef} className="w-full h-full" />
 
         {/* Quick Map Overlay Action Buttons */}
-        <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5" style={{ zIndex: 10 }}>
+        <div className="absolute top-3 right-3 z-30 flex flex-col gap-1.5" style={{ zIndex: 1000 }}>
           <button
             type="button"
             onClick={handleFitRoute}
@@ -518,6 +563,27 @@ export default function DeliveryRouteMap({
             title="Recenter and Fit Full Route"
           >
             <Crosshair size={14} className="text-blue-400" />
+          </button>
+
+          <button
+            ref={mapLayerBtnRef}
+            type="button"
+            onClick={() => {
+              if (!styleMenuOpen && mapLayerBtnRef.current) {
+                const rect = mapLayerBtnRef.current.getBoundingClientRect();
+                setMenuCoords({
+                  top: Math.round(rect.bottom + 8),
+                  right: Math.max(12, Math.round(window.innerWidth - rect.right)),
+                });
+              }
+              setStyleMenuOpen(!styleMenuOpen);
+            }}
+            className={`w-8 h-8 rounded-xl bg-stone-900/90 hover:bg-stone-900 border shadow-lg flex items-center justify-center transition cursor-pointer ${
+              styleMenuOpen ? "border-blue-400 text-blue-400" : "border-white/20 text-white"
+            }`}
+            title="Switch Map Tile Layer Style"
+          >
+            <Layers size={14} className="text-blue-400" />
           </button>
         </div>
 
@@ -544,6 +610,52 @@ export default function DeliveryRouteMap({
         </span>
         <span className="text-emerald-400 font-bold">Touch / Pinch / Drag Active</span>
       </div>
+
+      {/* Layer Switcher Popup Menu (Rendered via React Portal directly into document.body to ensure it floats 100% on top of all map tiles and containers) */}
+      {mounted && styleMenuOpen && menuCoords && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: `${menuCoords.top}px`,
+            right: `${menuCoords.right}px`,
+            zIndex: 999999,
+          }}
+          className="w-56 rounded-2xl bg-stone-900/98 backdrop-blur-md border border-white/20 p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+        >
+          <div className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-white/10 mb-1 flex items-center justify-between">
+            <span>Map Style</span>
+            <span className="text-[9px] text-blue-400 font-bold uppercase">{activeStyle}</span>
+          </div>
+          <div className="space-y-1">
+            {MAP_STYLES.map((style) => (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => {
+                  setActiveStyle(style.id);
+                  setStyleMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
+                  activeStyle === style.id
+                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                    : "text-stone-300 hover:bg-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{style.icon}</span>
+                  <div>
+                    <div className="leading-tight">{style.name}</div>
+                    <div className="text-[10px] text-stone-400 font-normal leading-tight">{style.subtext}</div>
+                  </div>
+                </div>
+                {activeStyle === style.id && <Check size={14} className="text-blue-400 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
