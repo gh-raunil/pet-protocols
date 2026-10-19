@@ -24,7 +24,7 @@ export async function GET(request, { params }) {
       User.countDocuments({ restaurant: id, role: { $in: ["restaurant_admin", "admin"] } }),
       Product.countDocuments({ restaurant: id }),
       User.find({ restaurant: id, role: { $in: ["restaurant_admin", "admin"] } })
-        .select("-password")
+        .select("-password -visiblePassword")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -60,16 +60,23 @@ export async function PUT(request, { params }) {
     }
 
     // Update fields
-    if (body.status !== undefined) restaurant.status = body.status;
-    if (body.name !== undefined) restaurant.name = body.name;
-    if (body.description !== undefined) restaurant.description = body.description;
-    if (body.phone !== undefined) restaurant.phone = body.phone;
-    if (body.whatsappNumber !== undefined) restaurant.whatsappNumber = body.whatsappNumber;
-    if (body.email !== undefined) restaurant.email = body.email;
+    if (body.status !== undefined && ["active", "inactive", "suspended"].includes(body.status)) {
+      restaurant.status = body.status;
+    }
+    if (body.name !== undefined) restaurant.name = String(body.name).trim();
+    if (body.description !== undefined) restaurant.description = String(body.description).trim();
+    if (body.phone !== undefined) restaurant.phone = String(body.phone).trim();
+    if (body.whatsappNumber !== undefined) restaurant.whatsappNumber = String(body.whatsappNumber).trim();
+    if (body.email !== undefined) restaurant.email = String(body.email).toLowerCase().trim();
     if (body.address !== undefined) restaurant.address = body.address;
-    if (body.cuisineType !== undefined) restaurant.cuisineType = body.cuisineType;
-    if (body.rating !== undefined) restaurant.rating = body.rating;
+    if (body.cuisineType !== undefined) {
+      restaurant.cuisineType = Array.isArray(body.cuisineType)
+        ? body.cuisineType
+        : String(body.cuisineType).split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    if (body.rating !== undefined) restaurant.rating = Number(body.rating) || 4.8;
     if (body.image !== undefined) restaurant.image = body.image;
+    if (body.bannerImage !== undefined) restaurant.bannerImage = body.bannerImage;
     if (body.enabledFeatures !== undefined && Array.isArray(body.enabledFeatures)) {
       restaurant.enabledFeatures = body.enabledFeatures;
     }

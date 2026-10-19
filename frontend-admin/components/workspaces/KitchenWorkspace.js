@@ -77,7 +77,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
   // Filter kitchen-relevant orders
   const activeTickets = useMemo(() => {
     return orders.filter(
-      (o) => o.status === "pending" || o.status === "preparing" || o.status === "out_for_delivery"
+      (o) => o.status === "pending" || o.status === "preparing" || o.status === "ready" || o.status === "out_for_delivery"
     );
   }, [orders]);
 
@@ -203,7 +203,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
           {displayedOrders.map((order) => {
             const isPending = order.status === "pending";
             const isPreparing = order.status === "preparing";
-            const isReady = order.status === "out_for_delivery";
+            const isReady = order.status === "out_for_delivery" || order.status === "ready";
             const isUpdating = updatingId === order._id;
 
             // Elapsed time

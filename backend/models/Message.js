@@ -67,6 +67,12 @@ const MessageSchema = new mongoose.Schema(
         readAt: { type: Date, default: Date.now },
       },
     ],
+    deletedBy: [
+      {
+        recipientId: { type: String },
+        deletedAt: { type: Date, default: Date.now },
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

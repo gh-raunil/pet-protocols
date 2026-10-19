@@ -119,9 +119,20 @@ export async function POST(request) {
     const body = await request.json();
     await connectDB();
 
-    // If restaurant_admin, force product restaurant to be session user's restaurant
-    if (session.user.role === 'restaurant_admin') {
-      body.restaurant = session.user.restaurantId;
+    // Non-superadmin users are strictly locked to their assigned restaurant
+    if (session.user.role !== 'superadmin') {
+      const userRestId = session.user.restaurantId || session.user.restaurant;
+      if (!userRestId) {
+        return NextResponse.json({ success: false, message: 'Restaurant ID is required' }, { status: 400 });
+      }
+      const restDoc = await Restaurant.findById(userRestId).select('status').lean();
+      if (!restDoc || restDoc.status === 'suspended') {
+        return NextResponse.json(
+          { success: false, message: 'Restaurant branch is suspended. Operations are disabled.' },
+          { status: 403 }
+        );
+      }
+      body.restaurant = userRestId;
     }
 
     if (!body.restaurant) {

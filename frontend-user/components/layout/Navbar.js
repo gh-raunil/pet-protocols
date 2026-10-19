@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
@@ -13,10 +14,21 @@ import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 const Navbar = () => {
   const hidden = useHideOnScroll();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchButtonRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleOpen = () => setMobileSearchOpen(true);
+    window.addEventListener("open_mobile_search", handleOpen);
+    return () => window.removeEventListener("open_mobile_search", handleOpen);
+  }, []);
 
   const handleCloseMobileSearch = () => {
     setMobileSearchOpen(false);
@@ -85,19 +97,20 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Full-Screen Search Dialog */}
-      {mobileSearchOpen && (
+      {mobileSearchOpen && mounted && typeof document !== "undefined" && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Search dishes and menu"
-          className="md:hidden fixed inset-0 z-[100] bg-[var(--bg-main)]"
+          className="md:hidden fixed inset-0 z-[100] bg-[var(--bg-main)] w-screen h-[100dvh] overflow-hidden"
         >
           <SearchBar
             isMobile={true}
             onClose={handleCloseMobileSearch}
             autoFocus={true}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

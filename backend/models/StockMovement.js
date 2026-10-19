@@ -47,6 +47,11 @@ const StockMovementSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    idempotencyKey: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     stockBefore: {
       type: Number,
       required: true,
@@ -65,6 +70,15 @@ const StockMovementSchema = new mongoose.Schema(
 
 StockMovementSchema.index({ restaurant: 1, date: -1 });
 StockMovementSchema.index({ restaurant: 1, ingredient: 1, date: -1 });
+StockMovementSchema.index(
+  { idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      idempotencyKey: { $type: "string" },
+    },
+  }
+);
 
 delete mongoose.models.StockMovement;
 

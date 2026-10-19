@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import toast from "react-hot-toast";
 import {
   Truck,
   Package,
@@ -20,7 +21,20 @@ import {
   Check,
   Send,
   Calendar,
+  Navigation,
+  Radio,
+  Signal,
+  ShieldAlert,
+  Compass,
+  Gauge,
+  AlertTriangle,
+  Power,
+  WifiOff,
 } from "lucide-react";
+import {
+  useDeliveryGpsTransmitter,
+  isPickupOrder,
+} from "@/hooks/useDeliveryGpsTransmitter";
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [orders, setOrders] = useState([]);
@@ -32,6 +46,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [deliveryNote, setDeliveryNote] = useState({});
+
+  const gpsTransmitter = useDeliveryGpsTransmitter();
 
   async function loadOrders(isSilent = false) {
     try {
@@ -61,6 +77,18 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Teardown GPS if active tracked order gets marked delivered or cancelled elsewhere
+  useEffect(() => {
+    if (gpsTransmitter.activeOrderId && orders.length > 0) {
+      const activeObj = orders.find(
+        (o) => o._id === gpsTransmitter.activeOrderId || o.orderId === gpsTransmitter.activeOrderId
+      );
+      if (activeObj && (activeObj.status === "delivered" || activeObj.status === "cancelled")) {
+        gpsTransmitter.stopTracking("stopped");
+      }
+    }
+  }, [orders, gpsTransmitter.activeOrderId, gpsTransmitter.stopTracking]);
+
   async function updateOrderStatus(orderId, newStatus, extra = {}) {
     try {
       setUpdatingId(orderId);
@@ -79,12 +107,35 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         setOrders((prev) =>
           prev.map((o) => (o._id === orderId ? { ...o, status: newStatus, ...extra } : o))
         );
+
+        const currentOrder = orders.find((o) => o._id === orderId);
+
+        // Auto-start GPS when transitioning to out_for_delivery if not pickup
+        if (newStatus === "out_for_delivery") {
+          if (!isPickupOrder(currentOrder)) {
+            gpsTransmitter.startTracking(currentOrder?.orderId || orderId, {
+              ...currentOrder,
+              status: "out_for_delivery",
+            });
+            toast.success("Transit started: Device GPS tracking activated.");
+          } else {
+            toast("Counter pickup: Live GPS tracking is not required.", { icon: "🛍️" });
+          }
+        } else if (newStatus === "delivered" || newStatus === "cancelled") {
+          // Teardown GPS when delivered or cancelled
+          if (
+            gpsTransmitter.activeOrderId === orderId ||
+            (currentOrder && gpsTransmitter.activeOrderId === currentOrder.orderId)
+          ) {
+            gpsTransmitter.stopTracking("stopped");
+          }
+        }
       } else {
-        alert(data.message || "Failed to update delivery status.");
+        toast.error(data.message || "Failed to update delivery status.");
       }
     } catch (err) {
       console.error("Update error:", err);
-      alert("Network error updating delivery status.");
+      toast.error("Network error updating delivery status.");
     } finally {
       setUpdatingId(null);
     }
@@ -212,6 +263,159 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         </div>
       </div>
 
+      {/* ── LIVE DELIVERY GPS STATUS PANEL ───────────────────────────── */}
+      {gpsTransmitter.trackingStatus === "permission_denied" && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldAlert size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-rose-900 dark:text-rose-200">
+                  Location Permission Denied
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                  GPS Blocked
+                </span>
+              </div>
+              <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 max-w-2xl leading-relaxed">
+                Device location access is required to transmit live coordinates to customers during transit. Please tap the lock / settings icon in your browser address bar, enable Location permissions, and retry.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => gpsTransmitter.stopTracking("idle")}
+            className="px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0 cursor-pointer"
+          >
+            Dismiss Alert
+          </button>
+        </div>
+      )}
+
+      {gpsTransmitter.trackingStatus === "unsupported" && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3">
+          <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div className="text-xs text-amber-800 dark:text-amber-200">
+            <strong className="block font-bold">Geolocation Unsupported</strong>
+            This device browser does not provide standard GPS geolocation APIs.
+          </div>
+        </div>
+      )}
+
+      {gpsTransmitter.activeOrderId && (
+        <div className="bg-gradient-to-r from-emerald-950/40 via-[#101928] to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-lg shadow-emerald-500/5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
+                <Radio size={20} className={gpsTransmitter.trackingStatus === "sharing" ? "animate-pulse" : ""} />
+                {gpsTransmitter.trackingStatus === "sharing" && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                    Live GPS Transmission Active
+                  </span>
+                  <span className="text-stone-400 text-xs">•</span>
+                  <span className="font-extrabold text-sm text-white">
+                    Order #{gpsTransmitter.activeOrderId}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                      gpsTransmitter.trackingStatus === "sharing"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : gpsTransmitter.trackingStatus === "requesting_permission"
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse"
+                        : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    }`}
+                  >
+                    {gpsTransmitter.trackingStatus === "sharing" && "● Sharing live location"}
+                    {gpsTransmitter.trackingStatus === "requesting_permission" && "⏳ Requesting permission..."}
+                    {gpsTransmitter.trackingStatus === "unavailable" && "⚠️ GPS signal unavailable or stale"}
+                    {gpsTransmitter.trackingStatus === "permission_denied" && "❌ Location permission denied"}
+                    {gpsTransmitter.trackingStatus === "stopped" && "⏹️ Delivery completed / tracking stopped"}
+                    {gpsTransmitter.trackingStatus === "unauthorized" && "🚫 Driver reassigned / unauthorized"}
+                  </span>
+
+                  {gpsTransmitter.wakeLockActive && (
+                    <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+                      📱 Screen Awake
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => gpsTransmitter.stopTracking("stopped")}
+              className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer"
+            >
+              <Power size={13} />
+              <span>Stop GPS Transmission</span>
+            </button>
+          </div>
+
+          {/* Telemetry Pills */}
+          {gpsTransmitter.lastLocation && (
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap pt-2 border-t border-white/10 text-xs">
+              <span className="font-mono text-emerald-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                📍 {gpsTransmitter.lastLocation.latitude.toFixed(5)}, {gpsTransmitter.lastLocation.longitude.toFixed(5)}
+              </span>
+
+              {typeof gpsTransmitter.lastLocation.accuracy === "number" && (
+                <span
+                  className={`font-semibold px-2 py-1 rounded-lg border text-[11px] ${
+                    gpsTransmitter.lastLocation.accuracy <= 20
+                      ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
+                      : gpsTransmitter.lastLocation.accuracy <= 50
+                      ? "text-amber-300 bg-amber-500/10 border-amber-500/20"
+                      : "text-rose-300 bg-rose-500/10 border-rose-500/20"
+                  }`}
+                >
+                  🎯 ±{Math.round(gpsTransmitter.lastLocation.accuracy)}m accuracy
+                </span>
+              )}
+
+              {typeof gpsTransmitter.lastLocation.speed === "number" && gpsTransmitter.lastLocation.speed > 0 && (
+                <span className="text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
+                  <Gauge size={12} />
+                  <span>{Math.round(gpsTransmitter.lastLocation.speed * 3.6)} km/h</span>
+                </span>
+              )}
+
+              {typeof gpsTransmitter.lastLocation.heading === "number" && gpsTransmitter.lastLocation.heading >= 0 && (
+                <span className="text-stone-300 bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
+                  <Compass size={12} />
+                  <span>{Math.round(gpsTransmitter.lastLocation.heading)}°</span>
+                </span>
+              )}
+
+              {gpsTransmitter.lastSentTime && (
+                <span className="text-stone-400 text-[11px] ml-auto">
+                  Sent: {new Date(gpsTransmitter.lastSentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+              )}
+            </div>
+          )}
+
+          {gpsTransmitter.errorMessage && (
+            <div className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 flex items-center gap-2">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span>{gpsTransmitter.errorMessage}</span>
+            </div>
+          )}
+
+          {/* Device and Background GPS Note */}
+          <p className="text-[11px] text-stone-400 leading-relaxed pt-1">
+            ⚠️ <strong>Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.
+          </p>
+        </div>
+      )}
+
       {/* ── FILTER & SEARCH TOOLBAR ─────────────────────────────────── */}
       <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Search */}
@@ -275,6 +479,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             const isCOD = order.paymentMethod?.toLowerCase().includes("cash") || order.paymentMethod?.toLowerCase().includes("cod");
             const isPaid = order.paymentStatus === "paid" || order.paymentStatus === "test_paid";
             const isUpdating = updatingId === order._id;
+            const isPickup = isPickupOrder(order);
+            const isOrderTracking =
+              gpsTransmitter.activeOrderId === order._id ||
+              gpsTransmitter.activeOrderId === order.orderId;
 
             return (
               <div
@@ -313,6 +521,33 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             : order.status?.toUpperCase()}
                         </span>
 
+                        {/* Pickup or GPS Tracking Status Pill */}
+                        {isPickup ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            🛍️ COUNTER PICKUP
+                          </span>
+                        ) : order.status === "out_for_delivery" ? (
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
+                              isOrderTracking
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                : "bg-stone-500/10 text-stone-600 dark:text-stone-400 border-stone-500/20"
+                            }`}
+                          >
+                            {isOrderTracking ? (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                                <span>LIVE GPS ACTIVE</span>
+                              </>
+                            ) : (
+                              <>
+                                <Navigation size={10} className="text-stone-400" />
+                                <span>GPS INACTIVE</span>
+                              </>
+                            )}
+                          </span>
+                        ) : null}
+
                         {/* Payment Status Pill */}
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
@@ -344,7 +579,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   </div>
 
                   {/* Quick Action Button for Delivery Flow */}
-                  <div className="flex items-center gap-2 self-end md:self-auto">
+                  <div className="flex items-center gap-2 self-end md:self-auto flex-wrap justify-end">
                     {order.status === "preparing" && (
                       <button
                         onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
@@ -357,14 +592,38 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     )}
 
                     {order.status === "out_for_delivery" && (
-                      <button
-                        onClick={() => updateOrderStatus(order._id, "delivered")}
-                        disabled={isUpdating}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <CheckCircle2 size={14} />
-                        <span>Mark Handed Over / Delivered</span>
-                      </button>
+                      <>
+                        {!isPickup && (
+                          isOrderTracking ? (
+                            <button
+                              onClick={() => gpsTransmitter.stopTracking("stopped")}
+                              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                              title="Stop sending GPS coordinates for this order"
+                            >
+                              <Power size={13} />
+                              <span>Stop GPS</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                              title="Start transmitting real device GPS for this active delivery"
+                            >
+                              <Navigation size={13} />
+                              <span>Share Live GPS</span>
+                            </button>
+                          )
+                        )}
+
+                        <button
+                          onClick={() => updateOrderStatus(order._id, "delivered")}
+                          disabled={isUpdating}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Mark Handed Over / Delivered</span>
+                        </button>
+                      </>
                     )}
 
                     <button

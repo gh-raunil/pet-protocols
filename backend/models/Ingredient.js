@@ -45,11 +45,29 @@ const IngredientSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    appliedRestorations: [
+      {
+        opKey: { type: String, required: true },
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
+        quantity: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+      },
+    ],
+    appliedDeductions: [
+      {
+        opKey: { type: String, required: true },
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
+        quantity: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
 
 IngredientSchema.index({ restaurant: 1, name: 1 });
+IngredientSchema.index({ "appliedRestorations.opKey": 1 });
+IngredientSchema.index({ "appliedDeductions.opKey": 1 });
 
 delete mongoose.models.Ingredient;
 

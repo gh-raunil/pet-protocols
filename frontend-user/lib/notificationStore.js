@@ -1,5 +1,26 @@
 import { create } from "zustand";
 
+const STORAGE_KEY_DELETED = "pet_protocols_deleted_notifications";
+
+function getDeletedIdsSet() {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function persistDeletedIds(idsSet) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(idsSet)));
+  } catch (e) {}
+}
+
 const useNotificationStore = create((set, get) => ({
   isOpen: false,
   messages: [],
@@ -36,9 +57,11 @@ const useNotificationStore = create((set, get) => ({
 
       const data = await res.json();
       if (data.success) {
-        const msgs = data.messages || [];
+        const deletedSet = getDeletedIdsSet();
+        const rawMsgs = data.messages || [];
+        const msgs = rawMsgs.filter((m) => !deletedSet.has((m.id || m._id)?.toString()));
         const count = typeof data.unreadCount === "number"
-          ? data.unreadCount
+          ? msgs.filter((m) => !m.isRead).length
           : msgs.filter((m) => !m.isRead).length;
 
         set({
@@ -108,6 +131,68 @@ const useNotificationStore = create((set, get) => ({
       console.error("Failed to mark all messages as read:", err);
     }
   },
+
+  deleteNotification: async (msgId) => {
+    if (!msgId) return;
+
+    const prevMessages = get().messages;
+    const targetMsg = prevMessages.find((m) => (m.id || m._id)?.toString() === msgId.toString());
+    const updatedMessages = prevMessages.filter((m) => (m.id || m._id)?.toString() !== msgId.toString());
+    const wasUnread = targetMsg && !targetMsg.isRead;
+    const newUnreadCount = wasUnread ? Math.max(0, get().unreadCount - 1) : get().unreadCount;
+
+    // Persist deleted ID in client storage
+    const deletedSet = getDeletedIdsSet();
+    deletedSet.add(msgId.toString());
+    persistDeletedIds(deletedSet);
+
+    set({
+      messages: updatedMessages,
+      unreadCount: newUnreadCount,
+      selectedMessage:
+        get().selectedMessage && (get().selectedMessage.id || get().selectedMessage._id)?.toString() === msgId.toString()
+          ? null
+          : get().selectedMessage,
+    });
+
+    try {
+      await fetch(`/api/messages/${msgId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("Failed to delete notification on server:", err);
+    }
+  },
+
+  clearAllNotifications: async () => {
+    const prevMessages = get().messages;
+    const deletedSet = getDeletedIdsSet();
+    prevMessages.forEach((m) => {
+      const id = (m.id || m._id)?.toString();
+      if (id) deletedSet.add(id);
+    });
+    persistDeletedIds(deletedSet);
+
+    set({
+      messages: [],
+      unreadCount: 0,
+      selectedMessage: null,
+    });
+
+    try {
+      await fetch("/api/messages/clear-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("Failed to clear all notifications on server:", err);
+    }
+  },
 }));
+
+if (typeof window !== "undefined") {
+  window.__notificationStore = useNotificationStore;
+}
 
 export default useNotificationStore;

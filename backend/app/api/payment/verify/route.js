@@ -1,14 +1,25 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import connectDB from '@/lib/db';
 import Order from '@/models/Order';
-import User from '@/models/User';
 import Restaurant from '@/models/Restaurant';
-import Product from '@/models/Product';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import PaymentIntent from '@/models/PaymentIntent';
 import { deductStockForOrder } from '@/lib/inventoryService';
 import { notifyOrderEvent } from '@/lib/pushService';
+import { _setTestRazorpayClient as _setRefundTestClient } from '@/lib/refundService';
+import {
+  razorpayHttpClient,
+  computePayloadFingerprint,
+  generateRefundIdempotencyKey,
+} from '@/lib/razorpayHttpClient';
+
+// Optional override for automated testing
+let testRazorpayClient = null;
+export function _setTestRazorpayClient(client) {
+  testRazorpayClient = client;
+  _setRefundTestClient(client);
+}
 
 export async function POST(request) {
   try {
@@ -18,11 +29,7 @@ export async function POST(request) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      items,
-      address,
-      notes = '',
-      totalAmount,
-    } = body;
+    } = body || {};
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return NextResponse.json(
@@ -33,7 +40,7 @@ export async function POST(request) {
 
     // Step 1: Verify HMAC signature
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) {
+    if (!secret && !testRazorpayClient) {
       console.error('Payment verification failed: RAZORPAY_KEY_SECRET is not configured on server.');
       return NextResponse.json(
         { success: false, message: 'Payment verification service is currently unavailable.' },
@@ -41,8 +48,9 @@ export async function POST(request) {
       );
     }
 
+    const verificationSecret = secret || 'test_secret_for_mock_verification';
     const generatedSignature = crypto
-      .createHmac('sha256', secret)
+      .createHmac('sha256', verificationSecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
@@ -54,135 +62,519 @@ export async function POST(request) {
       );
     }
 
-    // Step 2: Connect DB
+    // Step 2: Connect DB and reconcile with stored PaymentIntent (SEC-01)
     await connectDB();
 
-    // Find User
-    let userId = null;
-    const session = await getServerSession(authOptions);
-    const userEmail = session?.user?.email || body.userEmail;
-
-    if (userEmail) {
-      const dbUser = await User.findOne({ email: userEmail });
-      if (dbUser) userId = dbUser._id;
-    } else if (body.userId && body.userId.length === 24) {
-      const dbUser = await User.findById(body.userId);
-      if (dbUser) userId = dbUser._id;
-    }
-
-    // Step 3: Fetch all products in cart from database to get their accurate restaurant association
-    const productIds = (items || []).map((item) => item._id || item.product).filter(Boolean);
-    const dbProducts = await Product.find({ _id: { $in: productIds } }).lean();
-    const productMap = new Map(dbProducts.map((p) => [p._id.toString(), p]));
-
-    const fallbackRest = await Restaurant.findOne({ status: "active" });
-    const fallbackRestId = fallbackRest?._id?.toString();
-
-    // Group items by their owning restaurant
-    const itemsByRestaurant = new Map();
-
-    for (const item of (items || [])) {
-      const prodId = (item._id || item.product)?.toString();
-      const dbProd = productMap.get(prodId);
-      const restId = (
-        item.restaurantId ||
-        item.restaurant?._id ||
-        item.restaurant ||
-        dbProd?.restaurant?.toString() ||
-        body.restaurantId ||
-        fallbackRestId
-      )?.toString();
-
-      if (!restId) continue;
-
-      if (!itemsByRestaurant.has(restId)) {
-        itemsByRestaurant.set(restId, []);
-      }
-
-      const price = Number(item.price) || (dbProd ? Number(dbProd.price) : 0);
-      const qty = Number(item.quantity) || 1;
-
-      itemsByRestaurant.get(restId).push({
-        product: prodId,
-        name: item.name || dbProd?.name || "Dish",
-        price,
-        quantity: qty,
-        image: item.image || dbProd?.image || "",
-        category: item.category || dbProd?.category || "",
-        foodType: item.foodType || item.type || dbProd?.type || "veg",
-      });
-    }
-
-    if (itemsByRestaurant.size === 0) {
+    const paymentIntent = await PaymentIntent.findOne({ razorpayOrderId: razorpay_order_id });
+    if (!paymentIntent) {
       return NextResponse.json(
-        { success: false, message: "Could not associate order with an active restaurant" },
+        { success: false, message: 'Payment order was not found or has expired.' },
         { status: 400 }
       );
     }
 
-    const createdOrders = [];
-    let cumulativeSubtotal = 0;
-    let remainingDiscount = Math.max(0, Number(body.discount) || 0);
-
-    for (const [targetRestId, restSnapshotItems] of itemsByRestaurant.entries()) {
-      const restDoc = await Restaurant.findById(targetRestId).lean();
-      const restSubtotal = restSnapshotItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-      cumulativeSubtotal += restSubtotal;
-
-      const isPickup = body.orderType === "pickup";
-      const flatFee = restDoc?.chargeSettings?.flatDeliveryFee ?? 40;
-      const freeThreshold = restDoc?.chargeSettings?.freeDeliveryThreshold ?? 500;
-
-      const restDeliveryFee = isPickup
-        ? 0
-        : restSubtotal >= freeThreshold
-        ? 0
-        : flatFee;
-
-      const discountForThisOrder = Math.min(restSubtotal + restDeliveryFee, remainingDiscount);
-      remainingDiscount -= discountForThisOrder;
-      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discountForThisOrder);
-
-      const newOrder = await Order.create({
-        user: userId,
-        restaurant: targetRestId,
-        items: restSnapshotItems,
-        address,
-        subtotal: restSubtotal,
-        deliveryFee: restDeliveryFee,
-        discount: discountForThisOrder,
-        couponCode: body.couponCode || "",
-        totalAmount: restTotal,
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id,
-        paymentStatus: "paid",
-        paymentMethod: "Razorpay (Online Payment)",
-        status: "pending",
-        notes: isPickup ? `[PICKUP] ${notes}` : notes,
-      });
-
-      // Deduct stock based on recipe
-      await deductStockForOrder(newOrder);
-
-      const populatedOrder = await Order.findById(newOrder._id)
+    // Idempotency: If already verified or reconciliation required, check if all sub-orders exist (SEC-04)
+    if (paymentIntent.status === 'verified' || paymentIntent.status === 'reconciliation_required') {
+      const existingOrders = await Order.find({ orderId: razorpay_order_id })
         .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
         .populate("user", "name email");
 
-      createdOrders.push(populatedOrder);
-      notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
-        console.warn('[Payment Verify Push] Push warning:', e.message)
+      const expectedCount = paymentIntent.calcResult?.orders?.length || 1;
+      if (existingOrders.length >= expectedCount) {
+        const hasInventoryFailures = existingOrders.some((o) => o.stockDeducted === false);
+        return NextResponse.json(
+          {
+            success: true,
+            message: hasInventoryFailures
+              ? "Payment already verified. Note: Inventory deduction incomplete for one or more items."
+              : "Payment already verified and order confirmed.",
+            order: existingOrders[0],
+            orders: existingOrders,
+            inventoryDeducted: !hasInventoryFailures,
+            reconciliationRequired: hasInventoryFailures,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
+    // If already refunded, refund pending, or refund reconciliation required, return status without double processing (SEC-02)
+    const isRefundReconciliation =
+      paymentIntent.refundDetails?.status === 'reconciliation_required' ||
+      Boolean(paymentIntent.refundDetails?.requiresManualReconciliation);
+
+    if (
+      paymentIntent.status === 'refunded' ||
+      paymentIntent.status === 'refund_pending' ||
+      isRefundReconciliation
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          suspended: true,
+          refundStatus: isRefundReconciliation ? 'reconciliation_required' : paymentIntent.status,
+          requiresManualReconciliation: isRefundReconciliation,
+          refundId: paymentIntent.refundDetails?.refundId,
+          message: isRefundReconciliation
+            ? `Payment (${razorpay_payment_id}) requires manual reconciliation. Refund redispatch is prohibited to prevent duplicate payouts.`
+            : `Payment (${razorpay_payment_id}) has already been recorded for refund (Status: ${paymentIntent.refundDetails?.status || paymentIntent.status}).`,
+        },
+        { status: 400 }
       );
     }
 
-    return NextResponse.json(
+    // Step 3: Server-side validation against Razorpay API (SEC-01)
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const razorpay =
+      testRazorpayClient ||
+      (key_id && secret ? new Razorpay({ key_id, key_secret: secret }) : null);
+
+    if (!razorpay) {
+      return NextResponse.json(
+        { success: false, message: 'Payment service configuration missing on server.' },
+        { status: 503 }
+      );
+    }
+
+    let rzOrder;
+    let rzPayment;
+    try {
+      [rzOrder, rzPayment] = await Promise.all([
+        razorpay.orders.fetch(razorpay_order_id),
+        razorpay.payments.fetch(razorpay_payment_id),
+      ]);
+    } catch (apiErr) {
+      console.error('Razorpay gateway fetch failed:', apiErr.message);
+      return NextResponse.json(
+        { success: false, message: 'Failed to verify payment with payment gateway. Please contact support.' },
+        { status: 502 }
+      );
+    }
+
+    // a) Verify association between payment and order
+    if (rzPayment.order_id !== razorpay_order_id || rzOrder.id !== razorpay_order_id) {
+      return NextResponse.json(
+        { success: false, message: 'Payment is not associated with the specified order.' },
+        { status: 400 }
+      );
+    }
+
+    // b) Verify currency is INR
+    if (rzOrder.currency !== 'INR' || rzPayment.currency !== 'INR') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid payment currency. Pet Protocols only supports INR.' },
+        { status: 400 }
+      );
+    }
+
+    // c) Verify exact amount in paise matches original server-calculated payable amount
+    if (rzOrder.amount !== paymentIntent.amountPaise || rzPayment.amount !== paymentIntent.amountPaise) {
+      console.error(
+        `[Payment Security Alert] Amount mismatch! Stored: ${paymentIntent.amountPaise} paise, Gateway Order: ${rzOrder.amount}, Payment: ${rzPayment.amount}`
+      );
+      return NextResponse.json(
+        { success: false, message: 'Payment amount mismatch. Verified payment does not match payable amount.' },
+        { status: 400 }
+      );
+    }
+
+    // d) Verify payment was captured or authorized
+    if (!['captured', 'authorized'].includes(rzPayment.status)) {
+      return NextResponse.json(
+        { success: false, message: `Payment is not successful (Gateway status: ${rzPayment.status}).` },
+        { status: 400 }
+      );
+    }
+
+    // Step 4: Concurrency Lock — transition state to 'verifying' (SEC-04)
+    // NOTE: Refund reconciliation_required is strictly excluded to prevent redispatch, but order-creation recovery is permitted
+    const lockedIntent = await PaymentIntent.findOneAndUpdate(
       {
-        success: true,
-        message: "Payment verified and order placed successfully!",
-        order: createdOrders[0],
-        orders: createdOrders,
+        _id: paymentIntent._id,
+        status: { $in: ['created', 'reconciliation_required'] },
+        'refundDetails.requiresManualReconciliation': { $ne: true },
+        'refundDetails.status': { $ne: 'reconciliation_required' },
       },
-      { status: 201 }
+      { $set: { status: 'verifying', razorpayPaymentId: razorpay_payment_id } },
+      { returnDocument: 'after' }
     );
+
+    if (!lockedIntent) {
+      const freshIntent = await PaymentIntent.findById(paymentIntent._id);
+      const isFreshRefundRecon =
+        freshIntent?.refundDetails?.status === 'reconciliation_required' ||
+        Boolean(freshIntent?.refundDetails?.requiresManualReconciliation);
+
+      if (
+        freshIntent?.status === 'refunded' ||
+        freshIntent?.status === 'refund_pending' ||
+        isFreshRefundRecon
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            suspended: true,
+            refundStatus: isFreshRefundRecon ? 'reconciliation_required' : freshIntent.status,
+            requiresManualReconciliation: isFreshRefundRecon,
+            refundId: freshIntent?.refundDetails?.refundId,
+            message: isFreshRefundRecon
+              ? `Payment (${razorpay_payment_id}) requires manual reconciliation. Refund redispatch is prohibited to prevent duplicate payouts.`
+              : `Payment (${razorpay_payment_id}) has already been recorded for refund (Status: ${freshIntent?.refundDetails?.status || freshIntent?.status}).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Another request is actively verifying or has completed verification
+      const existingOrders = await Order.find({ orderId: razorpay_order_id })
+        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
+        .populate("user", "name email");
+
+      if (existingOrders.length > 0) {
+        return NextResponse.json(
+          {
+            success: true,
+            message: "Payment already verified and order confirmed.",
+            order: existingOrders[0],
+            orders: existingOrders,
+          },
+          { status: 200 }
+        );
+      }
+
+      return NextResponse.json(
+        { success: false, message: 'Payment verification is currently in progress. Please refresh.' },
+        { status: 409 }
+      );
+    }
+
+    // Step 5: Check Restaurant Status from Live Database (SEC-02 Safe Refund Workflow)
+    const subOrders = lockedIntent.calcResult?.orders || [];
+    let suspendedOrInactiveRest = null;
+
+    for (const calcOrder of subOrders) {
+      const restDoc = await Restaurant.findById(calcOrder.restaurantId).lean();
+      if (!restDoc || restDoc.status === 'suspended' || restDoc.status === 'inactive') {
+        suspendedOrInactiveRest = restDoc || { name: 'Kitchen branch', status: 'suspended' };
+        break;
+      }
+    }
+
+    if (suspendedOrInactiveRest) {
+      const isSuspended = suspendedOrInactiveRest.status === 'suspended';
+      const restName = suspendedOrInactiveRest.name || 'This kitchen';
+
+      const opKey = lockedIntent.refundDetails?.opKey || `refop_pi_${lockedIntent._id.toString()}`;
+      const idempotencyKey = lockedIntent.refundDetails?.idempotencyKey || generateRefundIdempotencyKey('pi', lockedIntent._id);
+
+      const refundNotes = {
+        opKey,
+        paymentIntentId: lockedIntent._id.toString(),
+        razorpay_order_id,
+        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        restaurant: restName,
+      };
+
+      const refundPayload = {
+        amount: lockedIntent.amountPaise,
+        currency: 'INR',
+        speed: 'normal',
+        notes: refundNotes,
+        receipt: razorpay_order_id || '',
+      };
+      const requestFingerprint = computePayloadFingerprint(refundPayload);
+
+      // Record durable dispatching state before calling refund API (SEC-02 / SEC-05)
+      lockedIntent.status = 'refund_pending';
+      lockedIntent.refundDetails = {
+        opKey,
+        idempotencyKey,
+        paymentId: razorpay_payment_id,
+        amountPaise: lockedIntent.amountPaise,
+        currency: 'INR',
+        requestFingerprint,
+        dispatchState: 'dispatching',
+        status: 'refund_pending',
+        gatewayStatus: null,
+        amount: lockedIntent.amount,
+        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        error: null,
+        retryCount: (lockedIntent.refundDetails?.retryCount || 0) + 1,
+        lastAttemptAt: new Date(),
+        requiresManualReconciliation: false,
+      };
+      await lockedIntent.save();
+
+      // Gateway reconciliation pre-check: verify whether gateway already refunded this payment
+      let alreadyRefundedOnGateway = false;
+      let existingRefundId = null;
+      try {
+        if (typeof razorpay.payments?.fetch === 'function') {
+          const fetchedPayment = await razorpay.payments.fetch(razorpay_payment_id);
+          if (
+            fetchedPayment &&
+            ((fetchedPayment.amount_refunded && fetchedPayment.amount_refunded >= lockedIntent.amountPaise) ||
+              fetchedPayment.refund_status === 'full' ||
+              fetchedPayment.status === 'refunded')
+          ) {
+            alreadyRefundedOnGateway = true;
+            existingRefundId =
+              fetchedPayment.refunds?.[0]?.id ||
+              fetchedPayment.refundId ||
+              `rfnd_reconciled_${Date.now()}`;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[PaymentIntent Refund] Gateway fetch warning before refund:', fetchErr.message);
+      }
+
+      if (alreadyRefundedOnGateway) {
+        lockedIntent.status = 'refunded';
+        lockedIntent.refundDetails = {
+          ...lockedIntent.refundDetails,
+          dispatchState: 'confirmed',
+          status: 'processed',
+          gatewayStatus: 'processed',
+          refundId: existingRefundId,
+          amount: lockedIntent.amount,
+          reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+          processedAt: new Date(),
+          reconciled: true,
+          requiresManualReconciliation: false,
+        };
+        await lockedIntent.save();
+
+        return NextResponse.json(
+          {
+            success: false,
+            suspended: isSuspended,
+            refundStatus: 'processed',
+            refundId: existingRefundId,
+            message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Your refund of ₹${lockedIntent.amount} was already processed via Razorpay (Refund ID: ${existingRefundId}).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Trigger Razorpay refund API via RazorpayHttpClient (or test client adapter)
+      let refundResponse;
+      if (testRazorpayClient && typeof testRazorpayClient.payments?.refund === 'function') {
+        try {
+          const raw = await testRazorpayClient.payments.refund(razorpay_payment_id, {
+            amount: lockedIntent.amountPaise,
+            notes: refundNotes,
+          }, {
+            headers: {
+              'X-Refund-Idempotency': idempotencyKey,
+            },
+          });
+          refundResponse = {
+            success: true,
+            refundId: raw?.id || `rfnd_${Date.now()}`,
+            status: raw?.status || 'processed',
+            refund: raw,
+          };
+        } catch (mockErr) {
+          refundResponse = { success: false, uncertain: true, error: mockErr.message };
+        }
+      } else {
+        refundResponse = await razorpayHttpClient.executeRefund({
+          paymentId: razorpay_payment_id,
+          amountPaise: lockedIntent.amountPaise,
+          idempotencyKey,
+          notes: refundNotes,
+          speed: 'normal',
+          receipt: razorpay_order_id || '',
+        });
+      }
+
+      if (refundResponse && refundResponse.success && refundResponse.refundId) {
+        lockedIntent.status = 'refunded';
+        lockedIntent.refundDetails = {
+          ...lockedIntent.refundDetails,
+          opKey,
+          refundId: refundResponse.refundId,
+          dispatchState: 'confirmed',
+          status: refundResponse.status || 'processed',
+          gatewayStatus: refundResponse.status || 'processed',
+          amount: lockedIntent.amount,
+          reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+          processedAt: new Date(),
+          reconciled: true,
+          error: null,
+          requiresManualReconciliation: false,
+        };
+        await lockedIntent.save();
+
+        return NextResponse.json(
+          {
+            success: false,
+            suspended: isSuspended,
+            refundStatus: 'processed',
+            refundId: refundResponse.refundId,
+            message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Your refund of ₹${lockedIntent.amount} has been processed via Razorpay (Refund ID: ${refundResponse.refundId}).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // If gateway returned uncertain, 409 conflict, payload mismatch, or error: quarantine immediately
+      console.error('[Safe Refund Failure]:', refundResponse?.error);
+      lockedIntent.status = 'reconciliation_required';
+      lockedIntent.refundDetails = {
+        ...lockedIntent.refundDetails,
+        opKey,
+        dispatchState: 'quarantined',
+        status: 'reconciliation_required',
+        gatewayStatus: 'failed',
+        amount: lockedIntent.amount,
+        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        error: refundResponse?.error || 'Refund dispatch failed or uncertain',
+        requiresManualReconciliation: true,
+        lastAttemptAt: new Date(),
+      };
+      await lockedIntent.save();
+
+      return NextResponse.json(
+        {
+          success: false,
+          suspended: isSuspended,
+          refundStatus: 'reconciliation_required',
+          requiresManualReconciliation: true,
+          message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Refund outcome is uncertain and has been queued for manual reconciliation (Reference: ${razorpay_order_id}). Customer support has been notified.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Step 6: Create Confirmed Orders from Server-Stored Snapshots (SEC-01 & SEC-05)
+    // Client-supplied items/amounts are completely ignored; user is verified identity from session
+    const createdOrders = [];
+    const isPickup = lockedIntent.orderType === 'pickup';
+    const notes = lockedIntent.notes || '';
+
+    try {
+      for (const calcOrder of subOrders) {
+        let orderDoc = await Order.findOne({
+          paymentId: razorpay_payment_id,
+          restaurant: calcOrder.restaurantId,
+        });
+
+        if (!orderDoc) {
+          try {
+            orderDoc = await Order.create({
+              user: lockedIntent.user, // SEC-05: Server-verified user identity only
+              restaurant: calcOrder.restaurantId,
+              items: calcOrder.items,
+              address: lockedIntent.address,
+              subtotal: calcOrder.subtotal,
+              deliveryFee: calcOrder.deliveryFee,
+              discount: calcOrder.discount,
+              couponCode: calcOrder.couponCode || '',
+              totalAmount: calcOrder.totalAmount,
+              paymentId: razorpay_payment_id,
+              orderId: razorpay_order_id,
+              paymentStatus: 'paid',
+              paymentMethod: 'Razorpay (Online Payment)',
+              status: 'pending',
+              notes: isPickup ? `[PICKUP] ${notes}` : notes,
+            });
+          } catch (createErr) {
+            if (createErr.code === 11000) {
+              orderDoc = await Order.findOne({
+                paymentId: razorpay_payment_id,
+                restaurant: calcOrder.restaurantId,
+              });
+            } else {
+              throw createErr;
+            }
+          }
+        }
+
+        // Deduct inventory stock based on recipes if not yet completed
+        if (!orderDoc.stockDeducted) {
+          const deductRes = await deductStockForOrder(orderDoc);
+          if (!deductRes.success) {
+            const invMsg = deductRes.message || 'Insufficient stock for one or more ingredients';
+            await Order.findByIdAndUpdate(orderDoc._id, {
+              inventoryStatus: 'failed',
+              notes: `${orderDoc.notes || ''} [INVENTORY ALERT: ${invMsg}]`.trim(),
+            });
+          } else {
+            await Order.findByIdAndUpdate(orderDoc._id, {
+              inventoryStatus: 'deducted',
+            });
+          }
+        }
+
+        const populatedOrder = await Order.findById(orderDoc._id)
+          .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
+          .populate("user", "name email");
+
+        createdOrders.push(populatedOrder);
+        notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
+          console.warn('[Payment Verify Push] Push warning:', e.message)
+        );
+      }
+
+      const hasInventoryFailures = createdOrders.some((o) => o.stockDeducted === false);
+
+      // Mark PaymentIntent: reconciliation_required if any inventory failed, else verified
+      lockedIntent.status = hasInventoryFailures ? 'reconciliation_required' : 'verified';
+      lockedIntent.createdOrders = createdOrders.map((o) => o._id);
+      await lockedIntent.save();
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: hasInventoryFailures
+            ? "Payment verified. Note: Inventory deduction incomplete for one or more items."
+            : "Payment verified and order placed successfully!",
+          order: createdOrders[0],
+          orders: createdOrders,
+          inventoryDeducted: !hasInventoryFailures,
+          reconciliationRequired: hasInventoryFailures,
+        },
+        { status: 201 }
+      );
+    } catch (orderCreateErr) {
+      if (orderCreateErr.code === 11000) {
+        // SEC-04: Concurrency duplicate-key caught safely
+        console.warn(`[Concurrency] Duplicate key caught for paymentId ${razorpay_payment_id}. Fetching confirmed order.`);
+        const existingOrders = await Order.find({ orderId: razorpay_order_id })
+          .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
+          .populate("user", "name email");
+
+        const hasInventoryFailures = existingOrders.some((o) => o.stockDeducted === false);
+        return NextResponse.json(
+          {
+            success: true,
+            message: hasInventoryFailures
+              ? "Payment already verified. Note: Inventory deduction incomplete for one or more items."
+              : "Payment already verified and order confirmed.",
+            order: existingOrders[0],
+            orders: existingOrders,
+            inventoryDeducted: !hasInventoryFailures,
+            reconciliationRequired: hasInventoryFailures,
+          },
+          { status: 200 }
+        );
+      }
+
+      // Preserve any sub-orders created so far so retry can finish the batch safely
+      if (createdOrders.length > 0) {
+        lockedIntent.createdOrders = Array.from(new Set([
+          ...(lockedIntent.createdOrders || []).map((id) => id.toString()),
+          ...createdOrders.map((o) => o._id.toString()),
+        ]));
+        lockedIntent.status = 'reconciliation_required';
+        await lockedIntent.save();
+      } else {
+        lockedIntent.status = 'created';
+        await lockedIntent.save();
+      }
+      throw orderCreateErr;
+    }
 
   } catch (error) {
     console.error('Razorpay verification error:', error?.message || error);

@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
+import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { toast } from "@/components/ui/ToastProvider";
 
@@ -77,6 +78,7 @@ export default function OrderConfirmationClient() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [isAuthError, setIsAuthError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -183,7 +185,14 @@ export default function OrderConfirmationClient() {
         const res = await fetch(url);
         const data = await res.json();
 
+        if (res.status === 401 || data.message === "Unauthorized") {
+          setIsAuthError(true);
+          setError("Unauthorized");
+          return;
+        }
+
         if (data.success) {
+          setIsAuthError(false);
           const target = data.order || (data.orders && data.orders[0]);
           if (target) {
             setOrder(target);
@@ -209,12 +218,12 @@ export default function OrderConfirmationClient() {
   useEffect(() => {
     fetchOrder(false);
 
-    // Stop polling if order reaches a final state or if window is hidden
+    // Stop polling if order reaches a final state, if window is hidden, or if unauthorized
     const intervalId = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         return;
       }
-      if (order?.status !== "delivered" && order?.status !== "cancelled") {
+      if (order?.status !== "delivered" && order?.status !== "cancelled" && !isAuthError) {
         fetchOrder(false);
       }
     }, POLL_INTERVAL);
@@ -224,7 +233,8 @@ export default function OrderConfirmationClient() {
         typeof document !== "undefined" &&
         document.visibilityState === "visible" &&
         order?.status !== "delivered" &&
-        order?.status !== "cancelled"
+        order?.status !== "cancelled" &&
+        !isAuthError
       ) {
         fetchOrder(false);
       }
@@ -236,7 +246,7 @@ export default function OrderConfirmationClient() {
       clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchOrder, order?.status]);
+  }, [fetchOrder, order?.status, isAuthError]);
 
   useEffect(() => {
     if (!order) return;
@@ -281,19 +291,32 @@ export default function OrderConfirmationClient() {
     return (
       <main className="min-h-screen pt-32 pb-20 px-4 max-w-md mx-auto text-[var(--text-main)] flex flex-col items-center justify-center text-center gap-5">
         <div className="w-16 h-16 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-3xl">
-          📦
+          {isAuthError ? "🔒" : "📦"}
         </div>
-        <h1 className="text-2xl font-black">Order Confirmation</h1>
+        <h1 className="text-2xl font-black">{isAuthError ? "Sign In Required" : "Order Confirmation"}</h1>
         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-          {error || "We couldn't retrieve the details for this order. You can view all your orders in your account."}
+          {isAuthError
+            ? "Your login session has expired or you are not signed in. Please sign in to view and track this order."
+            : (error || "We couldn't retrieve the details for this order. You can view all your orders in your account.")}
         </p>
         <div className="flex gap-3">
-          <Link
-            href="/orders"
-            className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-md shadow-[var(--brand-accent)]/20"
-          >
-            Go to My Orders
-          </Link>
+          {isAuthError ? (
+            <Link
+              href={`/auth/login?callbackUrl=${encodeURIComponent(
+                typeof window !== "undefined" ? window.location.pathname + window.location.search : "/orders"
+              )}`}
+              className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-md shadow-[var(--brand-accent)]/20"
+            >
+              Sign In to View Order
+            </Link>
+          ) : (
+            <Link
+              href="/orders"
+              className="px-5 py-2.5 rounded-xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-md shadow-[var(--brand-accent)]/20"
+            >
+              Go to My Orders
+            </Link>
+          )}
           <Link
             href="/menu"
             className="px-5 py-2.5 rounded-xl bg-[var(--bg-sub)] text-[var(--text-main)] font-semibold text-xs border border-[var(--border-color)]"
@@ -422,6 +445,21 @@ export default function OrderConfirmationClient() {
           paymentStatus={order.paymentStatus}
           isPickup={isPickup}
           cancellationReason={order.cancellationReason || order.cancelReason || ""}
+          statusHistory={order.statusHistory || []}
+          notes={order.notes || ""}
+          createdAt={order.createdAt}
+        />
+        <LiveDeliveryMap
+          orderId={order.orderId || order._id}
+          initialStatus={order.status}
+          isPickup={isPickup}
+          restaurant={order.restaurant || restaurantDetails}
+          destination={order.address}
+          onStatusUpdate={(newStatus) => {
+            if (newStatus && newStatus !== order.status) {
+              setOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+            }
+          }}
         />
         <DeliveryPushPrompt />
 

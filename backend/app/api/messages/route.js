@@ -36,6 +36,11 @@ export async function GET(request) {
     // Determine target audience
     let target = requestedTarget === "restaurants" ? "restaurants" : "customers";
 
+    // Determine current recipient identifier for read and delete tracking
+    const currentRecipientId = target === "restaurants"
+      ? (restaurantId || userId || "partner")
+      : (userId || null);
+
     const now = new Date();
 
     // Base query conditions: status must be sent (or scheduled time has arrived), not expired
@@ -99,17 +104,17 @@ export async function GET(request) {
       }
     }
 
+    // Exclude messages deleted by current recipient
+    if (currentRecipientId) {
+      andConditions.push({ "deletedBy.recipientId": { $ne: currentRecipientId.toString() } });
+    }
+
     const query = { $and: andConditions };
 
     const messages = await Message.find(query)
       .sort({ priority: -1, sentAt: -1, createdAt: -1 })
       .limit(50)
       .lean();
-
-    // Determine current recipient identifier for read tracking
-    const currentRecipientId = target === "restaurants"
-      ? (restaurantId || userId || "partner")
-      : (userId || null);
 
     const formattedMessages = messages.map((m) => {
       const isRead = currentRecipientId
@@ -197,6 +202,51 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Messages recipient GET error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// DELETE — Clear all notifications for the authenticated user
+export async function DELETE(request) {
+  try {
+    await connectDB();
+    const session = await getServerSession(authOptions);
+    let userId = null;
+
+    if (session?.user?.email) {
+      const dbUser = await User.findOne({ email: session.user.email.toLowerCase().trim() }).lean();
+      if (dbUser) {
+        userId = dbUser._id.toString();
+      }
+    }
+
+    if (!userId) {
+      // Unauthenticated visitor: frontend clears client-side cache
+      return NextResponse.json({ success: true, message: "Cleared locally" });
+    }
+
+    // 1. Delete all personal InAppNotification entries for this user
+    await InAppNotification.deleteMany({ user: userId });
+
+    // 2. Mark active broadcast messages as deleted for this recipient
+    const now = new Date();
+    await Message.updateMany(
+      {
+        status: "sent",
+        recipientType: { $in: ["all", "customers"] },
+        "deletedBy.recipientId": { $ne: userId },
+      },
+      {
+        $push: { deletedBy: { recipientId: userId, deletedAt: now } },
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "All notifications cleared successfully.",
+    });
+  } catch (error) {
+    console.error("Clear all notifications error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -16,35 +16,56 @@ export async function GET() {
 
     await connectDB();
 
+    const PlatformSetting = (await import("@/models/PlatformSetting")).default;
+
     const [
       totalRestaurants,
       activeRestaurants,
+      inactiveRestaurants,
       suspendedRestaurants,
       totalAdmins,
       totalCustomers,
       totalProducts,
       totalOrders,
       totalCategories,
-      orders,
+      revenueAgg,
+      ordersByStatusAgg,
+      platformSettings,
     ] = await Promise.all([
       Restaurant.countDocuments(),
       Restaurant.countDocuments({ status: "active" }),
+      Restaurant.countDocuments({ status: "inactive" }),
       Restaurant.countDocuments({ status: "suspended" }),
       User.countDocuments({ role: { $in: ["restaurant_admin", "admin"] } }),
       User.countDocuments({ role: { $in: ["customer", "user"] } }),
       Product.countDocuments(),
       Order.countDocuments(),
       Category.countDocuments(),
-      Order.find({ status: { $ne: "cancelled" } }).select("totalAmount status createdAt").lean(),
+      Order.aggregate([
+        { $match: { status: { $ne: "cancelled" } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" } } },
+      ]),
+      Order.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      PlatformSetting.findOne({ key: "global" }).lean(),
     ]);
 
-    const totalRevenue = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].totalRevenue : 0;
+    const platformFeePercent = platformSettings?.platformFeePercent ?? 5.0;
+    const platformRevenue = Math.round((totalRevenue * (platformFeePercent / 100)) * 100) / 100;
+
+    const ordersByStatus = {};
+    for (const item of ordersByStatusAgg) {
+      if (item._id) ordersByStatus[item._id] = item.count;
+    }
 
     return NextResponse.json({
       success: true,
       stats: {
         totalRestaurants,
         activeRestaurants,
+        inactiveRestaurants,
         suspendedRestaurants,
         totalAdmins,
         totalCustomers,
@@ -52,6 +73,9 @@ export async function GET() {
         totalOrders,
         totalCategories,
         totalRevenue,
+        platformFeePercent,
+        platformRevenue,
+        ordersByStatus,
       },
     });
   } catch (error) {

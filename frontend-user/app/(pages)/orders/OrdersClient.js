@@ -24,6 +24,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
+import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
@@ -505,7 +506,21 @@ export default function OrdersClient() {
                   paymentStatus={order.paymentStatus}
                   isPickup={isPickup}
                   cancellationReason={order.cancellationReason || ""}
+                  statusHistory={order.statusHistory || []}
+                  notes={order.notes || ""}
+                  createdAt={order.createdAt}
                 />
+                {order.status === "out_for_delivery" && !isPickup && (
+                  <div className="pt-3">
+                    <LiveDeliveryMap
+                      orderId={order.orderId || order._id}
+                      initialStatus={order.status}
+                      isPickup={isPickup}
+                      restaurant={order.restaurant}
+                      destination={order.address}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Customer Cancellation Inline Form (if active) */}

@@ -207,7 +207,8 @@ export default function SuperadminClient() {
 
   // Copy Slug
   function handleCopySlug(slug, restId) {
-    const fullPath = `${customerBaseUrl}/menu?restaurant=${restId}`;
+    const identifier = slug || restId;
+    const fullPath = `${customerBaseUrl}/menu?restaurant=${identifier}`;
     navigator.clipboard.writeText(fullPath);
     setCopiedSlug(restId);
     toast.success("Storefront link copied to clipboard!");
@@ -316,8 +317,7 @@ export default function SuperadminClient() {
           const filteredAdminList = grp.admins.filter(
             (a) =>
               a.name?.toLowerCase().includes(q) ||
-              a.email?.toLowerCase().includes(q) ||
-              a.visiblePassword?.toLowerCase().includes(q)
+              a.email?.toLowerCase().includes(q)
           );
           if (matchRest) {
             return grp;
@@ -341,8 +341,7 @@ export default function SuperadminClient() {
       (a) =>
         a.name?.toLowerCase().includes(q) ||
         a.email?.toLowerCase().includes(q) ||
-        a.restaurant?.name?.toLowerCase().includes(q) ||
-        a.visiblePassword?.toLowerCase().includes(q)
+        a.restaurant?.name?.toLowerCase().includes(q)
     );
   }, [admins, adminSearchQuery]);
 
@@ -614,18 +613,6 @@ export default function SuperadminClient() {
       const data = await res.json();
       if (data.success) {
         toast.success(`Password reset successfully for ${resetPasswordAdmin.name}!`);
-        const updatedPass = newPasswordInput.trim();
-        setAdmins((prev) =>
-          prev.map((a) =>
-            a._id === resetPasswordAdmin._id
-              ? { ...a, visiblePassword: updatedPass }
-              : a
-          )
-        );
-        setRevealedPasswords((prev) => ({
-          ...prev,
-          [resetPasswordAdmin._id]: true,
-        }));
         setResetPasswordAdmin(null);
         setNewPasswordInput("");
         await loadData();
@@ -719,6 +706,7 @@ export default function SuperadminClient() {
   }
 
   const activeRestCount = stats?.activeRestaurants ?? restaurants.filter((r) => r.status === "active").length;
+  const inactiveRestCount = stats?.inactiveRestaurants ?? restaurants.filter((r) => r.status === "inactive").length;
   const suspendedRestCount = stats?.suspendedRestaurants ?? restaurants.filter((r) => r.status === "suspended").length;
   const activeAdminsCount = admins.filter((a) => a.status === "active").length;
   const totalOrdersCount = stats?.totalOrders ?? 0;
@@ -992,11 +980,13 @@ export default function SuperadminClient() {
                 {stats?.totalRestaurants ?? restaurants.length}
               </span>
             </div>
-            <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 flex-wrap">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-0.5 inline-block" />
               <span>{activeRestCount} active</span>
               <span className="text-slate-300 dark:text-slate-600 font-normal">·</span>
-              <span className="text-slate-400 dark:text-slate-500 font-normal">{suspendedRestCount} suspended</span>
+              <span className="text-amber-600 dark:text-amber-400 font-normal">{inactiveRestCount} inactive</span>
+              <span className="text-slate-300 dark:text-slate-600 font-normal">·</span>
+              <span className="text-rose-500 dark:text-rose-400 font-normal">{suspendedRestCount} suspended</span>
             </p>
           </div>
 
@@ -1070,19 +1060,20 @@ export default function SuperadminClient() {
           <div className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Revenue
+                Gross Order Value
               </span>
               <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg">
                 ₹
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-3xl font-bold tracking-tight text-slate-900 dark:text-emerald-400">
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-emerald-400">
                 ₹{totalRevenue.toLocaleString("en-IN")}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Total processed
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Take-Rate ({stats?.platformFeePercent ?? 5}%):</span>
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">₹{(stats?.platformRevenue ?? Math.round(totalRevenue * 0.05)).toLocaleString("en-IN")}</span>
             </p>
           </div>
         </section>
@@ -1266,7 +1257,7 @@ export default function SuperadminClient() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Manage restaurant branch admins, reveal passwords, and assign branch access
+                  Manage restaurant branch admins, reset passwords, and assign branch access
                 </p>
               </div>
             </div>
@@ -1490,62 +1481,25 @@ export default function SuperadminClient() {
                                         {adm.email}
                                       </td>
 
-                                      {/* Password (Visible to Superadmin) */}
+                                      {/* Password (Hashed / Secure) */}
                                       <td className="py-3 px-5">
-                                        <div className="flex items-center gap-1.5">
-                                          {adm.visiblePassword ? (
-                                            <>
-                                              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs min-w-[90px]">
-                                                {revealedPasswords[adm._id] ? (
-                                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400 select-all tracking-wide">
-                                                    {adm.visiblePassword}
-                                                  </span>
-                                                ) : (
-                                                  <span className="text-slate-400 dark:text-slate-500 tracking-widest select-none font-bold">
-                                                    ••••••••
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <button
-                                                type="button"
-                                                onClick={() => togglePasswordReveal(adm._id)}
-                                                className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                                title={revealedPasswords[adm._id] ? "Hide password" : "Reveal password"}
-                                              >
-                                                {revealedPasswords[adm._id] ? (
-                                                  <EyeOff className="w-3.5 h-3.5 text-indigo-500" />
-                                                ) : (
-                                                  <Eye className="w-3.5 h-3.5" />
-                                                )}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleCopyPassword(adm.visiblePassword, adm._id)}
-                                                className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                                title="Copy password"
-                                              >
-                                                {copiedPasswordId === adm._id ? (
-                                                  <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
-                                                ) : (
-                                                  <Copy className="w-3.5 h-3.5" />
-                                                )}
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-xs text-slate-400 italic">Encrypted</span>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setResetPasswordAdmin(adm);
-                                                  setNewPasswordInput("");
-                                                }}
-                                                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
-                                              >
-                                                Reset to reveal
-                                              </button>
-                                            </div>
-                                          )}
+                                        <div className="flex items-center gap-2">
+                                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+                                            <KeyRound className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            <span>••••••••</span>
+                                            <span className="text-[10px] uppercase font-sans font-semibold text-emerald-600 dark:text-emerald-400 ml-1">Encrypted</span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setResetPasswordAdmin(adm);
+                                              setNewPasswordInput("");
+                                            }}
+                                            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
+                                            title="Set a new password for this administrator"
+                                          >
+                                            Reset
+                                          </button>
                                         </div>
                                       </td>
 
@@ -1676,60 +1630,23 @@ export default function SuperadminClient() {
 
                         {/* Password */}
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-1.5">
-                            {adm.visiblePassword ? (
-                              <>
-                                <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs min-w-[90px]">
-                                  {revealedPasswords[adm._id] ? (
-                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400 select-all tracking-wide">
-                                      {adm.visiblePassword}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 dark:text-slate-500 tracking-widest select-none font-bold">
-                                      ••••••••
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => togglePasswordReveal(adm._id)}
-                                  className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                  title={revealedPasswords[adm._id] ? "Hide password" : "Reveal password"}
-                                >
-                                  {revealedPasswords[adm._id] ? (
-                                    <EyeOff className="w-3.5 h-3.5 text-indigo-500" />
-                                  ) : (
-                                    <Eye className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyPassword(adm.visiblePassword, adm._id)}
-                                  className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                  title="Copy password"
-                                >
-                                  {copiedPasswordId === adm._id ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              </>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-slate-400 italic">Encrypted</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setResetPasswordAdmin(adm);
-                                    setNewPasswordInput("");
-                                  }}
-                                  className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
-                                >
-                                  Reset to reveal
-                                </button>
-                              </div>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+                              <KeyRound className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>••••••••</span>
+                              <span className="text-[10px] uppercase font-sans font-semibold text-emerald-600 dark:text-emerald-400 ml-1">Encrypted</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResetPasswordAdmin(adm);
+                                setNewPasswordInput("");
+                              }}
+                              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
+                              title="Set a new password for this administrator"
+                            >
+                              Reset
+                            </button>
                           </div>
                         </td>
 

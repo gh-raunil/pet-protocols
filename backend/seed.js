@@ -25,10 +25,15 @@ async function seed() {
     await Message.deleteMany({});
 
     const isProduction = process.env.NODE_ENV === "production";
-    const superadminEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim() || (isProduction ? null : "superadmin.petprotocols@gmail.com");
+    const configuredEmails = (process.env.SUPERADMIN_EMAIL || "superadmin.petprotocols@gmail.com")
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    const superadminEmail = configuredEmails[0] || (isProduction ? null : "superadmin.petprotocols@gmail.com");
 
     if (isProduction) {
-      if (!process.env.SUPERADMIN_EMAIL) {
+      if (!superadminEmail) {
         throw new Error("CRITICAL: SUPERADMIN_EMAIL environment variable is required in production.");
       }
       if (!process.env.SUPERADMIN_PASSWORD) {
@@ -54,6 +59,19 @@ async function seed() {
       phone: "+91 99999 00000",
       image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200",
     });
+
+    // Also seed any secondary configured superadmin emails
+    for (let i = 1; i < configuredEmails.length; i++) {
+      const extraEmail = configuredEmails[i];
+      await User.create({
+        name: `Super Admin (${extraEmail.split("@")[0]})`,
+        email: extraEmail,
+        password: superadminPassword,
+        role: "superadmin",
+        status: "active",
+        phone: "+91 99999 00000",
+      });
+    }
 
     const isDemo = process.argv.includes("--demo");
 

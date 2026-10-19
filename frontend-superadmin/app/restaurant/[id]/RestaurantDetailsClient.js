@@ -38,6 +38,7 @@ import {
   CheckSquare,
   Square,
   FolderTree,
+  Pencil,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 
@@ -88,6 +89,21 @@ export default function RestaurantDetailsClient() {
   const [newAdmin, setNewAdmin] = useState({ name: "", email: "", password: "" });
   const [creatingAdmin, setCreatingAdmin] = useState(false);
 
+  // Restaurant Profile Edit state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    description: "",
+    phone: "",
+    whatsappNumber: "",
+    email: "",
+    cuisineType: "",
+    bannerImage: "",
+    status: "active",
+    address: { street: "", city: "", state: "", pincode: "" },
+  });
+
   const defaultCustomerUrl = typeof window !== "undefined" && !window.location.hostname.includes("localhost")
     ? "https://pet-protocols.vercel.app"
     : "http://localhost:3000";
@@ -109,12 +125,29 @@ export default function RestaurantDetailsClient() {
       const data = await res.json();
 
       if (data.success && data.restaurant) {
-        setRestaurant(data.restaurant);
-        setAdmins(data.restaurant.admins || []);
-        setLogoInput(data.restaurant.image || "");
+        const rest = data.restaurant;
+        setRestaurant(rest);
+        setAdmins(rest.admins || []);
+        setLogoInput(rest.image || "");
+        setProfileForm({
+          name: rest.name || "",
+          description: rest.description || "",
+          phone: rest.phone || "",
+          whatsappNumber: rest.whatsappNumber || "",
+          email: rest.email || "",
+          cuisineType: Array.isArray(rest.cuisineType) ? rest.cuisineType.join(", ") : (rest.cuisineType || ""),
+          bannerImage: rest.bannerImage || "",
+          status: rest.status || "active",
+          address: {
+            street: rest.address?.street || "",
+            city: rest.address?.city || "",
+            state: rest.address?.state || "",
+            pincode: rest.address?.pincode || "",
+          },
+        });
 
-        const features = Array.isArray(data.restaurant.enabledFeatures)
-          ? data.restaurant.enabledFeatures
+        const features = Array.isArray(rest.enabledFeatures)
+          ? rest.enabledFeatures
           : ALL_AVAILABLE_FEATURES.map((f) => f.id);
         setEnabledFeatures(features);
       } else {
@@ -137,11 +170,38 @@ export default function RestaurantDetailsClient() {
 
   // Copy Storefront Link
   function handleCopySlug() {
-    const fullPath = `${customerBaseUrl}/menu?restaurant=${restaurantId}`;
+    const identifier = restaurant?.slug || restaurantId;
+    const fullPath = `${customerBaseUrl}/menu?restaurant=${identifier}`;
     navigator.clipboard.writeText(fullPath);
     setCopiedSlug(true);
     toast.success("Storefront link copied to clipboard!");
     setTimeout(() => setCopiedSlug(false), 2000);
+  }
+
+  // Save Restaurant Profile
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+    try {
+      setSavingProfile(true);
+      const res = await fetch(`/api/superadmin/restaurants/${restaurantId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Restaurant profile updated successfully!");
+        setRestaurant(data.restaurant);
+        setIsEditingProfile(false);
+      } else {
+        toast.error(data.message || "Failed to update profile.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   // Toggle Feature Checkbox
@@ -274,11 +334,6 @@ export default function RestaurantDetailsClient() {
       const data = await res.json();
       if (data.success) {
         toast.success(`Password reset for ${resetPasswordAdmin.name}!`);
-        const updatedPass = newPasswordInput.trim();
-        setAdmins((prev) =>
-          prev.map((a) => (a._id === resetPasswordAdmin._id ? { ...a, visiblePassword: updatedPass } : a))
-        );
-        setRevealedPasswords((prev) => ({ ...prev, [resetPasswordAdmin._id]: true }));
         setResetPasswordAdmin(null);
         setNewPasswordInput("");
       } else {
@@ -475,7 +530,7 @@ export default function RestaurantDetailsClient() {
                 {/* Storefront Link Badge */}
                 <div className="pt-2 flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-[11px] px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
-                    {customerBaseUrl}/menu?restaurant={restaurant._id}
+                    {customerBaseUrl}/menu?restaurant={restaurant.slug || restaurant._id}
                   </span>
                   <button
                     type="button"
@@ -486,7 +541,7 @@ export default function RestaurantDetailsClient() {
                     {copiedSlug ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                   <a
-                    href={`${customerBaseUrl}/menu?restaurant=${restaurant._id}`}
+                    href={`${customerBaseUrl}/menu?restaurant=${restaurant.slug || restaurant._id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition"
@@ -494,6 +549,16 @@ export default function RestaurantDetailsClient() {
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProfile(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-500/30 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition"
+                    title="Edit restaurant details and settings"
+                  >
+                    <Pencil size={12} />
+                    <span>Edit Profile</span>
+                  </button>
 
                   <Link
                     href={`/?tab=categories&restaurant=${restaurant._id}`}
@@ -686,58 +751,25 @@ export default function RestaurantDetailsClient() {
                         {adm.email}
                       </td>
 
-                      {/* Password Reveal */}
+                      {/* Password (Hashed / Secure) */}
                       <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-1.5">
-                          {adm.visiblePassword ? (
-                            <>
-                              <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700/80 font-mono text-xs min-w-[90px]">
-                                {revealedPasswords[adm._id] ? (
-                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400 select-all tracking-wide">
-                                    {adm.visiblePassword}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 dark:text-slate-500 tracking-widest select-none font-bold">
-                                    ••••••••
-                                  </span>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => togglePasswordReveal(adm._id)}
-                                className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                title={revealedPasswords[adm._id] ? "Hide password" : "Reveal password"}
-                              >
-                                {revealedPasswords[adm._id] ? <EyeOff className="w-3.5 h-3.5 text-indigo-500" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyPassword(adm.visiblePassword, adm._id)}
-                                className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                                title="Copy password"
-                              >
-                                {copiedPasswordId === adm._id ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-slate-400 italic">Encrypted</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setResetPasswordAdmin(adm);
-                                  setNewPasswordInput("");
-                                }}
-                                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
-                              >
-                                Reset to reveal
-                              </button>
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+                            <KeyRound className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>••••••••</span>
+                            <span className="text-[10px] uppercase font-sans font-semibold text-emerald-600 dark:text-emerald-400 ml-1">Encrypted</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResetPasswordAdmin(adm);
+                              setNewPasswordInput("");
+                            }}
+                            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
+                            title="Set a new password for this administrator"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </td>
 
@@ -989,6 +1021,178 @@ export default function RestaurantDetailsClient() {
                   className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20"
                 >
                   {resettingPassword ? "Resetting..." : "Confirm Reset"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT RESTAURANT PROFILE MODAL ── */}
+      {isEditingProfile && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative my-8 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 z-10">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Store className="w-4 h-4 text-amber-500" />
+                <span>Edit Restaurant Profile</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Restaurant Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Status</label>
+                  <select
+                    value={profileForm.status}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Cuisine Types (comma-separated)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Italian, Pizza, Pasta"
+                    value={profileForm.cuisineType}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, cuisineType: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Description</label>
+                  <textarea
+                    rows={2}
+                    value={profileForm.description}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, description: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Phone</label>
+                  <input
+                    type="text"
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">WhatsApp Number</label>
+                  <input
+                    type="text"
+                    value={profileForm.whatsappNumber}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Email</label>
+                  <input
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Banner Image URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={profileForm.bannerImage}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, bannerImage: e.target.value }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-2">Location / Address</span>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Street Address</label>
+                  <input
+                    type="text"
+                    value={profileForm.address?.street || ""}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, address: { ...prev.address, street: e.target.value } }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">City</label>
+                  <input
+                    type="text"
+                    value={profileForm.address?.city || ""}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, address: { ...prev.address, city: e.target.value } }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">State</label>
+                  <input
+                    type="text"
+                    value={profileForm.address?.state || ""}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, address: { ...prev.address, state: e.target.value } }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Pincode</label>
+                  <input
+                    type="text"
+                    value={profileForm.address?.pincode || ""}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, address: { ...prev.address, pincode: e.target.value } }))}
+                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3 py-2 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProfile(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20"
+                >
+                  {savingProfile ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>

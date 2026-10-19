@@ -36,6 +36,19 @@ import { formatOrderId } from "../dashboard/DashboardClient";
 
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
 
+export function checkIsPickup(order) {
+  if (!order) return false;
+  const method = String(order.paymentMethod || "").toLowerCase();
+  const notes = String(order.notes || "").toLowerCase();
+  const addressType = String(order.address?.addressType || "").toLowerCase();
+  return (
+    method.includes("pickup") ||
+    method.includes("cop") ||
+    notes.includes("[pickup]") ||
+    addressType.includes("pickup")
+  );
+}
+
 // Live elapsed kitchen timer helper with progressive urgency colors
 export function getOrderElapsedInfo(createdAt, status, updatedAt) {
   // If order is delivered, stop timer and show completion badge
@@ -902,6 +915,7 @@ export default function OrdersClient() {
                   const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
                   const paymentModeStr = (order.paymentMethod || "").toLowerCase();
                   const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
+                  const isPickup = checkIsPickup(order);
 
                   const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
                   const packedCount = (order.items || []).filter((_, idx) => isDishPacked(order, idx)).length;
@@ -955,15 +969,22 @@ export default function OrdersClient() {
                             )}
                           </div>
 
-                          {isCod ? (
-                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                              COD ₹{order.totalAmount}
-                            </span>
-                          ) : (
-                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
-                              Paid Online
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isPickup && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                Pickup
+                              </span>
+                            )}
+                            {isCod ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                                COD ₹{order.totalAmount}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
+                                Paid Online
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Special Note if any */}
@@ -1098,27 +1119,51 @@ export default function OrdersClient() {
                         )}
 
                         {order.status === "preparing" && (
-                          <button
-                            type="button"
-                            disabled={updatingOrderId === order._id}
-                            onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                            className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <Truck size={13} />
-                            <span>Dispatch for Delivery</span>
-                          </button>
+                          isPickup ? (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "ready")}
+                              className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 size={13} />
+                              <span>Mark Ready for Pickup</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                              className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <Truck size={13} />
+                              <span>Dispatch for Delivery</span>
+                            </button>
+                          )
                         )}
 
                         {order.status === "ready" && (
-                          <button
-                            type="button"
-                            disabled={updatingOrderId === order._id}
-                            onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <Truck size={13} />
-                            <span>Dispatch for Delivery</span>
-                          </button>
+                          isPickup ? (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "delivered")}
+                              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 size={13} />
+                              <span>Confirm Customer Picked Up</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                              className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <Truck size={13} />
+                              <span>Dispatch for Delivery</span>
+                            </button>
+                          )
                         )}
 
                         {order.status === "out_for_delivery" && (
@@ -1158,6 +1203,7 @@ export default function OrdersClient() {
                   const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
                   const paymentModeStr = (order.paymentMethod || "").toLowerCase();
                   const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
+                  const isPickup = checkIsPickup(order);
 
                   const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
 
@@ -1190,6 +1236,13 @@ export default function OrdersClient() {
                         </div>
 
                         <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                          {/* Pickup Badge */}
+                          {isPickup && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                              Pickup
+                            </span>
+                          )}
+
                           {/* Payment Badge (COD vs Online) */}
                           {isCod ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
@@ -1360,27 +1413,51 @@ export default function OrdersClient() {
                           )}
 
                           {order.status === "preparing" && (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={14} />
-                              <span>Dispatch for Delivery</span>
-                            </button>
+                            isPickup ? (
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "ready")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={14} />
+                                <span>Mark Ready for Pickup</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Truck size={14} />
+                                <span>Dispatch for Delivery</span>
+                              </button>
+                            )
                           )}
 
                           {order.status === "ready" && (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={14} />
-                              <span>Dispatch for Delivery</span>
-                            </button>
+                            isPickup ? (
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "delivered")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={14} />
+                                <span>Confirm Customer Picked Up</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Truck size={14} />
+                                <span>Dispatch for Delivery</span>
+                              </button>
+                            )
                           )}
 
                           {order.status === "out_for_delivery" && (

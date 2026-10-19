@@ -81,6 +81,32 @@ export async function PUT(request, { params }) {
       if (!updated) {
         return NextResponse.json({ success: false, message: "Message not found" }, { status: 404 });
       }
+
+      // Asynchronously trigger push notification broadcast
+      try {
+        const { broadcastPushNotification } = await import("@/lib/pushService");
+        broadcastPushNotification(
+          {
+            title: `📢 ${updated.title.trim()}`,
+            body: updated.content.trim().slice(0, 140),
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/favicon-32x32.png",
+            data: {
+              url: updated.recipientType === "restaurants" ? "/updates" : "/notifications",
+              type: "superadmin_broadcast",
+              messageId: updated._id.toString(),
+            },
+          },
+          updated.recipientType,
+          {
+            recipientSelection: updated.recipientSelection,
+            recipients: updated.recipientSelection === "selected" ? updated.recipients : [],
+          }
+        ).catch((err) => console.warn("[PushBroadcast] Non-blocking send_now warning:", err.message));
+      } catch (pushErr) {
+        console.warn("[PushBroadcast] Failed to trigger push broadcast on send_now:", pushErr.message);
+      }
+
       return NextResponse.json({
         success: true,
         message: "Message dispatched immediately.",

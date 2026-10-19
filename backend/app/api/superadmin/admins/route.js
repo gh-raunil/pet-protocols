@@ -18,7 +18,7 @@ export async function GET() {
       role: { $in: ["restaurant_admin", "admin"] },
     })
       .populate("restaurant", "name slug status")
-      .select("-password")
+      .select("-password -visiblePassword")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -83,7 +83,6 @@ export async function POST(request) {
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-      visiblePassword: password,
       role: "restaurant_admin",
       restaurant: restaurant._id,
       status: "active",
@@ -97,7 +96,6 @@ export async function POST(request) {
           _id: newAdmin._id,
           name: newAdmin.name,
           email: newAdmin.email,
-          visiblePassword: newAdmin.visiblePassword,
           role: newAdmin.role,
           status: newAdmin.status,
           restaurant: {

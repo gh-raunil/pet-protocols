@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Order from '@/models/Order';
@@ -6,13 +7,28 @@ import Restaurant from '@/models/Restaurant';
 import Product from '@/models/Product';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { calculateOrderDetails } from '@/lib/checkoutCalculationService';
 import { deductStockForOrder, restoreStockForOrder } from '@/lib/inventoryService';
+import { executeOrderRefund } from '@/lib/refundService';
 import { notifyOrderEvent } from '@/lib/pushService';
+
+let _getServerSession = getServerSession;
+export function _setTestGetServerSession(fn) {
+  _getServerSession = fn;
+}
+
+async function resolveSession() {
+  try {
+    return await _getServerSession(authOptions);
+  } catch {
+    return null;
+  }
+}
 
 // GET — Fetch customer's orders (with optional ?orderId= filter)
 export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await resolveSession();
 
     if (!session) {
       return NextResponse.json(
@@ -55,9 +71,48 @@ export async function GET(request) {
       .populate('user', 'name email')
       .sort({ createdAt: -1 });
 
-    const order = orders.length > 0 ? orders[0] : null;
+    const sanitizedOrders = orders.map((o) => {
+      const orderObj = typeof o.toObject === 'function' ? o.toObject() : { ...o };
+      if (!Array.isArray(orderObj.statusHistory) || orderObj.statusHistory.length === 0) {
+        orderObj.statusHistory = [
+          {
+            status: orderObj.status || 'pending',
+            changedAt: orderObj.createdAt || new Date(),
+            note: 'Order placed',
+          },
+        ];
+      } else {
+        // Sanitize history entries: only expose customer-safe fields
+        orderObj.statusHistory = orderObj.statusHistory.map((h) => ({
+          status: h.status,
+          changedAt: h.changedAt,
+          note: h.note || '',
+        }));
+      }
 
-    return NextResponse.json({ success: true, order, orders });
+      // Customer Privacy (Requirement 5): Never expose driver coordinates unless actively out_for_delivery
+      if (orderObj.deliveryTracking) {
+        if (typeof Order.sanitizeTrackingForCustomer === 'function') {
+          orderObj.deliveryTracking = Order.sanitizeTrackingForCustomer(orderObj);
+        } else if (orderObj.status !== 'out_for_delivery' || !orderObj.deliveryTracking.isLive) {
+          orderObj.deliveryTracking = {
+            isLive: false,
+            currentLocation: null,
+            startedAt: orderObj.deliveryTracking.startedAt || null,
+            endedAt: orderObj.deliveryTracking.endedAt || null,
+            endReason: orderObj.deliveryTracking.endReason || null,
+            lastUpdatedAt: orderObj.deliveryTracking.lastUpdatedAt || null,
+            status: orderObj.status,
+          };
+        }
+      }
+
+      return orderObj;
+    });
+
+    const order = sanitizedOrders.length > 0 ? sanitizedOrders[0] : null;
+
+    return NextResponse.json({ success: true, order, orders: sanitizedOrders });
 
   } catch (error) {
     return NextResponse.json(
@@ -70,9 +125,14 @@ export async function GET(request) {
 // POST — Place an order (Mock/Test payment checkout)
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await resolveSession();
     const body = await request.json();
     const { items, address, paymentMethod = 'Mock Test Payment', notes = '' } = body;
+    let idempotencyKey = request.headers.get('x-idempotency-key') || body.idempotencyKey || null;
+    if (typeof idempotencyKey === 'string') {
+      idempotencyKey = idempotencyKey.trim();
+      if (!idempotencyKey) idempotencyKey = null;
+    }
 
     if (!items || !items.length) {
       return NextResponse.json({ success: false, message: 'Cart items are required' }, { status: 400 });
@@ -90,93 +150,111 @@ export async function POST(request) {
       if (user) userId = user._id;
     }
 
-    // Fetch all products in cart from database to get their accurate restaurant association
-    const productIds = items.map((item) => item._id || item.product).filter(Boolean);
-    const dbProducts = await Product.find({ _id: { $in: productIds } }).lean();
-    const productMap = new Map(dbProducts.map((p) => [p._id.toString(), p]));
-
-    const fallbackRest = await Restaurant.findOne({ status: "active" });
-    const fallbackRestId = fallbackRest?._id?.toString();
-
-    // Group items by their owning restaurant
-    const itemsByRestaurant = new Map();
-
-    for (const item of items) {
-      const prodId = (item._id || item.product)?.toString();
-      const dbProd = productMap.get(prodId);
-      const restId = (
-        item.restaurantId ||
-        item.restaurant?._id ||
-        item.restaurant ||
-        dbProd?.restaurant?.toString() ||
-        body.restaurantId ||
-        fallbackRestId
-      )?.toString();
-
-      if (!restId) continue;
-
-      if (!itemsByRestaurant.has(restId)) {
-        itemsByRestaurant.set(restId, []);
-      }
-
-      const price = Number(item.price) || (dbProd ? Number(dbProd.price) : 0);
-      const qty = Number(item.quantity) || 1;
-
-      itemsByRestaurant.get(restId).push({
-        product: prodId,
-        name: item.name || dbProd?.name || "Dish",
-        price,
-        quantity: qty,
-        image: item.image || dbProd?.image || "",
-        category: item.category || dbProd?.category || "",
-        type: item.type || item.foodType || dbProd?.type || "veg",
-      });
+    // Fallback: If client did not provide an idempotency key, compute a deterministic server-side key
+    // bounded by user/phone, items, address, and a 1-minute bucket so rapid double-clicks are de-duplicated safely.
+    if (!idempotencyKey) {
+      const itemsFingerprint = (items || []).map((i) => `${i.product || i._id}_${i.quantity}`).sort().join('|');
+      const userFingerprint = userId?.toString() || address?.phone || 'anon';
+      const timeBucket = Math.floor(Date.now() / 60000);
+      idempotencyKey = `server_fallback_${crypto.createHash('sha256').update(`${userFingerprint}:${itemsFingerprint}:${address?.street || ''}:${timeBucket}`).digest('hex').substring(0, 32)}`;
     }
 
-    if (itemsByRestaurant.size === 0) {
-      return NextResponse.json({ success: false, message: "Invalid restaurant for order" }, { status: 400 });
+    // Authoritative Server-Side Checkout Calculation & Security Checks
+    const calcResult = await calculateOrderDetails({
+      items,
+      orderType: body.orderType,
+      couponCode: body.couponCode,
+    });
+
+    if (!calcResult.success) {
+      return NextResponse.json(
+        { success: false, message: calcResult.message },
+        { status: calcResult.status || 400 }
+      );
     }
 
-    const createdOrders = [];
-    let overallSubtotal = 0;
-    let remainingDiscount = Math.max(0, Number(body.discount) || 0);
+    // Compute canonical payload hash to detect conflicting parameters on key reuse
+    const canonicalPayload = {
+      items: (calcResult.orders || []).map((o) => ({
+        restaurantId: o.restaurantId?.toString(),
+        items: (o.items || []).map((i) => ({
+          product: (i.product?._id || i.product)?.toString(),
+          quantity: i.quantity,
+          price: i.price,
+        })),
+        totalAmount: o.totalAmount,
+      })),
+      address: {
+        fullName: address.fullName?.trim()?.toLowerCase(),
+        street: address.street?.trim()?.toLowerCase(),
+        phone: address.phone?.trim(),
+      },
+    };
+    const payloadHash = crypto.createHash('sha256').update(JSON.stringify(canonicalPayload)).digest('hex');
 
-    for (const [targetRestId, restSnapshotItems] of itemsByRestaurant.entries()) {
-      const restDoc = await Restaurant.findById(targetRestId).lean();
-      if (restDoc) {
-        if (restDoc.isOpen === false || restDoc.isTemporarilyClosed || restDoc.acceptingOrders === false) {
+    // Pre-check for existing orders placed with this idempotency key
+    if (idempotencyKey) {
+      const targetKeys = calcResult.orders.map((c) =>
+        calcResult.orders.length > 1 ? `${idempotencyKey}_${c.restaurantId}` : idempotencyKey
+      );
+      const existingOrders = await Order.find({
+        idempotencyKey: { $in: targetKeys },
+      })
+        .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
+        .populate("user", "name email");
+
+      if (existingOrders.length > 0) {
+        // 1. Cross-user security check: key must belong to this user / phone
+        for (const exist of existingOrders) {
+          const isUserMatch = userId
+            ? exist.user?._id?.toString() === userId.toString()
+            : exist.address?.phone === address.phone;
+          if (!isUserMatch) {
+            return NextResponse.json(
+              { success: false, message: "Idempotency key conflict: key belongs to another user account." },
+              { status: 403 }
+            );
+          }
+
+          // 2. Conflict check: reject key reuse with different cart/address/parameters
+          if (exist.payloadHash && exist.payloadHash !== payloadHash) {
+            return NextResponse.json(
+              { success: false, message: "Idempotency key cannot be reused with different cart items, amounts, or checkout parameters." },
+              { status: 409 }
+            );
+          }
+
+          // 3. Never replay a cancelled order as a successful checkout
+          if (exist.status === "cancelled") {
+            return NextResponse.json(
+              { success: false, message: "A previous order placed with this idempotency key was cancelled. Please submit a new checkout attempt." },
+              { status: 409 }
+            );
+          }
+        }
+
+        if (existingOrders.length === calcResult.orders.length) {
+          const hasCod = existingOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
           return NextResponse.json(
-            { success: false, message: `${restDoc.name || 'Kitchen'} is currently closed or not accepting orders.` },
-            { status: 400 }
+            {
+              success: true,
+              message: hasCod
+                ? "Order placed successfully with Cash on Delivery!"
+                : "Order placed successfully with Test Payment!",
+              order: existingOrders[0],
+              orders: existingOrders,
+              idempotentReplay: true,
+            },
+            { status: 200 }
           );
         }
       }
+    }
 
-      const restSubtotal = restSnapshotItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-      overallSubtotal += restSubtotal;
+    const createdOrders = [];
+    let isReplay = false;
 
-      const minOrder = restDoc?.orderLimits?.minOrderAmount ?? 0;
-      if (minOrder > 0 && restSubtotal < minOrder) {
-        return NextResponse.json(
-          { success: false, message: `Minimum order amount for ${restDoc?.name || 'this kitchen'} is ₹${minOrder}. Please add more items.` },
-          { status: 400 }
-        );
-      }
-
-      const isPickup = body.orderType === "pickup";
-      const flatFee = restDoc?.chargeSettings?.flatDeliveryFee ?? 40;
-      const freeThreshold = restDoc?.chargeSettings?.freeDeliveryThreshold ?? 500;
-
-      const restDeliveryFee = isPickup
-        ? 0
-        : restSubtotal >= freeThreshold
-        ? 0
-        : flatFee;
-
-      const discountForThisOrder = Math.min(restSubtotal + restDeliveryFee, remainingDiscount);
-      remainingDiscount -= discountForThisOrder;
-      const restTotal = Math.max(0, restSubtotal + restDeliveryFee - discountForThisOrder);
-
+    for (const calcOrder of calcResult.orders) {
       const isCod = paymentMethod?.toLowerCase().includes("cash on delivery") || paymentMethod?.toLowerCase().includes("cod");
       const isCop = paymentMethod?.toLowerCase().includes("cash on pickup") || paymentMethod?.toLowerCase().includes("cop");
       const paymentStatus = isCod || isCop ? "pending" : "test_paid";
@@ -185,23 +263,143 @@ export async function POST(request) {
       if (isCod) finalPaymentMethod = "Cash on Delivery (COD)";
       else if (isCop) finalPaymentMethod = "Cash on Pickup (COP)";
 
-      const newOrder = await Order.create({
-        user: userId,
-        restaurant: targetRestId,
-        items: restSnapshotItems,
-        address,
-        subtotal: restSubtotal,
-        discount: discountForThisOrder,
-        couponCode: body.couponCode || "",
-        totalAmount: restTotal,
-        paymentStatus,
-        paymentMethod: finalPaymentMethod,
-        status: "pending",
-        notes: isPickup ? `[PICKUP] ${notes}` : notes,
-      });
+      const scopedKey = calcResult.orders.length > 1
+        ? `${idempotencyKey}_${calcOrder.restaurantId}`
+        : idempotencyKey;
 
-      // Deduct ingredient stock safely based on dish recipes
-      await deductStockForOrder(newOrder);
+      let newOrder;
+      let isExisting = false;
+
+      try {
+        newOrder = await Order.create({
+          user: userId,
+          restaurant: calcOrder.restaurantId,
+          items: calcOrder.items,
+          address,
+          subtotal: calcOrder.subtotal,
+          deliveryFee: calcOrder.deliveryFee,
+          discount: calcOrder.discount,
+          couponCode: calcOrder.couponCode || "",
+          totalAmount: calcOrder.totalAmount,
+          paymentStatus,
+          paymentMethod: finalPaymentMethod,
+          status: "pending",
+          notes: body.orderType === "pickup" ? `[PICKUP] ${notes}` : notes,
+          idempotencyKey: scopedKey,
+          payloadHash,
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000 && scopedKey) {
+          // Concurrent duplicate submission caught by unique index
+          newOrder = await Order.findOne({
+            restaurant: calcOrder.restaurantId,
+            idempotencyKey: scopedKey,
+          });
+          if (newOrder) {
+            // Check cross-user collision
+            const isUserMatch = userId
+              ? newOrder.user?.toString() === userId.toString()
+              : newOrder.address?.phone === address.phone;
+            if (!isUserMatch) {
+              return NextResponse.json(
+                { success: false, message: "Idempotency key conflict: key belongs to another user account." },
+                { status: 403 }
+              );
+            }
+            // Check payload hash
+            if (newOrder.payloadHash && newOrder.payloadHash !== payloadHash) {
+              return NextResponse.json(
+                { success: false, message: "Idempotency key cannot be reused with different cart items or parameters." },
+                { status: 409 }
+              );
+            }
+            // Reject cancelled order replay
+            if (newOrder.status === "cancelled") {
+              return NextResponse.json(
+                { success: false, message: "Cannot replay a cancelled order as a successful checkout." },
+                { status: 409 }
+              );
+            }
+
+            isExisting = true;
+            isReplay = true;
+          } else {
+            throw createErr;
+          }
+        } else {
+          throw createErr;
+        }
+      }
+
+      if (!isExisting) {
+        // Deduct ingredient stock safely based on dish recipes
+        const deductRes = await deductStockForOrder(newOrder);
+        if (!deductRes.success) {
+          // Rollback any orders created in this batch
+          const cancelReasonMsg = `Inventory deduction failed: ${deductRes.message || 'Insufficient stock'}`;
+          const currentOrderDoc = await Order.findById(newOrder._id);
+          if (currentOrderDoc) {
+            if (typeof currentOrderDoc.addStatusTransition === 'function') {
+              currentOrderDoc.addStatusTransition(
+                'cancelled',
+                { role: 'system', name: 'Inventory System' },
+                cancelReasonMsg
+              );
+            } else {
+              currentOrderDoc.status = 'cancelled';
+            }
+            currentOrderDoc.set('cancellationReason', cancelReasonMsg, { strict: false });
+            currentOrderDoc.notes = currentOrderDoc.notes
+              ? `${currentOrderDoc.notes} | ${cancelReasonMsg}`
+              : cancelReasonMsg;
+            await currentOrderDoc.save();
+          } else {
+            await Order.findByIdAndUpdate(newOrder._id, {
+              status: 'cancelled',
+              cancellationReason: cancelReasonMsg,
+            });
+          }
+
+          for (const prevOrder of createdOrders) {
+            try {
+              await restoreStockForOrder(prevOrder._id);
+              const prevDoc = await Order.findById(prevOrder._id);
+              if (prevDoc) {
+                const multiCancelMsg = 'Cancelled due to item unavailability in multi-restaurant checkout';
+                if (typeof prevDoc.addStatusTransition === 'function') {
+                  prevDoc.addStatusTransition(
+                    'cancelled',
+                    { role: 'system', name: 'Inventory System' },
+                    multiCancelMsg
+                  );
+                } else {
+                  prevDoc.status = 'cancelled';
+                }
+                prevDoc.set('cancellationReason', multiCancelMsg, { strict: false });
+                prevDoc.notes = prevDoc.notes
+                  ? `${prevDoc.notes} | ${multiCancelMsg}`
+                  : multiCancelMsg;
+                await prevDoc.save();
+              } else {
+                await Order.findByIdAndUpdate(prevOrder._id, {
+                  status: 'cancelled',
+                  cancellationReason: 'Cancelled due to item unavailability in multi-restaurant checkout',
+                });
+              }
+            } catch (_) {}
+          }
+
+          return NextResponse.json(
+            {
+              success: false,
+              error: deductRes.message || "Insufficient stock to complete order. Please adjust your cart.",
+              insufficientStock: deductRes.insufficientStock || false,
+              missingRequirements: deductRes.missingRequirements || [],
+            },
+            { status: 400 }
+          );
+        }
+      }
 
       const populatedOrder = await Order.findById(newOrder._id)
         .populate("restaurant", "name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings")
@@ -209,10 +407,12 @@ export async function POST(request) {
 
       createdOrders.push(populatedOrder);
 
-      // Dispatch Web Push notifications to customer and restaurant admins
-      notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
-        console.warn("[Order Create Push] Non-blocking push warning:", e.message)
-      );
+      if (!isExisting) {
+        // Dispatch Web Push notifications to customer and restaurant admins
+        notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
+          console.warn("[Order Create Push] Non-blocking push warning:", e.message)
+        );
+      }
     }
 
     const hasCod = createdOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
@@ -225,8 +425,9 @@ export async function POST(request) {
           : "Order placed successfully with Test Payment!",
         order: createdOrders[0],
         orders: createdOrders,
+        idempotentReplay: isReplay,
       },
-      { status: 201 }
+      { status: isReplay ? 200 : 201 }
     );
 
   } catch (error) {
@@ -237,7 +438,14 @@ export async function POST(request) {
 // PATCH — Customer Order Cancellation
 export async function PATCH(request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await resolveSession();
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { success: false, message: 'Authentication required to cancel an order. For guest orders, please contact the kitchen branch directly.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { orderId, reason = 'Cancelled by customer' } = body;
 
@@ -252,30 +460,42 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
     }
 
-    // Verify ownership
     let currentUser = null;
-    if (session?.user?.email) {
+    if (session.user.email) {
       currentUser = await User.findOne({ email: session.user.email });
     }
 
-    const isOwner =
-      (order.user && currentUser && order.user.toString() === currentUser._id.toString()) ||
-      (session?.user && order.address?.phone && session.user.phone && order.address.phone === session.user.phone) ||
-      (session?.user && order.address?.email && session.user.email && order.address.email === session.user.email) ||
-      (!order.user) || // Guest orders placed without an account
-      session?.user?.role === 'superadmin' ||
-      (session?.user?.role === 'restaurant_admin' && order.restaurant?._id?.toString() === session.user.restaurantId);
+    const isSuperadmin = session.user.role === 'superadmin';
+    const isRestAdmin =
+      session.user.role === 'restaurant_admin' &&
+      order.restaurant?._id?.toString() === (session.user.restaurantId || session.user.restaurant)?.toString();
+    const isCustomerOwner = Boolean(order.user && currentUser && order.user.toString() === currentUser._id.toString());
 
-    if (!isOwner) {
-      return NextResponse.json({ success: false, message: 'Not authorized to cancel this order' }, { status: 403 });
+    if (!isSuperadmin && !isRestAdmin && !isCustomerOwner) {
+      return NextResponse.json({ success: false, message: 'Not authorized to cancel this order.' }, { status: 403 });
     }
 
     // Check current order status
-    if (order.status === 'cancelled') {
-      return NextResponse.json({ success: false, message: 'Order is already cancelled' }, { status: 400 });
-    }
+    const isRestorationIncomplete =
+      !order.stockRestored &&
+      (order.stockDeducted ||
+        (Array.isArray(order.stockDeduction?.deductedIngredients) && order.stockDeduction.deductedIngredients.length > 0) ||
+        order.stockDeduction?.status === 'partial_failed');
 
-    if (order.status !== 'pending') {
+    const isRefundEligible =
+      ['paid', 'refund_pending'].includes(order.paymentStatus) &&
+      (order.paymentMethod?.toLowerCase().includes('razorpay') || order.paymentMethod?.toLowerCase().includes('online'));
+
+    const isRefundIncomplete =
+      isRefundEligible &&
+      order.refundDetails?.status !== 'processed';
+
+    if (order.status === 'cancelled') {
+      if (!isRestorationIncomplete && !isRefundIncomplete) {
+        return NextResponse.json({ success: false, message: 'Order is already cancelled' }, { status: 400 });
+      }
+      // If cancellation was previously interrupted, allow retry of restoration/refund without rejecting
+    } else if (order.status !== 'pending') {
       return NextResponse.json({
         success: false,
         message: `Order cannot be cancelled because it is already ${order.status.replace(/_/g, ' ')}. Please contact the kitchen directly.`,
@@ -284,49 +504,127 @@ export async function PATCH(request) {
 
     // Check restaurant customer cancellation settings
     const cancelSettings = order.restaurant?.cancellationSettings || {};
-    if (cancelSettings.allowCustomerCancel === false && session?.user?.role !== 'superadmin') {
-      return NextResponse.json({
-        success: false,
-        message: 'This restaurant does not allow self-cancellation. Please contact the kitchen directly.',
-      }, { status: 400 });
+    if (order.status !== 'cancelled') {
+      if (cancelSettings.allowCustomerCancel === false && session?.user?.role !== 'superadmin') {
+        return NextResponse.json({
+          success: false,
+          message: 'This restaurant does not allow self-cancellation. Please contact the kitchen directly.',
+        }, { status: 400 });
+      }
+
+      // Check cancellation time window (default 1 minute)
+      const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
+      const createdAtMs = new Date(order.createdAt).getTime();
+      const elapsedMinutes = (Date.now() - createdAtMs) / (60 * 1000);
+
+      // Provide a small 30-second grace buffer to handle network travel time
+      const allowedWindowMinutes = windowMinutes + 0.5;
+
+      if (elapsedMinutes > allowedWindowMinutes && session?.user?.role !== 'superadmin') {
+        return NextResponse.json({
+          success: false,
+          message: `The ${windowMinutes}-minute cancellation window has passed. Please contact the kitchen directly.`,
+        }, { status: 400 });
+      }
+
+      // Cancel order
+      if (typeof order.addStatusTransition === 'function') {
+        order.addStatusTransition(
+          'cancelled',
+          {
+            userId: currentUser?._id,
+            role: session.user?.role || 'customer',
+            name: currentUser?.name || session.user?.name || 'Customer',
+          },
+          `Cancellation reason: ${reason}`
+        );
+      } else {
+        order.status = 'cancelled';
+      }
+      order.notes = order.notes ? `${order.notes} | Cancellation reason: ${reason}` : `Cancellation reason: ${reason}`;
+      await order.save();
     }
 
-    // Check cancellation time window (default 1 minute)
-    const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
-    const createdAtMs = new Date(order.createdAt).getTime();
-    const elapsedMinutes = (Date.now() - createdAtMs) / (60 * 1000);
-
-    // Provide a small 30-second grace buffer to handle network travel time
-    const allowedWindowMinutes = windowMinutes + 0.5;
-
-    if (elapsedMinutes > allowedWindowMinutes && session?.user?.role !== 'superadmin') {
-      return NextResponse.json({
-        success: false,
-        message: `The ${windowMinutes}-minute cancellation window has passed. Please contact the kitchen directly.`,
-      }, { status: 400 });
-    }
-
-    // Cancel order
-    order.status = 'cancelled';
-    order.notes = order.notes ? `${order.notes} | Cancellation reason: ${reason}` : `Cancellation reason: ${reason}`;
-    await order.save();
-
-    // Restore stock if previously deducted
-    if (order.stockDeducted && !order.stockRestored) {
+    // Restore stock if previously deducted or partially deducted
+    let stockRestorationResult = null;
+    if (!order.stockRestored) {
       try {
-        await restoreStockForOrder(order);
+        stockRestorationResult = await restoreStockForOrder(order);
       } catch (stockErr) {
         console.warn('[Order Cancel] Stock restore warning:', stockErr.message);
+        stockRestorationResult = { success: false, error: stockErr.message };
       }
+    }
+
+    // Execute idempotent refund if order is eligible
+    let refundResult = null;
+    if (isRefundEligible) {
+      if (order.refundDetails?.status !== 'processed') {
+        try {
+          refundResult = await executeOrderRefund({
+            orderId: order._id,
+            reason: `Customer cancellation: ${reason}`,
+            initiatedBy: 'customer',
+          });
+        } catch (refErr) {
+          console.warn('[Order Cancel] Refund warning:', refErr.message);
+          refundResult = { success: false, error: refErr.message };
+        }
+      } else {
+        refundResult = { success: true, alreadyRefunded: true };
+      }
+    } else if (order.paymentStatus === 'reconciliation_required' || order.refundDetails?.status === 'reconciliation_required') {
+      refundResult = {
+        success: false,
+        status: 'reconciliation_required',
+        requiresManualReconciliation: true,
+        message: 'Order is in reconciliation_required state. Refund redispatch is prohibited during cancellation.',
+      };
     }
 
     // Dispatch push notifications to customer and restaurant admins
     notifyOrderEvent(order, 'order_cancelled_by_customer', { reason }).catch(() => {});
 
+    const updatedOrder = await Order.findById(order._id);
+
+    let refundMsg = 'Order cancelled successfully.';
+    if (refundResult) {
+      if (refundResult.success) {
+        refundMsg = 'Order cancelled and refund processed successfully.';
+      } else if (refundResult.requiresManualReconciliation || refundResult.status === 'reconciliation_required') {
+        refundMsg = 'Order cancelled. Refund outcome is uncertain and has been queued for manual reconciliation.';
+      } else if (refundResult.status === 'refund_pending') {
+        refundMsg = 'Order cancelled. Refund is pending and has been queued for processing.';
+      } else if (refundResult.inProgress) {
+        refundMsg = 'Order cancelled. Refund is currently processing.';
+      } else if (refundResult.status === 'failed') {
+        refundMsg = `Order cancelled, but refund failed: ${refundResult.error || refundResult.message}. Staff alerted.`;
+      }
+    }
+
+    if (stockRestorationResult && !stockRestorationResult.success && !stockRestorationResult.alreadyRestored) {
+      return NextResponse.json({
+        success: true,
+        orderCancelled: true,
+        inventoryRestored: false,
+        refund: refundResult,
+        message: stockRestorationResult.requiresManualReconciliation
+          ? 'Order cancelled, but inventory requires manual reconciliation.'
+          : stockRestorationResult.inProgress
+          ? 'Order cancelled, but inventory restoration is currently in progress.'
+          : 'Order cancelled, but inventory restoration was incomplete. Kitchen staff has been alerted.',
+        order: updatedOrder,
+        stockRestoration: stockRestorationResult,
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Order cancelled successfully.',
-      order,
+      orderCancelled: true,
+      inventoryRestored: true,
+      refund: refundResult,
+      message: refundMsg,
+      order: updatedOrder,
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

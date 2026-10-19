@@ -48,7 +48,7 @@ export async function PUT(request, { params }) {
         );
       }
       admin.password = await bcrypt.hash(body.newPassword.trim(), 12);
-      admin.visiblePassword = body.newPassword.trim();
+      admin.set("visiblePassword", undefined);
     }
 
     await admin.save();
@@ -60,7 +60,6 @@ export async function PUT(request, { params }) {
         _id: admin._id,
         name: admin.name,
         email: admin.email,
-        visiblePassword: admin.visiblePassword,
         role: admin.role,
         status: admin.status,
         restaurant: admin.restaurant,

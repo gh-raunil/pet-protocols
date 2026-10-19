@@ -1,10 +1,10 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import connectDB from "@/lib/db";
-import User from "@/models/User";
-import Restaurant from "@/models/Restaurant";
+import connectDB from "./db.js";
+import User from "../models/User.js";
+import Restaurant from "../models/Restaurant.js";
 
 export async function getAuthSession() {
+  const { authOptions } = await import("./auth.js");
   return await getServerSession(authOptions);
 }
 
@@ -34,12 +34,19 @@ export async function requireSuperAdmin() {
     .map((e) => e.trim())
     .filter(Boolean);
 
-  const userEmail = dbUser.email?.toLowerCase().trim();
+  const userEmails = (dbUser.email || "")
+    .toLowerCase()
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
   const isAllowedSuperadmin =
     configuredSuperadminEmails.length === 0 ||
-    configuredSuperadminEmails.includes(userEmail) ||
-    userEmail === "superadmin.petprotocols@gmail.com" ||
-    userEmail === "superadmin@petprotocols.com";
+    userEmails.some(
+      (e) =>
+        configuredSuperadminEmails.includes(e) ||
+        e === "superadmin.petprotocols@gmail.com" ||
+        e === "superadmin@petprotocols.com"
+    );
 
   if (!isAllowedSuperadmin) {
     return { error: "Access denied. Only the dedicated Superadmin email is authorized.", status: 403 };
@@ -48,8 +55,8 @@ export async function requireSuperAdmin() {
   return { user: dbUser };
 }
 
-export async function requireRestaurantAdmin({ allowStaff = false, requiredPermission = null, requiredFeature = null } = {}) {
-  const session = await getAuthSession();
+export async function requireRestaurantAdmin({ allowStaff = false, requiredPermission = null, requiredFeature = null, sessionOverride = null } = {}) {
+  const session = sessionOverride || await getAuthSession();
   if (!session || !session.user) {
     return { error: "Authentication required", status: 401 };
   }
@@ -86,12 +93,20 @@ export async function requireRestaurantAdmin({ allowStaff = false, requiredPermi
   }
 
   let restaurant = dbUser.restaurant;
+  if (restaurant && !restaurant.status) {
+    restaurant = await Restaurant.findById(restaurant._id || restaurant);
+  }
   if (!restaurant && dbUser.role === "superadmin") {
     restaurant = await Restaurant.findOne({ status: "active" });
   }
 
   if (!restaurant) {
     return { error: "No restaurant associated with this account.", status: 400 };
+  }
+
+  // P0-B: Deny restaurant admins / staff whenever their associated restaurant is suspended
+  if (dbUser.role !== "superadmin" && restaurant.status === "suspended") {
+    return { error: "Restaurant branch is suspended. Operations are disabled.", status: 403 };
   }
 
   if (requiredFeature && Array.isArray(restaurant.enabledFeatures)) {

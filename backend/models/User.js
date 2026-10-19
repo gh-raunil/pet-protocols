@@ -62,10 +62,6 @@ const UserSchema = new mongoose.Schema(
     password: {
       type: String,
     },
-    visiblePassword: {
-      type: String,
-      default: null,
-    },
     role: {
       type: String,
       enum: ['superadmin', 'restaurant_admin', 'customer', 'admin', 'user', 'staff'],

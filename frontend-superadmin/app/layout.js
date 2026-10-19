@@ -1,7 +1,7 @@
 import Providers from "./providers";
 import { ThemeProvider, ThemeScript } from "../components/ui/ThemeProvider";
 import AppShell from "../components/layout/AppShell";
-import { Toaster } from "react-hot-toast";
+import RichToaster from "../components/ui/RichToaster";
 import "./globals.css";
 
 export const metadata = {
@@ -26,13 +26,7 @@ export default function RootLayout({ children }) {
       >
         <ThemeProvider>
           <Providers>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                className: "text-xs font-medium border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-slate-200 shadow-xl",
-                duration: 3500,
-              }}
-            />
+            <RichToaster />
             <AppShell>{children}</AppShell>
           </Providers>
         </ThemeProvider>

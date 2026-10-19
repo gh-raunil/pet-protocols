@@ -13,6 +13,39 @@ import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } fro
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
+function getSmartInitialImage(product) {
+  const isDefaultSeedBurger =
+    product?.image && product.image.includes("1568901346375-23c9450c58cd");
+  const name = (product?.name || "").toLowerCase();
+  const cat = (
+    typeof product?.category === "string"
+      ? product.category
+      : product?.category?.name || ""
+  ).toLowerCase();
+
+  // If it's the generic seed burger image but the item is actually fries, pizza, or momos, give it the proper matched image
+  if (isDefaultSeedBurger) {
+    if (name.includes("frie") || cat.includes("frie")) return "/images/fries.png";
+    if (name.includes("pizza") || cat.includes("pizza")) return "/images/pizza.png";
+    if (name.includes("momo") || cat.includes("momo")) return "/images/momos.png";
+  }
+
+  if (product?.image && product.image.trim()) {
+    return product.image;
+  }
+
+  if (name.includes("frie") || cat.includes("frie")) return "/images/fries.png";
+  if (name.includes("pizza") || cat.includes("pizza")) return "/images/pizza.png";
+  if (name.includes("momo") || cat.includes("momo")) return "/images/momos.png";
+  if (name.includes("drink") || name.includes("coke") || cat.includes("drink") || cat.includes("beverage")) return "/images/drinks.png";
+  if (name.includes("burger") || cat.includes("burger")) return "/images/burger.png";
+  if (name.includes("dessert") || name.includes("jamun") || cat.includes("dessert") || cat.includes("sweet")) return "/images/cat-desserts.jpg";
+  if (name.includes("sandwich") || cat.includes("sandwich")) return "/images/cat-sandwiches.jpg";
+  if (name.includes("indian") || name.includes("curry") || cat.includes("indian")) return "/images/cat-indian.jpg";
+
+  return FALLBACK_IMAGE;
+}
+
 export function ProductCardSkeleton({ isCarousel = false }) {
   return (
     <div
@@ -39,13 +72,13 @@ export function ProductCardSkeleton({ isCarousel = false }) {
 export default function ProductCard({ product, isCarousel = false, offers = [] }) {
   const { addItem } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const [imgSrc, setImgSrc] = useState(product?.image || FALLBACK_IMAGE);
+  const [imgSrc, setImgSrc] = useState(() => getSmartInitialImage(product));
   const isFav = product?._id ? isFavorite(product._id) : false;
   const restStatus = useOperationalStatus(product?.restaurant);
 
   useEffect(() => {
-    setImgSrc(product?.image || FALLBACK_IMAGE);
-  }, [product?.image]);
+    setImgSrc(getSmartInitialImage(product));
+  }, [product?.image, product?.name, product?.category]);
 
   if (!product) return null;
 
@@ -200,7 +233,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             )}
 
             {/* Dish Title */}
-            <h3 className="text-xs sm:text-sm font-bold text-[var(--text-main)] line-clamp-1 group-hover:text-[var(--brand-accent)] transition-colors break-words">
+            <h3 className="text-xs sm:text-sm font-bold text-[var(--text-main)] line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem] group-hover:text-[var(--brand-accent)] transition-colors break-words leading-tight">
               {product.name}
             </h3>
           </div>
@@ -244,7 +277,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <button
             disabled
             aria-disabled="true"
-            className="w-full py-2 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed"
+            className="w-full py-2 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[38px] sm:min-h-[40px]"
           >
             Unavailable
           </button>
@@ -253,7 +286,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             type="button"
             onClick={handleAddToCart}
             aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
-            className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden"
+            className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
           >
             <Clock size={12} /> Closed
           </button>
@@ -262,10 +295,10 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             type="button"
             onClick={handleAddToCart}
             aria-label={`Add ${product.name} to cart`}
-            className="w-full py-2 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden"
+            className="w-full py-2 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
           >
             <Plus size={14} strokeWidth={2.5} />
-            <span>Add</span>
+            <span>Add to Cart</span>
           </button>
         )}
       </div>

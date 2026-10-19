@@ -39,19 +39,19 @@ toast.toast = toast;
 function parseToastContent(rawContent, type) {
   if (typeof rawContent === "object" && rawContent !== null && !React.isValidElement(rawContent)) {
     return {
-      title: rawContent.title || defaultTitleForType(type),
-      description: rawContent.message || rawContent.description || "",
-      badge: rawContent.badge,
+      title: rawContent.title || rawContent.message || defaultTitleForType(type),
+      description: rawContent.title ? (rawContent.message || rawContent.description || "") : (rawContent.description || ""),
+      badge: rawContent.badge || null,
     };
   }
 
-  const str = typeof rawContent === "string" ? rawContent : String(rawContent || "");
+  const str = typeof rawContent === "string" ? rawContent.trim() : String(rawContent || "").trim();
 
   // Multiline string
   if (str.includes("\n")) {
-    const lines = str.split("\n");
+    const lines = str.split("\n").map((l) => l.trim()).filter(Boolean);
     return {
-      title: lines[0],
+      title: lines[0] || defaultTitleForType(type),
       description: lines.slice(1).join(" "),
       badge: null,
     };
@@ -60,7 +60,7 @@ function parseToastContent(rawContent, type) {
   // String with ": " separator where prefix is short (e.g. "Order #104: Confirmed")
   if (str.includes(": ")) {
     const parts = str.split(": ");
-    if (parts[0].length <= 26) {
+    if (parts[0].length <= 26 && parts.slice(1).join(": ").trim().length > 0) {
       return {
         title: parts[0],
         description: parts.slice(1).join(": "),
@@ -69,29 +69,29 @@ function parseToastContent(rawContent, type) {
     }
   }
 
-  // Single string
+  // Single string: The string itself is the primary readable message (e.g. "Added to cart")
   return {
-    title: defaultTitleForType(type, str),
-    description: str,
+    title: str || defaultTitleForType(type),
+    description: "",
     badge: null,
   };
 }
 
 function defaultTitleForType(type, message = "") {
   const lower = typeof message === "string" ? message.toLowerCase() : "";
-  if (lower.includes("cart") || lower.includes("dish") || lower.includes("item") || lower.includes("quantity")) return "Cart & Selection";
+  if (lower.includes("cart") || lower.includes("dish") || lower.includes("item") || lower.includes("quantity")) return "Cart Updated";
   if (lower.includes("order") || lower.includes("checkout") || lower.includes("kitchen")) return "Order Status";
   if (lower.includes("coupon") || lower.includes("offer") || lower.includes("discount") || lower.includes("promo")) return "Special Offer";
   if (lower.includes("address") || lower.includes("location") || lower.includes("deliver")) return "Delivery Details";
   if (lower.includes("payment") || lower.includes("refund") || lower.includes("upi") || lower.includes("card")) return "Payment & Billing";
-  if (lower.includes("profile") || lower.includes("account") || lower.includes("login") || lower.includes("otp") || lower.includes("logout")) return "Account & Security";
-  if (lower.includes("push") || lower.includes("notification") || lower.includes("alert")) return "Live Alerts";
+  if (lower.includes("profile") || lower.includes("account") || lower.includes("login") || lower.includes("otp") || lower.includes("logout")) return "Account";
+  if (lower.includes("push") || lower.includes("notification") || lower.includes("alert")) return "Alerts";
 
   switch (type) {
     case "success":
-      return "Action Completed";
+      return "Success";
     case "error":
-      return "Something Went Wrong";
+      return "Error";
     case "warning":
       return "Notice";
     case "loading":
@@ -105,49 +105,49 @@ function defaultTitleForType(type, message = "") {
 const typeConfig = {
   success: {
     icon: CheckCircle2,
-    badgeText: "SUCCESS",
-    badgeClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25",
-    iconBg: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-emerald-500/10",
+    badgeText: "Success",
+    badgeClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     borderAccent: "border-l-emerald-500",
-    glowColor: "rgba(16, 185, 129, 0.18)",
-    progressBar: "from-emerald-500 via-teal-400 to-emerald-400",
+    glowColor: "rgba(16, 185, 129, 0.08)",
+    progressBar: "from-emerald-500 to-teal-400",
   },
   error: {
     icon: AlertCircle,
-    badgeText: "ERROR",
-    badgeClass: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25",
-    iconBg: "bg-rose-500/10 text-rose-500 border-rose-500/20 shadow-rose-500/10",
+    badgeText: "Error",
+    badgeClass: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    iconBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
     borderAccent: "border-l-rose-500",
-    glowColor: "rgba(244, 63, 94, 0.18)",
-    progressBar: "from-rose-500 via-red-400 to-rose-400",
+    glowColor: "rgba(244, 63, 94, 0.08)",
+    progressBar: "from-rose-500 to-red-400",
   },
   warning: {
     icon: AlertTriangle,
-    badgeText: "WARNING",
-    badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25",
-    iconBg: "bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-amber-500/10",
+    badgeText: "Warning",
+    badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
     borderAccent: "border-l-amber-500",
-    glowColor: "rgba(245, 158, 11, 0.18)",
-    progressBar: "from-amber-500 via-orange-400 to-amber-400",
+    glowColor: "rgba(245, 158, 11, 0.08)",
+    progressBar: "from-amber-500 to-orange-400",
   },
   loading: {
     icon: Loader2,
-    badgeText: "WORKING",
-    badgeClass: "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/25",
-    iconBg: "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/20 shadow-[var(--brand-accent)]/10",
+    badgeText: "Loading",
+    badgeClass: "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/20",
+    iconBg: "bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border-[var(--brand-accent)]/20",
     borderAccent: "border-l-[var(--brand-accent)]",
-    glowColor: "rgba(255, 90, 31, 0.18)",
-    progressBar: "from-orange-500 via-amber-400 to-orange-400",
+    glowColor: "rgba(234, 88, 12, 0.08)",
+    progressBar: "from-[var(--brand-accent)] to-amber-500",
     spinIcon: true,
   },
   info: {
     icon: Info,
-    badgeText: "UPDATE",
-    badgeClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25",
-    iconBg: "bg-sky-500/10 text-sky-500 border-sky-500/20 shadow-sky-500/10",
+    badgeText: "Info",
+    badgeClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+    iconBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
     borderAccent: "border-l-sky-500",
-    glowColor: "rgba(14, 165, 233, 0.18)",
-    progressBar: "from-sky-500 via-cyan-400 to-sky-400",
+    glowColor: "rgba(14, 165, 233, 0.08)",
+    progressBar: "from-sky-500 to-cyan-400",
   },
 };
 
@@ -161,7 +161,7 @@ export function ToastProvider({ children }) {
     );
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 240);
+    }, 220);
   }, []);
 
   const addToast = useCallback(
@@ -175,7 +175,12 @@ export function ToastProvider({ children }) {
       recentMessages.set(msgKey, now);
 
       const id = opts.id || Math.random().toString(36).substring(2, 9);
-      const defaultDuration = type === "loading" ? 0 : 3800;
+      const defaultDuration =
+        type === "loading"
+          ? 0
+          : type === "error"
+          ? 3200
+          : 2200;
       const duration = opts.duration !== undefined ? opts.duration : defaultDuration;
 
       const newToast = {
@@ -215,14 +220,23 @@ export function ToastProvider({ children }) {
           50% { transform: translateX(200%); }
           100% { transform: translateX(400%); }
         }
+        @media (prefers-reduced-motion: reduce) {
+          .rich-toast-item {
+            transition: opacity 0.15s ease !important;
+            transform: none !important;
+          }
+          .rich-toast-progress {
+            animation: none !important;
+          }
+        }
       `}</style>
       {children}
       {/* Toast Overlay Container:
           - When navbar is visible: sits comfortably below navbar (top-[4.5rem] sm:top-20)
           - When navbar hides on scroll: slides smoothly to the top (top-3 sm:top-4)
-          - Mobile responsive: left-3 right-3 on mobile so it never overflows or gets cut off */}
+          - Mobile responsive: left-3 right-3 with max-w-sm so it never overflows or obscures crucial controls */}
       <div
-        className={`fixed z-[99999] pointer-events-none flex flex-col gap-2.5 transition-all duration-300 ease-out left-3 right-3 sm:left-auto sm:right-6 sm:w-auto sm:max-w-md ${
+        className={`fixed z-[99999] pointer-events-none flex flex-col gap-2 transition-all duration-300 ease-out left-3 right-3 sm:left-auto sm:right-6 sm:w-auto sm:max-w-sm ${
           isNavHidden ? "top-3 sm:top-4" : "top-[4.5rem] sm:top-20"
         }`}
         aria-live="polite"
@@ -245,7 +259,7 @@ function SwipeableToastItem({ toast, onDismiss }) {
   const startYRef = useRef(0);
   const isHorizontalSwipe = useRef(false);
 
-  const duration = toast.duration ?? 3800;
+  const duration = toast.duration ?? (toast.type === "error" ? 3200 : 2200);
   const remainingTimeRef = useRef(duration);
   const timerStartRef = useRef(Date.now());
   const timerIdRef = useRef(null);
@@ -330,7 +344,7 @@ function SwipeableToastItem({ toast, onDismiss }) {
       transform = "translateX(120%)";
       opacity = 0;
     } else {
-      transform = "translateY(-8px) scale(0.95)";
+      transform = "translateY(-6px) scale(0.97)";
       opacity = 0;
     }
   }
@@ -347,7 +361,7 @@ function SwipeableToastItem({ toast, onDismiss }) {
           transform,
           opacity,
           touchAction: "pan-y",
-          transition: isDragging ? "none" : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease",
+          transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease",
         }}
         className="pointer-events-auto cursor-grab active:cursor-grabbing select-none"
       >
@@ -373,50 +387,46 @@ function SwipeableToastItem({ toast, onDismiss }) {
         transform,
         opacity,
         touchAction: "pan-y",
-        transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease",
+        transition: isDragging
+          ? "none"
+          : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease",
       }}
-      className={`pointer-events-auto relative overflow-hidden rounded-2xl bg-white/95 dark:bg-[#10141e]/95 border border-stone-200/80 dark:border-stone-800/80 text-stone-900 dark:text-white shadow-2xl shadow-black/20 dark:shadow-black/60 backdrop-blur-2xl p-4 min-w-[290px] sm:min-w-[340px] max-w-md border-l-[4px] ${cfg.borderAccent} cursor-grab active:cursor-grabbing select-none group`}
+      className={`rich-toast-item pointer-events-auto relative overflow-hidden rounded-xl bg-[var(--bg-card)]/95 border border-[var(--border-color)] text-[var(--text-main)] shadow-lg shadow-black/5 dark:shadow-black/25 backdrop-blur-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-[280px] sm:min-w-[320px] max-w-sm border-l-[3px] ${cfg.borderAccent} cursor-grab active:cursor-grabbing select-none group`}
     >
-      {/* Ambient glow sphere */}
+      {/* Subtle ambient accent glow */}
       <div
-        className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl transition-opacity duration-500"
+        className="pointer-events-none absolute -top-6 -right-6 w-20 h-20 rounded-full blur-xl opacity-60 transition-opacity duration-300"
         style={{ backgroundColor: cfg.glowColor }}
       />
 
       {isCustomElement ? (
         toast.content
       ) : (
-        <div className="flex items-start gap-3 relative z-10">
+        <div className="flex items-start gap-2.5 sm:gap-3 relative z-10">
           {/* Status Icon Badge */}
           <div
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 shadow-sm mt-0.5 ${cfg.iconBg}`}
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${cfg.iconBg}`}
           >
             <IconComponent
-              className={`w-5 h-5 ${cfg.spinIcon ? "animate-spin" : ""}`}
+              className={`w-4 h-4 shrink-0 ${cfg.spinIcon ? "animate-spin" : ""}`}
             />
           </div>
 
           {/* Text & Metadata Container */}
-          <div className="flex-1 min-w-0 pr-1">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span
-                  className={`px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wider uppercase rounded-md border ${cfg.badgeClass}`}
-                >
-                  {badge || cfg.badgeText}
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] text-stone-400 dark:text-stone-500 font-medium">
-                  <span className="w-1 h-1 rounded-full bg-stone-300 dark:bg-stone-600 animate-pulse" />
-                  just now
-                </span>
-              </div>
-            </div>
+          <div className="flex-1 min-w-0 pr-0.5">
+            {badge && (
+              <span
+                className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold tracking-wider uppercase rounded border mb-1 ${cfg.badgeClass}`}
+              >
+                {badge}
+              </span>
+            )}
 
-            <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-white leading-tight tracking-tight">
+            <h4 className="text-xs sm:text-sm font-semibold text-[var(--text-main)] leading-snug tracking-tight break-words">
               {title}
             </h4>
             {description ? (
-              <p className="text-[11px] sm:text-xs text-stone-600 dark:text-stone-300 mt-1 leading-relaxed break-words font-normal">
+              <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed break-words font-normal">
                 {description}
               </p>
             ) : null}
@@ -429,7 +439,7 @@ function SwipeableToastItem({ toast, onDismiss }) {
               e.stopPropagation();
               onDismiss("fade");
             }}
-            className="p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800/60 transition shrink-0 -mr-1 -mt-1 cursor-pointer"
+            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition shrink-0 -mr-1 -mt-0.5 cursor-pointer"
             aria-label="Dismiss notification"
           >
             <X size={14} />
@@ -439,9 +449,9 @@ function SwipeableToastItem({ toast, onDismiss }) {
 
       {/* Progress Bar */}
       {duration > 0 && toast.type !== "loading" ? (
-        <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-stone-100 dark:bg-stone-900/40 overflow-hidden">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--border-color)]/30 overflow-hidden">
           <div
-            className={`h-full bg-gradient-to-r ${cfg.progressBar}`}
+            className={`rich-toast-progress h-full bg-gradient-to-r ${cfg.progressBar}`}
             style={{
               animation: `richToastProgress ${duration}ms linear forwards`,
               animationPlayState: isHovered || isDragging ? "paused" : "running",
@@ -449,8 +459,10 @@ function SwipeableToastItem({ toast, onDismiss }) {
           />
         </div>
       ) : toast.type === "loading" ? (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-stone-100 dark:bg-stone-900/40 overflow-hidden">
-          <div className={`h-full w-1/3 bg-gradient-to-r ${cfg.progressBar} animate-[richToastIndeterminate_1.5s_infinite_ease-in-out]`} />
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--border-color)]/30 overflow-hidden">
+          <div
+            className={`rich-toast-progress h-full w-1/3 bg-gradient-to-r ${cfg.progressBar} animate-[richToastIndeterminate_1.5s_infinite_ease-in-out]`}
+          />
         </div>
       ) : null}
     </div>

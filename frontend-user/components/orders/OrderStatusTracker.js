@@ -105,11 +105,69 @@ export function getActiveStepIndex(status) {
   }
 }
 
+function formatStepTime(dateVal) {
+  if (!dateVal) return null;
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return null;
+  }
+}
+
+function formatFullDateTime(dateVal) {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString([], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function getStepHistoryEntry(stepId, history = [], createdAt = null) {
+  if (!Array.isArray(history) || history.length === 0) {
+    if (stepId === "pending" && createdAt) {
+      return { status: "pending", changedAt: createdAt };
+    }
+    return null;
+  }
+
+  if (stepId === "pending") {
+    const found = history.find((h) => h.status === "pending" || h.status === "confirmed");
+    return found || (createdAt ? { status: "pending", changedAt: createdAt } : null);
+  }
+  if (stepId === "preparing") {
+    return history.find((h) => h.status === "preparing") || null;
+  }
+  if (stepId === "ready") {
+    return history.find((h) => h.status === "ready") || null;
+  }
+  if (stepId === "out_for_delivery") {
+    return history.find((h) => h.status === "out_for_delivery") || null;
+  }
+  if (stepId === "delivered") {
+    return history.find((h) => h.status === "delivered") || null;
+  }
+  return null;
+}
+
 export default function OrderStatusTracker({
   status = "pending",
   paymentStatus = "paid",
   isPickup = false,
   cancellationReason = "",
+  statusHistory = [],
+  notes = "",
+  createdAt = null,
 }) {
   const isCancelled = status?.toLowerCase() === "cancelled";
   const isFailed = paymentStatus?.toLowerCase() === "failed";
@@ -117,30 +175,73 @@ export default function OrderStatusTracker({
   const steps = getOrderSteps(isPickup);
   const currentStep = steps[activeIndex] || steps[0];
 
+  // Cancellation timestamp & details from history if available
+  const cancelEntry = Array.isArray(statusHistory)
+    ? [...statusHistory].reverse().find((h) => h.status === "cancelled")
+    : null;
+  const cancelledAtDisplay = cancelEntry?.changedAt ? formatFullDateTime(cancelEntry.changedAt) : null;
+  const effectiveCancelReason =
+    cancellationReason || cancelEntry?.note || "This order was cancelled by the kitchen or customer.";
+
   // 1. Cancelled or Failed Order State
   if (isCancelled || isFailed) {
     return (
-      <div className="w-full bg-red-500/10 border border-red-500/25 rounded-3xl p-6 text-red-500 shadow-lg">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
-            {isCancelled ? <XCircle size={24} /> : <AlertTriangle size={24} />}
-          </div>
-          <div className="space-y-1">
-            <span className="inline-block text-xs font-black uppercase tracking-wider bg-red-500/20 text-red-500 px-3 py-1 rounded-full border border-red-500/30 mb-1">
-              {isCancelled ? "Order Cancelled" : "Payment Declined"}
-            </span>
-            <h4 className="text-base font-bold text-[var(--text-main)]">
-              {isCancelled ? "This order will not be fulfilled" : "Payment could not be processed"}
-            </h4>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              {isCancelled
-                ? (cancellationReason
-                    ? `Cancellation reason: ${cancellationReason}. If any payment was captured, the full refund is initiated to the source payment method.`
-                    : "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method.")
-                : "The payment transaction failed. Please retry your order using Cash on Delivery or another digital payment method."}
-            </p>
+      <div className="w-full space-y-4">
+        <div className="w-full bg-rose-500/10 border border-rose-500/25 rounded-3xl p-6 sm:p-7 text-rose-500 shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+              {isCancelled ? <XCircle size={24} /> : <AlertTriangle size={24} />}
+            </div>
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="inline-block text-xs font-black uppercase tracking-wider bg-rose-500/20 text-rose-500 px-3 py-1 rounded-full border border-rose-500/30">
+                  {isCancelled ? "Order Cancelled" : "Payment Declined"}
+                </span>
+                {cancelledAtDisplay && (
+                  <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1 font-medium">
+                    <Clock size={12} /> {cancelledAtDisplay}
+                  </span>
+                )}
+              </div>
+              <h4 className="text-base font-bold text-[var(--text-main)]">
+                {isCancelled ? "This order will not be fulfilled" : "Payment could not be processed"}
+              </h4>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                {isCancelled
+                  ? (effectiveCancelReason
+                      ? `Cancellation reason: ${effectiveCancelReason}. If any payment was captured, the full refund is initiated to the source payment method.`
+                      : "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method.")
+                  : "The payment transaction failed. Please retry your order using Cash on Delivery or another digital payment method."}
+              </p>
+            </div>
           </div>
         </div>
+
+        {/* Status History Trail if entries exist */}
+        {Array.isArray(statusHistory) && statusHistory.length > 0 && (
+          <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-6 shadow-md">
+            <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-muted)] mb-3 flex items-center gap-1.5">
+              <Clock size={14} className="text-[var(--brand-accent)]" /> Recorded Status Log
+            </h5>
+            <div className="space-y-3">
+              {statusHistory.map((entry, idx) => (
+                <div key={idx} className="flex items-start justify-between gap-2 text-xs border-b border-[var(--border-color)]/50 pb-2.5 last:border-0 last:pb-0">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-[var(--text-main)] capitalize">
+                      {entry.status?.replace(/_/g, " ")}
+                    </span>
+                    {entry.note && (
+                      <p className="text-[11px] text-[var(--text-muted)]">{entry.note}</p>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-mono text-[var(--text-muted)] shrink-0">
+                    {formatFullDateTime(entry.changedAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -150,88 +251,188 @@ export default function OrderStatusTracker({
 
   // 2. Normal Active Order Progress Tracker
   return (
-    <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden transition-all">
-      {/* Tracker Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-[var(--border-color)]">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--brand-accent)] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--brand-accent)]" />
-            </span>
-            <span className="text-xs font-black uppercase tracking-widest text-[var(--brand-accent)]">
-              Kitchen Live Tracker
+    <div className="w-full space-y-4">
+      <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden transition-all">
+        {/* Tracker Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-[var(--border-color)]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--brand-accent)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--brand-accent)]" />
+              </span>
+              <span className="text-xs font-black uppercase tracking-widest text-[var(--brand-accent)]">
+                Live Order Progress
+              </span>
+            </div>
+            <p className="text-sm sm:text-base font-bold text-[var(--text-main)] mt-1">
+              {currentStep.statusMessage}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25">
+              <Sparkles size={12} />
+              {currentStep.label}
             </span>
           </div>
-          <p className="text-sm sm:text-base font-bold text-[var(--text-main)] mt-1">
-            {currentStep.statusMessage}
-          </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/25">
-            <Sparkles size={12} />
-            {currentStep.label}
-          </span>
+        {/* Operational Problem / Alert Banner if present */}
+        {notes && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
+            <Clock size={16} className="shrink-0 mt-0.5 text-amber-500" />
+            <div className="min-w-0">
+              <p className="font-bold">Kitchen Note</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5 leading-relaxed">{notes}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop & Tablet Stepper with Real Recorded Timestamps */}
+        <div className="hidden sm:block pt-8 pb-2">
+          <div className="relative flex items-center justify-between">
+            {/* Background Connecting Track */}
+            <div className="absolute top-6 left-10 right-10 h-1.5 bg-[var(--bg-sub)] rounded-full z-0" />
+
+            {/* Active Filled Progress Bar */}
+            <div
+              className="absolute top-6 left-10 h-1.5 bg-gradient-to-r from-emerald-500 via-[var(--brand-accent)] to-[var(--brand-accent)] rounded-full z-0 transition-all duration-700 ease-out"
+              style={{
+                width: `calc(${progressPercent}% * (100% - 5rem) / 100)`,
+              }}
+            />
+
+            {/* Stepper Nodes */}
+            {steps.map((step, idx) => {
+              const Icon = step.icon;
+              const isCompleted = idx < activeIndex;
+              const isCurrent = idx === activeIndex;
+              const historyEntry = getStepHistoryEntry(step.id, statusHistory, createdAt);
+              const stepTime = historyEntry?.changedAt ? formatStepTime(historyEntry.changedAt) : null;
+
+              return (
+                <div
+                  key={step.id}
+                  className="flex flex-col items-center text-center z-10 w-32 relative"
+                >
+                  {/* Node Pill / Circle */}
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                      isCurrent
+                        ? "bg-[var(--brand-accent)] text-white shadow-xl shadow-[var(--brand-accent)]/40 ring-4 ring-[var(--brand-accent)]/20 scale-110"
+                        : isCompleted
+                        ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                        : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 size={20} strokeWidth={2.5} />
+                    ) : (
+                      <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />
+                    )}
+                  </div>
+
+                  {/* Step Labels */}
+                  <div className="mt-3.5 space-y-0.5">
+                    <p
+                      className={`text-xs font-bold leading-tight ${
+                        isCurrent
+                          ? "text-[var(--brand-accent)] font-extrabold"
+                          : isCompleted
+                          ? "text-[var(--text-main)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {step.label}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                      {step.description}
+                    </p>
+
+                    {/* Step Recorded Timestamp or Status Badge */}
+                    {stepTime ? (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)]">
+                        <Clock size={10} />
+                        {stepTime}
+                      </span>
+                    ) : isCurrent ? (
+                      <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--brand-accent)] bg-[var(--brand-accent)]/15 px-2 py-0.5 rounded-full">
+                        In Progress
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Desktop & Tablet Stepper */}
-      <div className="hidden sm:block pt-8 pb-2">
-        <div className="relative flex items-center justify-between">
-          {/* Background Connecting Track */}
-          <div className="absolute top-6 left-10 right-10 h-1.5 bg-[var(--bg-sub)] rounded-full z-0" />
-
-          {/* Active Filled Progress Bar */}
-          <div
-            className="absolute top-6 left-10 h-1.5 bg-gradient-to-r from-emerald-500 via-[var(--brand-accent)] to-[var(--brand-accent)] rounded-full z-0 transition-all duration-700 ease-out"
-            style={{
-              width: `calc(${progressPercent}% * (100% - 5rem) / 100)`,
-            }}
-          />
-
-          {/* Stepper Nodes */}
+        {/* Mobile Stepper View */}
+        <div className="sm:hidden pt-6 space-y-4">
           {steps.map((step, idx) => {
             const Icon = step.icon;
             const isCompleted = idx < activeIndex;
             const isCurrent = idx === activeIndex;
+            const historyEntry = getStepHistoryEntry(step.id, statusHistory, createdAt);
+            const stepTime = historyEntry?.changedAt ? formatStepTime(historyEntry.changedAt) : null;
 
             return (
-              <div
-                key={step.id}
-                className="flex flex-col items-center text-center z-10 w-32 relative"
-              >
-                {/* Node Pill / Circle */}
+              <div key={step.id} className="relative flex items-start gap-3.5">
+                {idx < steps.length - 1 && (
+                  <div
+                    className={`absolute top-9 left-4 -ml-0.5 w-1 h-9 rounded-full transition-colors ${
+                      isCompleted ? "bg-emerald-500" : "bg-[var(--border-color)]"
+                    }`}
+                  />
+                )}
+
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 z-10 transition-all ${
                     isCurrent
-                      ? "bg-[var(--brand-accent)] text-white shadow-xl shadow-[var(--brand-accent)]/40 ring-4 ring-[var(--brand-accent)]/20 scale-110"
+                      ? "bg-[var(--brand-accent)] text-white shadow-lg shadow-[var(--brand-accent)]/30 ring-3 ring-[var(--brand-accent)]/25"
                       : isCompleted
-                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      ? "bg-emerald-500 text-white shadow-sm"
                       : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
                   }`}
                 >
                   {isCompleted ? (
-                    <CheckCircle2 size={20} strokeWidth={2.5} />
+                    <CheckCircle2 size={16} strokeWidth={2.5} />
                   ) : (
-                    <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />
+                    <Icon size={16} strokeWidth={isCurrent ? 2.5 : 2} />
                   )}
                 </div>
 
-                {/* Step Labels */}
-                <div className="mt-3.5 space-y-0.5">
-                  <p
-                    className={`text-xs font-bold leading-tight ${
-                      isCurrent
-                        ? "text-[var(--brand-accent)] font-extrabold"
-                        : isCompleted
-                        ? "text-[var(--text-main)]"
-                        : "text-[var(--text-muted)]"
-                    }`}
-                  >
-                    {step.label}
-                  </p>
-                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p
+                      className={`text-xs font-bold ${
+                        isCurrent
+                          ? "text-[var(--brand-accent)]"
+                          : isCompleted
+                          ? "text-[var(--text-main)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {step.label}
+                    </p>
+                    {stepTime && (
+                      <span className="text-[10px] font-mono text-[var(--text-muted)] flex items-center gap-0.5">
+                        <Clock size={10} /> {stepTime}
+                      </span>
+                    )}
+                    {!stepTime && isCurrent && (
+                      <span className="text-[9px] font-black uppercase tracking-wider text-[var(--brand-accent)] bg-[var(--brand-accent)]/15 px-2 py-0.5 rounded-full border border-[var(--brand-accent)]/30">
+                        In Progress
+                      </span>
+                    )}
+                    {!stepTime && isCompleted && (
+                      <span className="text-[10px] font-bold text-emerald-500">
+                        Completed ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                     {step.description}
                   </p>
                 </div>
@@ -241,71 +442,52 @@ export default function OrderStatusTracker({
         </div>
       </div>
 
-      {/* Mobile Stepper View */}
-      <div className="sm:hidden pt-6 space-y-4">
-        {steps.map((step, idx) => {
-          const Icon = step.icon;
-          const isCompleted = idx < activeIndex;
-          const isCurrent = idx === activeIndex;
+      {/* Chronological Milestone Timeline (Zomato / Zepto Style Status Log) */}
+      {Array.isArray(statusHistory) && statusHistory.length > 0 && (
+        <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-3.5">
+            <h4 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+              <Clock size={14} className="text-[var(--brand-accent)]" /> Order Status History
+            </h4>
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {statusHistory.length} event{statusHistory.length > 1 ? "s" : ""}
+            </span>
+          </div>
 
-          return (
-            <div key={step.id} className="relative flex items-start gap-3.5">
-              {idx < steps.length - 1 && (
-                <div
-                  className={`absolute top-9 left-4 -ml-0.5 w-1 h-9 rounded-full transition-colors ${
-                    isCompleted ? "bg-emerald-500" : "bg-[var(--border-color)]"
-                  }`}
-                />
-              )}
-
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 z-10 transition-all ${
-                  isCurrent
-                    ? "bg-[var(--brand-accent)] text-white shadow-lg shadow-[var(--brand-accent)]/30 ring-3 ring-[var(--brand-accent)]/25"
-                    : isCompleted
-                    ? "bg-emerald-500 text-white shadow-sm"
-                    : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
-                }`}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 size={16} strokeWidth={2.5} />
-                ) : (
-                  <Icon size={16} strokeWidth={isCurrent ? 2.5 : 2} />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0 pt-0.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p
-                    className={`text-xs font-bold ${
-                      isCurrent
-                        ? "text-[var(--brand-accent)]"
-                        : isCompleted
-                        ? "text-[var(--text-main)]"
-                        : "text-[var(--text-muted)]"
+          <div className="space-y-3 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border-color)]">
+            {statusHistory.map((item, idx) => {
+              const isLast = idx === statusHistory.length - 1;
+              return (
+                <div key={idx} className="relative flex items-start gap-3 pl-7">
+                  <div
+                    className={`absolute left-1.5 top-1.5 w-3 h-3 rounded-full border-2 transition-colors ${
+                      isLast
+                        ? "bg-[var(--brand-accent)] border-[var(--brand-accent)] ring-3 ring-[var(--brand-accent)]/20"
+                        : "bg-emerald-500 border-emerald-500"
                     }`}
-                  >
-                    {step.label}
-                  </p>
-                  {isCurrent && (
-                    <span className="text-[9px] font-black uppercase tracking-wider text-[var(--brand-accent)] bg-[var(--brand-accent)]/15 px-2 py-0.5 rounded-full border border-[var(--brand-accent)]/30">
-                      In Progress
-                    </span>
-                  )}
-                  {isCompleted && (
-                    <span className="text-[10px] font-bold text-emerald-500">
-                      Completed ✓
-                    </span>
-                  )}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-[var(--text-main)] capitalize">
+                        {item.status?.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                        {formatFullDateTime(item.changedAt)}
+                      </span>
+                    </div>
+                    {item.note && (
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                        {item.note}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  {step.description}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

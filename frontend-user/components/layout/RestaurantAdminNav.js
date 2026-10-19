@@ -30,7 +30,7 @@ export default function RestaurantAdminNav() {
         <div className="flex items-center gap-4">
           <Link href="/restaurant/dashboard" className="flex items-center gap-2">
             <span className="text-xl font-black tracking-tight text-white">
-              PET <span className="text-orange-500">PROTOCOLS</span>
+              पेट <span className="text-orange-500">PROTOCOLS</span>
             </span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
               RESTAURANT ADMIN

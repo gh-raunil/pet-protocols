@@ -15,6 +15,7 @@ import {
   ArrowRight,
   ChevronDown,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
 
@@ -63,10 +64,13 @@ export default function NotificationsClient() {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearAllNotifications,
   } = useNotificationStore();
 
   const [expandedId, setExpandedId] = useState(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -146,22 +150,53 @@ export default function NotificationsClient() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAll}
               disabled={markingAll}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] hover:bg-[var(--brand-accent)] hover:text-white transition text-xs font-bold shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] hover:bg-[var(--brand-accent)] hover:text-white transition text-xs font-bold shadow-sm cursor-pointer"
             >
               <CheckCheck size={14} />
               <span>Mark all read</span>
             </button>
           )}
 
+          {messages.length > 0 && (
+            confirmingClear ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30">
+                <span className="text-xs text-rose-500 font-bold">Clear all?</span>
+                <button
+                  onClick={async () => {
+                    await clearAllNotifications();
+                    setConfirmingClear(false);
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-rose-500 text-white text-[11px] font-bold hover:bg-rose-600 transition cursor-pointer"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setConfirmingClear(false)}
+                  className="px-2 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] text-[11px] font-medium hover:text-[var(--text-main)] transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingClear(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 text-xs font-semibold transition cursor-pointer"
+              >
+                <Trash2 size={14} />
+                <span>Clear all</span>
+              </button>
+            )
+          )}
+
           <button
             onClick={() => fetchNotifications()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
           >
             <RefreshCw size={13} className={loading ? "animate-spin text-[var(--brand-accent)]" : ""} />
             <span>Refresh</span>
@@ -330,6 +365,15 @@ export default function NotificationsClient() {
                             Mark as read
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => deleteNotification(msgId)}
+                          title="Delete notification"
+                          aria-label={`Delete notification ${msg.title}`}
+                          className="p-1 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
                   );

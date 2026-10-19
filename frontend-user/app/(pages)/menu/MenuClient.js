@@ -321,9 +321,9 @@ export default function MenuClient() {
       </div>
 
       {/* ── UNIFIED MENU DISCOVERY HUB ─────────────────────────────── */}
-      <div className="p-3 sm:p-4 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-xs space-y-3 w-full max-w-full overflow-hidden min-w-0">
+      <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-xs space-y-2.5 sm:space-y-3 w-full max-w-full overflow-hidden min-w-0">
         {/* Row 1: Primary Category Discovery */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 scrollbar-none -mx-0.5 px-0.5">
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             return (
@@ -331,16 +331,16 @@ export default function MenuClient() {
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategoryClick(cat.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shadow-2xs shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                className={`h-8 inline-flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                   isSelected
-                    ? "bg-[var(--brand-accent)] text-white shadow-xs"
-                    : "bg-[var(--bg-sub)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/50 border border-[var(--border-color)]"
+                    ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
+                    : "bg-[var(--bg-sub)] text-[var(--text-main)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)]"
                 }`}
               >
-                <span className="mr-1">{cat.icon}</span>
+                <span className="shrink-0 text-sm leading-none" aria-hidden="true">{cat.icon}</span>
                 <span>{cat.label}</span>
                 {cat.count > 0 && (
-                  <span className={`ml-1 text-[10px] font-semibold opacity-75`}>
+                  <span className={`text-[10px] font-medium opacity-80 ml-0.5`}>
                     ({cat.count})
                   </span>
                 )}
@@ -350,17 +350,17 @@ export default function MenuClient() {
         </div>
 
         {/* Row 2: Search, Dietary, Stock, and Sort Controls */}
-        <div className="flex flex-col md:flex-row gap-2.5 sm:gap-3 items-stretch md:items-center">
+        <div className="flex flex-col md:flex-row gap-2 sm:gap-2.5 items-stretch md:items-center">
           {/* Search Input */}
-          <div className="flex-1 relative min-w-[200px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4 pointer-events-none" />
+          <div className="relative flex-1 min-w-[200px] md:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4 pointer-events-none" />
             <input
               type="text"
               aria-label="Search dishes by name or category"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search dishes by name or category..."
-              className="w-full pl-10 pr-9 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-2 focus:ring-[var(--brand-accent)]/20 outline-none transition shadow-2xs font-medium"
+              className="h-9 w-full pl-9 pr-8 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition font-medium"
             />
             {searchInput && (
               <button
@@ -370,7 +370,7 @@ export default function MenuClient() {
                   updateFilters({ search: "" });
                 }}
                 aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer"
               >
                 <X size={14} />
               </button>
@@ -378,15 +378,15 @@ export default function MenuClient() {
           </div>
 
           {/* Quick Filter Controls */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 md:pb-0 scrollbar-none shrink-0 -mx-0.5 px-0.5">
             {/* Veg / Non-Veg Toggle */}
-            <div className="flex rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] p-0.5 shrink-0 shadow-2xs">
+            <div className="h-9 inline-flex items-center rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => handleTypeClick("all")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
                   selectedType === "all"
-                    ? "bg-[var(--brand-accent)] text-white shadow-2xs"
+                    ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 }`}
               >
@@ -395,24 +395,24 @@ export default function MenuClient() {
               <button
                 type="button"
                 onClick={() => handleTypeClick("veg")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                   selectedType === "veg"
-                    ? "bg-emerald-600 text-white shadow-2xs"
+                    ? "bg-emerald-600 text-white shadow-2xs font-bold"
                     : "text-emerald-600 dark:text-emerald-400 hover:opacity-80"
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Veg
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> Veg
               </button>
               <button
                 type="button"
                 onClick={() => handleTypeClick("non-veg")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
                   selectedType === "non-veg"
-                    ? "bg-rose-600 text-white shadow-2xs"
+                    ? "bg-rose-600 text-white shadow-2xs font-bold"
                     : "text-rose-600 dark:text-rose-400 hover:opacity-80"
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Non-Veg
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" /> Non-Veg
               </button>
             </div>
 
@@ -421,13 +421,13 @@ export default function MenuClient() {
               type="button"
               onClick={handleStockToggle}
               aria-pressed={onlyInStock}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition shrink-0 flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden shadow-2xs ${
+              className={`h-9 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold border transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                 onlyInStock
-                  ? "bg-[var(--brand-accent)]/15 border-[var(--brand-accent)] text-[var(--brand-accent)]"
+                  ? "bg-[var(--brand-accent)]/15 border-[var(--brand-accent)] text-[var(--brand-accent)] font-bold"
                   : "bg-[var(--bg-sub)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
               }`}
             >
-              <Check size={13} className={onlyInStock ? "opacity-100" : "opacity-30"} />
+              <Check size={13} className={onlyInStock ? "opacity-100" : "opacity-35"} />
               <span>In Stock Only</span>
             </button>
 
@@ -437,7 +437,7 @@ export default function MenuClient() {
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
                 aria-label="Sort dishes"
-                className="pl-3 pr-7 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)] outline-none transition cursor-pointer appearance-none shadow-2xs"
+                className="h-9 pl-3 pr-7 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
               >
                 <option value="default">Sort: Recommended</option>
                 <option value="price-low">Price: Low to High</option>
@@ -453,7 +453,7 @@ export default function MenuClient() {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-3 py-2 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-bold text-[var(--brand-accent)] transition shrink-0 cursor-pointer flex items-center gap-1 shadow-2xs"
+                className="h-9 inline-flex items-center gap-1 px-2.5 sm:px-3 rounded-lg bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-semibold text-[var(--brand-accent)] transition shrink-0 cursor-pointer"
               >
                 <X size={12} />
                 <span>Reset ({activeFiltersCount})</span>
@@ -464,14 +464,14 @@ export default function MenuClient() {
 
         {/* Row 3: Integrated Partner Kitchen Chips */}
         {restaurants.length > 0 && (
-          <div className="pt-2.5 border-t border-[var(--border-color)] flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none text-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1 shrink-0 mr-1">
-              <Building2 size={13} className="text-[var(--brand-accent)]" /> Partner Kitchens:
+          <div className="pt-2 border-t border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 scrollbar-none text-xs -mx-0.5 px-0.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 shrink-0 mr-0.5 select-none">
+              <Building2 size={13} className="text-[var(--brand-accent)] shrink-0" /> Partner Kitchens:
             </span>
             <button
               type="button"
               onClick={() => handleRestaurantClick("all")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+              className={`h-7 inline-flex items-center px-2.5 rounded-md text-xs font-medium whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                 selectedRestaurant === "all"
                   ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
                   : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
@@ -487,7 +487,7 @@ export default function MenuClient() {
                   key={rest._id}
                   type="button"
                   onClick={() => handleRestaurantClick(rest._id)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                  className={`h-7 inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                     isSelected
                       ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
                       : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
@@ -495,7 +495,7 @@ export default function MenuClient() {
                 >
                   <span>{rest.name}</span>
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                       op.isOpen ? "bg-emerald-500" : "bg-amber-500"
                     }`}
                     title={op.isOpen ? "Open Now" : op.reason}

@@ -13,7 +13,7 @@ export default function SearchBar({
   placeholder,
 }) {
   const isHero = variant === "hero";
-  const [heroMobileOpen, setHeroMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,10 @@ export default function SearchBar({
   const [activeCategory, setActiveCategory] = useState("All");
   const [recentSearches, setRecentSearches] = useState([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const router = useRouter();
   const searchContainerRef = useRef(null);
@@ -483,16 +487,18 @@ export default function SearchBar({
             setActiveIndex(-1);
           }}
           onKeyDown={handleInputKeyDown}
-          onFocus={() => {
+          onFocus={(e) => {
             if (isHero && typeof window !== "undefined" && window.innerWidth < 768) {
-              setHeroMobileOpen(true);
+              e.target.blur();
+              window.dispatchEvent(new CustomEvent("open_mobile_search"));
             } else {
               setIsOpen(true);
             }
           }}
-          onClick={() => {
+          onClick={(e) => {
             if (isHero && typeof window !== "undefined" && window.innerWidth < 768) {
-              setHeroMobileOpen(true);
+              e.target.blur();
+              window.dispatchEvent(new CustomEvent("open_mobile_search"));
             }
           }}
           placeholder={
@@ -530,6 +536,12 @@ export default function SearchBar({
         {isHero && (
           <button
             type="submit"
+            onClick={(e) => {
+              if (typeof window !== "undefined" && window.innerWidth < 768 && !query.trim()) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent("open_mobile_search"));
+              }
+            }}
             className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer shadow-xs active:scale-97"
           >
             Search
@@ -698,22 +710,6 @@ export default function SearchBar({
               </button>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Mobile Full-Screen Search Dialog when triggered from hero on mobile */}
-      {isHero && heroMobileOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Search dishes and menu"
-          className="md:hidden fixed inset-0 z-[100] bg-[var(--bg-main)]"
-        >
-          <SearchBar
-            isMobile={true}
-            onClose={() => setHeroMobileOpen(false)}
-            autoFocus={true}
-          />
         </div>
       )}
     </div>

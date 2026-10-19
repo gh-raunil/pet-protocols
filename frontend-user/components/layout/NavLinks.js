@@ -19,10 +19,20 @@ const NavLinks = () => {
 
   const links = [
     {
+      href: "/",
+      label: "Home",
+      badge: 0,
+    },
+    {
       href: "/menu",
       label: "Explore Menu",
       badge: menuBadge,
       onClear: clearMenuBadge,
+    },
+    {
+      href: "/#restaurants",
+      label: "Restaurants",
+      badge: 0,
     },
     {
       href: "/offers",
