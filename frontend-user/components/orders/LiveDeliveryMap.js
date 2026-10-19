@@ -250,7 +250,7 @@ export default function LiveDeliveryMap({
 
     if (!script) {
       loadScriptWithFallback(
-        `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0`,
+        `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0&layer=vector`,
         `https://sdk.mappls.com/map/sdk/web?v=3.0&access_token=${encodeURIComponent(mapKey)}`
       );
     } else {
@@ -315,7 +315,7 @@ export default function LiveDeliveryMap({
     };
 
     loadScript(
-      `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0`,
+      `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0&layer=vector`,
       `https://sdk.mappls.com/map/sdk/web?v=3.0&access_token=${encodeURIComponent(mapKey)}`
     );
   }, [mapKey]);
@@ -364,7 +364,12 @@ export default function LiveDeliveryMap({
     // 1. Initialize Map once
     if (!mapInstanceRef.current) {
       try {
-        const map = new window.mappls.Map(mapContainerRef.current, {
+        const container = mapContainerRef.current;
+        if (!container.id) {
+          container.id = "mappls-live-delivery-map-canvas";
+        }
+
+        const map = new window.mappls.Map(container.id, {
           center: initialCenter,
           zoom: hasValidDriverCoords ? 15 : 14,
           placemark: false,
@@ -372,6 +377,14 @@ export default function LiveDeliveryMap({
           hybrid: false,
         });
         mapInstanceRef.current = map;
+
+        if (typeof map.on === "function") {
+          map.on("load", () => {
+            try {
+              map.resize();
+            } catch {}
+          });
+        }
       } catch (err) {
         console.warn("Failed to initialize Mappls Map:", err?.message);
         return;
@@ -380,6 +393,12 @@ export default function LiveDeliveryMap({
 
     const map = mapInstanceRef.current;
     if (!map) return;
+
+    try {
+      if (typeof map.resize === "function") {
+        map.resize();
+      }
+    } catch {}
 
     // 2. Manage Restaurant Marker
     if (hasValidRestaurantCoords) {
@@ -768,11 +787,12 @@ export default function LiveDeliveryMap({
       <div className="relative w-full overflow-hidden bg-stone-100 dark:bg-stone-900">
         {/* Interactive Mappls Map */}
         <div
+          id="mappls-live-delivery-map-canvas"
           ref={mapContainerRef}
-          className={`w-full transition-all duration-300 ${
+          className={`w-full transition-all duration-300 relative ${
             isExpanded ? "h-[450px] sm:h-[550px]" : "h-[300px] sm:h-[380px]"
           }`}
-          style={{ minHeight: "280px" }}
+          style={{ minHeight: "280px", width: "100%" }}
         />
 
         {/* Missing Key Fallback Overlay */}
