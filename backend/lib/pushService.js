@@ -372,6 +372,34 @@ export async function notifyOrderEvent(order, eventType, extraData = {}) {
       };
       notifications.push(sendPushForOrder(order, customerPayload, preferenceKey));
 
+      // When delivered, notify restaurant managers and staff
+      if (status === 'delivered' && restaurantId) {
+        const handlerName = order.codPaymentHandler?.name || order.assignedDeliveryStaff?.name || 'Delivery Partner';
+        const isCodOrder =
+          String(order.paymentMethod || '').toLowerCase().includes('cod') ||
+          String(order.paymentMethod || '').toLowerCase().includes('cash');
+        const codAmount = order.codPaymentHandler?.amount || order.totalAmount || 0;
+        const codSuffix = isCodOrder ? ` • Cash Collected: ₹${codAmount}` : ' • Paid Online';
+
+        const deliveredAdminPayload = {
+          title: 'Order Delivered! 🎉',
+          body: `Order #${orderShortId} was marked delivered by ${handlerName}${codSuffix}.`,
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/favicon-32x32.png',
+          url: `/delivery`,
+          tag: `restaurant-order-delivered-${orderId}`,
+          data: {
+            orderId,
+            status: 'delivered',
+            url: `/delivery`,
+            type: 'order_delivered',
+          },
+        };
+        notifications.push(
+          sendPushToRestaurantAdmins(restaurantId, deliveredAdminPayload, { settingKey: 'restaurantNewOrder' })
+        );
+      }
+
       // If status is cancelled by superadmin or external event, also notify restaurant admins
       if (status === 'cancelled' && extraData.notifyRestaurant && restaurantId) {
         const adminPayload = {

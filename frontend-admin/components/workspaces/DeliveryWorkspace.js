@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import {
   Truck,
@@ -30,6 +31,11 @@ import {
   AlertTriangle,
   Power,
   WifiOff,
+  Lock,
+  Banknote,
+  Wallet,
+  FileSpreadsheet,
+  BadgeCheck,
 } from "lucide-react";
 import {
   useDeliveryGpsTransmitter,
@@ -37,6 +43,15 @@ import {
 } from "@/hooks/useDeliveryGpsTransmitter";
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
+  const { data: session } = useSession();
+  const isLeadAdmin = session?.user?.role === "lead_admin" || session?.user?.role === "admin";
+  const staffRoles = Array.isArray(session?.user?.staffRoles) ? session.user.staffRoles : [];
+  const isManager = isLeadAdmin || staffRoles.includes("Manager");
+  const currentStaffName = session?.user?.name || "Delivery Staff";
+  const currentStaffPhone = session?.user?.phone || "";
+  const currentStaffId = session?.user?.id || session?.user?._id;
+
+  const [activeTab, setActiveTab] = useState("deliveries"); // "deliveries" | "cod_register"
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,6 +63,17 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [deliveryNote, setDeliveryNote] = useState({});
 
   const gpsTransmitter = useDeliveryGpsTransmitter();
+
+  const isOrderCod = (order) => {
+    if (!order) return false;
+    const method = String(order.paymentMethod || "").toLowerCase();
+    return method.includes("cod") || method.includes("cash") || order.paymentStatus === "pending";
+  };
+
+  const isCashCollected = (order) => {
+    if (!order) return false;
+    return Boolean(order.codPaymentHandler?.collected || order.paymentStatus === "paid");
+  };
 
   async function loadOrders(isSilent = false) {
     try {
@@ -91,6 +117,16 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
   async function updateOrderStatus(orderId, newStatus, extra = {}) {
     try {
+      const currentOrder = orders.find((o) => o._id === orderId);
+
+      // Lock delivered status for unpaid COD orders
+      if (newStatus === "delivered") {
+        if (currentOrder && isOrderCod(currentOrder) && !isCashCollected(currentOrder)) {
+          toast.error("Cash on Delivery must be collected before marking order delivered!");
+          return;
+        }
+      }
+
       setUpdatingId(orderId);
       const res = await fetch("/api/restaurant/orders", {
         method: "PUT",
@@ -108,7 +144,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           prev.map((o) => (o._id === orderId ? { ...o, status: newStatus, ...extra } : o))
         );
 
-        const currentOrder = orders.find((o) => o._id === orderId);
+        if (newStatus === "delivered") {
+          toast.success("Order marked delivered! Customer and Kitchen Manager notified.", { icon: "🎉" });
+        }
 
         // Auto-start GPS when transitioning to out_for_delivery if not pickup
         if (newStatus === "out_for_delivery") {
@@ -141,28 +179,100 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     }
   }
 
-  async function markCashPaid(orderId) {
-    if (!confirm("Confirm cash collected from customer?")) return;
+  async function handleCollectCash(order) {
+    const amount = Number(order.totalAmount || 0);
+    if (!confirm(`Confirm collecting ₹${amount.toFixed(2)} in cash from customer for order #${order.orderId || order._id}?`)) {
+      return;
+    }
     try {
-      setUpdatingId(orderId);
+      setUpdatingId(order._id);
       const res = await fetch("/api/restaurant/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId,
+          orderId: order._id,
           paymentStatus: "paid",
+          codPaymentHandler: {
+            id: currentStaffId,
+            name: currentStaffName,
+            phone: currentStaffPhone,
+            amount: amount,
+            collected: true,
+            collectedAt: new Date(),
+            settledWithManager: false,
+          },
         }),
       });
       const data = await res.json();
       if (data.success) {
+        toast.success(`₹${amount.toFixed(2)} cash collected! "Mark Handed Over / Delivered" is now unlocked.`);
         setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, paymentStatus: "paid" } : o))
+          prev.map((o) =>
+            o._id === order._id
+              ? {
+                  ...o,
+                  paymentStatus: "paid",
+                  codPaymentHandler: {
+                    id: currentStaffId,
+                    name: currentStaffName,
+                    phone: currentStaffPhone,
+                    amount: amount,
+                    collected: true,
+                    collectedAt: new Date().toISOString(),
+                    settledWithManager: false,
+                  },
+                }
+              : o
+          )
         );
       } else {
-        alert(data.message || "Failed to update payment status.");
+        toast.error(data.message || "Failed to record cash collection.");
       }
     } catch (err) {
-      console.error("Payment update error:", err);
+      console.error("Cash collection error:", err);
+      toast.error("Network error recording cash collection.");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function handleSettleCash(orderIds) {
+    const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
+    if (!ids.length) return;
+    if (!confirm(`Confirm settling COD cash for ${ids.length} order(s) with manager?`)) return;
+    try {
+      setUpdatingId(ids[0]);
+      const res = await fetch("/api/restaurant/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderIds: ids,
+          action: "settle_cod_cash",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || "COD cash marked as settled with manager.");
+        setOrders((prev) =>
+          prev.map((o) =>
+            ids.includes(o._id)
+              ? {
+                  ...o,
+                  codPaymentHandler: {
+                    ...(o.codPaymentHandler || {}),
+                    settledWithManager: true,
+                    settledAt: new Date().toISOString(),
+                  },
+                }
+              : o
+          )
+        );
+      } else {
+        toast.error(data.message || "Failed to settle cash.");
+      }
+    } catch (err) {
+      console.error("Settle cash error:", err);
+      toast.error("Network error settling cash.");
     } finally {
       setUpdatingId(null);
     }
@@ -201,6 +311,136 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
     return { ready, inTransit, deliveredToday, codToCollect };
   }, [orders]);
+
+  // Comprehensive COD cash summary & manager reconciliation dataset
+  const codSummary = useMemo(() => {
+    const codOrders = orders.filter((o) => {
+      const mode = String(o.paymentMethod || "").toLowerCase();
+      return (
+        mode.includes("cod") ||
+        mode.includes("cash") ||
+        o.paymentStatus === "pending" ||
+        o.codPaymentHandler?.collected
+      );
+    });
+
+    const collectedOrders = codOrders.filter((o) => o.codPaymentHandler?.collected || o.paymentStatus === "paid");
+    const totalCollected = collectedOrders.reduce(
+      (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+      0
+    );
+
+    const unsettledOrders = collectedOrders.filter((o) => !o.codPaymentHandler?.settledWithManager);
+    const totalUnsettled = unsettledOrders.reduce(
+      (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+      0
+    );
+
+    const settledOrders = collectedOrders.filter((o) => o.codPaymentHandler?.settledWithManager);
+    const totalSettled = settledOrders.reduce(
+      (sum, o) => sum + (o.codPaymentHandler?.amount || o.totalAmount || 0),
+      0
+    );
+
+    // Group by staff
+    const staffMap = {};
+    collectedOrders.forEach((o) => {
+      const staffName = o.codPaymentHandler?.name || "General Delivery Staff";
+      const staffId = o.codPaymentHandler?.id || "unknown";
+      const key = `${staffName}_${staffId}`;
+      if (!staffMap[key]) {
+        staffMap[key] = {
+          staffId,
+          staffName,
+          staffPhone: o.codPaymentHandler?.phone || "",
+          orderIds: [],
+          totalCollected: 0,
+          unsettledAmount: 0,
+          settledAmount: 0,
+        };
+      }
+      const amt = o.codPaymentHandler?.amount || o.totalAmount || 0;
+      staffMap[key].orderIds.push(o._id);
+      staffMap[key].totalCollected += amt;
+      if (o.codPaymentHandler?.settledWithManager) {
+        staffMap[key].settledAmount += amt;
+      } else {
+        staffMap[key].unsettledAmount += amt;
+      }
+    });
+
+    return {
+      codOrders,
+      collectedOrders,
+      unsettledOrders,
+      settledOrders,
+      totalCollected,
+      totalUnsettled,
+      totalSettled,
+      staffList: Object.values(staffMap),
+    };
+  }, [orders]);
+
+  // Export COD Cash Audit Ledger to CSV
+  function downloadCodReport() {
+    const exportTarget = codSummary.collectedOrders;
+    if (!exportTarget || exportTarget.length === 0) {
+      toast.error("No collected COD orders to export.");
+      return;
+    }
+
+    const headers = [
+      "Order ID",
+      "Customer Name",
+      "Customer Phone",
+      "Delivery Address",
+      "Amount Collected (INR)",
+      "Collected By Staff",
+      "Staff Phone",
+      "Collection Date & Time",
+      "Settled With Manager",
+      "Settlement Time",
+    ];
+
+    const rows = exportTarget.map((o) => {
+      const handler = o.codPaymentHandler || {};
+      const uniqueId = o.orderId || o._id;
+      const customer = o.address?.fullName || "Customer";
+      const phone = o.address?.phone || "";
+      const address = `${o.address?.street || ""}, ${o.address?.city || ""}`.replace(/"/g, '""');
+      const amount = handler.amount || o.totalAmount || 0;
+      const staffName = handler.name || "Delivery Staff";
+      const staffPhone = handler.phone || "";
+      const collectedAt = handler.collectedAt ? new Date(handler.collectedAt).toLocaleString() : "";
+      const isSettled = handler.settledWithManager ? "Yes" : "No";
+      const settledAt = handler.settledAt ? new Date(handler.settledAt).toLocaleString() : "";
+
+      return [
+        `"${uniqueId}"`,
+        `"${customer.replace(/"/g, '""')}"`,
+        `"${phone}"`,
+        `"${address}"`,
+        amount,
+        `"${staffName.replace(/"/g, '""')}"`,
+        `"${staffPhone}"`,
+        `"${collectedAt}"`,
+        `"${isSettled}"`,
+        `"${settledAt}"`,
+      ];
+    });
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `pet_protocols_cod_cash_ledger_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("COD Cash Audit Ledger downloaded.");
+  }
 
   return (
     <div className="space-y-6">
@@ -262,6 +502,56 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           </div>
         </div>
       </div>
+
+      {/* ── WORKSPACE TABS: DELIVERIES VS COD CASH REGISTER ─────────── */}
+      <div className="flex items-center gap-2 border-b border-stone-200/80 dark:border-white/10 pb-3 flex-wrap">
+        <button
+          onClick={() => setActiveTab("deliveries")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+            activeTab === "deliveries"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+              : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
+          }`}
+        >
+          <Truck size={16} />
+          <span>Live Deliveries & Transit</span>
+          <span
+            className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              activeTab === "deliveries"
+                ? "bg-white/20 text-white"
+                : "bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300"
+            }`}
+          >
+            {metrics.ready + metrics.inTransit}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("cod_register")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+            activeTab === "cod_register"
+              ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+              : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
+          }`}
+        >
+          <Wallet size={16} />
+          <span>COD Cash Register & Manager Reconciliation</span>
+          {codSummary.totalUnsettled > 0 && (
+            <span
+              className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                activeTab === "cod_register"
+                  ? "bg-white/20 text-white"
+                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              ₹{codSummary.totalUnsettled.toFixed(0)} to Settle
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === "deliveries" && (
+        <>
 
       {/* ── LIVE DELIVERY GPS STATUS PANEL ───────────────────────────── */}
       {gpsTransmitter.trackingStatus === "permission_denied" && (
@@ -615,14 +905,46 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           )
                         )}
 
-                        <button
-                          onClick={() => updateOrderStatus(order._id, "delivered")}
-                          disabled={isUpdating}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <CheckCircle2 size={14} />
-                          <span>Mark Handed Over / Delivered</span>
-                        </button>
+                        {/* COD Cash Collection requirement check */}
+                        {isOrderCod(order) && !isCashCollected(order) ? (
+                          <>
+                            <button
+                              onClick={() => handleCollectCash(order)}
+                              disabled={isUpdating}
+                              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow-md shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer animate-pulse"
+                            >
+                              <Banknote size={14} />
+                              <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} Cash</span>
+                            </button>
+
+                            <button
+                              disabled={true}
+                              title={`Please collect ₹${(order.totalAmount || 0).toFixed(2)} cash from customer first`}
+                              className="bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-500 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed border border-stone-300 dark:border-white/5 opacity-70"
+                            >
+                              <Lock size={14} className="text-amber-500" />
+                              <span>Mark Handed Over / Delivered</span>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {isOrderCod(order) && (
+                              <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs font-bold">
+                                <Check size={12} className="text-emerald-500" />
+                                <span>₹{(order.codPaymentHandler?.amount || order.totalAmount || 0).toFixed(2)} Cash Collected</span>
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => updateOrderStatus(order._id, "delivered")}
+                              disabled={isUpdating}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 size={14} />
+                              <span>Mark Handed Over / Delivered</span>
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
 
@@ -713,16 +1035,45 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                     {!isPaid && (
                       <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between">
-                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">
-                          ⚠️ Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                          <AlertTriangle size={13} />
+                          <span>Collect ₹{(order.totalAmount || 0).toFixed(2)} in Cash</span>
                         </span>
                         <button
-                          onClick={() => markCashPaid(order._id)}
+                          onClick={() => handleCollectCash(order)}
                           disabled={isUpdating}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1"
                         >
-                          Mark Cash Collected
+                          <Banknote size={13} />
+                          <span>Record Cash Collection</span>
                         </button>
+                      </div>
+                    )}
+
+                    {isPaid && isOrderCod(order) && order.codPaymentHandler?.collected && (
+                      <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+                        <span className="text-stone-600 dark:text-stone-300 flex items-center gap-1 text-[11px]">
+                          <BadgeCheck size={13} className="text-emerald-500 shrink-0" />
+                          <span>Collected by <strong>{order.codPaymentHandler?.name || currentStaffName}</strong></span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            order.codPaymentHandler?.settledWithManager
+                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                              : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                          }`}>
+                            {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "In Driver's Hand (Pending Handover)"}
+                          </span>
+                          {isManager && !order.codPaymentHandler?.settledWithManager && (
+                            <button
+                              onClick={() => handleSettleCash(order._id)}
+                              disabled={updatingId !== null}
+                              className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
+                            >
+                              Settle Now
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -809,6 +1160,233 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               </div>
             );
           })}
+        </div>
+      )}
+      </>
+      )}
+
+      {/* ── TAB 2: COD CASH RECONCILIATION & MANAGER REGISTER ───────── */}
+      {activeTab === "cod_register" && (
+        <div className="space-y-6">
+          {/* Reconciliation Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
+                Total COD Cash Collected
+              </span>
+              <div className="text-2xl font-black text-stone-900 dark:text-white">
+                ₹{codSummary.totalCollected.toFixed(2)}
+              </div>
+              <span className="text-[11px] text-stone-400">{codSummary.collectedOrders.length} orders recorded</span>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-200 dark:border-amber-500/30 shadow-xs space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
+                Pending Manager Handover
+              </span>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                ₹{codSummary.totalUnsettled.toFixed(2)}
+              </div>
+              <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                {codSummary.unsettledOrders.length} orders in drivers' hands
+              </span>
+            </div>
+
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 shadow-xs space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 block">
+                Settled with Manager
+              </span>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                ₹{codSummary.totalSettled.toFixed(2)}
+              </div>
+              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80">
+                {codSummary.settledOrders.length} orders settled & deposited
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
+                Active Drivers with Cash
+              </span>
+              <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                {codSummary.staffList.filter((s) => s.unsettledAmount > 0).length}
+              </div>
+              <span className="text-[11px] text-stone-400">across {codSummary.staffList.length} staff members</span>
+            </div>
+          </div>
+
+          {/* Staff Breakdown Table / Cards */}
+          <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
+            <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-base text-stone-900 dark:text-white flex items-center gap-2">
+                  <Wallet size={18} className="text-amber-500" />
+                  <span>Delivery Staff Cash Balances & Handover</span>
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  Real-time record of which delivery boy collected what cash amount and handover status.
+                </p>
+              </div>
+
+              <button
+                onClick={downloadCodReport}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer self-start sm:self-auto"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-500" />
+                <span>Export CSV Report</span>
+              </button>
+            </div>
+
+            {codSummary.staffList.length === 0 ? (
+              <div className="p-8 text-center text-xs text-stone-400">
+                No COD cash collections recorded yet today.
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-100 dark:divide-white/5">
+                {codSummary.staffList.map((staff, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-stone-50/50 dark:hover:bg-white/[0.01] transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center shrink-0">
+                        <User size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-stone-900 dark:text-white">
+                            {staff.staffName}
+                          </span>
+                          {staff.staffPhone && (
+                            <span className="text-xs text-stone-400 font-mono">
+                              ({staff.staffPhone})
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-stone-500 dark:text-stone-400">
+                          Handled {staff.orderIds.length} COD orders • Total Collected: ₹{staff.totalCollected.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 self-end md:self-auto">
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                          Cash in Hand
+                        </span>
+                        <span
+                          className={`text-base font-black ${
+                            staff.unsettledAmount > 0
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          ₹{staff.unsettledAmount.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {isManager && staff.unsettledAmount > 0 && (
+                        <button
+                          onClick={() => handleSettleCash(staff.orderIds)}
+                          disabled={updatingId !== null}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          Settle All (₹{staff.unsettledAmount.toFixed(2)})
+                        </button>
+                      )}
+
+                      {staff.unsettledAmount === 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+                          <Check size={13} />
+                          <span>All Settled</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Order-by-Order COD Cash Log */}
+          <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
+            <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10">
+              <h3 className="font-extrabold text-sm text-stone-900 dark:text-white uppercase tracking-wider">
+                Individual COD Orders Cash Audit Log ({codSummary.collectedOrders.length})
+              </h3>
+            </div>
+
+            <div className="divide-y divide-stone-100 dark:divide-white/5">
+              {codSummary.collectedOrders.length === 0 ? (
+                <div className="p-8 text-center text-xs text-stone-400">
+                  No collected COD orders found.
+                </div>
+              ) : (
+                codSummary.collectedOrders.map((o) => {
+                  const handler = o.codPaymentHandler || {};
+                  const isSettled = Boolean(handler.settledWithManager);
+                  return (
+                    <div
+                      key={o._id}
+                      className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-stone-900 dark:text-white bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded">
+                            #{o.orderId || o._id}
+                          </span>
+                          <span className="font-bold text-stone-800 dark:text-stone-200">
+                            {o.address?.fullName || "Customer"}
+                          </span>
+                          <span className="text-stone-400">•</span>
+                          <span className="text-stone-500 dark:text-stone-400">
+                            {o.address?.city || o.address?.street || "Destination"}
+                          </span>
+                        </div>
+                        <div className="text-stone-500 dark:text-stone-400 flex items-center gap-2 flex-wrap">
+                          <span>
+                            Collected by: <strong className="text-stone-700 dark:text-stone-300">{handler.name || "Delivery Staff"}</strong>
+                          </span>
+                          {handler.collectedAt && (
+                            <span>
+                              • {new Date(handler.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end md:self-auto">
+                        <div className="text-right">
+                          <span className="text-sm font-black text-stone-900 dark:text-white">
+                            ₹{(handler.amount || o.totalAmount || 0).toFixed(2)}
+                          </span>
+                          <span
+                            className={`block text-[10px] font-bold ${
+                              isSettled
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {isSettled ? "✓ Settled with Manager" : "⚠️ In Driver's Wallet"}
+                          </span>
+                        </div>
+
+                        {isManager && !isSettled && (
+                          <button
+                            onClick={() => handleSettleCash(o._id)}
+                            disabled={updatingId !== null}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer transition disabled:opacity-50"
+                          >
+                            Settle Cash
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

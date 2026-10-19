@@ -344,8 +344,11 @@ const OrderSchema = new mongoose.Schema(
       id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       name: { type: String, default: "" },
       phone: { type: String, default: "" },
+      amount: { type: Number, default: 0 },
       collected: { type: Boolean, default: false },
       collectedAt: { type: Date },
+      settledWithManager: { type: Boolean, default: false },
+      settledAt: { type: Date },
     },
     deliveryTracking: {
       type: DeliveryTrackingSchema,

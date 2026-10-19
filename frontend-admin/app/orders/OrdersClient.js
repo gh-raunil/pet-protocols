@@ -225,6 +225,27 @@ export default function OrdersClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const isDeliveryOnlyStaff =
+    session?.user?.role === "staff" &&
+    Array.isArray(session?.user?.staffRoles) &&
+    session.user.staffRoles.includes("Delivery") &&
+    !session.user.staffRoles.includes("Kitchen") &&
+    !session.user.staffRoles.includes("Manager");
+
+  const isManagerOrAdmin =
+    session?.user?.role === "lead_admin" ||
+    session?.user?.role === "admin" ||
+    (session?.user?.role === "staff" &&
+      Array.isArray(session?.user?.staffRoles) &&
+      session.user.staffRoles.includes("Manager"));
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (isDeliveryOnlyStaff) {
+      router.replace("/delivery");
+    }
+  }, [isDeliveryOnlyStaff, status, router]);
+
   const todayStr = useMemo(() => {
     return new Date().toISOString().split("T")[0];
   }, []);
@@ -487,6 +508,43 @@ export default function OrdersClient() {
     }
   }
 
+  async function handleSettleCodCash(orderId) {
+    if (!confirm("Confirm settling this COD cash collection with manager?")) return;
+    try {
+      setUpdatingOrderId(orderId);
+      const res = await fetch("/api/restaurant/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, action: "settle_cod_cash" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedback({ type: "success", message: "COD Cash marked as settled with manager." });
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === orderId
+              ? {
+                  ...o,
+                  codPaymentHandler: {
+                    ...(o.codPaymentHandler || {}),
+                    settledWithManager: true,
+                    settledAt: new Date().toISOString(),
+                  },
+                }
+              : o
+          )
+        );
+      } else {
+        setFeedback({ type: "error", message: data.message || "Failed to settle cash." });
+      }
+    } catch (err) {
+      console.error(err);
+      setFeedback({ type: "error", message: "Network error settling COD cash." });
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  }
+
   // Filter orders client-side for instantaneous feedback across orderId, #PET-xxx, mongo _id, customer name & phone
   const displayedOrders = useMemo(() => {
     if (!searchQuery || !searchQuery.trim()) return orders;
@@ -618,6 +676,28 @@ export default function OrdersClient() {
     cancelled:
       "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30",
   };
+
+  if (isDeliveryOnlyStaff) {
+    return (
+      <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] flex items-center justify-center p-6 text-center font-jakarta">
+        <div className="max-w-md bg-white dark:bg-[#10141f] p-8 rounded-3xl border border-stone-200 dark:border-white/10 shadow-xl space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <Truck size={28} />
+          </div>
+          <h2 className="text-xl font-extrabold text-stone-900 dark:text-white">Delivery Operations Workspace</h2>
+          <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
+            Delivery staff are assigned to the <strong>Delivery Operations</strong> portal to pick up packages, share live GPS transit, and collect cash at doorstep. Redirecting you now...
+          </p>
+          <button
+            onClick={() => router.replace("/delivery")}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+          >
+            Go to Delivery Portal Now →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
@@ -987,6 +1067,23 @@ export default function OrdersClient() {
                           </div>
                         </div>
 
+                        {/* COD Cash Collection & Manager Settlement status in Rush Mode */}
+                        {isCod && order.codPaymentHandler?.collected && (
+                          <div className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2 rounded-xl flex items-center justify-between">
+                            <span className="font-semibold flex items-center gap-1 truncate max-w-[200px]">
+                              <Banknote size={12} className="text-amber-600 shrink-0" />
+                              <span>₹{order.codPaymentHandler?.amount || order.totalAmount} by {order.codPaymentHandler?.name || "Delivery Staff"}</span>
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] uppercase tracking-wider shrink-0 ${
+                              order.codPaymentHandler?.settledWithManager
+                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                            }`}>
+                              {order.codPaymentHandler?.settledWithManager ? "Settled" : "Pending Handover"}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Special Note if any */}
                         {order.notes && (
                           <div className="text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
@@ -1352,11 +1449,42 @@ export default function OrdersClient() {
                             ))}
                           </div>
 
-                          <div className="pt-2 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 border-t border-stone-200/60 dark:border-white/5">
-                            <span>Payment: <strong className="text-stone-700 dark:text-stone-300">{order.paymentMethod || "Direct"}</strong></span>
-                            <span className={`font-bold uppercase text-[10px] tracking-wide ${isCod ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {order.paymentStatus === "pending" ? "Pending at Doorstep" : (order.paymentStatus || "Paid")}
-                            </span>
+                          <div className="pt-2 flex flex-col gap-1.5 text-xs text-stone-500 dark:text-stone-400 border-t border-stone-200/60 dark:border-white/5">
+                            <div className="flex items-center justify-between">
+                              <span>Payment: <strong className="text-stone-700 dark:text-stone-300">{order.paymentMethod || "Direct"}</strong></span>
+                              <span className={`font-bold uppercase text-[10px] tracking-wide ${isCod ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                {order.paymentStatus === "pending" ? "Pending at Doorstep" : (order.paymentStatus || "Paid")}
+                              </span>
+                            </div>
+
+                            {/* Detailed COD Cash Collected & Manager Settlement Info */}
+                            {isCod && order.codPaymentHandler?.collected && (
+                              <div className="mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200">
+                                <span className="font-medium flex items-center gap-1.5">
+                                  <Banknote size={14} className="text-amber-600 shrink-0" />
+                                  <span>Cash Collected: <strong className="font-bold">₹{order.codPaymentHandler?.amount || order.totalAmount}</strong> by <strong className="font-bold">{order.codPaymentHandler?.name || "Delivery Staff"}</strong></span>
+                                </span>
+                                <div className="flex items-center gap-2 self-end sm:self-auto">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    order.codPaymentHandler?.settledWithManager
+                                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                      : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                  }`}>
+                                    {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "⚠️ Pending Manager Handover"}
+                                  </span>
+                                  {isManagerOrAdmin && !order.codPaymentHandler?.settledWithManager && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSettleCodCash(order._id)}
+                                      disabled={updatingOrderId === order._id}
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition disabled:opacity-50"
+                                    >
+                                      Mark Settled
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

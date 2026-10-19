@@ -102,13 +102,48 @@ export async function PUT(request) {
 
     const { restaurantId } = auth;
     const body = await request.json();
-    const { orderId, status, paymentStatus, notes, assignedDeliveryStaff, codPaymentHandler, action } = body;
+    const { orderId, orderIds, status, paymentStatus, notes, assignedDeliveryStaff, codPaymentHandler, action } = body;
 
-    if (!orderId) {
+    if (!orderId && (!orderIds || !orderIds.length)) {
       return NextResponse.json({ success: false, message: "Order ID is required." }, { status: 400 });
     }
 
     await connectDB();
+
+    if (action === "settle_cod_cash") {
+      // Manager/Admin settling COD cash collected by staff
+      if (auth.isStaff && !auth.isAdmin && !auth.staffRoles.includes("Manager")) {
+        return NextResponse.json(
+          { success: false, message: "Only managers or restaurant admins can settle staff COD cash." },
+          { status: 403 }
+        );
+      }
+
+      const targetOrderIds = Array.isArray(orderIds) && orderIds.length > 0
+        ? orderIds
+        : (orderId ? [orderId] : []);
+
+      if (targetOrderIds.length === 0) {
+        return NextResponse.json({ success: false, message: "Order ID(s) required." }, { status: 400 });
+      }
+
+      await Order.updateMany(
+        { _id: { $in: targetOrderIds }, restaurant: restaurantId },
+        {
+          $set: {
+            "codPaymentHandler.settledWithManager": true,
+            "codPaymentHandler.settledAt": new Date(),
+          },
+        }
+      );
+
+      const refreshedOrder = orderId ? await Order.findById(orderId) : null;
+      return NextResponse.json({
+        success: true,
+        message: `Settled COD cash for ${targetOrderIds.length} order(s) with manager.`,
+        order: refreshedOrder,
+      });
+    }
 
     const order = await Order.findOne({ _id: orderId, restaurant: restaurantId });
     if (!order) {
@@ -140,6 +175,33 @@ export async function PUT(request) {
     if (status) {
       if (!["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"].includes(status)) {
         return NextResponse.json({ success: false, message: `Invalid status '${status}'.` }, { status: 400 });
+      }
+
+      // Role-based transition guard for staff
+      if (auth.isStaff && !auth.isAdmin) {
+        const isDeliveryStaff = auth.staffRoles.includes("Delivery");
+        const isKitchenStaff = auth.staffRoles.includes("Kitchen");
+        const isManager = auth.staffRoles.includes("Manager");
+
+        if (!isManager) {
+          if (isDeliveryStaff && !isKitchenStaff) {
+            // Delivery staff can only transition to out_for_delivery or delivered
+            if (!["out_for_delivery", "delivered"].includes(status)) {
+              return NextResponse.json(
+                { success: false, message: "Delivery staff can only transition orders to 'out_for_delivery' or 'delivered'." },
+                { status: 403 }
+              );
+            }
+          } else if (isKitchenStaff && !isDeliveryStaff) {
+            // Kitchen staff can only transition to confirmed, preparing, ready, or cancelled
+            if (!["confirmed", "preparing", "ready", "cancelled"].includes(status)) {
+              return NextResponse.json(
+                { success: false, message: "Kitchen staff can only transition orders to 'confirmed', 'preparing', or 'ready'." },
+                { status: 403 }
+              );
+            }
+          }
+        }
       }
 
       if (status === "cancelled") {
@@ -217,14 +279,20 @@ export async function PUT(request) {
       };
     }
     if (codPaymentHandler) {
+      const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
       order.codPaymentHandler = {
         id: codPaymentHandler.id || auth.user?._id,
-        name: codPaymentHandler.name || auth.user?.name || "Staff",
+        name: codPaymentHandler.name || auth.user?.name || "Delivery Staff",
         phone: codPaymentHandler.phone || auth.user?.phone || "",
-        collected: codPaymentHandler.collected !== undefined ? codPaymentHandler.collected : true,
-        collectedAt: new Date(),
+        amount: Number(codPaymentHandler.amount !== undefined ? codPaymentHandler.amount : (order.totalAmount || 0)),
+        collected: isCollected,
+        collectedAt: codPaymentHandler.collectedAt || (isCollected ? new Date() : null),
+        settledWithManager: codPaymentHandler.settledWithManager !== undefined
+          ? Boolean(codPaymentHandler.settledWithManager)
+          : Boolean(order.codPaymentHandler?.settledWithManager),
+        settledAt: codPaymentHandler.settledWithManager ? (order.codPaymentHandler?.settledAt || new Date()) : null,
       };
-      if (codPaymentHandler.collected) {
+      if (order.codPaymentHandler.collected) {
         order.paymentStatus = "paid";
       }
     }
