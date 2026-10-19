@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import {
@@ -309,9 +309,57 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     }
   }
 
-  // Filtered orders
+  // Helper: check if an order belongs to this particular staff member
+  const isMyOrder = useCallback(
+    (o) => {
+      if (!o) return false;
+      const staff = o.assignedDeliveryStaff;
+      const handler = o.codPaymentHandler;
+
+      if (currentStaffId) {
+        if (staff?.id && String(staff.id) === String(currentStaffId)) return true;
+        if (handler?.id && String(handler.id) === String(currentStaffId)) return true;
+      }
+      if (currentStaffPhone) {
+        const cleanMy = String(currentStaffPhone).replace(/\D/g, "");
+        if (cleanMy) {
+          if (staff?.phone && String(staff.phone).replace(/\D/g, "") === cleanMy) return true;
+          if (handler?.phone && String(handler.phone).replace(/\D/g, "") === cleanMy) return true;
+        }
+      }
+      if (currentStaffName) {
+        const sName = currentStaffName.toLowerCase().trim();
+        if (sName) {
+          if (staff?.name && staff.name.toLowerCase().trim() === sName) return true;
+          if (handler?.name && handler.name.toLowerCase().trim() === sName) return true;
+        }
+      }
+      return false;
+    },
+    [currentStaffId, currentStaffPhone, currentStaffName]
+  );
+
+  // Helper: check if order is explicitly in-progress/claimed by another named driver
+  const isAssignedToOtherStaff = useCallback(
+    (o) => {
+      if (!o) return false;
+      const staff = o.assignedDeliveryStaff;
+      if (!staff || !staff.name) return false;
+      const staffName = staff.name.toLowerCase().trim();
+      if (staffName === "general delivery staff" || staffName === "delivery staff") return false;
+      return !isMyOrder(o);
+    },
+    [isMyOrder]
+  );
+
+  // Filtered orders: scoped so staff only sees unassigned pickup tasks or their own orders
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
+      // In staff dashboard, do not show orders claimed/in-transit by other drivers
+      if (!isManager && isAssignedToOtherStaff(o)) {
+        return false;
+      }
+
       // Status filter
       if (statusFilter === "active") {
         if (o.status !== "preparing" && o.status !== "ready" && o.status !== "out_for_delivery") return false;
@@ -339,23 +387,29 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         matchStreet
       );
     });
-  }, [orders, statusFilter, searchQuery]);
+  }, [orders, statusFilter, searchQuery, isManager, isAssignedToOtherStaff]);
 
-  // Operational metrics
+  // Operational metrics: scoped to this particular staff member when !isManager
   const metrics = useMemo(() => {
-    const ready = orders.filter((o) => o.status === "preparing" || o.status === "ready").length;
-    const inTransit = orders.filter((o) => o.status === "out_for_delivery").length;
-    const deliveredToday = orders.filter((o) => o.status === "delivered").length;
+    const ready = orders.filter(
+      (o) => (o.status === "preparing" || o.status === "ready") && (isManager || !isAssignedToOtherStaff(o))
+    ).length;
+    const inTransit = orders.filter(
+      (o) => o.status === "out_for_delivery" && (isManager || isMyOrder(o))
+    ).length;
+    const deliveredToday = orders.filter(
+      (o) => o.status === "delivered" && (isManager || isMyOrder(o))
+    ).length;
     const codToCollect = orders
-      .filter((o) => o.status === "out_for_delivery" && o.paymentStatus !== "paid")
+      .filter((o) => o.status === "out_for_delivery" && o.paymentStatus !== "paid" && (isManager || isMyOrder(o)))
       .reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
 
     return { ready, inTransit, deliveredToday, codToCollect };
-  }, [orders]);
+  }, [orders, isManager, isAssignedToOtherStaff, isMyOrder]);
 
-  // Comprehensive COD cash summary & manager reconciliation dataset
+  // Comprehensive COD cash summary & reconciliation dataset: scoped to this particular staff member
   const codSummary = useMemo(() => {
-    const codOrders = orders.filter((o) => {
+    const allCodOrders = orders.filter((o) => {
       const mode = String(o.paymentMethod || "").toLowerCase();
       return (
         mode.includes("cod") ||
@@ -364,6 +418,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         o.codPaymentHandler?.collected
       );
     });
+
+    // When viewing as staff (not manager), restrict COD dataset strictly to orders collected by this staff member
+    const codOrders = isManager ? allCodOrders : allCodOrders.filter(isMyOrder);
 
     const collectedOrders = codOrders.filter((o) => o.codPaymentHandler?.collected || o.paymentStatus === "paid");
     const totalCollected = collectedOrders.reduce(
@@ -410,6 +467,17 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       }
     });
 
+    let staffList = Object.values(staffMap);
+    if (!isManager) {
+      // In staff dashboard, only show this particular staff member's record
+      staffList = staffList.filter(
+        (s) =>
+          (currentStaffId && String(s.staffId) === String(currentStaffId)) ||
+          (currentStaffPhone && s.staffPhone === currentStaffPhone) ||
+          (currentStaffName && s.staffName.toLowerCase().trim() === currentStaffName.toLowerCase().trim())
+      );
+    }
+
     return {
       codOrders,
       collectedOrders,
@@ -418,9 +486,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       totalCollected,
       totalUnsettled,
       totalSettled,
-      staffList: Object.values(staffMap),
+      staffList,
     };
-  }, [orders]);
+  }, [orders, isManager, isMyOrder, currentStaffId, currentStaffPhone, currentStaffName]);
 
   // Export COD Cash Audit Ledger to CSV
   function downloadCodReport() {
@@ -1461,12 +1529,24 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
             <div className="bg-white dark:bg-[#10141f] p-5 rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xs space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
-                Active Drivers with Cash
+                {isManager ? "Active Drivers with Cash" : "My Handover Status"}
               </span>
               <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {codSummary.staffList.filter((s) => s.unsettledAmount > 0).length}
+                {isManager ? (
+                  codSummary.staffList.filter((s) => s.unsettledAmount > 0).length
+                ) : codSummary.totalUnsettled > 0 ? (
+                  <span className="text-xl text-amber-600 dark:text-amber-400">Pending Deposit</span>
+                ) : (
+                  <span className="text-xl text-emerald-600 dark:text-emerald-400">All Handed Over</span>
+                )}
               </div>
-              <span className="text-[11px] text-stone-400">across {codSummary.staffList.length} staff members</span>
+              <span className="text-[11px] text-stone-400">
+                {isManager
+                  ? `across ${codSummary.staffList.length} staff members`
+                  : codSummary.totalUnsettled > 0
+                  ? `₹${codSummary.totalUnsettled.toFixed(2)} cash in hand`
+                  : "Your cash balance is completely clear"}
+              </span>
             </div>
           </div>
 
@@ -1476,10 +1556,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               <div>
                 <h3 className="font-extrabold text-base text-stone-900 dark:text-white flex items-center gap-2">
                   <Wallet size={18} className="text-amber-500" />
-                  <span>Delivery Staff Cash Balances & Handover</span>
+                  <span>{isManager ? "Delivery Staff Cash Balances & Handover" : "My Cash Balance & Handover Status"}</span>
                 </h3>
                 <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                  Real-time record of which delivery boy collected what cash amount and handover status.
+                  {isManager
+                    ? "Real-time record of which delivery boy collected what cash amount and handover status."
+                    : "Your real-time record of cash collected and handover status with manager."}
                 </p>
               </div>
 
@@ -1586,14 +1668,14 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           <div className="bg-white dark:bg-[#10141f] rounded-2xl border border-stone-200/90 dark:border-white/10 overflow-hidden shadow-xs">
             <div className="p-4 sm:p-5 border-b border-stone-100 dark:border-white/10">
               <h3 className="font-extrabold text-sm text-stone-900 dark:text-white uppercase tracking-wider">
-                Individual COD Orders Cash Audit Log ({codSummary.collectedOrders.length})
+                {isManager ? "Individual COD Orders Cash Audit Log" : "My COD Orders Cash Audit Log"} ({codSummary.collectedOrders.length})
               </h3>
             </div>
 
             <div className="divide-y divide-stone-100 dark:divide-white/5">
               {codSummary.collectedOrders.length === 0 ? (
                 <div className="p-8 text-center text-xs text-stone-400">
-                  No collected COD orders found.
+                  {isManager ? "No collected COD orders found." : "No collected COD orders found for your profile today."}
                 </div>
               ) : (
                 codSummary.collectedOrders.map((o) => {
