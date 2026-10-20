@@ -9,24 +9,28 @@ function AuthHandler() {
   const { clearCartLocal, loadCart } = useCartStore();
   const { loadFavorites, clearFavoritesLocal } = useFavoritesStore();
   const prevEmailRef = useRef(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     if (session?.user?.email) {
       const currentEmail = session.user.email;
       if (prevEmailRef.current !== currentEmail) {
         setTimeout(() => {
-          loadCart();
+          loadCart(currentEmail);
           loadFavorites(currentEmail);
         }, 100);
         prevEmailRef.current = currentEmail;
+        initializedRef.current = true;
       }
     } else if (status === "unauthenticated") {
       if (prevEmailRef.current) {
         clearCartLocal();
         clearFavoritesLocal();
         prevEmailRef.current = null;
-      } else {
-        loadFavorites(null); // guest favorites
+      } else if (!initializedRef.current) {
+        loadCart(null); // load guest cart from device storage
+        loadFavorites(null); // load guest favorites from device storage
+        initializedRef.current = true;
       }
     }
   }, [session?.user?.email, status]);

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import useNotificationStore from "@/lib/notificationStore";
 import useCartStore from "@/lib/cartStore";
+import useFavoritesStore from "@/lib/favoritesStore";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
 import { useNavBadges } from "@/hooks/useNavBadges";
 
@@ -79,6 +80,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
 
   const handleLogout = async () => {
     clearCartLocal();
+    useFavoritesStore.getState().clearFavoritesLocal();
     onClose();
     await performLogout({ callbackUrl: "/" });
   };

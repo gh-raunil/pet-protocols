@@ -1,10 +1,18 @@
 import { signOut } from "next-auth/react";
+import useCartStore from "./cartStore";
+import useFavoritesStore from "./favoritesStore";
 
 /**
- * Cleanly logs out user and removes push notification subscription from both
- * the local device and backend database so notifications cease immediately upon logout.
+ * Cleanly logs out user, clears local cart and favorites caches, and removes push notification subscription
+ * from both the local device and backend database so notifications cease immediately upon logout.
  */
 export async function performLogout(options = { callbackUrl: "/" }) {
+  try {
+    useCartStore.getState().clearCartLocal();
+    useFavoritesStore.getState().clearFavoritesLocal();
+  } catch (e) {
+    console.warn("[Logout] Local state cleanup note:", e);
+  }
   try {
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
       const swReadyPromise = navigator.serviceWorker.ready;

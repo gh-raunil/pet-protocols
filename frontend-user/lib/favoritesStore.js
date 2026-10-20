@@ -1,24 +1,26 @@
 import { create } from "zustand";
 
+const GUEST_STORAGE_KEY = "pet_protocols_favs_guest";
+
 function getUserStorageKey(userIdentifier) {
-  if (!userIdentifier) return "pet_protocols_favs_guest";
+  if (!userIdentifier) return GUEST_STORAGE_KEY;
   const clean = String(userIdentifier).toLowerCase().trim();
   return `pet_protocols_favs_${clean}`;
 }
 
 export const useFavoritesStore = create((set, get) => ({
-  favorites: [], // array of product objects for currently active user
-  currentUserId: null, // email or id of active user (null = uninitialized / guest)
+  favorites: [], // array of product objects for currently active user / guest
+  currentUserId: null, // email or id of active user (null = guest)
   isLoaded: false,
 
-  // Check if a product is favorited by the active user
+  // Check if a product is favorited by the active user or guest
   isFavorite: (productId) => {
     if (!productId) return false;
     const id = typeof productId === "object" ? String(productId._id || productId.id) : String(productId);
     return get().favorites.some((item) => String(item._id || item.id) === id);
   },
 
-  // Toggle favorite for the active user
+  // Toggle favorite for the active user or guest
   toggleFavorite: async (product) => {
     if (!product) return;
     const id = String(product._id || product.id);
@@ -34,17 +36,30 @@ export const useFavoritesStore = create((set, get) => ({
     }
     set({ favorites: updated });
 
-    // 2. Save to user-specific localStorage cache
-    const activeKey = getUserStorageKey(get().currentUserId);
+    const activeUser = get().currentUserId;
+
+    // 2. If guest, persist strictly to user's own device (localStorage) and NEVER call server API
+    if (!activeUser) {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(updated));
+        }
+      } catch (e) {
+        console.warn("Could not cache guest favorites locally:", e);
+      }
+      return;
+    }
+
+    // 3. If authenticated user, save to user-specific cache and sync with MongoDB
+    const activeKey = getUserStorageKey(activeUser);
     try {
       if (typeof window !== "undefined") {
         localStorage.setItem(activeKey, JSON.stringify(updated));
       }
     } catch (e) {
-      console.warn("Could not cache favorites locally:", e);
+      console.warn("Could not cache user favorites locally:", e);
     }
 
-    // 3. Persist to MongoDB for authenticated user
     try {
       const res = await fetch("/api/favorites", {
         method: "POST",
@@ -69,9 +84,45 @@ export const useFavoritesStore = create((set, get) => ({
   // Load favorites specifically for a logged-in user or guest
   loadFavorites: async (userIdentifier) => {
     const cleanId = userIdentifier ? String(userIdentifier).toLowerCase().trim() : null;
+
+    // 1. GUEST MODE — strictly load from local device storage, zero server calls
+    if (!cleanId) {
+      let cachedGuest = [];
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+          if (raw) cachedGuest = JSON.parse(raw);
+        } catch (e) {
+          cachedGuest = [];
+        }
+      }
+
+      set({
+        currentUserId: null,
+        favorites: Array.isArray(cachedGuest) ? cachedGuest : [],
+        isLoaded: true,
+      });
+      return;
+    }
+
+    // 2. AUTHENTICATED USER MODE
     const activeKey = getUserStorageKey(cleanId);
 
-    // 1. Instant restore from user-specific local cache
+    // Check if there are local guest favorites that need to be migrated to this logged-in account
+    let guestFavsToMigrate = [];
+    if (typeof window !== "undefined") {
+      try {
+        const rawGuest = localStorage.getItem(GUEST_STORAGE_KEY);
+        if (rawGuest) {
+          const parsed = JSON.parse(rawGuest);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            guestFavsToMigrate = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Instant UI restore from this user's local cache
     let cached = [];
     if (typeof window !== "undefined") {
       try {
@@ -88,22 +139,44 @@ export const useFavoritesStore = create((set, get) => ({
       isLoaded: true,
     });
 
-    // 2. If logged in, fetch from DB to get fresh server truth
-    if (cleanId) {
+    // If guest favorites exist, merge them into user's account on MongoDB and clear guest storage
+    if (guestFavsToMigrate.length > 0) {
       try {
-        const res = await fetch("/api/favorites");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.favorites)) {
-            set({ favorites: data.favorites });
-            if (typeof window !== "undefined") {
-              localStorage.setItem(activeKey, JSON.stringify(data.favorites));
-            }
+        const guestIds = guestFavsToMigrate
+          .map((p) => p?._id || p?.id)
+          .filter(Boolean);
+
+        if (guestIds.length > 0) {
+          await fetch("/api/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productIds: guestIds }),
+          });
+        }
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(GUEST_STORAGE_KEY);
+        }
+      } catch (migErr) {
+        console.warn("Failed to migrate guest favorites to user account:", migErr);
+      }
+    }
+
+    // Fetch fresh authoritative favorites list from DB for this user
+    try {
+      const res = await fetch("/api/favorites", {
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.favorites)) {
+          set({ favorites: data.favorites });
+          if (typeof window !== "undefined") {
+            localStorage.setItem(activeKey, JSON.stringify(data.favorites));
           }
         }
-      } catch (err) {
-        console.warn("Failed to load user favorites from backend:", err);
       }
+    } catch (err) {
+      console.warn("Failed to load user favorites from backend:", err);
     }
   },
 
@@ -114,12 +187,27 @@ export const useFavoritesStore = create((set, get) => ({
       favorites: [],
       isLoaded: false,
     });
+    // Ensure guest storage is also clean on explicit logout
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+      } catch (e) {}
+    }
   },
 
   // Delete all favorites from active user's account
   clearFavorites: async () => {
-    const activeKey = getUserStorageKey(get().currentUserId);
+    const activeUser = get().currentUserId;
     set({ favorites: [] });
+
+    if (!activeUser) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(GUEST_STORAGE_KEY);
+      }
+      return;
+    }
+
+    const activeKey = getUserStorageKey(activeUser);
     if (typeof window !== "undefined") {
       localStorage.removeItem(activeKey);
     }

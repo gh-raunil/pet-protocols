@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useCartStore from "@/lib/cartStore";
+import useFavoritesStore from "@/lib/favoritesStore";
 import { useSession } from "next-auth/react";
 import { performLogout } from "@/lib/logoutHelper";
 import {
@@ -54,6 +55,7 @@ const RightSection = ({
 
   const handleLogout = async () => {
     clearCartLocal();
+    useFavoritesStore.getState().clearFavoritesLocal();
     await performLogout({ callbackUrl: "/" });
   };
 
