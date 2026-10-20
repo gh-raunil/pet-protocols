@@ -79,7 +79,6 @@ export async function POST(request) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
     const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
       .toLowerCase()
       .split(",")

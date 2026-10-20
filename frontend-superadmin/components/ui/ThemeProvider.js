@@ -65,38 +65,7 @@ const ThemeContext = createContext({
   mounted: false,
 });
 
-export function ThemeScript() {
-  const scriptContent = `
-(function() {
-  try {
-    function getCookie(name) {
-      var v = "; " + document.cookie;
-      var parts = v.split("; " + name + "=");
-      if (parts.length === 2) return decodeURIComponent(parts.pop().split(";").shift());
-      return null;
-    }
-    var theme = getCookie("${STORAGE_KEY}") ||
-                getCookie("${SHARED_KEY}") ||
-                localStorage.getItem("${STORAGE_KEY}") ||
-                localStorage.getItem("${SHARED_KEY}") ||
-                "dark";
-    if (theme === "light") {
-      document.documentElement.classList.add("light");
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    }
-  } catch (e) {}
-})();
-  `;
-  return (
-    <script
-      id="theme-initializer"
-      dangerouslySetInnerHTML={{ __html: scriptContent }}
-    />
-  );
-}
+export { ThemeScript } from "./ThemeScript";
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState("dark");

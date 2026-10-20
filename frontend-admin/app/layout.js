@@ -1,5 +1,6 @@
 import Providers from "./providers";
-import { ThemeProvider, ThemeScript } from "../components/ui/ThemeProvider";
+import { ThemeProvider } from "../components/ui/ThemeProvider";
+import { ThemeScript } from "../components/ui/ThemeScript";
 import AppShell from "../components/layout/AppShell";
 import AdminServiceWorkerRegister from "../components/pwa/AdminServiceWorkerRegister";
 import RichToaster from "../components/ui/RichToaster";

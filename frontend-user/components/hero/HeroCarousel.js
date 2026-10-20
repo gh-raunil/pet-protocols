@@ -135,9 +135,7 @@ function SingleThemeCarousel({ slides, themeKey, isThemeActive, mode = "panorami
   const { data: session } = useSession();
   const userId = session?.user?.id || session?.user?.email || null;
 
-  const [activeIndex, setActiveIndex] = useState(() =>
-    getSessionStartingIndex(slides, themeKey, userId)
-  );
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const [loadedIndices, setLoadedIndices] = useState(() => {
     return new Set(slides.map((_, i) => i));
