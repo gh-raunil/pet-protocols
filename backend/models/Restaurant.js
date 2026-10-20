@@ -25,10 +25,24 @@ const RestaurantSchema = new mongoose.Schema(
     image: {
       type: String,
       default: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500',
+      validate: {
+        validator: function (v) {
+          if (!v || typeof v !== "string") return true;
+          return !(v.startsWith("data:") && v.length > 50000);
+        },
+        message: "Inline image data exceeds 50KB limit. Please upload images to storage instead.",
+      },
     },
     bannerImage: {
       type: String,
       default: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200',
+      validate: {
+        validator: function (v) {
+          if (!v || typeof v !== "string") return true;
+          return !(v.startsWith("data:") && v.length > 50000);
+        },
+        message: "Inline bannerImage data exceeds 50KB limit. Please upload images to storage instead.",
+      },
     },
     address: {
       street: { type: String, default: '' },

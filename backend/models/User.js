@@ -110,6 +110,13 @@ const UserSchema = new mongoose.Schema(
     },
     image: {
       type: String,
+      validate: {
+        validator: function (v) {
+          if (!v || typeof v !== "string") return true;
+          return !(v.startsWith("data:") && v.length > 50000);
+        },
+        message: "Inline image data exceeds 50KB limit. Please upload images to storage instead.",
+      },
     },
     phone: {
       type: String,

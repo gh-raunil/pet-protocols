@@ -173,15 +173,17 @@ export function ThemeProvider({ children }) {
     setAccentColor(savedAccent);
     setMounted(true);
 
-    // Fetch restaurant's saved appearance from API to sync authentic restaurant accent
-    fetch("/api/restaurant/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.success && data?.restaurant?.appearance?.primaryColor) {
-          setAccentColor(data.restaurant.appearance.primaryColor);
-        }
-      })
-      .catch(() => {});
+    // Fetch restaurant's saved appearance from API to sync authentic restaurant accent (skip on login page)
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      fetch("/api/restaurant/settings")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.success && data?.restaurant?.appearance?.primaryColor) {
+            setAccentColor(data.restaurant.appearance.primaryColor);
+          }
+        })
+        .catch(() => {});
+    }
 
     // Listen to system changes if in system mode
     if (typeof window !== "undefined" && window.matchMedia) {

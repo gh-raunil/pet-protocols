@@ -43,14 +43,20 @@ const providers = [
             throw new Error(`Too many failed login attempts. Please wait ${rateCheck.resetInSeconds} seconds before trying again.`);
           }
 
-          let user = await User.findOne({ email }).populate("restaurant");
+          let user = await User.findOne({ email }).populate({
+            path: "restaurant",
+            select: "_id name slug status enabledFeatures appearance",
+          });
 
           // Resilient superadmin lookup (handles comma-separated string from legacy seed)
           if (!user) {
             user = await User.findOne({
               role: "superadmin",
               email: { $regex: new RegExp(`(^|,)\\s*${(email || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*(,|$)`, "i") },
-            }).populate("restaurant");
+            }).populate({
+              path: "restaurant",
+              select: "_id name slug status enabledFeatures appearance",
+            });
           }
 
           // Auto-bootstrap superadmin if account doesn't exist yet in the database
@@ -229,12 +235,18 @@ export const authOptions = {
           .split(",")
           .map((e) => e.trim())
           .filter(Boolean);
-        let dbUser = await User.findOne({ email: token.email.toLowerCase().trim() }).populate("restaurant");
+        let dbUser = await User.findOne({ email: token.email.toLowerCase().trim() }).populate({
+          path: "restaurant",
+          select: "_id name slug status enabledFeatures appearance",
+        });
         if (!dbUser) {
           dbUser = await User.findOne({
             role: "superadmin",
             email: { $regex: new RegExp(`(^|,)\\s*${(token.email || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*(,|$)`, "i") },
-          }).populate("restaurant");
+          }).populate({
+            path: "restaurant",
+            select: "_id name slug status enabledFeatures appearance",
+          });
         }
         if (dbUser) {
           const userEmails = (dbUser.email || "")
