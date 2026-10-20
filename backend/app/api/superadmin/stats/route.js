@@ -32,7 +32,7 @@ export async function GET() {
       ordersByStatusAgg,
       platformSettings,
     ] = await Promise.all([
-      Restaurant.countDocuments(),
+      Restaurant.countDocuments({ status: { $ne: "archived" } }),
       Restaurant.countDocuments({ status: "active" }),
       Restaurant.countDocuments({ status: "inactive" }),
       Restaurant.countDocuments({ status: "suspended" }),

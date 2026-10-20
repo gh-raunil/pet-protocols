@@ -224,25 +224,35 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
         <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2 min-w-0">
           <div className="min-w-0">
             {/* Rating Badge + Review Count */}
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Tooltip
-                content={`Rated ${(product.rating || 4.5).toFixed(1)} out of 5 stars (${product.numRatings || 14} verified customer ratings)`}
-                placement="top"
-              >
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs cursor-help">
-                  <span>{(product.rating || 4.5).toFixed(1)}</span>
-                  <Star size={9} className="fill-white" />
-                </span>
-              </Tooltip>
-              <span className="text-[10px] text-[var(--text-muted)] font-medium">
-                ({product.numRatings || 14})
-              </span>
-              {product.isFeatured && (
-                <span className="ml-auto text-[9px] font-black text-amber-500 uppercase tracking-wider">
+            {typeof product.rating === "number" && product.rating > 0 ? (
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Tooltip
+                  content={`Rated ${product.rating.toFixed(1)} out of 5 stars${product.numRatings ? ` (${product.numRatings} verified ratings)` : ""}`}
+                  placement="top"
+                >
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs cursor-help">
+                    <span>{product.rating.toFixed(1)}</span>
+                    <Star size={9} className="fill-white" />
+                  </span>
+                </Tooltip>
+                {typeof product.numRatings === "number" && product.numRatings > 0 && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                    ({product.numRatings})
+                  </span>
+                )}
+                {product.isFeatured && (
+                  <span className="ml-auto text-[9px] font-black text-amber-500 uppercase tracking-wider">
+                    ⭐ Top
+                  </span>
+                )}
+              </div>
+            ) : product.isFeatured ? (
+              <div className="flex items-center justify-end mb-1.5">
+                <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider">
                   ⭐ Top
                 </span>
-              )}
-            </div>
+              </div>
+            ) : null}
 
             {/* Restaurant Name */}
             {product.restaurant?.name && (

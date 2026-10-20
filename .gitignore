@@ -57,4 +57,7 @@ android-twa/build/
 android-twa/.gradle/
 
 # Allow distributing the public signed release APK on the website
-!frontend-user/public/downloads/*.apk
+!frontend-user/public/downloads/*.apk
+
+# Database backups & exports
+backend/backups/

@@ -44,6 +44,7 @@ if (!testRestaurantA) {
     phone: "9876543210",
     address: { street: "123 Alpha St", city: "Bangalore", state: "KA", pincode: "560001", latitude: 12.9716, longitude: 77.5946 },
     enabledFeatures: ["delivery"],
+    status: "archived",
   });
 }
 
@@ -55,6 +56,7 @@ if (!testRestaurantB) {
     phone: "9876543222",
     address: { street: "456 Beta St", city: "Bangalore", state: "KA", pincode: "560002", latitude: 12.9800, longitude: 77.6000 },
     enabledFeatures: ["delivery"],
+    status: "archived",
   });
 }
 

@@ -2213,6 +2213,7 @@ async function runPhase2ATests() {
       slug: `test-phase2a-restb-${Date.now()}`,
       address: '456 Rest B St',
       phone: '9999999999',
+      status: 'archived',
     });
 
     const ingRestB = await Ingredient.create({

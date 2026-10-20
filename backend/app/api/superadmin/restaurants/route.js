@@ -8,7 +8,7 @@ import { requireSuperAdmin } from "@/lib/authMiddleware";
 import bcrypt from "bcryptjs";
 
 // GET — List all restaurants (Tenants)
-export async function GET() {
+export async function GET(request) {
   try {
     const auth = await requireSuperAdmin();
     if (auth.error) {
@@ -16,7 +16,11 @@ export async function GET() {
     }
 
     await connectDB();
-    const restaurants = await Restaurant.find().sort({ createdAt: -1 }).lean();
+    const { searchParams } = new URL(request?.url || "http://localhost/api/superadmin/restaurants");
+    const includeArchived = searchParams.get("includeArchived") === "true";
+
+    const query = includeArchived ? {} : { status: { $ne: "archived" } };
+    const restaurants = await Restaurant.find(query).sort({ createdAt: -1 }).lean();
 
     // Attach counts for admins, products, orders
     const enriched = await Promise.all(

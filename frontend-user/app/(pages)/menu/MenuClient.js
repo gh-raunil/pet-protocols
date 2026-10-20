@@ -9,24 +9,26 @@ import {
   Sparkles,
   UtensilsCrossed,
   X,
-  Check,
+  ArrowUpDown,
+  SlidersHorizontal,
   Clock,
   Tag,
-  ArrowUpDown,
-  Filter,
-  SlidersHorizontal,
+  Check,
 } from "lucide-react";
 import ProductCard, { ProductCardSkeleton } from "@/components/products/ProductCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
+import FilterDrawer from "@/components/menu/FilterDrawer";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import {
   getRecommendedProducts,
-  getBestSellingProducts,
-  getTopRatedProducts,
   hasUserPreferences,
   trackProductSearch,
 } from "@/lib/userPreferences";
-import { getProductNewArrivalStatus } from "@/lib/offersHelper";
+import {
+  getProductNewArrivalStatus,
+  getProductActiveOffer,
+  calculateItemDiscount,
+} from "@/lib/offersHelper";
 
 export default function MenuClient() {
   const searchParams = useSearchParams();
@@ -39,6 +41,9 @@ export default function MenuClient() {
   const typeFromUrl = searchParams.get("type") || "all";
   const sortFromUrl = searchParams.get("sort") || "default";
   const inStockFromUrl = searchParams.get("inStock") === "true";
+  const hasOffersFromUrl = searchParams.get("hasOffers") === "true";
+  const minPriceFromUrl = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined;
+  const maxPriceFromUrl = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined;
 
   // Data states
   const [products, setProducts] = useState([]);
@@ -49,12 +54,18 @@ export default function MenuClient() {
   const [error, setError] = useState(null);
   const [, setLiveTick] = useState(0);
 
+  // Filter drawer open state
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl);
   const [selectedRestaurant, setSelectedRestaurant] = useState(restaurantFromUrl);
   const [selectedType, setSelectedType] = useState(typeFromUrl);
   const [sortBy, setSortBy] = useState(sortFromUrl);
   const [onlyInStock, setOnlyInStock] = useState(inStockFromUrl);
+  const [onlyOffers, setOnlyOffers] = useState(hasOffersFromUrl);
+  const [minPrice, setMinPrice] = useState(minPriceFromUrl);
+  const [maxPrice, setMaxPrice] = useState(maxPriceFromUrl);
   const [searchInput, setSearchInput] = useState(searchFromUrl);
 
   // Preference & Curated States
@@ -68,7 +79,7 @@ export default function MenuClient() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync state when URL params change (e.g. from browser back/forward or navbar search)
+  // Sync state when URL params change
   useEffect(() => {
     setSelectedCategory(categoryFromUrl);
   }, [categoryFromUrl]);
@@ -88,6 +99,18 @@ export default function MenuClient() {
   useEffect(() => {
     setOnlyInStock(inStockFromUrl);
   }, [inStockFromUrl]);
+
+  useEffect(() => {
+    setOnlyOffers(hasOffersFromUrl);
+  }, [hasOffersFromUrl]);
+
+  useEffect(() => {
+    setMinPrice(minPriceFromUrl);
+  }, [minPriceFromUrl]);
+
+  useEffect(() => {
+    setMaxPrice(maxPriceFromUrl);
+  }, [maxPriceFromUrl]);
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -211,35 +234,151 @@ export default function MenuClient() {
     }
   }, [products, restaurants]);
 
-  // Client-side filtering & sorting
+  // Compute absolute min & max prices across current products
+  const priceBounds = useMemo(() => {
+    if (!products.length) return { min: 0, max: 1000 };
+    let min = Infinity;
+    let max = -Infinity;
+    products.forEach((p) => {
+      const price = Number(p.price) || 0;
+      if (price < min) min = price;
+      if (price > max) max = price;
+    });
+    return {
+      min: min === Infinity ? 0 : min,
+      max: max === -Infinity ? 1000 : max,
+    };
+  }, [products]);
+
+  // Helper to compute effective discount for discount sorting and filtering
+  const getProductDiscountInfo = useCallback((product) => {
+    if (!product) return { percent: 0, amount: 0 };
+    const offer = getProductActiveOffer(product, offers);
+    if (offer && offer.applyMode === "automatic") {
+      const disc = calculateItemDiscount(product, offer);
+      const pct = product.price > 0 ? Math.round((disc / product.price) * 100) : 0;
+      return { percent: pct, amount: disc };
+    }
+    if (product.originalPrice && product.originalPrice > product.price) {
+      const diff = product.originalPrice - product.price;
+      const pct = Math.round((diff / product.originalPrice) * 100);
+      return { percent: pct, amount: diff };
+    }
+    return { percent: 0, amount: 0 };
+  }, [offers]);
+
+  // Client-side filtering & real sorting
   const displayedProducts = useMemo(() => {
     let result = [...products];
 
+    // Availability filter
     if (onlyInStock) {
       result = result.filter((p) => p.isAvailable);
     }
 
-    if (sortBy === "price-low") {
-      result.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-    } else if (sortBy === "price-high") {
-      result.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
-    } else if (sortBy === "rating") {
-      result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    } else if (sortBy === "name") {
-      result.sort((a, b) => {
-        const nameA = typeof a?.name === "string" ? a.name : "";
-        const nameB = typeof b?.name === "string" ? b.name : "";
-        return nameA.localeCompare(nameB);
+    // Offers & Discounts filter
+    if (onlyOffers) {
+      result = result.filter((p) => {
+        const disc = getProductDiscountInfo(p);
+        const hasCoupon = Boolean(getProductActiveOffer(p, offers));
+        return disc.percent > 0 || disc.amount > 0 || hasCoupon;
       });
     }
 
-    return result;
-  }, [products, onlyInStock, sortBy]);
+    // Price range filters
+    if (minPrice !== undefined && !isNaN(minPrice)) {
+      result = result.filter((p) => (Number(p.price) || 0) >= minPrice);
+    }
+    if (maxPrice !== undefined && !isNaN(maxPrice)) {
+      result = result.filter((p) => (Number(p.price) || 0) <= maxPrice);
+    }
 
-  // Categories list with global counts (from /api/categories)
+    // Tie-breaker helper
+    const tieBreak = (a, b) => {
+      const nameComp = String(a?.name || "").localeCompare(String(b?.name || ""));
+      if (nameComp !== 0) return nameComp;
+      return String(a?._id || "").localeCompare(String(b?._id || ""));
+    };
+
+    // Real Sorting against actual schema values
+    switch (sortBy) {
+      case "popularity":
+        // Real popularity based on verified ratings count
+        result.sort((a, b) => {
+          const popB = Number(b.numRatings || 0);
+          const popA = Number(a.numRatings || 0);
+          if (popB !== popA) return popB - popA;
+          const rateB = Number(b.rating || 0);
+          const rateA = Number(a.rating || 0);
+          if (rateB !== rateA) return rateB - rateA;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "rating":
+        // Real ratings sort with numRatings tie-break
+        result.sort((a, b) => {
+          const rateB = Number(b.rating || 0);
+          const rateA = Number(a.rating || 0);
+          if (rateB !== rateA) return rateB - rateA;
+          const numB = Number(b.numRatings || 0);
+          const numA = Number(a.numRatings || 0);
+          if (numB !== numA) return numB - numA;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "price-low":
+        result.sort((a, b) => {
+          const diff = (Number(a.price) || 0) - (Number(b.price) || 0);
+          if (diff !== 0) return diff;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "price-high":
+        result.sort((a, b) => {
+          const diff = (Number(b.price) || 0) - (Number(a.price) || 0);
+          if (diff !== 0) return diff;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "newest":
+        // Real creation date sorting
+        result.sort((a, b) => {
+          const timeB = new Date(b.createdAt || 0).getTime();
+          const timeA = new Date(a.createdAt || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "discount":
+        // Real discount percentage sorting
+        result.sort((a, b) => {
+          const discB = getProductDiscountInfo(b);
+          const discA = getProductDiscountInfo(a);
+          if (discB.percent !== discA.percent) return discB.percent - discA.percent;
+          if (discB.amount !== discA.amount) return discB.amount - discA.amount;
+          return tieBreak(a, b);
+        });
+        break;
+
+      case "default":
+      case "recommended":
+      default:
+        // Preserves default ordering (featured first, then createdAt)
+        break;
+    }
+
+    return result;
+  }, [products, onlyInStock, onlyOffers, minPrice, maxPrice, sortBy, getProductDiscountInfo, offers]);
+
+  // Categories list with global counts (from /api/categories or dynamic scan)
   const categories = useMemo(() => {
     const totalGlobalDishes = dynamicCategories.reduce((sum, c) => sum + (c.dishCount || 0), 0);
-    const list = [{ id: "All", label: "All Items", icon: "✨", count: totalGlobalDishes }];
+    const list = [{ id: "All", label: "All Categories", icon: "✨", count: totalGlobalDishes }];
     dynamicCategories.forEach((cat) => {
       list.push({
         id: cat.name,
@@ -251,7 +390,7 @@ export default function MenuClient() {
     return list;
   }, [dynamicCategories]);
 
-  // Group displayed products by category for section browsing when "All" is active
+  // Group displayed products by category for section browsing when "All" is active and no search
   const categorySections = useMemo(() => {
     const groups = {};
     displayedProducts.forEach((item) => {
@@ -262,36 +401,34 @@ export default function MenuClient() {
     return groups;
   }, [displayedProducts]);
 
-  // Active filter tally for reset pill
+  // Active filter tally for Filter button badge and status
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (selectedCategory !== "All") count++;
     if (selectedRestaurant !== "all") count++;
     if (selectedType !== "all") count++;
     if (onlyInStock) count++;
-    if (sortBy !== "default") count++;
-    if (searchFromUrl.trim()) count++;
+    if (onlyOffers) count++;
+    if (minPrice !== undefined && minPrice !== "") count++;
+    if (maxPrice !== undefined && maxPrice !== "") count++;
     return count;
-  }, [selectedCategory, selectedRestaurant, selectedType, onlyInStock, sortBy, searchFromUrl]);
+  }, [selectedCategory, selectedRestaurant, selectedType, onlyInStock, onlyOffers, minPrice, maxPrice]);
 
   const handleResetFilters = () => {
     setSearchInput("");
     router.replace("/menu", { scroll: false });
   };
 
-  const handleCategoryClick = (catId) => {
-    setSelectedCategory(catId);
-    updateFilters({ category: catId });
-  };
-
-  const handleRestaurantClick = (restId) => {
-    setSelectedRestaurant(restId);
-    updateFilters({ restaurant: restId });
-  };
-
-  const handleTypeClick = (type) => {
-    setSelectedType(type);
-    updateFilters({ type });
+  const handleApplyDrawerFilters = (filters) => {
+    updateFilters({
+      category: filters.category,
+      restaurant: filters.restaurant,
+      type: filters.type,
+      inStock: filters.inStock,
+      hasOffers: filters.hasOffers,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+    });
   };
 
   const handleSortChange = (newSort) => {
@@ -299,16 +436,12 @@ export default function MenuClient() {
     updateFilters({ sort: newSort });
   };
 
-  const handleStockToggle = () => {
-    const next = !onlyInStock;
-    setOnlyInStock(next);
-    updateFilters({ inStock: next });
-  };
+  const selectedRestaurantObj = restaurants.find((r) => r._id === selectedRestaurant);
 
   return (
     <main className="min-h-screen pt-24 sm:pt-28 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── HEADER ─────────────────────────────────────────────────── */}
-      <div className="text-center w-full max-w-2xl mx-auto mb-5 sm:mb-6 px-2 min-w-0">
+      <div className="text-center w-full max-w-2xl mx-auto mb-4 sm:mb-6 px-2 min-w-0">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] font-bold uppercase tracking-wider mb-2">
           <Sparkles size={12} className="shrink-0" /> Verified Kitchen Menu
         </div>
@@ -320,47 +453,20 @@ export default function MenuClient() {
         </p>
       </div>
 
-      {/* ── UNIFIED MENU DISCOVERY HUB ─────────────────────────────── */}
-      <div className="p-3 sm:p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-6 shadow-xs space-y-2.5 sm:space-y-3 w-full max-w-full overflow-hidden min-w-0">
-        {/* Row 1: Primary Category Discovery */}
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 scrollbar-none -mx-0.5 px-0.5">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleCategoryClick(cat.id)}
-                className={`h-8 inline-flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                  isSelected
-                    ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
-                    : "bg-[var(--bg-sub)] text-[var(--text-main)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)]"
-                }`}
-              >
-                <span className="shrink-0 text-sm leading-none" aria-hidden="true">{cat.icon}</span>
-                <span>{cat.label}</span>
-                {cat.count > 0 && (
-                  <span className={`text-[10px] font-medium opacity-80 ml-0.5`}>
-                    ({cat.count})
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Row 2: Search, Dietary, Stock, and Sort Controls */}
-        <div className="flex flex-col md:flex-row gap-2 sm:gap-2.5 items-stretch md:items-center">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[200px] md:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4 pointer-events-none" />
+      {/* ── COMPACT TOOLBAR (SEARCH + SORT + FILTER) ────────────────── */}
+      <div className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-4 sm:mb-5 shadow-xs w-full max-w-full overflow-hidden min-w-0 space-y-2.5">
+        {/* Responsive Toolbar Row */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 items-stretch sm:items-center">
+          {/* Primary Search Input */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] w-4 h-4 pointer-events-none" />
             <input
               type="text"
               aria-label="Search dishes by name or category"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search dishes by name or category..."
-              className="h-9 w-full pl-9 pr-8 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition font-medium"
+              placeholder="Search dishes or cuisines..."
+              className="h-10 w-full pl-10 pr-9 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition font-medium"
             />
             {searchInput && (
               <button
@@ -369,226 +475,260 @@ export default function MenuClient() {
                   setSearchInput("");
                   updateFilters({ search: "" });
                 }}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer"
+                aria-label="Clear search query"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer"
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             )}
           </div>
 
-          {/* Quick Filter Controls */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 md:pb-0 scrollbar-none shrink-0 -mx-0.5 px-0.5">
-            {/* Veg / Non-Veg Toggle */}
-            <div className="h-9 inline-flex items-center rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] p-0.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleTypeClick("all")}
-                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
-                  selectedType === "all"
-                    ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTypeClick("veg")}
-                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                  selectedType === "veg"
-                    ? "bg-emerald-600 text-white shadow-2xs font-bold"
-                    : "text-emerald-600 dark:text-emerald-400 hover:opacity-80"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> Veg
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTypeClick("non-veg")}
-                className={`h-full px-2.5 sm:px-3 rounded-md text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                  selectedType === "non-veg"
-                    ? "bg-rose-600 text-white shadow-2xs font-bold"
-                    : "text-rose-600 dark:text-rose-400 hover:opacity-80"
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" /> Non-Veg
-              </button>
-            </div>
-
-            {/* In-Stock Filter */}
-            <button
-              type="button"
-              onClick={handleStockToggle}
-              aria-pressed={onlyInStock}
-              className={`h-9 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold border transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                onlyInStock
-                  ? "bg-[var(--brand-accent)]/15 border-[var(--brand-accent)] text-[var(--brand-accent)] font-bold"
-                  : "bg-[var(--bg-sub)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
-              }`}
-            >
-              <Check size={13} className={onlyInStock ? "opacity-100" : "opacity-35"} />
-              <span>In Stock Only</span>
-            </button>
-
-            {/* Sort Dropdown */}
-            <div className="relative shrink-0">
+          {/* Controls: Compact Sort & Filter Button (Mobile: side-by-side flex; Desktop: compact shrink-0) */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Real Sorting Dropdown */}
+            <div className="relative flex-1 sm:flex-initial">
               <select
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
-                aria-label="Sort dishes"
-                className="h-9 pl-3 pr-7 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
+                aria-label="Sort products"
+                className="h-10 w-full sm:w-auto pl-3 sm:pl-3.5 pr-8 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
               >
                 <option value="default">Sort: Recommended</option>
+                <option value="popularity">Popularity</option>
+                <option value="rating">Top Rated</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
-                <option value="rating">Top Rated</option>
-                <option value="name">Name: A to Z</option>
+                <option value="newest">Newest First</option>
+                <option value="discount">Highest Discount</option>
               </select>
-              <ArrowUpDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]" />
+              <ArrowUpDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]" />
             </div>
 
-            {/* Reset Filters Pill (visible when active) */}
-            {activeFiltersCount > 0 && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="h-9 inline-flex items-center gap-1 px-2.5 sm:px-3 rounded-lg bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-semibold text-[var(--brand-accent)] transition shrink-0 cursor-pointer"
-              >
-                <X size={12} />
-                <span>Reset ({activeFiltersCount})</span>
-              </button>
-            )}
+            {/* Filter Drawer Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsFilterDrawerOpen(true)}
+              aria-label="Open filter panel"
+              className={`h-10 flex-1 sm:flex-initial px-3.5 sm:px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
+                activeFiltersCount > 0
+                  ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)]"
+                  : "bg-[var(--bg-sub)] text-[var(--text-main)] border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card-hover)]"
+              }`}
+            >
+              <SlidersHorizontal size={14} className="shrink-0" />
+              <span>Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-white text-[var(--brand-accent)] text-[10px] font-black flex items-center justify-center ml-0.5 shadow-2xs">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Row 3: Integrated Partner Kitchen Chips */}
-        {restaurants.length > 0 && (
-          <div className="pt-2 border-t border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 scrollbar-none text-xs -mx-0.5 px-0.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 shrink-0 mr-0.5 select-none">
-              <Building2 size={13} className="text-[var(--brand-accent)] shrink-0" /> Partner Kitchens:
+        {/* ── APPLIED ACTIVE FILTER PILLS ROW ────────────────────────── */}
+        {(activeFiltersCount > 0 || searchFromUrl.trim()) && (
+          <div className="pt-2 border-t border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs flex-wrap">
+            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mr-1">
+              Active:
             </span>
+
+            {/* Category Chip */}
+            {selectedCategory !== "All" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <span>Category: {selectedCategory}</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ category: "All" })}
+                  aria-label={`Remove category filter: ${selectedCategory}`}
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Restaurant Chip */}
+            {selectedRestaurant !== "all" && selectedRestaurantObj && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <Building2 size={11} />
+                <span>{selectedRestaurantObj.name}</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ restaurant: "all" })}
+                  aria-label="Remove kitchen filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Dietary Chip */}
+            {selectedType !== "all" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <span className={`w-1.5 h-1.5 rounded-full ${selectedType === "veg" ? "bg-emerald-500" : "bg-rose-500"}`} />
+                <span>{selectedType === "veg" ? "Vegetarian" : "Non-Vegetarian"}</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ type: "all" })}
+                  aria-label="Remove diet filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* In-Stock Chip */}
+            {onlyInStock && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <Check size={11} />
+                <span>In Stock Only</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ inStock: false })}
+                  aria-label="Remove in stock filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Deals Only Chip */}
+            {onlyOffers && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <Tag size={11} />
+                <span>Deals & Offers</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ hasOffers: false })}
+                  aria-label="Remove offers filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Price Chip */}
+            {(minPrice !== undefined || maxPrice !== undefined) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <span>
+                  Price: ₹{minPrice ?? priceBounds.min} - ₹{maxPrice ?? priceBounds.max}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ minPrice: undefined, maxPrice: undefined })}
+                  aria-label="Remove price filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Search Query Chip */}
+            {searchFromUrl.trim() && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-xs font-medium">
+                <span>"{searchFromUrl.trim()}"</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput("");
+                    updateFilters({ search: "" });
+                  }}
+                  aria-label="Clear search"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Reset All Action */}
             <button
               type="button"
-              onClick={() => handleRestaurantClick("all")}
-              className={`h-7 inline-flex items-center px-2.5 rounded-md text-xs font-medium whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                selectedRestaurant === "all"
-                  ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
-                  : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-              }`}
+              onClick={handleResetFilters}
+              className="text-xs font-bold text-[var(--brand-accent)] hover:underline ml-auto cursor-pointer py-1 px-2"
             >
-              All Kitchens ({restaurants.length})
+              Clear All
             </button>
-            {restaurants.map((rest) => {
-              const op = getRestaurantOperationalStatus(rest);
-              const isSelected = selectedRestaurant === rest._id;
-              return (
-                <button
-                  key={rest._id}
-                  type="button"
-                  onClick={() => handleRestaurantClick(rest._id)}
-                  className={`h-7 inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium whitespace-nowrap transition cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                    isSelected
-                      ? "bg-[var(--brand-accent)] text-white shadow-2xs font-bold"
-                      : "bg-[var(--bg-sub)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-                  }`}
-                >
-                  <span>{rest.name}</span>
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      op.isOpen ? "bg-emerald-500" : "bg-amber-500"
-                    }`}
-                    title={op.isOpen ? "Open Now" : op.reason}
-                  />
-                </button>
-              );
-            })}
           </div>
         )}
 
-        {/* Active Kitchen Operational Banner (Expanded when a specific kitchen is selected) */}
-        {selectedRestaurant !== "all" && (() => {
-          const activeKitchen = restaurants.find((r) => r._id === selectedRestaurant);
-          if (!activeKitchen) return null;
-          const op = getRestaurantOperationalStatus(activeKitchen);
-          const flatFee = activeKitchen.chargeSettings?.flatDeliveryFee ?? 40;
-          const freeAbove = activeKitchen.chargeSettings?.freeDeliveryThreshold ?? 500;
-          const radius = activeKitchen.deliverySettings?.deliveryRadiusKm ?? 10;
-          const minOrder = activeKitchen.orderLimits?.minOrderAmount ?? 0;
-          const kitchenOffers = offers.filter(
-            (o) => !o.restaurant || o.restaurant?._id === activeKitchen._id || o.restaurant === activeKitchen._id
-          );
+        {/* Selected Kitchen Details Banner (When filtered by single restaurant) */}
+        {selectedRestaurant !== "all" && selectedRestaurantObj && (() => {
+          const op = getRestaurantOperationalStatus(selectedRestaurantObj);
+          const flatFee = selectedRestaurantObj.chargeSettings?.flatDeliveryFee ?? 40;
+          const freeAbove = selectedRestaurantObj.chargeSettings?.freeDeliveryThreshold ?? 500;
+          const radius = selectedRestaurantObj.deliverySettings?.deliveryRadiusKm ?? 10;
+          const minOrder = selectedRestaurantObj.orderLimits?.minOrderAmount ?? 0;
 
           return (
-            <div className="pt-2.5 border-t border-[var(--border-color)] space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-extrabold text-xs sm:text-sm text-[var(--text-main)]">
-                    {activeKitchen.name}
+            <div className="pt-2 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-extrabold text-[var(--text-main)]">
+                  {selectedRestaurantObj.name}
+                </span>
+                {op.isOpen ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    ● Open Now
                   </span>
-                  {op.isOpen ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      ● Open Now
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                      ● Closed ({op.reason})
-                    </span>
-                  )}
-                  <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                    <Clock size={11} className="text-[var(--brand-accent)]" />
-                    {op.hoursText || activeKitchen.openingHours || "10:00 AM - 11:00 PM"}
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    ● Closed ({op.reason})
                   </span>
-                </div>
-
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] flex-wrap">
-                  <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium">
-                    🛵 ₹{flatFee} {freeAbove > 0 ? `(Free > ₹${freeAbove})` : ""}
-                  </span>
-                  <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium">
-                    📍 Up to {radius} km
-                  </span>
-                  {minOrder > 0 && (
-                    <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-lg border border-[var(--border-color)] font-medium text-amber-600 dark:text-amber-400">
-                      Min ₹{minOrder}
-                    </span>
-                  )}
-                </div>
+                )}
+                <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1">
+                  <Clock size={11} className="text-[var(--brand-accent)]" />
+                  {op.hoursText || selectedRestaurantObj.openingHours || "10:00 AM - 11:00 PM"}
+                </span>
               </div>
 
-              {!op.isOpen && (
-                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-2">
-                  <Clock size={13} className="shrink-0" />
-                  <span>
-                    This kitchen is currently closed or ordering is temporarily paused. Dishes are viewable but ordering is unavailable until opening.
+              <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] flex-wrap">
+                <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] font-medium">
+                  🛵 ₹{flatFee} {freeAbove > 0 ? `(Free > ₹${freeAbove})` : ""}
+                </span>
+                <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] font-medium">
+                  📍 {radius} km
+                </span>
+                {minOrder > 0 && (
+                  <span className="bg-[var(--bg-sub)] px-2 py-0.5 rounded-md border border-[var(--border-color)] font-medium text-amber-600 dark:text-amber-400">
+                    Min ₹{minOrder}
                   </span>
-                </div>
-              )}
-
-              {kitchenOffers.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                  <span className="text-[10px] font-bold text-[var(--brand-accent)] flex items-center gap-1 uppercase tracking-wider">
-                    <Tag size={11} /> Deals:
-                  </span>
-                  {kitchenOffers.slice(0, 2).map((off) => (
-                    <span
-                      key={off._id}
-                      className="px-2 py-0.5 rounded-md bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] font-bold"
-                    >
-                      {off.code}: {off.discountType === "percentage" ? `${off.discountValue}% OFF` : `₹${off.discountValue} OFF`}
-                    </span>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           );
         })()}
       </div>
 
+      {/* ── FILTER DRAWER MODAL ─────────────────────────────────────── */}
+      <FilterDrawer
+        isOpen={isFilterDrawerOpen}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        categories={categories}
+        restaurants={restaurants}
+        appliedFilters={{
+          category: selectedCategory,
+          restaurant: selectedRestaurant,
+          type: selectedType,
+          inStock: onlyInStock,
+          hasOffers: onlyOffers,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+        }}
+        priceBounds={priceBounds}
+        onApply={handleApplyDrawerFilters}
+        onReset={handleResetFilters}
+      />
+
       {/* ── PRODUCTS CONTENT & STATES ───────────────────────────────── */}
       {loading ? (
-        /* Skeletons resembling the final responsive grid */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
+        /* Skeletons */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
           {Array.from({ length: 8 }).map((_, i) => (
             <ProductCardSkeleton key={i} />
           ))}
@@ -621,7 +761,7 @@ export default function MenuClient() {
           <p className="text-xs text-[var(--text-muted)] mt-1.5 max-w-sm mx-auto leading-relaxed">
             {searchFromUrl
               ? `No dishes matched "${searchFromUrl}" with your active filters.`
-              : "No dishes are currently active under this selection."}
+              : "No dishes are currently active under your selected filters."}
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <button
@@ -635,7 +775,7 @@ export default function MenuClient() {
         </div>
       ) : (
         /* Products Found */
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           {/* Filter Status Summary Header */}
           {(searchFromUrl.trim() || activeFiltersCount > 0) && (
             <div className="flex items-center justify-between flex-wrap gap-2 pt-1 pb-2 border-b border-[var(--border-color)]">
@@ -661,8 +801,8 @@ export default function MenuClient() {
             </div>
           )}
 
-          {/* 1. Curated Highlights Carousel: Shown only when browsing "All" with no specific search */}
-          {!searchFromUrl.trim() && selectedCategory === "All" && activeFiltersCount <= 1 && (
+          {/* 1. Curated Highlights Carousel: Shown only when browsing "All" with no specific search or heavy filters */}
+          {!searchFromUrl.trim() && selectedCategory === "All" && activeFiltersCount === 0 && (
             <>
               {/* Recommended based on personal preferences */}
               {userHasHistory && recommendedList.length > 0 && (
@@ -691,9 +831,9 @@ export default function MenuClient() {
           )}
 
           {/* 2. Main Responsive Grids */}
-          {selectedCategory !== "All" || searchFromUrl.trim() || activeFiltersCount > 1 ? (
+          {selectedCategory !== "All" || searchFromUrl.trim() || activeFiltersCount > 0 ? (
             /* Single composed responsive grid when category/search/filter is active */
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
               {displayedProducts.map((product) => (
                 <ProductCard
                   key={product._id}
@@ -705,9 +845,9 @@ export default function MenuClient() {
             </div>
           ) : (
             /* Categorized Sections when browsing all dishes */
-            <div className="space-y-10">
+            <div className="space-y-8 sm:space-y-10">
               {Object.entries(categorySections).map(([catName, catProducts]) => (
-                <section key={catName} className="space-y-3.5">
+                <section key={catName} className="space-y-3">
                   <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
                     <div className="flex items-center gap-2">
                       <h2 className="text-base sm:text-lg font-black text-[var(--text-main)]">
@@ -719,14 +859,14 @@ export default function MenuClient() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleCategoryClick(catName)}
+                      onClick={() => updateFilters({ category: catName })}
                       className="text-xs font-bold text-[var(--brand-accent)] hover:underline cursor-pointer"
                     >
-                      Filter {catName}
+                      Filter {catName} →
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
                     {catProducts.map((product) => (
                       <ProductCard
                         key={product._id}

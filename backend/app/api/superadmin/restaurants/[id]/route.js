@@ -60,7 +60,7 @@ export async function PUT(request, { params }) {
     }
 
     // Update fields
-    if (body.status !== undefined && ["active", "inactive", "suspended"].includes(body.status)) {
+    if (body.status !== undefined && ["active", "inactive", "suspended", "archived"].includes(body.status)) {
       restaurant.status = body.status;
     }
     if (body.name !== undefined) restaurant.name = String(body.name).trim();

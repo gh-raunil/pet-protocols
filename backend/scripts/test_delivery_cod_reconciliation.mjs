@@ -39,6 +39,7 @@ if (!testRest) {
     phone: "9876543291",
     address: { street: "10 Delivery Rd", city: "Vellore", state: "TN", pincode: "632014" },
     enabledFeatures: ["delivery"],
+    status: "archived",
   });
 }
 

@@ -83,7 +83,7 @@ const RestaurantSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'suspended'],
+      enum: ['active', 'inactive', 'suspended', 'archived'],
       default: 'active',
     },
     // Feature Access Control (Configured by Superadmin per restaurant)
