@@ -935,7 +935,7 @@ export default function RestaurantDetailsClient() {
               <span>Add Admin to {restaurant.name}</span>
             </h3>
 
-            <form onSubmit={handleAddAdmin} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <form onSubmit={handleAddAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                   Full Name <span className="text-rose-500">*</span>
@@ -964,25 +964,25 @@ export default function RestaurantDetailsClient() {
                 />
               </div>
 
-              <div className="flex gap-2">
-                <div className="w-full">
-                  <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                    Password <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={newAdmin.password}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                    className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  Password <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={newAdmin.password}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                  className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500"
+                />
+              </div>
 
+              <div>
                 <button
                   type="submit"
                   disabled={creatingAdmin}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95 shrink-0 self-end"
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95 cursor-pointer text-center"
                 >
                   {creatingAdmin ? "Adding..." : "Add Admin"}
                 </button>

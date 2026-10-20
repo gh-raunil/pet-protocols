@@ -84,7 +84,7 @@ function TimeSelect({ value, onChange, is12Hour, className = "" }) {
     <select
       value={value || "08:00"}
       onChange={(e) => onChange(e.target.value)}
-      className={`bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 hover:border-orange-500 focus:border-orange-500 outline-none cursor-pointer transition-colors shadow-2xs min-w-[105px] ${className}`}
+      className={`bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 hover:border-orange-500 focus:border-orange-500 outline-none cursor-pointer transition-colors shadow-2xs w-auto min-w-[95px] max-w-[135px] ${className}`}
     >
       {displayOptions.map((opt) => (
         <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
@@ -577,24 +577,24 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
             return (
               <div
                 key={key}
-                className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col lg:flex-row lg:items-center justify-between gap-3 transition-all ${
+                className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col xl:flex-row xl:items-center justify-between gap-3 transition-all min-w-0 ${
                   isOpen
                     ? "bg-zinc-50/70 dark:bg-zinc-900/40 border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700"
                     : "bg-zinc-100/40 dark:bg-zinc-900/20 border-zinc-200/50 dark:border-zinc-800/50 opacity-60"
                 }`}
               >
                 {/* Left Side: Day Identity + Open/Closed Switch */}
-                <div className="flex items-center justify-between sm:justify-start gap-3 shrink-0">
-                  <div className="flex items-center gap-2 w-32 sm:w-36">
+                <div className="flex items-center justify-between sm:justify-start gap-3 min-w-0">
+                  <div className="flex items-center gap-2 min-w-[120px] sm:min-w-[130px]">
                     <span className="text-xs sm:text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
                       {label}
                     </span>
                     {isWeekend ? (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
                         Weekend
                       </span>
                     ) : (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 shrink-0">
                         Weekday
                       </span>
                     )}
@@ -627,12 +627,12 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
                   </div>
                 </div>
 
-                {/* Right Side: Hours Pickers + Copy Action (unified container with safe gap) */}
-                <div className="flex items-center justify-between lg:justify-end gap-3 shrink-0 flex-wrap sm:flex-nowrap">
+                {/* Right Side: Hours Pickers + Copy Action */}
+                <div className="flex items-center justify-between xl:justify-end gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap min-w-0">
                   {isOpen ? (
-                    <div className="flex items-center gap-2 sm:gap-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-semibold text-zinc-400">Opens:</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap sm:flex-nowrap min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] font-semibold text-zinc-400 shrink-0">Opens:</span>
                         <TimeSelect
                           value={slot.open || "08:00"}
                           onChange={(val) => updateDaySlot(key, "open", val)}
@@ -640,10 +640,10 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
                         />
                       </div>
 
-                      <span className="text-zinc-400 font-bold text-xs">—</span>
+                      <span className="text-zinc-400 font-bold text-xs shrink-0">—</span>
 
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-semibold text-zinc-400">Closes:</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] font-semibold text-zinc-400 shrink-0">Closes:</span>
                         <TimeSelect
                           value={slot.close || "21:00"}
                           onChange={(val) => updateDaySlot(key, "close", val)}
@@ -659,12 +659,14 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
                     </div>
                   )}
 
-                  {/* Copy to All Button with guaranteed separation */}
+                  {/* Copy to All Button with guaranteed containment */}
                   <button
                     type="button"
                     onClick={() => copyDayToAll(key)}
-                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 border border-zinc-200 dark:border-zinc-700/80 hover:border-orange-500/40 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer ml-auto sm:ml-0"
+                    disabled={!isOpen}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 border border-zinc-200 dark:border-zinc-700/80 hover:border-orange-500/40 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ml-auto sm:ml-0"
                     title={`Apply ${label}'s timing to all 7 days`}
+                    aria-label={`Apply ${label}'s timing to all 7 days`}
                   >
                     <Copy className="w-3.5 h-3.5" />
                     <span className="text-[11px]">Copy to all</span>

@@ -165,7 +165,7 @@ export default function AdvancedSection({ form, meta, onChange, onSave, onResetD
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
               Country & Currency
@@ -315,7 +315,7 @@ export default function AdvancedSection({ form, meta, onChange, onSave, onResetD
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
           <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60 space-y-1.5">
             <div className="flex items-center justify-between">
               <CreditCard className="w-4 h-4 text-orange-500" />

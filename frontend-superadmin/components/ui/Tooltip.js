@@ -166,57 +166,25 @@ export default function Tooltip({
 
   if (!content) return children;
 
-  // Wrap or augment child element
-  let triggerElement = null;
-  if (isValidElement(children)) {
-    triggerElement = cloneElement(children, {
-      ref: (node) => {
-        triggerRef.current = node;
-        const { ref } = children;
-        if (typeof ref === "function") ref(node);
-        else if (ref) ref.current = node;
-      },
-      onMouseEnter: (e) => {
-        children.props.onMouseEnter?.(e);
-        show();
-      },
-      onMouseLeave: (e) => {
-        children.props.onMouseLeave?.(e);
-        hide();
-      },
-      onFocus: (e) => {
-        children.props.onFocus?.(e);
-        show();
-      },
-      onBlur: (e) => {
-        children.props.onBlur?.(e);
-        hide();
-      },
-      onClick: (e) => {
-        children.props.onClick?.(e);
+  // Wrap child element in accessible trigger wrapper
+  const triggerElement = (
+    <span
+      ref={triggerRef}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+      onClick={(e) => {
         if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) {
           toggle(e);
         }
-      },
-      "aria-describedby": isOpen ? id : children.props["aria-describedby"],
-    });
-  } else {
-    triggerElement = (
-      <span
-        ref={triggerRef}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onFocus={show}
-        onBlur={hide}
-        onClick={toggle}
-        tabIndex={0}
-        aria-describedby={isOpen ? id : undefined}
-        className="inline-flex cursor-help"
-      >
-        {children}
-      </span>
-    );
-  }
+      }}
+      aria-describedby={isOpen ? id : undefined}
+      className="inline-flex max-w-full"
+    >
+      {children}
+    </span>
+  );
 
   return (
     <>

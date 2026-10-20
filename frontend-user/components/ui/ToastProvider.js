@@ -261,7 +261,7 @@ function SwipeableToastItem({ toast, onDismiss }) {
 
   const duration = toast.duration ?? (toast.type === "error" ? 3200 : 2200);
   const remainingTimeRef = useRef(duration);
-  const timerStartRef = useRef(Date.now());
+  const timerStartRef = useRef(0);
   const timerIdRef = useRef(null);
 
   // Resume or start timer

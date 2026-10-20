@@ -657,7 +657,7 @@ export default function OrdersClient() {
 
   return (
     <div className="min-h-screen bg-transparent text-stone-900 dark:text-white font-jakarta transition-colors relative">
-      <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 min-w-0">
         
         {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
         {!kitchenActive && (
@@ -915,7 +915,7 @@ export default function OrdersClient() {
         )}
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
+        <div className="flex items-center gap-2 overflow-x-auto subtle-scrollbar pb-1.5 w-full min-w-0">
           {statusTabs.map((tab) => (
             <button
               key={tab.id}
@@ -1616,7 +1616,7 @@ export default function OrdersClient() {
           </div>
         )}
 
-      </main>
+      </div>
 
       {/* Explicit Out-of-Range Order Manager Confirmation Dialog */}
       {outOfRangePrompt && (

@@ -509,7 +509,7 @@ export default function OrdersClient() {
                 setDateFilterMode("date");
               }
             }}
-            className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-accent)] cursor-pointer"
+            className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-accent)] cursor-pointer w-auto min-w-0 max-w-[130px] sm:max-w-none"
             title="Pick a specific date to view orders"
           />
         </div>

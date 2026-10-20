@@ -169,8 +169,10 @@ export function useNavBadges() {
   const pathnameRef = useRef(pathname);
   const sessionRef = useRef(session);
 
-  pathnameRef.current = pathname;
-  sessionRef.current = session;
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    sessionRef.current = session;
+  }, [pathname, session]);
 
   // Clear badge when user opens/navigates to that section
   useEffect(() => {

@@ -45,6 +45,9 @@ export default function SettingsClient() {
     const tab = searchParams.get("tab");
     if (tab && tab !== activeSection) {
       setActiveSection(tab);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
       if (contentPanelRef.current) {
         contentPanelRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -209,6 +212,9 @@ export default function SettingsClient() {
     setActiveSection(id);
     const newUrl = `/settings?tab=${id}`;
     window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     if (contentPanelRef.current) {
       contentPanelRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -366,9 +372,9 @@ export default function SettingsClient() {
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:px-6 lg:py-3.5 max-w-7xl mx-auto w-full font-jakarta lg:h-[calc(100dvh-3.5rem)] flex flex-col min-h-0 lg:overflow-hidden">
+    <div className="p-3 sm:p-4 lg:p-6 max-w-7xl mx-auto w-full font-jakarta flex flex-col min-w-0">
       {/* Short & Minimal Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-stone-200/60 dark:border-white/10 pb-2.5 shrink-0">
+      <div className="flex items-center justify-between gap-3 border-b border-stone-200/60 dark:border-white/10 pb-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
           <h1 className="text-sm sm:text-base font-bold tracking-tight text-stone-900 dark:text-white truncate">
@@ -388,10 +394,10 @@ export default function SettingsClient() {
         </button>
       </div>
 
-      {/* Main Two-Pane Layout: Left Sidebar & Right Content Panel independently scrollable on desktop */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 pt-2.5 lg:overflow-hidden">
+      {/* Main Two-Pane Layout: Left Sidebar Sticky & Right Content Panel Natural Scroll */}
+      <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-5 pt-4 items-start">
         {/* Component 1: Left Settings Nav Menu */}
-        <div className="w-full lg:w-64 xl:w-72 shrink-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 shadow-xs lg:h-full lg:flex lg:flex-col min-h-0">
+        <div className="w-full lg:w-64 xl:w-72 shrink-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 shadow-xs lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto subtle-scrollbar">
           <SettingsSidebar
             activeSection={activeSection}
             onSelectSection={handleSelectSection}
@@ -401,7 +407,7 @@ export default function SettingsClient() {
         {/* Component 2: Right Settings Content Panel */}
         <div
           ref={contentPanelRef}
-          className="flex-1 w-full min-w-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-7 shadow-xs lg:h-full lg:overflow-y-auto min-h-0 [overscroll-behavior:contain] subtle-scrollbar"
+          className="flex-1 w-full min-w-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xs overflow-x-hidden"
         >
             {/* Global Feedback Alert */}
             {feedback.message && (
