@@ -99,8 +99,7 @@ export default function AvailabilityClient() {
   const soldOutCount = products.filter((p) => !p.isAvailable).length;
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors">
-      <main className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 font-jakarta">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-white/10">
           <div>
@@ -275,7 +274,6 @@ export default function AvailabilityClient() {
             })}
           </div>
         )}
-      </main>
     </div>
   );
 }

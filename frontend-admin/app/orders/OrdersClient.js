@@ -656,13 +656,8 @@ export default function OrdersClient() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
-      {/* Soft warm ambient background glow for light mode */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
-      </div>
-
-      <main className="pt-20 sm:pt-28 pb-28 sm:pb-24 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-5">
+    <div className="min-h-screen bg-transparent text-stone-900 dark:text-white font-jakarta transition-colors relative">
+      <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
         
         {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
         {!kitchenActive && (

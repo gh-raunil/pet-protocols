@@ -135,20 +135,19 @@ export default function CashierWorkspace({ restaurantName = "" }) {
 
   return (
     <div className="space-y-6">
-      {/* ── TOP CASHIER BANNER ──────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-green-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-500/10 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+      {/* ── TOP CASHIER OPERATIONAL HEADER ────────────────────────── */}
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md mb-3 border border-white/20">
-              <Receipt size={14} />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold mb-2 border border-emerald-500/20">
+              <Receipt size={14} className="text-emerald-500" />
               <span>CASHIER & BILLING REGISTER</span>
               {restaurantName && <span>• {restaurantName}</span>}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
               Front Counter POS Terminal
             </h1>
-            <p className="text-emerald-100 text-xs sm:text-sm mt-1.5 max-w-xl font-medium leading-relaxed">
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl">
               Order billing, cash collection, digital settlement, and tax invoice receipt printing.
             </p>
           </div>
@@ -156,7 +155,7 @@ export default function CashierWorkspace({ restaurantName = "" }) {
           <button
             onClick={() => loadOrders(false)}
             disabled={refreshing || loading}
-            className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-emerald-950 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             <span>{refreshing ? "Refreshing..." : "Sync Billing"}</span>
@@ -164,34 +163,38 @@ export default function CashierWorkspace({ restaurantName = "" }) {
         </div>
 
         {/* ── 4 STATS CARDS ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 pt-6 border-t border-white/15">
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-5 pt-5 border-t border-stone-100 dark:border-white/5">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
               Total Revenue Settled
             </span>
-            <div className="text-2xl font-black mt-1 text-white">
+            <div className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400 font-mono">
               ₹{metrics.totalCollected.toFixed(2)}
             </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
               Pending Settlement
             </span>
-            <div className="text-2xl font-black mt-1 text-yellow-300">
+            <div className="text-2xl font-black mt-1 text-amber-600 dark:text-amber-400 font-mono">
               ₹{metrics.pendingCollection.toFixed(2)}
             </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
               Bills Settled
             </span>
-            <div className="text-2xl font-black mt-1 text-white">{metrics.settledCount}</div>
+            <div className="text-2xl font-black mt-1 text-stone-900 dark:text-white font-mono">
+              {metrics.settledCount}
+            </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block">
               Unpaid Tickets
             </span>
-            <div className="text-2xl font-black mt-1 text-amber-300">{metrics.unpaidCount}</div>
+            <div className="text-2xl font-black mt-1 text-rose-600 dark:text-rose-400 font-mono">
+              {metrics.unpaidCount}
+            </div>
           </div>
         </div>
       </div>

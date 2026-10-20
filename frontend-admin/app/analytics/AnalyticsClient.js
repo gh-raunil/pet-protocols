@@ -76,9 +76,8 @@ export default function AnalyticsClient() {
   ];
 
   return (
-    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
-      <main className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
-        <FeatureGuard featureKey="analytics" featureName="Advanced Analytics">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 font-jakarta">
+      <FeatureGuard featureKey="analytics" featureName="Advanced Analytics">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6">
             <div>
@@ -261,7 +260,6 @@ export default function AnalyticsClient() {
             </div>
           </div>
         </FeatureGuard>
-      </main>
     </div>
   );
 }

@@ -83,6 +83,7 @@ export default function SettingsSidebar({ activeSection, onSelectSection }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const pillContainerRef = useRef(null);
+  const desktopNavRef = useRef(null);
 
   const activeGroups = Array.isArray(enabledFeatures)
     ? SETTINGS_GROUPS.map((group) => ({
@@ -129,16 +130,29 @@ export default function SettingsSidebar({ activeSection, onSelectSection }) {
     }
   }, [activeSection]);
 
+  // Keep active desktop sidebar item visible in view
+  useEffect(() => {
+    if (desktopNavRef.current) {
+      const activeEl = desktopNavRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [activeSection]);
+
   return (
-    <aside className="w-full">
-      {/* Desktop Sidebar Pane */}
-      <div className="hidden lg:block space-y-2 pb-6">
-        <div className="px-2 pb-3 mb-2 border-b border-zinc-200/80 dark:border-zinc-800/80">
-          <h2 className="text-xs font-black uppercase tracking-wider text-orange-500">Settings</h2>
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">Restaurant Administration</p>
+    <aside className="w-full lg:h-full lg:flex lg:flex-col min-h-0">
+      {/* Desktop Sidebar Pane: Independently scrollable */}
+      <div className="hidden lg:flex lg:flex-col lg:h-full min-h-0">
+        <div className="shrink-0 px-2 pb-2.5 mb-2 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#10141f]">
+          <h2 className="text-[11px] font-black uppercase tracking-wider text-orange-500">Settings</h2>
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-medium">Restaurant Administration</p>
         </div>
 
-        <nav className="space-y-3 pr-1">
+        <nav
+          ref={desktopNavRef}
+          className="flex-1 min-h-0 overflow-y-auto [overscroll-behavior:contain] subtle-scrollbar space-y-3 pr-1 pb-3"
+        >
           {activeGroups.map((group) => (
             <div key={group.title}>
               <div className="px-2.5 py-1 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
@@ -151,6 +165,7 @@ export default function SettingsSidebar({ activeSection, onSelectSection }) {
                   return (
                     <button
                       key={item.id}
+                      data-active={isActive ? "true" : undefined}
                       onClick={() => onSelectSection(item.id)}
                       type="button"
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs sm:text-sm font-medium transition-all duration-150 cursor-pointer ${

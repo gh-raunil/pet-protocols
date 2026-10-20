@@ -267,7 +267,7 @@ export default function RestaurantAdminProfileClient() {
   const userInitial = (managerName?.trim()?.charAt(0) || (isStaff ? "S" : "M")).toUpperCase();
 
   return (
-    <main className="min-h-screen pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto font-jakarta text-stone-900 dark:text-white transition-colors">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto font-jakarta space-y-6">
       {/* Toast Alert */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-3 duration-200">
@@ -780,6 +780,6 @@ export default function RestaurantAdminProfileClient() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

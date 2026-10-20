@@ -56,6 +56,17 @@ const MAP_STYLES = [
     maxZoom: 19,
   },
   {
+    id: "terrain",
+    name: "Topo & Terrain",
+    subtext: "Elevation & Natural Relief",
+    icon: "⛰️",
+    base: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "abc",
+    overlay: null,
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    maxZoom: 19,
+  },
+  {
     id: "night",
     name: "Night Mode",
     subtext: "Dark High-Contrast",

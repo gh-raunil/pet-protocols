@@ -46,26 +46,56 @@
 :root,
 .dark { 
   --bg-main: #07090e;
+  --bg-page: #090d16;
   --bg-sub: #0d111a;
   --bg-card: #10141f;
   --bg-card-hover: #161e31;
+  --bg-sidebar: #0b0f19;
+  --bg-header: rgba(11, 15, 25, 0.85);
+  --surface-primary: #10141f;
+  --surface-secondary: #0d111a;
+  --surface-elevated: #161e31;
   --border-color: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.15);
   --text-main: #f8fafc;
-  --text-muted: #94a3b8;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   --accent-orange: var(--brand-accent, #f97316);
   --accent-orange-hover: var(--brand-accent-hover, #ea580c);
+  --ring-focus: rgba(249, 115, 22, 0.35);
+  --sidebar-active-bg: rgba(249, 115, 22, 0.12);
+  --sidebar-active-border: var(--brand-accent, #f97316);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: var(--brand-accent, #f97316);
+  --scrollbar-track: transparent;
 }
 
 .light {
-  --bg-main: #fafaf9;
-  --bg-sub: #f5f5f4;
+  --bg-main: #f8fafc;
+  --bg-page: #f8fafc;
+  --bg-sub: #f1f5f9;
   --bg-card: #ffffff;
-  --bg-card-hover: #fcfcfc;
-  --border-color: #e7e5e4;
-  --text-main: #1c1917;
-  --text-muted: #78716c;
+  --bg-card-hover: #f8fafc;
+  --bg-sidebar: #ffffff;
+  --bg-header: rgba(255, 255, 255, 0.88);
+  --surface-primary: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-elevated: #ffffff;
+  --border-color: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-strong: #cbd5e1;
+  --text-main: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
   --accent-orange: var(--brand-accent, #f97316);
   --accent-orange-hover: var(--brand-accent-hover, #ea580c);
+  --ring-focus: rgba(249, 115, 22, 0.30);
+  --sidebar-active-bg: rgba(249, 115, 22, 0.10);
+  --sidebar-active-border: var(--brand-accent, #f97316);
+  --scrollbar-thumb: rgba(100, 116, 139, 0.28);
+  --scrollbar-thumb-hover: var(--brand-accent, #f97316);
+  --scrollbar-track: transparent;
 }
 
 
@@ -82,7 +112,7 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* ── Scrollbar-none Utility ── */
+/* ── Scrollbar Utilities ── */
 .scrollbar-none::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
@@ -93,24 +123,73 @@ body {
   scrollbar-width: none !important;
 }
 
-
 /* Standard scrollbars */
+* {
+  scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16)) var(--scrollbar-track, transparent);
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #f97316;
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16));
   border-radius: 9999px;
 }
-.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, #f97316);
 }
-.light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+
+/* Custom sleek scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16)) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16));
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, #f97316);
+}
+
+/* Subtle auto-hiding scrollbar: clean & transparent until hovered */
+.subtle-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+.subtle-scrollbar:hover {
+  scrollbar-color: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16)) transparent;
+}
+.subtle-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.subtle-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+.subtle-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.16));
+}
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, #f97316);
 }
 
 /* ── Universal Input Focus & Autofill Overrides ── */

@@ -131,29 +131,28 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
 
   return (
     <div className="space-y-6">
-      {/* ── TOP KITCHEN BANNER ──────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-orange-500/10 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+      {/* ── TOP KITCHEN OPERATIONAL HEADER ────────────────────────── */}
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md mb-3 border border-white/20">
-              <ChefHat size={14} className="animate-bounce" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-bold mb-2 border border-orange-500/20">
+              <ChefHat size={14} className="text-orange-500" />
               <span>KITCHEN DISPLAY SYSTEM (KDS)</span>
               {restaurantName && <span>• {restaurantName}</span>}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
               Cook & Prep Workstation
             </h1>
-            <p className="text-amber-100 text-xs sm:text-sm mt-1.5 max-w-xl font-medium leading-relaxed">
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl">
               Real-time ticket queue for food line preparation, dietary notes, and cooking timers.
             </p>
           </div>
 
-          <Tooltip content="Fetch newly arrived kitchen orders immediately" position="bottom">
+          <Tooltip content="Fetch newly arrived kitchen orders immediately" placement="bottom">
             <button
               onClick={() => loadOrders(false)}
               disabled={refreshing || loading}
-              className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-orange-950 hover:bg-amber-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
+              className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
               <span>{refreshing ? "Syncing..." : "Sync Tickets"}</span>
@@ -162,30 +161,38 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
         </div>
 
         {/* ── 4 STATS CARDS ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 pt-6 border-t border-white/15">
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider block">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-5 pt-5 border-t border-stone-100 dark:border-white/5">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
               New Tickets
             </span>
-            <div className="text-2xl font-black mt-1 text-yellow-300">{metrics.pendingCount}</div>
+            <div className="text-2xl font-black mt-1 text-amber-600 dark:text-amber-400 font-mono">
+              {metrics.pendingCount}
+            </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider block">
               Cooking Now
             </span>
-            <div className="text-2xl font-black mt-1 text-white">{metrics.cookingCount}</div>
+            <div className="text-2xl font-black mt-1 text-orange-600 dark:text-orange-400 font-mono">
+              {metrics.cookingCount}
+            </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
               Ready for Handover
             </span>
-            <div className="text-2xl font-black mt-1 text-emerald-300">{metrics.readyCount}</div>
+            <div className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400 font-mono">
+              {metrics.readyCount}
+            </div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
               Completed Shift
             </span>
-            <div className="text-2xl font-black mt-1 text-white">{metrics.completedToday}</div>
+            <div className="text-2xl font-black mt-1 text-stone-900 dark:text-white font-mono">
+              {metrics.completedToday}
+            </div>
           </div>
         </div>
       </div>

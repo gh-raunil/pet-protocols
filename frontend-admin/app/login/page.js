@@ -113,7 +113,7 @@ function LoginForm({ defaultRole = "admin" }) {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center pt-20 pb-8 px-4 sm:px-6 bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600 overflow-x-hidden">
+    <main className="min-h-screen flex flex-col items-center justify-center py-8 px-4 sm:px-6 bg-transparent text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600 overflow-x-hidden">
       {/* Soft warm ambient background glow for light mode */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
         <div

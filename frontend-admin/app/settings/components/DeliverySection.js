@@ -1,6 +1,7 @@
 "use client";
 
 import { Truck, MapPin } from "lucide-react";
+import RestaurantLocationPicker from "./RestaurantLocationPicker";
 
 export default function DeliverySection({ form, onChange, onSave, saving }) {
   const delivery = form.deliverySettings || {
@@ -125,6 +126,14 @@ export default function DeliverySection({ form, onChange, onSave, saving }) {
               <span>30 km (wide city)</span>
             </div>
           </div>
+
+          {/* Interactive Live Kitchen Location & Coverage Map */}
+          <RestaurantLocationPicker
+            address={form.address || {}}
+            onChangeAddress={(updatedAddress) => onChange("address", updatedAddress)}
+            restaurantName={form.name || "Your Restaurant"}
+            radiusKm={delivery.deliveryRadiusKm ?? 5}
+          />
         </div>
       </section>
     </div>

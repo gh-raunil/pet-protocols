@@ -102,20 +102,19 @@ export default function SupportWorkspace({ restaurantName = "" }) {
 
   return (
     <div className="space-y-6">
-      {/* ── TOP SUPPORT BANNER ──────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-pink-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-rose-500/10 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+      {/* ── TOP SUPPORT OPERATIONAL HEADER ────────────────────────── */}
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md mb-3 border border-white/20">
-              <Headphones size={14} />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold mb-2 border border-rose-500/20">
+              <Headphones size={14} className="text-rose-500" />
               <span>CUSTOMER SUPPORT & ORDER LOOKUP</span>
               {restaurantName && <span>• {restaurantName}</span>}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
               Customer Inquiry & Issue Resolution
             </h1>
-            <p className="text-rose-100 text-xs sm:text-sm mt-1.5 max-w-xl font-medium leading-relaxed">
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl">
               Fast order tracking, phone lookup, customer verification, and live order status timeline.
             </p>
           </div>
@@ -123,7 +122,7 @@ export default function SupportWorkspace({ restaurantName = "" }) {
           <button
             onClick={() => loadOrders(false)}
             disabled={refreshing || loading}
-            className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-rose-950 hover:bg-rose-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
+            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             <span>{refreshing ? "Refreshing..." : "Sync Orders"}</span>

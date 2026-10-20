@@ -52,28 +52,26 @@ export default function StandardsClient() {
   ];
 
   return (
-    <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors relative selection:bg-orange-500/20 selection:text-orange-600">
-      {/* Soft warm ambient background glow for light mode */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-100/60 via-amber-50/30 to-transparent dark:from-orange-500/5 dark:via-transparent dark:to-transparent rounded-full blur-3xl opacity-80" />
-      </div>
-
-      <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-        <FeatureGuard featureKey="standards" featureName="Standards & Protocols">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 font-jakarta">
+      <FeatureGuard featureKey="standards" featureName="Standards & Protocols">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-6 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-5">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 dark:text-white">
-              Kitchen <span className="text-orange-500">Standards</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-bold mb-2 border border-orange-500/20">
+              <ShieldCheck size={14} className="text-orange-500" />
+              <span>KITCHEN COMPLIANCE & SAFETY</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
+              Kitchen Standards & Protocols
             </h1>
-            <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 mt-1">
+            <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-1">
               Mandatory hygiene, preparation, and packaging SOPs for all partner kitchens.
             </p>
           </div>
 
           <Link
             href="/orders"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition shadow-sm shadow-orange-500/20 w-fit active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition shadow-xs w-fit active:scale-95"
           >
             <span>Open Orders</span>
             <ArrowRight size={13} />
@@ -87,14 +85,14 @@ export default function StandardsClient() {
             return (
               <div
                 key={idx}
-                className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-6 shadow-sm shadow-stone-200/40 dark:shadow-none flex flex-col justify-between hover:border-orange-500/30 transition"
+                className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-orange-500/30 transition"
               >
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
                       <Icon size={20} />
                     </div>
-                    <span className="text-[11px] font-mono font-bold text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-stone-200/60 dark:border-white/5">
+                    <span className="text-[11px] font-mono font-bold text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-stone-200/60 dark:border-white/5">
                       SOP-0{idx + 1}
                     </span>
                   </div>
@@ -112,15 +110,14 @@ export default function StandardsClient() {
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-stone-100 dark:border-white/5 flex items-center justify-between text-[11px] text-stone-400 font-medium">
-                  <span>Verified in Quality Checks</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Active</span>
+                  <span>Verified in Quality Audits</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Active SOP</span>
                 </div>
               </div>
             );
           })}
         </div>
-        </FeatureGuard>
-      </main>
+      </FeatureGuard>
     </div>
   );
 }

@@ -7,16 +7,16 @@ import "./globals.css";
 
 export const metadata = {
   title: {
-    default: "पेट Protocols — Fresh Food, Zero Compromises",
-    template: "%s | पेट Protocols",
+    default: "पेट Protocols — Restaurant Management & Kitchen OS",
+    template: "%s | पेट Protocols Restaurant Portal",
   },
   description:
-    "Order fresh burgers, pizzas, momos, fries and cold drinks online across top kitchens.",
-  keywords: ["food delivery", "burgers", "pizza", "momos", "fries", "multi-restaurant food order"],
+    "Enterprise restaurant operations, live kitchen display system, staff station workspace, and delivery logistics.",
+  keywords: ["restaurant management", "kitchen display system", "pos billing", "cloud kitchen os", "food orders"],
   authors: [{ name: "पेट Protocols" }],
   openGraph: {
-    title: "पेट Protocols — Fresh Food, Zero Compromises",
-    description: "Order fresh food across top partnered restaurants and cloud kitchens.",
+    title: "पेट Protocols — Restaurant Management & Kitchen OS",
+    description: "Enterprise restaurant operations portal for Pet Protocols partnered kitchens.",
     type: "website",
     locale: "en_IN",
   },

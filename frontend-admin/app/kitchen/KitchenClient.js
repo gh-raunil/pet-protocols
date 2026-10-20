@@ -19,12 +19,10 @@ export default function KitchenClient() {
   const restaurantName = session?.user?.restaurantName || "";
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] dark:bg-[#07090e] text-stone-900 dark:text-white font-jakarta transition-colors">
-      <main className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <FeatureGuard featureKey="kitchen" featureName="Kitchen Display System">
-          <KitchenWorkspace restaurantName={restaurantName} />
-        </FeatureGuard>
-      </main>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto font-jakarta">
+      <FeatureGuard featureKey="kitchen" featureName="Kitchen Display System">
+        <KitchenWorkspace restaurantName={restaurantName} />
+      </FeatureGuard>
     </div>
   );
 }

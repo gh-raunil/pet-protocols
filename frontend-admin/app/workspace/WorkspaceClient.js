@@ -11,6 +11,7 @@ import {
   Settings,
   ArrowRight,
   LayoutDashboard,
+  Layers,
 } from "lucide-react";
 
 export default function WorkspaceClient() {
@@ -27,28 +28,28 @@ export default function WorkspaceClient() {
 
   const tools = [
     {
-      title: "Orders",
+      title: "Live Orders Queue",
       desc: "Monitor incoming customer tickets and transition orders through preparation to dispatch.",
       icon: ShoppingBag,
       link: "/orders",
       actionText: "Open Orders",
     },
     {
-      title: "Menu",
+      title: "Dishes & Menu Catalog",
       desc: "Manage dish prices, descriptions, categories, and real-time stock availability.",
       icon: UtensilsCrossed,
       link: "/products",
       actionText: "Manage Menu",
     },
     {
-      title: "Standards",
+      title: "Kitchen Standards & SOPs",
       desc: "Review required preparation times, tamper-evident seals, and food safety SOPs.",
       icon: ShieldCheck,
       link: "/standards",
       actionText: "View Standards",
     },
     {
-      title: "Settings",
+      title: "Branch Configuration",
       desc: "Configure kitchen operating hours, contact phone numbers, and branch address.",
       icon: Settings,
       link: "/settings",
@@ -57,63 +58,65 @@ export default function WorkspaceClient() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-white font-jakarta transition-colors">
-      <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              Workspace
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Operational tools for <span className="font-semibold text-orange-500">{restaurantName}</span>.
-            </p>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 font-jakarta">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-5">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-bold mb-2 border border-orange-500/20">
+            <Layers size={14} className="text-orange-500" />
+            <span>OPERATIONAL WORKSPACE</span>
           </div>
-
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/10 font-semibold text-xs transition"
-          >
-            <LayoutDashboard size={14} />
-            <span>Dashboard</span>
-          </Link>
+          <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
+            Operations Hub
+          </h1>
+          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-1">
+            Operational tools and management stations for <span className="font-semibold text-orange-500">{restaurantName}</span>.
+          </p>
         </div>
 
-        {/* 4 Clean Tools Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {tools.map((t, idx) => {
-            const Icon = t.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-white dark:bg-[#10141f] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:border-orange-500/40 transition group"
-              >
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-4">
-                    <Icon size={20} />
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-orange-500 transition-colors">
-                    {t.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-                    {t.desc}
-                  </p>
-                </div>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs"
+        >
+          <LayoutDashboard size={14} />
+          <span>Dashboard</span>
+        </Link>
+      </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
-                  <Link
-                    href={t.link}
-                    className="text-xs font-semibold text-orange-500 hover:text-orange-600 flex items-center gap-1.5 transition"
-                  >
-                    <span>{t.actionText}</span>
-                    <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
+      {/* 4 Clean Tools Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        {tools.map((t, idx) => {
+          const Icon = t.icon;
+          return (
+            <div
+              key={idx}
+              className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-orange-500/40 transition group"
+            >
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-4 font-bold">
+                  <Icon size={20} />
                 </div>
+                <h3 className="text-base font-bold text-stone-900 dark:text-white group-hover:text-orange-500 transition-colors">
+                  {t.title}
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-1.5 leading-relaxed">
+                  {t.desc}
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </main>
+
+              <div className="mt-6 pt-4 border-t border-stone-100 dark:border-white/5 flex items-center justify-between">
+                <Link
+                  href={t.link}
+                  className="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1.5 transition"
+                >
+                  <span>{t.actionText}</span>
+                  <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

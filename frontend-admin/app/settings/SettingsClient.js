@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SettingsSidebar, { SETTINGS_GROUPS } from "./components/SettingsSidebar";
@@ -38,19 +38,18 @@ export default function SettingsClient() {
   // Active section management
   const initialTab = searchParams.get("tab") || "general";
   const [activeSection, setActiveSection] = useState(initialTab);
+  const contentPanelRef = useRef(null);
 
   // Sync tab with URL
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab && tab !== activeSection) {
       setActiveSection(tab);
+      if (contentPanelRef.current) {
+        contentPanelRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }
   }, [searchParams]);
-
-  function handleSelectSection(sectionId) {
-    setActiveSection(sectionId);
-    router.replace(`/settings?tab=${sectionId}`, { scroll: false });
-  }
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -205,11 +204,14 @@ export default function SettingsClient() {
     }
   }, [status, session, router]);
 
-  // Update URL tab
+  // Update URL tab & scroll content pane to top
   function handleSelectSection(id) {
     setActiveSection(id);
     const newUrl = `/settings?tab=${id}`;
     window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl);
+    if (contentPanelRef.current) {
+      contentPanelRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   // Load Settings
@@ -364,26 +366,43 @@ export default function SettingsClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col font-jakarta relative selection:bg-orange-500 selection:text-white transition-colors duration-200">
-      {/* Soft warm ambient background glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-orange-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl opacity-70" />
+    <div className="p-3 sm:p-4 lg:px-6 lg:py-3.5 max-w-7xl mx-auto w-full font-jakarta lg:h-[calc(100dvh-3.5rem)] flex flex-col min-h-0 lg:overflow-hidden">
+      {/* Short & Minimal Header */}
+      <div className="flex items-center justify-between gap-3 border-b border-stone-200/60 dark:border-white/10 pb-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+          <h1 className="text-sm sm:text-base font-bold tracking-tight text-stone-900 dark:text-white truncate">
+            Branch Settings & Administration
+          </h1>
+          <span className="hidden md:inline text-xs text-stone-400 dark:text-stone-500 font-normal truncate">
+            — Operations, ordering rules, staff roles & configuration
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleResetDefaults}
+          className="shrink-0 text-[11px] font-semibold text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white px-2.5 py-1 rounded-lg border border-stone-200 dark:border-white/10 hover:bg-stone-50 dark:hover:bg-white/5 transition cursor-pointer"
+        >
+          Reset Defaults
+        </button>
       </div>
 
-      {/* Main Content Container with two independent scrollable components */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-16 lg:h-screen lg:overflow-hidden flex flex-col">
-        {/* Layout: Sidebar + Active Section as two distinct components */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-0 lg:gap-8 lg:overflow-hidden py-4 sm:py-6">
-          {/* Component 1: Left Sidebar Pane (Independently scrollable on desktop) */}
-          <div className="w-full lg:w-64 shrink-0 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto lg:border-r border-zinc-200/90 dark:border-zinc-800/90 lg:pr-5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <SettingsSidebar
-              activeSection={activeSection}
-              onSelectSection={handleSelectSection}
-            />
-          </div>
+      {/* Main Two-Pane Layout: Left Sidebar & Right Content Panel independently scrollable on desktop */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 pt-2.5 lg:overflow-hidden">
+        {/* Component 1: Left Settings Nav Menu */}
+        <div className="w-full lg:w-64 xl:w-72 shrink-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 shadow-xs lg:h-full lg:flex lg:flex-col min-h-0">
+          <SettingsSidebar
+            activeSection={activeSection}
+            onSelectSection={handleSelectSection}
+          />
+        </div>
 
-          {/* Component 2: Right Settings Content Panel (Independently scrollable on desktop) */}
-          <div className="flex-1 w-full min-w-0 lg:h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pl-2 pb-28">
+        {/* Component 2: Right Settings Content Panel */}
+        <div
+          ref={contentPanelRef}
+          className="flex-1 w-full min-w-0 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-7 shadow-xs lg:h-full lg:overflow-y-auto min-h-0 [overscroll-behavior:contain] subtle-scrollbar"
+        >
             {/* Global Feedback Alert */}
             {feedback.message && (
               <div
@@ -523,7 +542,6 @@ export default function SettingsClient() {
             </button>
           </div>
         )}
-      </main>
     </div>
   );
 }

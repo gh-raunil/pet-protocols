@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Building2, Upload, AlertCircle, Phone, MessageSquare, Mail, MapPin, FileText, Globe } from "lucide-react";
+import RestaurantLocationPicker from "./RestaurantLocationPicker";
 
 export default function GeneralSection({ form, onChange, onSave, saving }) {
   const [logoUploading, setLogoUploading] = useState(false);
@@ -216,6 +217,13 @@ export default function GeneralSection({ form, onChange, onSave, saving }) {
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700/80 text-zinc-900 dark:text-white text-xs sm:text-sm focus:border-orange-500 focus:bg-white dark:focus:bg-zinc-800 transition-colors"
             />
           </div>
+
+          {/* Interactive Live Location Pin & Draggable Map */}
+          <RestaurantLocationPicker
+            address={address}
+            onChangeAddress={(updatedAddress) => onChange("address", updatedAddress)}
+            restaurantName={form.name || "Your Restaurant"}
+          />
         </div>
 
         {/* Short Description */}

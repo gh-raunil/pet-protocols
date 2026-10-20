@@ -619,28 +619,27 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
   return (
     <div className="space-y-6">
-      {/* ── TOP ROLE BANNER ─────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-500/10 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+      {/* ── TOP ROLE OPERATIONAL HEADER ───────────────────────────── */}
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md mb-3 border border-white/20">
-              <Truck size={14} className="animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold mb-2 border border-blue-500/20">
+              <Truck size={14} className="text-blue-500" />
               <span>DELIVERY & TRANSIT DISPATCH</span>
               {restaurantName && <span>• {restaurantName}</span>}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
               Delivery Operations Portal
             </h1>
-            <p className="text-blue-100 text-xs sm:text-sm mt-1.5 max-w-xl font-medium leading-relaxed">
-              Complete visibility into order contents, customer addresses, contact numbers, and payment collection status for accurate fulfillment.
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl">
+              Complete visibility into order contents, customer addresses, contact numbers, and payment collection status.
             </p>
           </div>
 
           <button
             onClick={() => loadOrders(false)}
             disabled={refreshing || loading}
-            className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-blue-900 hover:bg-blue-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             <span>{refreshing ? "Refreshing..." : "Sync Live Orders"}</span>
@@ -648,30 +647,30 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         </div>
 
         {/* ── 4 KEY METRICS ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 pt-6 border-t border-white/15">
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider block">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-5 pt-5 border-t border-stone-100 dark:border-white/5">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
               In Kitchen / Ready
             </span>
-            <div className="text-2xl font-black mt-1 text-amber-300">{metrics.ready}</div>
+            <div className="text-2xl font-black mt-1 text-amber-600 dark:text-amber-400 font-mono">{metrics.ready}</div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
               Out in Transit
             </span>
-            <div className="text-2xl font-black mt-1 text-white">{metrics.inTransit}</div>
+            <div className="text-2xl font-black mt-1 text-blue-600 dark:text-blue-400 font-mono">{metrics.inTransit}</div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider block">
-              Delivered
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+              Delivered Today
             </span>
-            <div className="text-2xl font-black mt-1 text-emerald-300">{metrics.deliveredToday}</div>
+            <div className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400 font-mono">{metrics.deliveredToday}</div>
           </div>
-          <div className="bg-white/10 rounded-2xl p-3.5 backdrop-blur-xs">
-            <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
               COD To Collect
             </span>
-            <div className="text-2xl font-black mt-1 text-yellow-300">
+            <div className="text-2xl font-black mt-1 text-stone-900 dark:text-white font-mono">
               ₹{metrics.codToCollect.toFixed(2)}
             </div>
           </div>
