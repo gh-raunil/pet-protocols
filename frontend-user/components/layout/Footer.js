@@ -2,6 +2,12 @@ import React from "react";
 import Logo from "./Logo";
 import Link from "next/link";
 
+const defaultAdminUrl = "https://pet-protocols-restaurant.vercel.app";
+const defaultSuperadminUrl = "https://pet-protocols-superadmin.vercel.app";
+
+const adminLoginUrl = `${process.env.NEXT_PUBLIC_ADMIN_URL || defaultAdminUrl}/login`;
+const superadminLoginUrl = `${process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl}/login`;
+
 const Footer = () => {
   return (
     <footer className="bg-[#1C1917] text-[#FAF7F2] border-t border-white/10 transition-colors">
@@ -122,15 +128,15 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Column 4 — For Restaurants */}
+          {/* Column 4 — For Restaurants (External portals use standard anchor navigation, avoiding cross-origin RSC prefetch CORS blocks) */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-3.5">
               For Restaurants
             </h3>
             <div className="flex flex-col gap-2.5 text-xs text-[#A8A29E]">
-              <Link href="/restaurant/login" className="hover:text-white transition">Restaurant Login</Link>
-              <Link href="/restaurant/login" className="hover:text-white transition">Admin Login</Link>
-              <Link href="/superadmin/login" className="hover:text-white transition">Superadmin Login</Link>
+              <a href={adminLoginUrl} className="hover:text-white transition">Restaurant Login</a>
+              <a href={adminLoginUrl} className="hover:text-white transition">Admin Login</a>
+              <a href={superadminLoginUrl} className="hover:text-white transition">Superadmin Login</a>
             </div>
           </div>
         </div>

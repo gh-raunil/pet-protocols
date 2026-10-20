@@ -30,7 +30,7 @@ export function proxy(request) {
   }
 
   response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Url, Accept')
 
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers: response.headers })
