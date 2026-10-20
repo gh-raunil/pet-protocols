@@ -23,25 +23,35 @@ async function connectDB() {
     throw new Error('Please define MONGODB_URI in the backend environment')
   }
 
-  // Configure high-availability public DNS servers for Atlas SRV resolution
-  const dnsServers = (process.env.MONGODB_DNS_SERVERS || '8.8.8.8,1.1.1.1')
-    .split(',')
-    .map((server) => server.trim())
-    .filter(Boolean)
+  // Only override DNS servers if explicitly configured
+  if (process.env.MONGODB_DNS_SERVERS) {
+    const dnsServers = process.env.MONGODB_DNS_SERVERS
+      .split(',')
+      .map((server) => server.trim())
+      .filter(Boolean)
 
-  if (dnsServers.length > 0) {
-    try {
-      dns.setServers(dnsServers)
-    } catch (_) {}
+    if (dnsServers.length > 0) {
+      try {
+        dns.setServers(dnsServers)
+      } catch (_) {}
+    }
   }
 
   let connectionUri = mongodbUri
-  if (mongodbUri.startsWith('mongodb+srv://') && process.env.MONGODB_DIRECT_HOSTS) {
+  const rawDirectHosts =
+    process.env.MONGODB_DIRECT_HOSTS ||
+    process.env.MONGODB_HOSTS ||
+    (mongodbUri.includes('pet-protocols.t3jdmic.mongodb.net')
+      ? 'ac-e6norca-shard-00-00.t3jdmic.mongodb.net:27017,ac-e6norca-shard-00-01.t3jdmic.mongodb.net:27017,ac-e6norca-shard-00-02.t3jdmic.mongodb.net:27017'
+      : '')
+
+  if (mongodbUri.startsWith('mongodb+srv://') && rawDirectHosts) {
     const match = mongodbUri.match(/^mongodb\+srv:\/\/([^/]+)(\/.*)?$/)
-    const hosts = process.env.MONGODB_DIRECT_HOSTS
+    const hosts = rawDirectHosts
       .split(',')
       .map((host) => host.trim())
       .filter(Boolean)
+      .map((host) => (host.includes(':') ? host : `${host}:27017`))
 
     if (match && hosts.length > 0) {
       const suffix = match[2] || '/'
@@ -59,6 +69,9 @@ async function connectDB() {
   if (!cached.promise || mongoose.connection.readyState === 0) {
     cached.promise = mongoose.connect(connectionUri, {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      family: 4,
+      autoIndex: false,
     })
   }
 

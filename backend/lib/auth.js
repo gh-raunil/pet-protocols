@@ -184,7 +184,9 @@ const providers = [
             email: email || user.email,
             role: user.role,
             status: user.status,
-            restaurantId: user.restaurant ? user.restaurant._id.toString() : null,
+            restaurantId: user.restaurant
+              ? (user.restaurant._id ? user.restaurant._id.toString() : user.restaurant.toString())
+              : null,
             restaurantName: user.restaurant ? user.restaurant.name : null,
             enabledFeatures: user.restaurant ? (user.restaurant.enabledFeatures || []) : [],
             image: sanitizeTokenImage(user.image),
@@ -227,8 +229,8 @@ export const authOptions = {
         token.permissions = user.permissions;
       }
 
-      // Refresh DB data
-      if (token.email) {
+      // Refresh DB data on subsequent session calls (skip on initial sign-in since user is already freshly populated)
+      if (!user && token.email) {
         await connectDB();
         const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
           .toLowerCase()
@@ -270,7 +272,9 @@ export const authOptions = {
           }
           token.id = dbUser._id.toString();
           token.status = dbUser.status;
-          token.restaurantId = dbUser.restaurant ? dbUser.restaurant._id.toString() : null;
+          token.restaurantId = dbUser.restaurant
+            ? (dbUser.restaurant._id ? dbUser.restaurant._id.toString() : dbUser.restaurant.toString())
+            : null;
           token.restaurantName = dbUser.restaurant ? dbUser.restaurant.name : null;
           token.enabledFeatures = dbUser.restaurant ? (dbUser.restaurant.enabledFeatures || []) : [];
           token.image = sanitizeTokenImage(dbUser.image) || sanitizeTokenImage(token.image);
