@@ -4,6 +4,7 @@ import User from "@/models/User";
 import Restaurant from "@/models/Restaurant";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
 import bcrypt from "bcryptjs";
+import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/validation";
 
 // GET — List all restaurant admins
 export async function GET() {
@@ -46,6 +47,23 @@ export async function POST(request) {
       );
     }
 
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { success: false, message: "Please enter a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return NextResponse.json(
+        { success: false, message: passwordCheck.message },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+
     await connectDB();
 
     const restaurant = await Restaurant.findById(restaurantId);
@@ -53,7 +71,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: "Selected restaurant not found." }, { status: 404 });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: "An account with this email already exists." },

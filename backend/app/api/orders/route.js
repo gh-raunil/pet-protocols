@@ -11,6 +11,7 @@ import { calculateOrderDetails } from '@/lib/checkoutCalculationService';
 import { deductStockForOrder, restoreStockForOrder } from '@/lib/inventoryService';
 import { executeOrderRefund } from '@/lib/refundService';
 import { notifyOrderEvent } from '@/lib/pushService';
+import { isValidPhone, normalizePhone } from '@/lib/validation';
 
 let _getServerSession = getServerSession;
 export function _setTestGetServerSession(fn) {
@@ -140,6 +141,24 @@ export async function POST(request) {
 
     if (!address || !address.fullName || !address.street || !address.phone) {
       return NextResponse.json({ success: false, message: 'Complete delivery address is required' }, { status: 400 });
+    }
+
+    if (!isValidPhone(address.phone)) {
+      return NextResponse.json(
+        { success: false, message: 'Please provide a valid 10-digit mobile contact number for delivery.' },
+        { status: 400 }
+      );
+    }
+    address.phone = normalizePhone(address.phone);
+
+    if (address.recipientPhone) {
+      if (!isValidPhone(address.recipientPhone)) {
+        return NextResponse.json(
+          { success: false, message: 'Please provide a valid 10-digit mobile number for the recipient.' },
+          { status: 400 }
+        );
+      }
+      address.recipientPhone = normalizePhone(address.recipientPhone);
     }
 
     await connectDB();

@@ -38,13 +38,39 @@ export default function SignupPage() {
 
   // Handle Signup
   async function handleSubmit(e) {
-
     e.preventDefault();
 
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const password = formData.password;
+
+    if (!trimmedName) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (password.length > 72) {
+      setError("Password must not exceed 72 characters.");
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(password) || !/[\d!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
+      setError("Password must contain at least one letter and at least one number or special character.");
+      return;
+    }
+
     try {
-
       setLoading(true);
-
       setError("");
 
       const response = await fetch("/api/auth/signup", {
@@ -205,6 +231,8 @@ export default function SignupPage() {
               value={formData.password}
               onChange={handleChange}
               required
+              minLength={8}
+              maxLength={72}
               className="
                 w-full
                 bg-[var(--bg-sub)]
@@ -221,6 +249,9 @@ export default function SignupPage() {
                 transition
               "
             />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+              Minimum 8 characters with at least one letter and one number or symbol.
+            </p>
           </div>
 
           {/* Error Message */}

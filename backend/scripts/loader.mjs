@@ -4,7 +4,12 @@ import fs from 'node:fs';
 
 export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'next/server') {
-    return nextResolve('next/server', context);
+    const nextServerPath = path.resolve(process.cwd(), 'node_modules/next/server.js');
+    return {
+      url: pathToFileURL(nextServerPath).href,
+      shortCircuit: true,
+      format: 'commonjs',
+    };
   }
 
   if (specifier.startsWith('@/')) {
@@ -15,7 +20,11 @@ export async function resolve(specifier, context, nextResolve) {
     } else if (fs.existsSync(path.join(resolved, 'index.js'))) {
       resolved = path.join(resolved, 'index.js');
     }
-    return nextResolve(pathToFileURL(resolved).href, context);
+    return {
+      url: pathToFileURL(resolved).href,
+      shortCircuit: true,
+      format: 'module',
+    };
   }
 
   if (specifier.startsWith('.') && context.parentURL) {

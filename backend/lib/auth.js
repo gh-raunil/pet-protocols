@@ -4,6 +4,8 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Restaurant from "@/models/Restaurant";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "@/lib/validation";
+import { isLoginRateLimited, recordFailedLoginAttempt, resetLoginAttempts } from "@/lib/rateLimit";
 
 // Handle both ESM and CommonJS default exports safely
 const Google = GoogleProvider?.default || GoogleProvider;
@@ -29,7 +31,18 @@ const providers = [
     async authorize(credentials) {
         try {
           await connectDB();
-          const email = credentials.email?.toLowerCase().trim();
+          const email = normalizeEmail(credentials?.email || "");
+
+          if (!email) {
+            throw new Error("Invalid email or password");
+          }
+
+          // Protect against brute force attacks with in-memory sliding window
+          const rateCheck = isLoginRateLimited(email);
+          if (rateCheck.limited) {
+            throw new Error(`Too many failed login attempts. Please wait ${rateCheck.resetInSeconds} seconds before trying again.`);
+          }
+
           let user = await User.findOne({ email }).populate("restaurant");
 
           // Resilient superadmin lookup (handles comma-separated string from legacy seed)
@@ -76,6 +89,7 @@ const providers = [
           }
 
           if (!user) {
+            recordFailedLoginAttempt(email);
             throw new Error("Invalid email or password");
           }
 
@@ -109,6 +123,7 @@ const providers = [
               email === "superadmin@petprotocols.com";
 
             if (!isAllowed) {
+              recordFailedLoginAttempt(email);
               throw new Error("Invalid email or password");
             }
           }
@@ -140,8 +155,12 @@ const providers = [
           }
 
           if (!isPasswordCorrect) {
+            recordFailedLoginAttempt(email);
             throw new Error("Invalid email or password");
           }
+
+          // Reset failed attempts counter upon successful credentials match
+          resetLoginAttempts(email);
 
           // Clean legacy comma-separated email string in DB if present
           if (user.role === "superadmin" && user.email.includes(",")) {
@@ -268,10 +287,16 @@ export const authOptions = {
       return session;
     },
 
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account.provider === "google") {
+        // Verify provider-verified email address boundary
+        if (profile && profile.email_verified === false) {
+          console.warn(`[Auth] Rejected Google sign-in: email not verified by provider for ${user?.email}`);
+          return false;
+        }
+
         await connectDB();
-        const email = user.email?.toLowerCase().trim();
+        const email = normalizeEmail(user.email);
         const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
           .toLowerCase()
           .split(",")

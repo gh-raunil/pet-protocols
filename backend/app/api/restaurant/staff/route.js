@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
+import { isValidEmail, normalizeEmail, isValidPhone, normalizePhone, validatePassword } from "@/lib/validation";
 
 // GET — List all staff members for the authenticated restaurant
 export async function GET() {
@@ -80,6 +81,36 @@ export async function POST(request) {
       );
     }
 
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { success: false, message: "Please provide a valid staff email address." },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+
+    let normalizedPhone = "";
+    if (phone && phone.trim()) {
+      if (!isValidPhone(phone)) {
+        return NextResponse.json(
+          { success: false, message: "Please provide a valid 10-digit mobile contact number for staff." },
+          { status: 400 }
+        );
+      }
+      normalizedPhone = normalizePhone(phone);
+    }
+
+    if (password && password !== "TempPassword@123") {
+      const passwordCheck = validatePassword(password);
+      if (!passwordCheck.valid) {
+        return NextResponse.json(
+          { success: false, message: passwordCheck.message },
+          { status: 400 }
+        );
+      }
+    }
+
     // Normalize multiple roles
     const assignedRoles = Array.isArray(staffRoles) && staffRoles.length > 0
       ? staffRoles
@@ -90,7 +121,7 @@ export async function POST(request) {
 
     await connectDB();
 
-    const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: "A user with this email address already exists." },
@@ -98,14 +129,14 @@ export async function POST(request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password || "TempPassword@123", 10);
+    const hashedPassword = await bcrypt.hash(password || "TempPassword@123", 12);
 
     // SECURITY: Strictly assign role to 'staff' and restaurant to current restaurantId
     // Restaurant admin can NEVER create a superadmin
     const newStaff = await User.create({
       name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password: hashedPassword,
       role: "staff",
       staffRole: primaryRole,

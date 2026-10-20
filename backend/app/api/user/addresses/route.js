@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
+import { isValidPhone, normalizePhone } from '@/lib/validation';
 
 // GET — List all saved addresses for the authenticated user
 export async function GET() {
@@ -36,11 +37,19 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
     }
 
+    const body = await request.json().catch(() => ({}));
     const { label, fullName, phone, street, city, state, pincode, isDefault, latitude, longitude } = body;
 
     if (!fullName || !phone || !street || !city || !state || !pincode) {
       return NextResponse.json(
         { success: false, message: 'All address fields (Full Name, Phone, Street, City, State, Pincode) are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidPhone(phone)) {
+      return NextResponse.json(
+        { success: false, message: 'Please enter a valid 10-digit mobile contact number.' },
         { status: 400 }
       );
     }
@@ -65,7 +74,7 @@ export async function POST(request) {
     const newAddress = {
       label: label ? label.trim() : 'Home',
       fullName: fullName.trim(),
-      phone: phone.trim(),
+      phone: normalizePhone(phone),
       street: street.trim(),
       city: city.trim(),
       state: state.trim(),
@@ -98,7 +107,7 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { addressId, action, label, fullName, phone, street, city, state, pincode, isDefault, latitude, longitude } = body;
 
     if (!addressId) {
@@ -126,7 +135,15 @@ export async function PUT(request) {
     // Update details if provided
     if (label !== undefined) targetAddr.label = label.trim();
     if (fullName !== undefined) targetAddr.fullName = fullName.trim();
-    if (phone !== undefined) targetAddr.phone = phone.trim();
+    if (phone !== undefined) {
+      if (!isValidPhone(phone)) {
+        return NextResponse.json(
+          { success: false, message: 'Please enter a valid 10-digit mobile contact number.' },
+          { status: 400 }
+        );
+      }
+      targetAddr.phone = normalizePhone(phone);
+    }
     if (street !== undefined) targetAddr.street = street.trim();
     if (city !== undefined) targetAddr.city = city.trim();
     if (state !== undefined) targetAddr.state = state.trim();
