@@ -27,6 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+import { buildMapplsDirectionUrl } from "@/lib/geoDistance";
 
 const TRACKING_POLL_INTERVAL_MS = 8000; // 8 seconds poll interval
 
@@ -945,19 +946,79 @@ export default function LiveDeliveryMap({
 
           {/* Right Block: External Maps App Link + Action Buttons */}
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
-            {hasEffectiveDest && (
-              <a
-                href={`https://mappls.com/direction?dest=${effectiveDestLat},${effectiveDestLng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="h-8.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
-                title="Open turn-by-turn voice driving directions directly in Mappls app"
-              >
-                <Navigation size={13} />
-                <span>Mappls Navigation</span>
-                <ExternalLink size={10} />
-              </a>
-            )}
+            {hasEffectiveDest && (() => {
+              const effectiveOriginLat = driverLat ?? deviceCoords?.latitude ?? restLat;
+              const effectiveOriginLng = driverLng ?? deviceCoords?.longitude ?? restLng;
+              const isKitchenFallback = (!driverLat && !deviceCoords?.latitude) || (effectiveOriginLat === restLat && effectiveOriginLng === restLng);
+              const originLabel = isKitchenFallback
+                ? (restaurant?.name || "Kitchen Location")
+                : "Staff Location";
+              const destLabel = recipientName || destObj?.street || "Customer Destination";
+
+              const mapplsNavUrl = buildMapplsDirectionUrl({
+                startLat: effectiveOriginLat,
+                startLng: effectiveOriginLng,
+                startLabel: originLabel,
+                destLat: effectiveDestLat,
+                destLng: effectiveDestLng,
+                destLabel: destLabel,
+                mode: "driving",
+              });
+
+              const handleMapplsClick = (e) => {
+                // If we already have full Mappls URL with live staff origin coordinates, proceed directly
+                if (mapplsNavUrl && effectiveOriginLat && effectiveOriginLng) return;
+
+                if (typeof window !== "undefined" && navigator.geolocation) {
+                  e.preventDefault();
+                  const newTab = window.open("about:blank", "_blank");
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      const sLat = pos.coords.latitude;
+                      const sLng = pos.coords.longitude;
+                      setDeviceCoords({
+                        latitude: sLat,
+                        longitude: sLng,
+                        accuracy: pos.coords.accuracy,
+                      });
+                      const freshUrl = buildMapplsDirectionUrl({
+                        startLat: sLat,
+                        startLng: sLng,
+                        startLabel: "Staff Location",
+                        destLat: effectiveDestLat,
+                        destLng: effectiveDestLng,
+                        destLabel: destLabel,
+                        mode: "driving",
+                      });
+                      if (newTab) {
+                        newTab.location.href = freshUrl || mapplsNavUrl;
+                      }
+                    },
+                    () => {
+                      if (newTab) {
+                        newTab.location.href = mapplsNavUrl;
+                      }
+                    },
+                    { enableHighAccuracy: true, timeout: 4000, maximumAge: 10000 }
+                  );
+                }
+              };
+
+              return (
+                <a
+                  href={mapplsNavUrl}
+                  onClick={handleMapplsClick}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-8.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                  title="Open turn-by-turn voice driving directions directly in Mappls app"
+                >
+                  <Navigation size={13} />
+                  <span>Mappls Navigation</span>
+                  <ExternalLink size={10} />
+                </a>
+              );
+            })()}
 
             <button
               type="button"

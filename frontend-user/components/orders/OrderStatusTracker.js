@@ -12,6 +12,7 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 export const ORDER_STEPS = [
   {
@@ -317,21 +318,27 @@ export default function OrderStatusTracker({
                   className="flex flex-col items-center text-center z-10 w-32 relative"
                 >
                   {/* Node Pill / Circle */}
-                  <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                      isCurrent
-                        ? "bg-[var(--brand-accent)] text-white shadow-xl shadow-[var(--brand-accent)]/40 ring-4 ring-[var(--brand-accent)]/20 scale-110"
-                        : isCompleted
-                        ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                        : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
-                    }`}
+                  <Tooltip
+                    content={step.statusMessage}
+                    title={step.label}
+                    placement="top"
                   >
-                    {isCompleted ? (
-                      <CheckCircle2 size={20} strokeWidth={2.5} />
-                    ) : (
-                      <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />
-                    )}
-                  </div>
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 cursor-help ${
+                        isCurrent
+                          ? "bg-[var(--brand-accent)] text-white shadow-xl shadow-[var(--brand-accent)]/40 ring-4 ring-[var(--brand-accent)]/20 scale-110"
+                          : isCompleted
+                          ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                          : "bg-[var(--bg-card)] text-[var(--text-muted)] border-2 border-[var(--border-color)]"
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle2 size={20} strokeWidth={2.5} />
+                      ) : (
+                        <Icon size={20} strokeWidth={isCurrent ? 2.5 : 2} />
+                      )}
+                    </div>
+                  </Tooltip>
 
                   {/* Step Labels */}
                   <div className="mt-3.5 space-y-0.5">
@@ -448,6 +455,11 @@ export default function OrderStatusTracker({
           <div className="flex items-center justify-between mb-3.5">
             <h4 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
               <Clock size={14} className="text-[var(--brand-accent)]" /> Order Status History
+              <HelpTooltip
+                content="Milestones are recorded live whenever the kitchen team or delivery partner updates your order progress."
+                title="Status Milestones"
+                side="right"
+              />
             </h4>
             <span className="text-[11px] text-[var(--text-muted)]">
               {statusHistory.length} event{statusHistory.length > 1 ? "s" : ""}

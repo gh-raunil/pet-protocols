@@ -41,16 +41,65 @@ import {
   Pencil,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const ALL_AVAILABLE_FEATURES = [
-  { id: "inventory", name: "Inventory Control", desc: "Stock levels, Ingredients, Recipes, Waste logging, Suppliers & Purchase orders", badge: "📦" },
-  { id: "cashier", name: "Cashier / POS System", desc: "Front counter billing, direct order entry, payment collection & receipt printing", badge: "💵" },
-  { id: "kitchen", name: "Kitchen Display (KDS)", desc: "Real-time kitchen order queue, Preparation status & Station dispatching", badge: "👨‍🍳" },
-  { id: "delivery", name: "Delivery Dispatch", desc: "Delivery driver assignment, dispatch tracking & route monitoring", badge: "🚚" },
-  { id: "standards", name: "Standards & Protocols", desc: "Kitchen hygiene standards, food safety protocols & compliance checklists", badge: "📋" },
-  { id: "offers", name: "Offers & Promotions", desc: "Discount vouchers, promo codes, percentage deals & targeted offers", badge: "🏷️" },
-  { id: "support", name: "Support & Helpdesk", desc: "Customer support tickets, manager inquiry handling & issue tracking", badge: "💬" },
-  { id: "analytics", name: "Advanced Analytics", desc: "Revenue breakdowns, peak sales hours, item popularity & financial reports", badge: "📊" },
+  {
+    id: "inventory",
+    name: "Inventory Control",
+    desc: "Stock levels, Ingredients, Recipes, Waste logging, Suppliers & Purchase orders",
+    badge: "📦",
+    tooltip: "Enables inventory stock tracking, ingredient deduction, recipe management, and vendor purchase orders in the restaurant dashboard.",
+  },
+  {
+    id: "cashier",
+    name: "Cashier / POS System",
+    desc: "Front counter billing, direct order entry, payment collection & receipt printing",
+    badge: "💵",
+    tooltip: "Enables the POS front-desk terminal for in-person walk-in orders, direct cash billing, and thermal receipt printing.",
+  },
+  {
+    id: "kitchen",
+    name: "Kitchen Display (KDS)",
+    desc: "Real-time kitchen order queue, Preparation status & Station dispatching",
+    badge: "👨‍🍳",
+    tooltip: "Enables Kitchen Display System (KDS) for cooks to view live order tickets and advance preparation steps without paper clutter.",
+  },
+  {
+    id: "delivery",
+    name: "Delivery Dispatch",
+    desc: "Delivery driver assignment, dispatch tracking & route monitoring",
+    badge: "🚚",
+    tooltip: "Enables delivery dispatching, driver assignment, GPS tracking, and cash-on-delivery reconciliation.",
+  },
+  {
+    id: "standards",
+    name: "Standards & Protocols",
+    desc: "Kitchen hygiene standards, food safety protocols & compliance checklists",
+    badge: "📋",
+    tooltip: "Enables food safety standards, hygiene inspection checklists, and compliance audit reporting.",
+  },
+  {
+    id: "offers",
+    name: "Offers & Promotions",
+    desc: "Discount vouchers, promo codes, percentage deals & targeted offers",
+    badge: "🏷️",
+    tooltip: "Enables custom discount coupons, percentage promotions, and promotional banner management.",
+  },
+  {
+    id: "support",
+    name: "Support & Helpdesk",
+    desc: "Customer support tickets, manager inquiry handling & issue tracking",
+    badge: "💬",
+    tooltip: "Enables in-app live chat and ticketing for resolving customer inquiries and delivery disputes.",
+  },
+  {
+    id: "analytics",
+    name: "Advanced Analytics",
+    desc: "Revenue breakdowns, peak sales hours, item popularity & financial reports",
+    badge: "📊",
+    tooltip: "Enables deep financial reports, sales hourly trends, item profitability, and tax breakdown charts.",
+  },
 ];
 
 export default function RestaurantDetailsClient() {
@@ -432,13 +481,15 @@ export default function RestaurantDetailsClient() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition inline-flex items-center gap-1 text-xs font-semibold"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </Link>
+            <Tooltip content="Return to superadmin command center and restaurant list" position="right">
+              <Link
+                href="/"
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition inline-flex items-center gap-1 text-xs font-semibold"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back</span>
+              </Link>
+            </Tooltip>
             <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow-xs">
@@ -447,30 +498,41 @@ export default function RestaurantDetailsClient() {
               <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight truncate max-w-[180px] sm:max-w-none">
                 {restaurant.name}
               </span>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+              <Tooltip
+                content={
                   restaurant.status === "active"
-                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
-                    : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
-                }`}
+                    ? "Active: storefront is live and kitchen can receive customer orders."
+                    : "Suspended / Inactive: storefront is closed and staff cannot log in."
+                }
+                position="bottom"
               >
-                <span className={`w-1.5 h-1.5 rounded-full mr-1 ${restaurant.status === "active" ? "bg-emerald-500" : "bg-rose-500"}`} />
-                {restaurant.status || "active"}
-              </span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    restaurant.status === "active"
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                      : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full mr-1 ${restaurant.status === "active" ? "bg-emerald-500" : "bg-rose-500"}`} />
+                  {restaurant.status || "active"}
+                </span>
+              </Tooltip>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={loadRestaurantData}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs transition"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+            <Tooltip content="Reload restaurant details, module settings, and staff list" position="bottom">
+              <button
+                type="button"
+                onClick={loadRestaurantData}
+                disabled={refreshing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -482,20 +544,21 @@ export default function RestaurantDetailsClient() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex items-start gap-4 sm:gap-5">
               {/* Logo Thumbnail */}
-              <div
-                onClick={() => setEditingLogo(true)}
-                className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-100 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 overflow-hidden shrink-0 cursor-pointer shadow-md"
-                title="Click to update restaurant logo"
-              >
-                <img
-                  src={restaurant.image || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300"}
-                  alt={restaurant.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
-                  <Camera size={20} />
+              <Tooltip content="Click to update restaurant branding photo or logo" position="right">
+                <div
+                  onClick={() => setEditingLogo(true)}
+                  className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-100 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 overflow-hidden shrink-0 cursor-pointer shadow-md"
+                >
+                  <img
+                    src={restaurant.image || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300"}
+                    alt={restaurant.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                    <Camera size={20} />
+                  </div>
                 </div>
-              </div>
+              </Tooltip>
 
               {/* Title & Info */}
               <div className="space-y-1.5">
@@ -504,9 +567,11 @@ export default function RestaurantDetailsClient() {
                     {restaurant.name}
                   </h1>
                   {restaurant.slug && (
-                    <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 font-semibold">
-                      @{restaurant.slug}
-                    </span>
+                    <Tooltip content="Unique URL identifier used for customer storefront links" position="bottom">
+                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 font-semibold cursor-help">
+                        @{restaurant.slug}
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
 
@@ -532,42 +597,46 @@ export default function RestaurantDetailsClient() {
                   <span className="font-mono text-[11px] px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
                     {customerBaseUrl}/menu?restaurant={restaurant.slug || restaurant._id}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleCopySlug}
-                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition"
-                    title="Copy customer menu link"
-                  >
-                    {copiedSlug ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <a
-                    href={`${customerBaseUrl}/menu?restaurant=${restaurant.slug || restaurant._id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition"
-                    title="Open storefront menu in new tab"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                  <Tooltip content="Copy public customer ordering link to clipboard" position="top">
+                    <button
+                      type="button"
+                      onClick={handleCopySlug}
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition"
+                    >
+                      {copiedSlug ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Open live customer ordering page in a new browser tab" position="top">
+                    <a
+                      href={`${customerBaseUrl}/menu?restaurant=${restaurant.slug || restaurant._id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </Tooltip>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingProfile(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-500/30 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition"
-                    title="Edit restaurant details and settings"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit Profile</span>
-                  </button>
+                  <Tooltip content="Edit contact details, address, cuisine types, and operational status" position="top">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingProfile(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-500/30 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition"
+                    >
+                      <Pencil size={12} />
+                      <span>Edit Profile</span>
+                    </button>
+                  </Tooltip>
 
-                  <Link
-                    href={`/?tab=categories&restaurant=${restaurant._id}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
-                    title="Manage categories for this kitchen"
-                  >
-                    <FolderTree size={12} />
-                    <span>Manage Categories</span>
-                  </Link>
+                  <Tooltip content="Organize menu sections and category hierarchy for this branch" position="top">
+                    <Link
+                      href={`/?tab=categories&restaurant=${restaurant._id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+                    >
+                      <FolderTree size={12} />
+                      <span>Manage Categories</span>
+                    </Link>
+                  </Tooltip>
                 </div>
               </div>
             </div>
@@ -611,7 +680,10 @@ export default function RestaurantDetailsClient() {
                 <SlidersHorizontal className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Feature Access Control</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Feature Access Control</span>
+                  <HelpTooltip text="Disabling a module immediately hides its navigation tab and restricts access for staff at this restaurant." position="top" />
+                </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Select which modules this restaurant branch is authorized to use.
                 </p>
@@ -619,30 +691,36 @@ export default function RestaurantDetailsClient() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setEnabledFeatures(ALL_AVAILABLE_FEATURES.map((f) => f.id))}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
-                Enable All
-              </button>
+              <Tooltip content="Grant access to all 8 operational modules for this branch" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setEnabledFeatures(ALL_AVAILABLE_FEATURES.map((f) => f.id))}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Enable All
+                </button>
+              </Tooltip>
               <span className="text-slate-300 dark:text-slate-700">|</span>
-              <button
-                type="button"
-                onClick={() => setEnabledFeatures([])}
-                className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
-              >
-                Disable All
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveFeatures}
-                disabled={savingFeatures}
-                className="ml-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95 inline-flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{savingFeatures ? "Saving..." : "Save Feature Permissions"}</span>
-              </button>
+              <Tooltip content="Revoke access to all modules, locking the dashboard to core views" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setEnabledFeatures([])}
+                  className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
+                >
+                  Disable All
+                </button>
+              </Tooltip>
+              <Tooltip content="Persist module permission changes to the database and update staff permissions" position="bottom">
+                <button
+                  type="button"
+                  onClick={handleSaveFeatures}
+                  disabled={savingFeatures}
+                  className="ml-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95 inline-flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{savingFeatures ? "Saving..." : "Save Feature Permissions"}</span>
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -664,8 +742,9 @@ export default function RestaurantDetailsClient() {
                     <span className="text-2xl leading-none mt-0.5">{feat.badge}</span>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                          {feat.name}
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <span>{feat.name}</span>
+                          <HelpTooltip text={feat.tooltip} position="top" />
                         </h3>
                         {isEnabled ? (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
@@ -759,17 +838,18 @@ export default function RestaurantDetailsClient() {
                             <span>••••••••</span>
                             <span className="text-[10px] uppercase font-sans font-semibold text-emerald-600 dark:text-emerald-400 ml-1">Encrypted</span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setResetPasswordAdmin(adm);
-                              setNewPasswordInput("");
-                            }}
-                            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
-                            title="Set a new password for this administrator"
-                          >
-                            Reset
-                          </button>
+                          <Tooltip content="Set a temporary password for this administrator" position="top">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResetPasswordAdmin(adm);
+                                setNewPasswordInput("");
+                              }}
+                              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
+                            >
+                              Reset
+                            </button>
+                          </Tooltip>
                         </div>
                       </td>
 
@@ -797,35 +877,48 @@ export default function RestaurantDetailsClient() {
                       {/* Actions */}
                       <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setResetPasswordAdmin(adm);
-                              setNewPasswordInput("");
-                            }}
-                            className="px-2.5 py-1 text-xs font-medium rounded-md transition border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 inline-flex items-center gap-1"
-                            type="button"
-                          >
-                            <KeyRound className="w-3 h-3" />
-                            <span>Reset</span>
-                          </button>
-                          <button
-                            onClick={() => handleToggleAdminStatus(adm)}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition border ${
+                          <Tooltip content="Set a temporary password for this administrator so they can log back into their dashboard." position="left">
+                            <button
+                              onClick={() => {
+                                setResetPasswordAdmin(adm);
+                                setNewPasswordInput("");
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium rounded-md transition border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 inline-flex items-center gap-1"
+                              type="button"
+                            >
+                              <KeyRound className="w-3 h-3" />
+                              <span>Reset</span>
+                            </button>
+                          </Tooltip>
+                          <Tooltip
+                            content={
                               adm.status === "active"
-                                ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30"
-                                : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30"
-                            }`}
-                            type="button"
+                                ? "Revoke dashboard login access immediately without deleting their account."
+                                : "Restore dashboard login access for this administrator."
+                            }
+                            position="left"
                           >
-                            {adm.status === "active" ? "Suspend" : "Reactivate"}
-                          </button>
-                          <button
-                            onClick={() => handleRemoveAdmin(adm)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center"
-                            type="button"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            <button
+                              onClick={() => handleToggleAdminStatus(adm)}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-md transition border ${
+                                adm.status === "active"
+                                  ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30"
+                                  : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30"
+                              }`}
+                              type="button"
+                            >
+                              {adm.status === "active" ? "Suspend" : "Reactivate"}
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Permanently delete this staff account and revoke all dashboard access. This cannot be undone." position="left">
+                            <button
+                              onClick={() => handleRemoveAdmin(adm)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center"
+                              type="button"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
@@ -992,18 +1085,20 @@ export default function RestaurantDetailsClient() {
                     onChange={(e) => setNewPasswordInput(e.target.value)}
                     className="w-full text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$";
-                      let pass = "";
-                      for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-                      setNewPasswordInput(pass);
-                    }}
-                    className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0"
-                  >
-                    Generate
-                  </button>
+                  <Tooltip content="Auto-generate a strong 10-character random password" position="top">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$";
+                        let pass = "";
+                        for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+                        setNewPasswordInput(pass);
+                      }}
+                      className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                    >
+                      Generate
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -1060,7 +1155,10 @@ export default function RestaurantDetailsClient() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 block">Status</label>
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                    <span>Status</span>
+                    <HelpTooltip text="Active allows customer ordering. Inactive hides the branch from search. Suspended blocks orders and staff logins." position="top" />
+                  </label>
                   <select
                     value={profileForm.status}
                     onChange={(e) => setProfileForm((prev) => ({ ...prev, status: e.target.value }))}

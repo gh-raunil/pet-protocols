@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
 import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
+import Tooltip from "@/components/ui/Tooltip";
 
 export default function KitchenWorkspace({ restaurantName = "" }) {
   const [orders, setOrders] = useState([]);
@@ -148,14 +149,16 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
             </p>
           </div>
 
-          <button
-            onClick={() => loadOrders(false)}
-            disabled={refreshing || loading}
-            className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-orange-950 hover:bg-amber-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            <span>{refreshing ? "Syncing..." : "Sync Tickets"}</span>
-          </button>
+          <Tooltip content="Fetch newly arrived kitchen orders immediately" position="bottom">
+            <button
+              onClick={() => loadOrders(false)}
+              disabled={refreshing || loading}
+              className="self-start md:self-auto inline-flex items-center gap-2 bg-white text-orange-950 hover:bg-amber-50 font-bold px-4 py-2.5 rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer disabled:opacity-70"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              <span>{refreshing ? "Syncing..." : "Sync Tickets"}</span>
+            </button>
+          </Tooltip>
         </div>
 
         {/* ── 4 STATS CARDS ─────────────────────────────────────────── */}
@@ -268,37 +271,59 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                     <span className="font-black text-sm text-stone-900 dark:text-white">
                       #{order.orderId || order._id.slice(-6).toUpperCase()}
                     </span>
-                    <span
-                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                    <Tooltip
+                      content={
                         isPending
-                          ? "bg-amber-500 text-white"
+                          ? "New order placed by customer, waiting for kitchen acceptance"
                           : isPreparing
-                          ? "bg-orange-500 text-white"
-                          : "bg-emerald-500 text-white"
-                      }`}
+                          ? "Order is currently being cooked at the station"
+                          : "Dishes are packed and ready for delivery driver pickup"
+                      }
+                      position="top"
                     >
-                      {isPending ? "NEW TICKET" : isPreparing ? "COOKING" : "READY"}
-                    </span>
-                    {order.isOutOfRange && (
                       <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                          order.acceptedOutOfRange
-                            ? "bg-blue-500/20 text-blue-700 dark:text-blue-300"
-                            : "bg-rose-500 text-white animate-pulse"
+                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full cursor-help ${
+                          isPending
+                            ? "bg-amber-500 text-white"
+                            : isPreparing
+                            ? "bg-orange-500 text-white"
+                            : "bg-emerald-500 text-white"
                         }`}
                       >
-                        <AlertTriangle size={9} />
-                        <span>{order.acceptedOutOfRange ? `Out of Range (${order.deliveryDistanceKm}k)` : `⚠️ Out of Range (${order.deliveryDistanceKm}k)`}</span>
+                        {isPending ? "NEW TICKET" : isPreparing ? "COOKING" : "READY"}
                       </span>
+                    </Tooltip>
+                    {order.isOutOfRange && (
+                      <Tooltip
+                        content={
+                          order.acceptedOutOfRange
+                            ? `Destination is ${order.deliveryDistanceKm}km away. Manager approved fulfillment.`
+                            : `Destination (${order.deliveryDistanceKm}km) exceeds standard delivery radius. Manager review required before cooking.`
+                        }
+                        position="top"
+                      >
+                        <span
+                          className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 cursor-help ${
+                            order.acceptedOutOfRange
+                              ? "bg-blue-500/20 text-blue-700 dark:text-blue-300"
+                              : "bg-rose-500 text-white animate-pulse"
+                          }`}
+                        >
+                          <AlertTriangle size={9} />
+                          <span>{order.acceptedOutOfRange ? `Out of Range (${order.deliveryDistanceKm}k)` : `⚠️ Out of Range (${order.deliveryDistanceKm}k)`}</span>
+                        </span>
+                      </Tooltip>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs font-bold">
-                    <Timer size={13} className={diffMinutes > 20 ? "text-red-500 animate-pulse" : ""} />
-                    <span className={diffMinutes > 20 ? "text-red-600 font-black" : "text-stone-600 dark:text-stone-400"}>
-                      {diffMinutes}m ago
-                    </span>
-                  </div>
+                  <Tooltip content="Time elapsed since the customer placed this order" position="top">
+                    <div className="flex items-center gap-1 text-xs font-bold cursor-help">
+                      <Timer size={13} className={diffMinutes > 20 ? "text-red-500 animate-pulse" : ""} />
+                      <span className={diffMinutes > 20 ? "text-red-600 font-black" : "text-stone-600 dark:text-stone-400"}>
+                        {diffMinutes}m ago
+                      </span>
+                    </div>
+                  </Tooltip>
                 </div>
 
                 {/* Items List */}
@@ -354,32 +379,38 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                 {/* Status Advancement Actions */}
                 <div className="p-3 border-t border-stone-100 dark:border-white/5 bg-stone-50/50 dark:bg-white/[0.01]">
                   {isPending && (
-                    <button
-                      onClick={() => handleStartCooking(order)}
-                      disabled={isUpdating}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <Flame size={14} />
-                      <span>Start Cooking</span>
-                    </button>
+                    <Tooltip content="Accept ticket and begin preparing food on the cooking line" position="top">
+                      <button
+                        onClick={() => handleStartCooking(order)}
+                        disabled={isUpdating}
+                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Flame size={14} />
+                        <span>Start Cooking</span>
+                      </button>
+                    </Tooltip>
                   )}
 
                   {isPreparing && (
-                    <button
-                      onClick={() => updateStatus(order._id, "out_for_delivery")}
-                      disabled={isUpdating}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <PackageCheck size={14} />
-                      <span>Mark Ready for Pickup</span>
-                    </button>
+                    <Tooltip content="Mark dishes completed and ready for driver pickup or counter collection" position="top">
+                      <button
+                        onClick={() => updateStatus(order._id, "out_for_delivery")}
+                        disabled={isUpdating}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <PackageCheck size={14} />
+                        <span>Mark Ready for Pickup</span>
+                      </button>
+                    </Tooltip>
                   )}
 
                   {isReady && (
-                    <div className="text-center py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1">
-                      <CheckCircle2 size={14} />
-                      <span>Ready & Awaiting Delivery Pickup</span>
-                    </div>
+                    <Tooltip content="Food is boxed and waiting for driver or customer handover" position="top">
+                      <div className="text-center py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 cursor-default">
+                        <CheckCircle2 size={14} />
+                        <span>Ready & Awaiting Delivery Pickup</span>
+                      </div>
+                    </Tooltip>
                   )}
                 </div>
               </div>

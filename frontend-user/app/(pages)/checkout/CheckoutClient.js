@@ -37,6 +37,7 @@ import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
 import DeliveryLocationMapPicker from "@/components/checkout/DeliveryLocationMapPicker";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -983,55 +984,65 @@ export default function CheckoutClient() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleOrderTypeChange("delivery")}
-                  className={`p-4 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3.5 ${
-                    orderType === "delivery"
-                      ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
-                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
-                  }`}
+                <Tooltip
+                  content="Fresh meals dispatched straight to your doorstep with live GPS rider tracking."
+                  placement="top"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center shrink-0 mt-0.5">
-                    <Truck size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-[var(--text-main)]">Doorstep Delivery</span>
-                      {orderType === "delivery" && (
-                        <CheckCircle2 size={16} className="text-[var(--brand-accent)] shrink-0" />
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => handleOrderTypeChange("delivery")}
+                    className={`w-full p-4 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3.5 ${
+                      orderType === "delivery"
+                        ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
+                        : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center shrink-0 mt-0.5">
+                      <Truck size={18} />
                     </div>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">
-                      {isFreeDelivery ? "Free delivery unlocked!" : `Flat ₹${flatFee} delivery fee`}
-                    </p>
-                  </div>
-                </button>
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-[var(--text-main)]">Doorstep Delivery</span>
+                        {orderType === "delivery" && (
+                          <CheckCircle2 size={16} className="text-[var(--brand-accent)] shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        {isFreeDelivery ? "Free delivery unlocked!" : `Flat ₹${flatFee} delivery fee`}
+                      </p>
+                    </div>
+                  </button>
+                </Tooltip>
 
-                <button
-                  type="button"
-                  onClick={() => handleOrderTypeChange("pickup")}
-                  className={`p-4 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3.5 ${
-                    orderType === "pickup"
-                      ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
-                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
-                  }`}
+                <Tooltip
+                  content="Save on delivery charges! Pick up your freshly prepared meal in person at the kitchen counter."
+                  placement="top"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
-                    <ShoppingBag size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-[var(--text-main)]">Self Pickup (COP)</span>
-                      {orderType === "pickup" && (
-                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => handleOrderTypeChange("pickup")}
+                    className={`w-full p-4 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3.5 ${
+                      orderType === "pickup"
+                        ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
+                        : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <ShoppingBag size={18} />
                     </div>
-                    <p className="text-xs text-emerald-500 font-semibold mt-1">
-                      ₹0 delivery charge • Pick up at kitchen
-                    </p>
-                  </div>
-                </button>
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-[var(--text-main)]">Self Pickup (COP)</span>
+                        {orderType === "pickup" && (
+                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-emerald-500 font-semibold mt-1">
+                        ₹0 delivery charge • Pick up at kitchen
+                      </p>
+                    </div>
+                  </button>
+                </Tooltip>
               </div>
             </div>
 
@@ -1300,25 +1311,35 @@ export default function CheckoutClient() {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setIsMapPickerOpen(true)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                          <Tooltip
+                            content="Open interactive map to set an exact pin for your building gate or doorway"
+                            placement="top"
                           >
-                            <MapPinned size={14} />
-                            <span>{address.latitude ? "Change Pin" : "Choose on Map"}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsMapPickerOpen(true)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                            >
+                              <MapPinned size={14} />
+                              <span>{address.latitude ? "Change Pin" : "Choose on Map"}</span>
+                            </button>
+                          </Tooltip>
 
-                          <button
-                            type="button"
-                            onClick={handleQuickGps}
-                            disabled={isLocatingDevice}
-                            className="px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            title="Use my device current location"
+                          <Tooltip
+                            content="Automatically detect and pin your current physical GPS coordinates"
+                            placement="top"
                           >
-                            <Crosshair size={14} className="text-emerald-500" />
-                            <span>{isLocatingDevice ? "Locating..." : "Use My GPS"}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={handleQuickGps}
+                              disabled={isLocatingDevice}
+                              className="px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              aria-label="Use my device current location"
+                            >
+                              <Crosshair size={14} className="text-emerald-500" />
+                              <span>{isLocatingDevice ? "Locating..." : "Use My GPS"}</span>
+                            </button>
+                          </Tooltip>
                         </div>
                       </div>
 
@@ -1330,13 +1351,18 @@ export default function CheckoutClient() {
                               Exact Delivery Pin Set: <span className="font-mono text-[11px] font-bold">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</span>
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleClearPin}
-                            className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                          <Tooltip
+                            content="Clear the GPS pin and rely on your written street address"
+                            placement="left"
                           >
-                            Remove Pin
-                          </button>
+                            <button
+                              type="button"
+                              onClick={handleClearPin}
+                              className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                            >
+                              Remove Pin
+                            </button>
+                          </Tooltip>
                         </div>
                       )}
                     </div>
@@ -1483,7 +1509,12 @@ export default function CheckoutClient() {
             <div className="bg-[var(--bg-card)] rounded-3xl p-6 md:p-8 border border-[var(--border-color)] shadow-xl space-y-4">
               <h2 className="text-base font-extrabold text-[var(--text-main)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
                 <CreditCard size={18} className="text-[var(--brand-accent)]" />
-                Select Payment Method
+                <span>Select Payment Method</span>
+                <HelpTooltip
+                  content="Choose how you prefer to pay. Cash on Delivery is collected in cash or UPI scan at your door. Online payment is processed securely via Razorpay."
+                  title="Payment Options"
+                  side="right"
+                />
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5" role="radiogroup" aria-label="Payment method selection">
@@ -1919,9 +1950,20 @@ export default function CheckoutClient() {
                 <span>Items Subtotal</span>
                 <span className="text-[var(--text-main)] font-semibold">₹{subtotal}</span>
               </div>
-              <div className="flex justify-between text-[var(--text-muted)]">
-                <span>
-                  {orderType === "pickup" ? "Self Pickup Charge" : "Delivery Charge"}
+              <div className="flex justify-between items-center text-[var(--text-muted)]">
+                <span className="flex items-center gap-1">
+                  <span>{orderType === "pickup" ? "Self Pickup Charge" : "Delivery Charge"}</span>
+                  <HelpTooltip
+                    content={
+                      orderType === "pickup"
+                        ? "Self-pickup at the restaurant counter is always ₹0 free of charge."
+                        : isFreeDelivery
+                        ? `Free delivery active! Your order value is over ₹${freeThreshold}.`
+                        : `Standard doorstep delivery fee. Orders above ₹${freeThreshold} qualify for free delivery.`
+                    }
+                    title="Delivery Charges"
+                    side="right"
+                  />
                 </span>
                 <span className="text-[var(--text-main)] font-semibold">
                   {deliveryFee === 0 ? (
@@ -1952,8 +1994,15 @@ export default function CheckoutClient() {
                 </p>
               )}
 
-              <div className="flex justify-between font-extrabold text-base text-[var(--text-main)] border-t border-[var(--border-color)] pt-3">
-                <span>Grand Total</span>
+              <div className="flex justify-between items-center font-extrabold text-base text-[var(--text-main)] border-t border-[var(--border-color)] pt-3">
+                <span className="flex items-center gap-1">
+                  <span>Grand Total</span>
+                  <HelpTooltip
+                    content="All taxes and charges included. No surprise fees at checkout."
+                    title="Total Payable"
+                    side="right"
+                  />
+                </span>
                 <span className="text-[var(--brand-accent)] font-mono text-xl">₹{total}</span>
               </div>
             </div>

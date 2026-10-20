@@ -26,6 +26,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const TRACKING_POLL_INTERVAL_MS = 9000; // 9 seconds (in the 8-10s range)
 
@@ -1011,27 +1012,33 @@ export default function LiveDeliveryMap({
 
           {/* Right Block: Consistent Action Buttons */}
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-            <button
-              type="button"
-              onClick={() => fetchTracking(true)}
-              disabled={isRefreshing}
-              className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-semibold"
-              title="Refresh live position"
-              aria-label="Refresh live position"
-            >
-              <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-              <span className="hidden xs:inline">Refresh</span>
-            </button>
+            <Tooltip content="Fetch the latest GPS location broadcast from the driver" placement="bottom">
+              <button
+                type="button"
+                onClick={() => fetchTracking(true)}
+                disabled={isRefreshing}
+                className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-semibold"
+                aria-label="Refresh live position"
+              >
+                <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+                <span className="hidden xs:inline">Refresh</span>
+              </button>
+            </Tooltip>
 
-            <button
-              type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] flex items-center gap-1.5 text-xs font-semibold"
-              title={isExpanded ? "Standard Map View" : "Enlarge Map View"}
+            <Tooltip
+              content={isExpanded ? "Collapse map to standard size" : "Expand map for a larger view"}
+              placement="bottom"
             >
-              {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              <span>{isExpanded ? "Collapse" : "Enlarge"}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] flex items-center gap-1.5 text-xs font-semibold"
+                aria-label={isExpanded ? "Standard Map View" : "Enlarge Map View"}
+              >
+                {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                <span>{isExpanded ? "Collapse" : "Enlarge"}</span>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -1059,29 +1066,34 @@ export default function LiveDeliveryMap({
         </div>
 
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={handleShareLocation}
-            disabled={sharingLocationLoading}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 ${
-              isSharingLocation || hasValidCustomerCoords
-                ? "bg-purple-600/10 hover:bg-purple-600/20 text-purple-600 dark:text-purple-400 border border-purple-500/30"
-                : "bg-purple-600 hover:bg-purple-700 text-white"
-            }`}
+          <Tooltip
+            content="Broadcast your current device GPS coordinates to help the delivery driver reach your exact doorstep without calling"
+            placement="left"
           >
-            {sharingLocationLoading ? (
-              <RefreshCw size={13} className="animate-spin" />
-            ) : (
-              <Crosshair size={13} />
-            )}
-            <span>
-              {sharingLocationLoading
-                ? "Acquiring GPS..."
-                : isSharingLocation || hasValidCustomerCoords
-                ? "Update Live GPS"
-                : "Share My Live Location"}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={handleShareLocation}
+              disabled={sharingLocationLoading}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 ${
+                isSharingLocation || hasValidCustomerCoords
+                  ? "bg-purple-600/10 hover:bg-purple-600/20 text-purple-600 dark:text-purple-400 border border-purple-500/30"
+                  : "bg-purple-600 hover:bg-purple-700 text-white"
+              }`}
+            >
+              {sharingLocationLoading ? (
+                <RefreshCw size={13} className="animate-spin" />
+              ) : (
+                <Crosshair size={13} />
+              )}
+              <span>
+                {sharingLocationLoading
+                  ? "Acquiring GPS..."
+                  : isSharingLocation || hasValidCustomerCoords
+                  ? "Update Live GPS"
+                  : "Share My Live Location"}
+              </span>
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -1118,16 +1130,18 @@ export default function LiveDeliveryMap({
         <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
           {/* Layer Switcher Button (Requirement 1 & 4) */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setStyleMenuOpen(!styleMenuOpen)}
-              className="h-9 px-3 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center gap-1.5 text-xs font-bold transition cursor-pointer backdrop-blur-xs"
-              title="Change Map Style"
-            >
-              <Layers size={14} className="text-blue-400" />
-              <span>Layers</span>
-              <ChevronDown size={12} className="text-stone-400" />
-            </button>
+            <Tooltip content="Switch map styles (satellite, night, or grey)" placement="left">
+              <button
+                type="button"
+                onClick={() => setStyleMenuOpen(!styleMenuOpen)}
+                className="h-9 px-3 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center gap-1.5 text-xs font-bold transition cursor-pointer backdrop-blur-xs"
+                aria-label="Change Map Style"
+              >
+                <Layers size={14} className="text-blue-400" />
+                <span>Layers</span>
+                <ChevronDown size={12} className="text-stone-400" />
+              </button>
+            </Tooltip>
 
             {/* Layer Switcher Popover */}
             {styleMenuOpen && (
@@ -1164,14 +1178,16 @@ export default function LiveDeliveryMap({
           </div>
 
           {/* Recenter View Button */}
-          <button
-            type="button"
-            onClick={handleRecenter}
-            className="w-9 h-9 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center justify-center transition cursor-pointer backdrop-blur-xs self-end"
-            title="Recenter Map View"
-          >
-            <Crosshair size={15} className="text-emerald-400" />
-          </button>
+          <Tooltip content="Recenter map to view both driver and doorstep" placement="left">
+            <button
+              type="button"
+              onClick={handleRecenter}
+              className="w-9 h-9 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center justify-center transition cursor-pointer backdrop-blur-xs self-end"
+              aria-label="Recenter Map View"
+            >
+              <Crosshair size={15} className="text-emerald-400" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Floating Route Stats Pill (Requirement 2 & 3: Turn-by-Turn Route Distance & ETA) */}
@@ -1265,15 +1281,16 @@ export default function LiveDeliveryMap({
             </div>
 
             {driver?.phone && (
-              <a
-                href={`tel:${driver.phone}`}
-                className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
-                title={`Call driver: ${driver.phone}`}
-                aria-label={`Call driver: ${driver.phone}`}
-              >
-                <Phone size={13} />
-                <span>Call Driver</span>
-              </a>
+              <Tooltip content={`Call driver ${driver.name || "partner"} directly at ${driver.phone}`} placement="top">
+                <a
+                  href={`tel:${driver.phone}`}
+                  className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
+                  aria-label={`Call driver: ${driver.phone}`}
+                >
+                  <Phone size={13} />
+                  <span>Call Driver</span>
+                </a>
+              </Tooltip>
             )}
           </div>
 

@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
 import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } from "@/lib/offersHelper";
+import Tooltip from "@/components/ui/Tooltip";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -157,19 +158,27 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
 
           {/* FSSAI Veg / Non-Veg Indicator Icon & Newly Arrived Tag */}
           <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
-            <span
-              className={`w-4 h-4 rounded-[4px] border-2 bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center shadow-xs ${
-                product.type === "veg" ? "border-emerald-600" : "border-rose-600"
-              }`}
-              title={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
-              aria-label={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
+            <Tooltip
+              content={
+                product.type === "veg"
+                  ? "Pure Vegetarian (Green dot): Contains 100% vegetarian ingredients"
+                  : "Non-Vegetarian (Red dot): Contains meat, egg, seafood, or animal derivatives"
+              }
+              placement="right"
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  product.type === "veg" ? "bg-emerald-600" : "bg-rose-600"
+                className={`w-4 h-4 rounded-[4px] border-2 bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center shadow-xs cursor-help ${
+                  product.type === "veg" ? "border-emerald-600" : "border-rose-600"
                 }`}
-              />
-            </span>
+                aria-label={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    product.type === "veg" ? "bg-emerald-600" : "bg-rose-600"
+                  }`}
+                />
+              </span>
+            </Tooltip>
             {isNew && (
               <span className="px-1.5 py-0.5 rounded-[4px] bg-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-xs flex items-center gap-0.5 leading-none">
                 <Sparkles size={8} className="fill-white" /> New
@@ -178,14 +187,19 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           </div>
 
           {/* Wishlist Button */}
-          <button
-            type="button"
-            onClick={handleToggleFav}
-            aria-label={isFav ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-            className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+          <Tooltip
+            content={isFav ? "Remove from saved favorites" : "Save to favorites"}
+            placement="left"
           >
-            <Heart size={13} className={isFav ? "fill-rose-500 text-rose-500" : ""} />
-          </button>
+            <button
+              type="button"
+              onClick={handleToggleFav}
+              aria-label={isFav ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            >
+              <Heart size={13} className={isFav ? "fill-rose-500 text-rose-500" : ""} />
+            </button>
+          </Tooltip>
 
           {/* Closed / Sold Out Overlay */}
           {!product.isAvailable ? (
@@ -211,10 +225,15 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <div className="min-w-0">
             {/* Rating Badge + Review Count */}
             <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs">
-                <span>{(product.rating || 4.5).toFixed(1)}</span>
-                <Star size={9} className="fill-white" />
-              </span>
+              <Tooltip
+                content={`Rated ${(product.rating || 4.5).toFixed(1)} out of 5 stars (${product.numRatings || 14} verified customer ratings)`}
+                placement="top"
+              >
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shadow-2xs cursor-help">
+                  <span>{(product.rating || 4.5).toFixed(1)}</span>
+                  <Star size={9} className="fill-white" />
+                </span>
+              </Tooltip>
               <span className="text-[10px] text-[var(--text-muted)] font-medium">
                 ({product.numRatings || 14})
               </span>
@@ -274,22 +293,29 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
       {/* Action Button Row */}
       <div className="px-3 pb-3 sm:px-3.5 sm:pb-3.5 pt-0">
         {!product.isAvailable ? (
-          <button
-            disabled
-            aria-disabled="true"
-            className="w-full py-2 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[38px] sm:min-h-[40px]"
-          >
-            Unavailable
-          </button>
+          <Tooltip content="This dish is currently out of stock in the kitchen" placement="top">
+            <button
+              disabled
+              aria-disabled="true"
+              className="w-full py-2 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[38px] sm:min-h-[40px]"
+            >
+              Unavailable
+            </button>
+          </Tooltip>
         ) : !restStatus.isOpen ? (
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
-            className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+          <Tooltip
+            content={`Kitchen is currently closed: ${restStatus.reason || "Check back during restaurant opening hours"}`}
+            placement="top"
           >
-            <Clock size={12} /> Closed
-          </button>
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
+              className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+            >
+              <Clock size={12} /> Closed
+            </button>
+          </Tooltip>
         ) : (
           <button
             type="button"

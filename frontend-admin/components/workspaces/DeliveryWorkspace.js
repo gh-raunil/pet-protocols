@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 import {
   Truck,
   Package,
@@ -42,7 +43,7 @@ import {
   useDeliveryGpsTransmitter,
   isPickupOrder,
 } from "@/hooks/useDeliveryGpsTransmitter";
-import { getOrderDistanceInfo } from "@/lib/geoDistance";
+import { getOrderDistanceInfo, buildMapplsDirectionUrl } from "@/lib/geoDistance";
 import DeliveryRouteMap from "./DeliveryRouteMap";
 
 export default function DeliveryWorkspace({ restaurantName = "" }) {
@@ -84,6 +85,50 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   };
 
   const gpsTransmitter = useDeliveryGpsTransmitter();
+  const [staffDeviceCoords, setStaffDeviceCoords] = useState(null);
+
+  // Auto-acquire and watch staff device geolocation so Mappls navigation can immediately use staff's live location
+  useEffect(() => {
+    if (typeof window === "undefined" || !navigator.geolocation) return;
+
+    let isCancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!isCancelled && pos?.coords) {
+          setStaffDeviceCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        }
+      },
+      (err) => console.warn("Staff device GPS prompt:", err?.message),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!isCancelled && pos?.coords) {
+          setStaffDeviceCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000 }
+    );
+
+    return () => {
+      isCancelled = true;
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {}
+      }
+    };
+  }, []);
 
   const isOrderCod = (order) => {
     if (!order) return false;
@@ -635,49 +680,53 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
       {/* ── WORKSPACE TABS: DELIVERIES VS COD CASH REGISTER ─────────── */}
       <div className="flex items-center gap-2 border-b border-stone-200/80 dark:border-white/10 pb-3 flex-wrap">
-        <button
-          onClick={() => setActiveTab("deliveries")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-            activeTab === "deliveries"
-              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-              : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
-          }`}
-        >
-          <Truck size={16} />
-          <span>Live Deliveries & Transit</span>
-          <span
-            className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+        <Tooltip content="View active delivery tasks, turn-by-turn navigation, and customer doorstep orders" position="bottom">
+          <button
+            onClick={() => setActiveTab("deliveries")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
               activeTab === "deliveries"
-                ? "bg-white/20 text-white"
-                : "bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
             }`}
           >
-            {metrics.ready + metrics.inTransit}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("cod_register")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
-            activeTab === "cod_register"
-              ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
-              : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
-          }`}
-        >
-          <Wallet size={16} />
-          <span>COD Cash Register & Manager Reconciliation</span>
-          {codSummary.totalUnsettled > 0 && (
+            <Truck size={16} />
+            <span>Live Deliveries & Transit</span>
             <span
               className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
-                activeTab === "cod_register"
+                activeTab === "deliveries"
                   ? "bg-white/20 text-white"
-                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                  : "bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300"
               }`}
             >
-              ₹{codSummary.totalUnsettled.toFixed(0)} to Settle
+              {metrics.ready + metrics.inTransit}
             </span>
-          )}
-        </button>
+          </button>
+        </Tooltip>
+
+        <Tooltip content="Audit cash collected at doorsteps and reconcile cash deposits to the restaurant register" position="bottom">
+          <button
+            onClick={() => setActiveTab("cod_register")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+              activeTab === "cod_register"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
+            }`}
+          >
+            <Wallet size={16} />
+            <span>COD Cash Register & Manager Reconciliation</span>
+            {codSummary.totalUnsettled > 0 && (
+              <span
+                className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                  activeTab === "cod_register"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                ₹{codSummary.totalUnsettled.toFixed(0)} to Settle
+              </span>
+            )}
+          </button>
+        </Tooltip>
       </div>
 
       {activeTab === "deliveries" && (
@@ -762,21 +811,25 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   </span>
 
                   {gpsTransmitter.wakeLockActive && (
-                    <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
-                      📱 Screen Awake
-                    </span>
+                    <Tooltip content="Keeps phone screen on while driving to prevent background GPS transmission pauses" position="top">
+                      <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1 cursor-help">
+                        📱 Screen Awake
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               </div>
             </div>
 
-            <button
-              onClick={() => gpsTransmitter.stopTracking("stopped")}
-              className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer"
-            >
-              <Power size={13} />
-              <span>Stop GPS Transmission</span>
-            </button>
+            <Tooltip content="Stop sharing your real-time GPS coordinates with the customer" position="left">
+              <button
+                onClick={() => gpsTransmitter.stopTracking("stopped")}
+                className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer"
+              >
+                <Power size={13} />
+                <span>Stop GPS Transmission</span>
+              </button>
+            </Tooltip>
           </div>
 
           {/* Telemetry Pills */}
@@ -1017,57 +1070,65 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   {/* Quick Action Button for Delivery Flow */}
                   <div className="flex items-center gap-2 self-end md:self-auto flex-wrap justify-end">
                     {(order.status === "preparing" || order.status === "ready") && (
-                      <button
-                        onClick={() =>
-                          updateOrderStatus(order._id, "out_for_delivery", {
-                            assignedDeliveryStaff: {
-                              id: currentStaffId,
-                              name: currentStaffName,
-                              phone: currentStaffPhone,
-                            },
-                          })
-                        }
-                        disabled={isUpdating}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <Truck size={14} />
-                        <span>Pick Up & Start Transit</span>
-                      </button>
+                      <Tooltip content="Pick up packed food parcel from kitchen and start transit to customer" position="top">
+                        <button
+                          onClick={() =>
+                            updateOrderStatus(order._id, "out_for_delivery", {
+                              assignedDeliveryStaff: {
+                                id: currentStaffId,
+                                name: currentStaffName,
+                                phone: currentStaffPhone,
+                              },
+                            })
+                          }
+                          disabled={isUpdating}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <Truck size={14} />
+                          <span>Pick Up & Start Transit</span>
+                        </button>
+                      </Tooltip>
                     )}
 
                     {order.status === "out_for_delivery" && (
                       <>
                         {!isPickup && (
                           isOrderTracking ? (
-                            <button
-                              onClick={() => gpsTransmitter.stopTracking("stopped")}
-                              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                              title="Stop sending GPS coordinates for this order"
-                            >
-                              <Power size={13} />
-                              <span>Stop GPS</span>
-                            </button>
+                            <Tooltip content="Stop sharing your live GPS coordinates for this delivery" position="top">
+                              <button
+                                onClick={() => gpsTransmitter.stopTracking("stopped")}
+                                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                                title="Stop sending GPS coordinates for this order"
+                              >
+                                <Power size={13} />
+                                <span>Stop GPS</span>
+                              </button>
+                            </Tooltip>
                           ) : (
-                            <button
-                              onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                              title="Start transmitting real device GPS for this active delivery"
-                            >
-                              <Navigation size={13} />
-                              <span>Share Live GPS</span>
-                            </button>
+                            <Tooltip content="Transmit your phone's real-time GPS location to the customer's live tracking map" position="top">
+                              <button
+                                onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                title="Start transmitting real device GPS for this active delivery"
+                              >
+                                <Navigation size={13} />
+                                <span>Share Live GPS</span>
+                              </button>
+                            </Tooltip>
                           )
                         )}
 
                         {/* Delivery Handover Action (automatically handles COD collection upon delivery confirmation) */}
-                        <button
-                          onClick={() => updateOrderStatus(order._id, "delivered")}
-                          disabled={isUpdating}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <CheckCircle2 size={14} />
-                          <span>Mark Handed Over / Delivered</span>
-                        </button>
+                        <Tooltip content="Confirm food handed to customer at doorstep. Automatically records cash collected for COD orders." position="top">
+                          <button
+                            onClick={() => updateOrderStatus(order._id, "delivered")}
+                            disabled={isUpdating}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <CheckCircle2 size={14} />
+                            <span>Mark Handed Over / Delivered</span>
+                          </button>
+                        </Tooltip>
                       </>
                     )}
 
@@ -1170,6 +1231,86 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                       const isMapOpen = expandedMapOrderIds.has(order._id);
                       const distInfo = getOrderDistanceInfo(order);
 
+                      // Determine staff / rider live origin coordinates
+                      const effectiveStaffLat =
+                        gpsTransmitter.lastLocation?.latitude ??
+                        staffDeviceCoords?.latitude ??
+                        order.deliveryTracking?.currentLocation?.latitude ??
+                        distInfo?.restCoords?.lat;
+
+                      const effectiveStaffLng =
+                        gpsTransmitter.lastLocation?.longitude ??
+                        staffDeviceCoords?.longitude ??
+                        order.deliveryTracking?.currentLocation?.longitude ??
+                        distInfo?.restCoords?.lng;
+
+                      const hasLiveStaff = Boolean(
+                        gpsTransmitter.lastLocation?.latitude ||
+                        staffDeviceCoords?.latitude ||
+                        order.deliveryTracking?.currentLocation?.latitude
+                      );
+
+                      const staffLabel = hasLiveStaff
+                        ? (currentStaffName || "Staff Location")
+                        : (restaurantName || "Restaurant Kitchen");
+
+                      const customerLabel =
+                        order.recipientName ||
+                        order.address?.recipientName ||
+                        order.address?.fullName ||
+                        order.user?.name ||
+                        "Customer Destination";
+
+                      const mapplsUrl = buildMapplsDirectionUrl({
+                        startLat: effectiveStaffLat,
+                        startLng: effectiveStaffLng,
+                        startLabel: staffLabel,
+                        destLat: navLat,
+                        destLng: navLng,
+                        destLabel: customerLabel,
+                        mode: "driving",
+                      });
+
+                      const handleStartMappls = (e) => {
+                        // If we already have full Mappls URL with live staff coordinates, proceed directly
+                        if (mapplsUrl && effectiveStaffLat && effectiveStaffLng) return;
+
+                        // If staff device GPS was still acquiring, request high-accuracy position before launching
+                        if (typeof window !== "undefined" && navigator.geolocation) {
+                          e.preventDefault();
+                          const newTab = window.open("about:blank", "_blank");
+                          navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                              const sLat = pos.coords.latitude;
+                              const sLng = pos.coords.longitude;
+                              setStaffDeviceCoords({
+                                latitude: sLat,
+                                longitude: sLng,
+                                accuracy: pos.coords.accuracy,
+                              });
+                              const freshUrl = buildMapplsDirectionUrl({
+                                startLat: sLat,
+                                startLng: sLng,
+                                startLabel: currentStaffName || "Staff Location",
+                                destLat: navLat,
+                                destLng: navLng,
+                                destLabel: customerLabel,
+                                mode: "driving",
+                              });
+                              if (newTab) {
+                                newTab.location.href = freshUrl || mapplsUrl;
+                              }
+                            },
+                            () => {
+                              if (newTab) {
+                                newTab.location.href = mapplsUrl;
+                              }
+                            },
+                            { enableHighAccuracy: true, timeout: 4000, maximumAge: 10000 }
+                          );
+                        }
+                      };
+
                       return (
                         <div className="pt-2 border-t border-stone-100 dark:border-white/5 space-y-2">
                           <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -1202,32 +1343,37 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           {/* Action Buttons: 1-Tap Mappls Navigation & Toggle Full-Width Map */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                             {/* Primary: Turn-by-Turn Voice Navigation in Native Mappls */}
-                            <a
-                              href={`https://mappls.com/direction?dest=${navLat},${navLng}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98"
-                              title="Launch turn-by-turn voice directions directly in Mappls"
-                            >
-                              <Navigation size={13} />
-                              <span>🚀 Start Mappls Navigation</span>
-                              <ExternalLink size={11} className="opacity-75" />
-                            </a>
+                            <Tooltip content="Launch turn-by-turn voice directions directly to the doorstep in Mappls" position="top">
+                              <a
+                                href={mapplsUrl}
+                                onClick={handleStartMappls}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98"
+                                title="Launch turn-by-turn voice directions directly in Mappls"
+                              >
+                                <Navigation size={13} />
+                                <span>🚀 Start Mappls Navigation</span>
+                                <ExternalLink size={11} className="opacity-75" />
+                              </a>
+                            </Tooltip>
 
                             {/* Secondary: Toggle Full-Width Screen Map */}
-                            <button
-                              type="button"
-                              onClick={() => toggleDoorstepMap(order._id)}
-                              className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer ${
-                                isMapOpen
-                                  ? "bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white border border-stone-600/30"
-                                  : "bg-blue-600 hover:bg-blue-700 text-white"
-                              }`}
-                            >
-                              <MapPin size={13} className={isMapOpen ? "text-blue-400" : ""} />
-                              <span>{isMapOpen ? "🗺️ Hide Doorstep Map" : "🗺️ View Live Map (Mappls)"}</span>
-                              <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
-                            </button>
+                            <Tooltip content={isMapOpen ? "Collapse doorstep route map" : "Display interactive route map with customer pin"} position="top">
+                              <button
+                                type="button"
+                                onClick={() => toggleDoorstepMap(order._id)}
+                                className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer ${
+                                  isMapOpen
+                                    ? "bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white border border-stone-600/30"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                                }`}
+                              >
+                                <MapPin size={13} className={isMapOpen ? "text-blue-400" : ""} />
+                                <span>{isMapOpen ? "🗺️ Hide Doorstep Map" : "🗺️ View Live Map (Mappls)"}</span>
+                                <ChevronDown size={14} className={`transition-transform duration-200 opacity-80 ${isMapOpen ? "rotate-180" : ""}`} />
+                              </button>
+                            </Tooltip>
                           </div>
                         </div>
                       );
@@ -1290,15 +1436,17 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               <AlertTriangle size={13} className="shrink-0" />
                               <span>Cash Pending Collection</span>
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleCollectCash(order)}
-                              disabled={updatingId !== null}
-                              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
-                            >
-                              <Banknote size={14} />
-                              <span>Record Cash Collection</span>
-                            </button>
+                            <Tooltip content="Record that cash was physically collected from customer at doorstep" position="top">
+                              <button
+                                type="button"
+                                onClick={() => handleCollectCash(order)}
+                                disabled={updatingId !== null}
+                                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                <Banknote size={14} />
+                                <span>Record Cash Collection</span>
+                              </button>
+                            </Tooltip>
                           </>
                         ) : (
                           <span className="text-[11px] text-stone-500 dark:text-stone-400 font-semibold flex items-center gap-1.5">
@@ -1333,13 +1481,15 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "In Driver's Hand (Pending Handover)"}
                           </span>
                           {isManager && !order.codPaymentHandler?.settledWithManager && (
-                            <button
-                              onClick={() => handleSettleCash(order._id)}
-                              disabled={updatingId !== null}
-                              className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
-                            >
-                              Settle Now
-                            </button>
+                            <Tooltip content="Acknowledge cash deposit into the restaurant cash register" position="top">
+                              <button
+                                onClick={() => handleSettleCash(order._id)}
+                                disabled={updatingId !== null}
+                                className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
+                              >
+                                Settle Now
+                              </button>
+                            </Tooltip>
                           )}
                         </div>
                       </div>
@@ -1406,6 +1556,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                 lat: gpsTransmitter.lastLocation.latitude,
                                 lng: gpsTransmitter.lastLocation.longitude,
                                 heading: gpsTransmitter.lastLocation.heading,
+                              }
+                            : staffDeviceCoords?.latitude
+                            ? {
+                                lat: staffDeviceCoords.latitude,
+                                lng: staffDeviceCoords.longitude,
+                                heading: 0,
                               }
                             : order.deliveryTracking?.currentLocation?.latitude
                             ? {
@@ -1691,28 +1847,32 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                   <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                     {codSummary.totalUnsettled > 0 && (
-                      <button
-                        onClick={() =>
-                          handleSettleCash(
-                            codSummary.unsettledOrders.map((o) => o._id),
-                            "All Active Drivers"
-                          )
-                        }
-                        disabled={updatingId !== null}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
-                      >
-                        <Check size={14} />
-                        <span>Settle All Pending (₹{codSummary.totalUnsettled.toFixed(2)})</span>
-                      </button>
+                      <Tooltip content="Confirm deposit of all collected cash into the restaurant cash register" position="top">
+                        <button
+                          onClick={() =>
+                            handleSettleCash(
+                              codSummary.unsettledOrders.map((o) => o._id),
+                              "All Active Drivers"
+                            )
+                          }
+                          disabled={updatingId !== null}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          <Check size={14} />
+                          <span>Settle All Pending (₹{codSummary.totalUnsettled.toFixed(2)})</span>
+                        </button>
+                      </Tooltip>
                     )}
 
-                    <button
-                      onClick={downloadCodReport}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer"
-                    >
-                      <FileSpreadsheet size={14} className="text-emerald-500" />
-                      <span>Export CSV Report</span>
-                    </button>
+                    <Tooltip content="Export an Excel/CSV audit spreadsheet of all COD orders, handlers, and settlement logs" position="top">
+                      <button
+                        onClick={downloadCodReport}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/15 text-stone-800 dark:text-stone-200 text-xs font-bold transition cursor-pointer"
+                      >
+                        <FileSpreadsheet size={14} className="text-emerald-500" />
+                        <span>Export CSV Report</span>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 
@@ -1756,8 +1916,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <span
                               className={`text-base font-black ${
                                 staff.unsettledAmount > 0
-                                  ? "text-amber-600 dark:text-amber-400"
-                                  : "text-emerald-600 dark:text-emerald-400"
+                                    ? "text-amber-600 dark:text-amber-400"
+                                    : "text-emerald-600 dark:text-emerald-400"
                               }`}
                             >
                               ₹{staff.unsettledAmount.toFixed(2)}
@@ -1765,14 +1925,16 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           </div>
 
                           {staff.unsettledAmount > 0 ? (
-                            <button
-                              onClick={() => handleSettleCash(staff.orderIds, staff.staffName)}
-                              disabled={updatingId !== null}
-                              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              <Check size={14} />
-                              <span>Confirm Handover & Settle (₹{staff.unsettledAmount.toFixed(2)})</span>
-                            </button>
+                            <Tooltip content={`Confirm receipt of physical cash from ${staff.staffName} into register`} position="top">
+                              <button
+                                onClick={() => handleSettleCash(staff.orderIds, staff.staffName)}
+                                disabled={updatingId !== null}
+                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                <Check size={14} />
+                                <span>Confirm Handover & Settle (₹{staff.unsettledAmount.toFixed(2)})</span>
+                              </button>
+                            </Tooltip>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
                               <Check size={14} className="text-emerald-500" />

@@ -35,6 +35,7 @@ import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
 import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
 
@@ -718,54 +719,74 @@ export default function OrdersClient() {
 
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Rush Mode Toggle */}
-            <button
-              onClick={() => setRushMode(!rushMode)}
-              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
-                rushMode
-                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 shadow-xs"
-                  : "bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
-              }`}
-              title="Toggle Rush Hour compact ticket grid"
+            <Tooltip
+              content="Toggle compact ticket grid for high-volume kitchen rush hours"
+              placement="bottom"
             >
-              <LayoutGrid size={13} className={rushMode ? "text-amber-600 dark:text-amber-400" : "text-stone-400"} />
-              <span>{rushMode ? "Rush Mode ON" : "Rush Mode"}</span>
-            </button>
+              <button
+                onClick={() => setRushMode(!rushMode)}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+                  rushMode
+                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 shadow-xs"
+                    : "bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
+                }`}
+                aria-label="Toggle Rush Hour compact ticket grid"
+              >
+                <LayoutGrid size={13} className={rushMode ? "text-amber-600 dark:text-amber-400" : "text-stone-400"} />
+                <span>{rushMode ? "Rush Mode ON" : "Rush Mode"}</span>
+              </button>
+            </Tooltip>
 
             {/* Chime sound test / toggle */}
-            <button
-              onClick={() => {
-                setSoundEnabled(!soundEnabled);
-                if (!soundEnabled) playChime(null, 1.0);
-              }}
-              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+            <Tooltip
+              content={
                 soundEnabled
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                  : "bg-white dark:bg-white/5 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
-              }`}
+                  ? "Audio alerts enabled for incoming orders • Click to mute"
+                  : "Audio alerts muted • Click to enable sound notifications"
+              }
+              placement="bottom"
             >
-              {soundEnabled ? <Volume2 size={13} className="text-emerald-600 dark:text-emerald-400" /> : <VolumeX size={13} className="text-stone-400" />}
-              <span>{soundEnabled ? "Chime On" : "Chime Muted"}</span>
-            </button>
+              <button
+                onClick={() => {
+                  setSoundEnabled(!soundEnabled);
+                  if (!soundEnabled) playChime(null, 1.0);
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+                  soundEnabled
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                    : "bg-white dark:bg-white/5 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
+                }`}
+                aria-label="Toggle kitchen audio alert"
+              >
+                {soundEnabled ? <Volume2 size={13} className="text-emerald-600 dark:text-emerald-400" /> : <VolumeX size={13} className="text-stone-400" />}
+                <span>{soundEnabled ? "Chime On" : "Chime Muted"}</span>
+              </button>
+            </Tooltip>
 
             {/* Download Report Button */}
-            <button
-              onClick={downloadOrdersReport}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 hover:bg-stone-100 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
-              title="Download Orders CSV Report"
-            >
-              <Download size={13} className="text-stone-500 dark:text-stone-400" />
-              <span>Export CSV</span>
-            </button>
+            <Tooltip content="Export filtered orders into a downloadable CSV report" placement="bottom">
+              <button
+                onClick={downloadOrdersReport}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 hover:bg-stone-100 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
+                aria-label="Download Orders CSV Report"
+              >
+                <Download size={13} className="text-stone-500 dark:text-stone-400" />
+                <span>Export CSV</span>
+              </button>
+            </Tooltip>
 
             {/* Manual Refresh Button */}
-            <button
-              onClick={() => fetchOrders(true)}
-              disabled={isRefreshing}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-              <span>Refresh</span>
-            </button>
+            <Tooltip content="Refresh orders immediately and sync ticket timers" placement="bottom">
+              <button
+                onClick={() => fetchOrders(true)}
+                disabled={isRefreshing}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+                aria-label="Refresh orders"
+              >
+                <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+                <span>Refresh</span>
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -977,14 +998,16 @@ export default function OrdersClient() {
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handlePrintKOT(order)}
-                              title="Print Kitchen Ticket (KOT)"
-                              className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition cursor-pointer"
-                            >
-                              <Printer size={13} />
-                            </button>
+                            <Tooltip content="Print Kitchen Order Ticket (KOT) for chef prep line and packaging" placement="top">
+                              <button
+                                type="button"
+                                onClick={() => handlePrintKOT(order)}
+                                aria-label="Print Kitchen Ticket (KOT)"
+                                className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition cursor-pointer"
+                              >
+                                <Printer size={13} />
+                              </button>
+                            </Tooltip>
                             <span className="font-mono font-black text-sm text-stone-900 dark:text-white">
                               ₹{order.totalAmount}
                             </span>
@@ -1009,21 +1032,25 @@ export default function OrdersClient() {
                               </span>
                             )}
                             {order.isOutOfRange && (
-                              <span
-                                className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${
-                                  order.acceptedOutOfRange
-                                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
-                                    : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
-                                }`}
-                                title={`Customer is ${order.deliveryDistanceKm || ">10"} km away`}
+                              <Tooltip
+                                content={`Delivery distance is ${order.deliveryDistanceKm || ">10"} km, which exceeds standard kitchen delivery radius.`}
+                                placement="top"
                               >
-                                <AlertTriangle size={10} />
-                                <span>
-                                  {order.acceptedOutOfRange
-                                    ? `Out of Range (${order.deliveryDistanceKm}k)`
-                                    : `⚠️ ${order.deliveryDistanceKm || ">10"}km`}
+                                <span
+                                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 cursor-help ${
+                                    order.acceptedOutOfRange
+                                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
+                                      : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
+                                  }`}
+                                >
+                                  <AlertTriangle size={10} />
+                                  <span>
+                                    {order.acceptedOutOfRange
+                                      ? `Out of Range (${order.deliveryDistanceKm}k)`
+                                      : `⚠️ ${order.deliveryDistanceKm || ">10"}km`}
+                                  </span>
                                 </span>
-                              </span>
+                              </Tooltip>
                             )}
                             {isCod ? (
                               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
@@ -1094,112 +1121,132 @@ export default function OrdersClient() {
                       <div className="pt-2 border-t border-stone-100 dark:border-white/10 flex items-center gap-2">
                         {order.status === "pending" && (
                           <>
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleAcceptOrderWithRangeCheck(order)}
-                              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <ChefHat size={13} />
-                              <span>Accept & Cook</span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => {
-                                if (confirm(`Cancel order ${uniqueId}?`)) {
-                                  handleUpdateStatus(order._id, "cancelled");
-                                }
-                              }}
-                              className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold cursor-pointer disabled:opacity-50"
-                            >
-                              ✕
-                            </button>
+                            <Tooltip content="Accept order and notify kitchen staff to prepare the dishes" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleAcceptOrderWithRangeCheck(order)}
+                                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <ChefHat size={13} />
+                                <span>Accept & Cook</span>
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Reject or cancel this order if unable to fulfill" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => {
+                                  if (confirm(`Cancel order ${uniqueId}?`)) {
+                                    handleUpdateStatus(order._id, "cancelled");
+                                  }
+                                }}
+                                className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold cursor-pointer disabled:opacity-50"
+                              >
+                                ✕
+                              </button>
+                            </Tooltip>
                           </>
                         )}
 
                         {order.status === "confirmed" && (
-                          <button
-                            type="button"
-                            disabled={updatingOrderId === order._id}
-                            onClick={() => handleUpdateStatus(order._id, "preparing")}
-                            className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <ChefHat size={13} />
-                            <span>Start Cooking</span>
-                          </button>
+                          <Tooltip content="Confirm cooking has started at the kitchen station" position="top">
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "preparing")}
+                              className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <ChefHat size={13} />
+                              <span>Start Cooking</span>
+                            </button>
+                          </Tooltip>
                         )}
 
                         {order.status === "preparing" && (
                           isPickup ? (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "ready")}
-                              className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <CheckCircle2 size={13} />
-                              <span>Mark Ready for Pickup</span>
-                            </button>
+                            <Tooltip content="Mark food packed and ready for counter pickup by customer" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "ready")}
+                                className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Mark Ready for Pickup</span>
+                              </button>
+                            </Tooltip>
                           ) : (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                              className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={13} />
-                              <span>Dispatch for Delivery</span>
-                            </button>
+                            <Tooltip content="Hand over food parcel to driver and mark out for delivery" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Truck size={13} />
+                                <span>Dispatch for Delivery</span>
+                              </button>
+                            </Tooltip>
                           )
                         )}
 
                         {order.status === "ready" && (
                           isPickup ? (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "delivered")}
-                              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <CheckCircle2 size={13} />
-                              <span>Confirm Customer Picked Up</span>
-                            </button>
+                            <Tooltip content="Confirm customer has collected order at the counter" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "delivered")}
+                                className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Confirm Customer Picked Up</span>
+                              </button>
+                            </Tooltip>
                           ) : (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                              className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={13} />
-                              <span>Dispatch for Delivery</span>
-                            </button>
+                            <Tooltip content="Hand over to delivery driver and dispatch to customer" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Truck size={13} />
+                                <span>Dispatch for Delivery</span>
+                              </button>
+                            </Tooltip>
                           )
                         )}
 
                         {order.status === "out_for_delivery" && (
-                          <button
-                            type="button"
-                            disabled={updatingOrderId === order._id}
-                            onClick={() => handleUpdateStatus(order._id, "delivered")}
-                            className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <Truck size={13} />
-                            <span>Confirm Delivered</span>
-                          </button>
+                          <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
+                            <button
+                              type="button"
+                              disabled={updatingOrderId === order._id}
+                              onClick={() => handleUpdateStatus(order._id, "delivered")}
+                              className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <Truck size={13} />
+                              <span>Confirm Delivered</span>
+                            </button>
+                          </Tooltip>
                         )}
 
                         {order.status === "delivered" && (
-                          <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                            ✓ Fulfilled
-                          </div>
+                          <Tooltip content="This order has been fulfilled and completed successfully" position="top">
+                            <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20 cursor-default">
+                              ✓ Fulfilled
+                            </div>
+                          </Tooltip>
                         )}
 
                         {order.status === "cancelled" && (
-                          <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20">
-                            ✕ Cancelled
-                          </div>
+                          <Tooltip content="This order was cancelled and was not fulfilled" position="top">
+                            <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20 cursor-default">
+                              ✕ Cancelled
+                            </div>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
@@ -1406,14 +1453,16 @@ export default function OrdersClient() {
                                     {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "⚠️ Pending Manager Handover"}
                                   </span>
                                   {isManagerOrAdmin && !order.codPaymentHandler?.settledWithManager && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSettleCodCash(order._id)}
-                                      disabled={updatingOrderId === order._id}
-                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition disabled:opacity-50"
-                                    >
-                                      Mark Settled
-                                    </button>
+                                    <Tooltip content="Confirm that the delivery driver has handed over the collected cash to the register" position="top">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSettleCodCash(order._id)}
+                                        disabled={updatingOrderId === order._id}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition disabled:opacity-50"
+                                      >
+                                        Mark Settled
+                                      </button>
+                                    </Tooltip>
                                   )}
                                 </div>
                               </div>
@@ -1425,112 +1474,130 @@ export default function OrdersClient() {
                       {/* Primary One-Click Action Stepper Bar */}
                       <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                         {/* Print KOT Button */}
-                        <button
-                          type="button"
-                          onClick={() => handlePrintKOT(order)}
-                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
-                        >
-                          <Printer size={13} className="text-stone-500" />
-                          <span>Print KOT Slip</span>
-                        </button>
+                        <Tooltip content="Print a Kitchen Order Ticket (KOT) receipt for the cooking station" position="top">
+                          <button
+                            type="button"
+                            onClick={() => handlePrintKOT(order)}
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
+                          >
+                            <Printer size={13} className="text-stone-500" />
+                            <span>Print KOT Slip</span>
+                          </button>
+                        </Tooltip>
 
                         <div className="flex items-center gap-2 justify-end">
                           {order.status === "pending" && (
                             <>
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleAcceptOrderWithRangeCheck(order)}
-                                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <ChefHat size={14} />
-                                <span>Accept & Start Cooking</span>
-                              </button>
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => {
-                                  if (confirm(`Cancel order ${uniqueId}?`)) {
-                                    handleUpdateStatus(order._id, "cancelled");
-                                  }
-                                }}
-                                className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
-                              >
-                                Cancel
-                              </button>
+                              <Tooltip content="Accept order and notify kitchen to begin preparation" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleAcceptOrderWithRangeCheck(order)}
+                                  className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <ChefHat size={14} />
+                                  <span>Accept & Start Cooking</span>
+                                </button>
+                              </Tooltip>
+                              <Tooltip content="Reject or cancel this order if unable to fulfill" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => {
+                                    if (confirm(`Cancel order ${uniqueId}?`)) {
+                                      handleUpdateStatus(order._id, "cancelled");
+                                    }
+                                  }}
+                                  className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </Tooltip>
                             </>
                           )}
 
                           {order.status === "confirmed" && (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "preparing")}
-                              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <ChefHat size={14} />
-                              <span>Start Cooking</span>
-                            </button>
+                            <Tooltip content="Confirm kitchen has started cooking this order" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "preparing")}
+                                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <ChefHat size={14} />
+                                <span>Start Cooking</span>
+                              </button>
+                            </Tooltip>
                           )}
 
                           {order.status === "preparing" && (
                             isPickup ? (
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "ready")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <CheckCircle2 size={14} />
-                                <span>Mark Ready for Pickup</span>
-                              </button>
+                              <Tooltip content="Mark food packed and ready for counter pickup by customer" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleUpdateStatus(order._id, "ready")}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  <span>Mark Ready for Pickup</span>
+                                </button>
+                              </Tooltip>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <Truck size={14} />
-                                <span>Dispatch for Delivery</span>
-                              </button>
+                              <Tooltip content="Hand over food parcel to driver and mark out for delivery" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Truck size={14} />
+                                  <span>Dispatch for Delivery</span>
+                                </button>
+                              </Tooltip>
                             )
                           )}
 
                           {order.status === "ready" && (
                             isPickup ? (
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "delivered")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <CheckCircle2 size={14} />
-                                <span>Confirm Customer Picked Up</span>
-                              </button>
+                              <Tooltip content="Confirm customer has collected order at the counter" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleUpdateStatus(order._id, "delivered")}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  <span>Confirm Customer Picked Up</span>
+                                </button>
+                              </Tooltip>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <Truck size={14} />
-                                <span>Dispatch for Delivery</span>
-                              </button>
+                              <Tooltip content="Hand over to delivery driver and dispatch to customer" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Truck size={14} />
+                                  <span>Dispatch for Delivery</span>
+                                </button>
+                              </Tooltip>
                             )
                           )}
 
                           {order.status === "out_for_delivery" && (
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "delivered")}
-                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={14} />
-                              <span>Confirm Order Delivered</span>
-                            </button>
+                            <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
+                              <button
+                                type="button"
+                                disabled={updatingOrderId === order._id}
+                                onClick={() => handleUpdateStatus(order._id, "delivered")}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Truck size={14} />
+                                <span>Confirm Order Delivered</span>
+                              </button>
+                            </Tooltip>
                           )}
 
                           {order.status === "delivered" && (

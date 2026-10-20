@@ -17,6 +17,7 @@ import {
   Award
 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
+import Tooltip from "../ui/Tooltip";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -57,27 +58,30 @@ const RightSection = () => {
 
       {/* Cart Icon (Only relevant for normal customers) */}
       {!isRestaurantAdmin && !isSuperadmin && (
-        <button
-          className="relative hover:text-orange-500 transition duration-200 hover:scale-105 p-1.5 rounded-xl text-gray-200 light:text-stone-700 hover:bg-white/5 light:hover:bg-stone-200"
-          onClick={() => openCart()}
-          aria-label="Open Cart"
-        >
-          <ShoppingCart size={21} />
-          {isMounted && totalItems > 0 && (
-            <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-orange-500/30">
-              {totalItems}
-            </span>
-          )}
-        </button>
+        <Tooltip content="View items added to your food basket" position="bottom">
+          <button
+            className="relative hover:text-orange-500 transition duration-200 hover:scale-105 p-1.5 rounded-xl text-gray-200 light:text-stone-700 hover:bg-white/5 light:hover:bg-stone-200"
+            onClick={() => openCart()}
+            aria-label="Open Cart"
+          >
+            <ShoppingCart size={21} />
+            {isMounted && totalItems > 0 && (
+              <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-orange-500/30">
+                {totalItems}
+              </span>
+            )}
+          </button>
+        </Tooltip>
       )}
 
       {/* Auth State Button / Dropdown */}
       {session ? (
         <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 bg-[#121214] light:bg-[#ffffff] border border-white/10 light:border-stone-300 rounded-full pl-1 pr-3 py-1 hover:border-orange-500 transition shadow-sm"
-          >
+          <Tooltip content="Account menu, active permissions, and dashboard links" position="bottom">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-2 bg-[#121214] light:bg-[#ffffff] border border-white/10 light:border-stone-300 rounded-full pl-1 pr-3 py-1 hover:border-orange-500 transition shadow-sm"
+            >
             <div className="w-7 h-7 rounded-full bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-xs overflow-hidden">
               {session.user.image ? (
                 <Image
@@ -107,6 +111,7 @@ const RightSection = () => {
               }`}
             />
           </button>
+        </Tooltip>
 
           {dropdownOpen && (
             <div className="absolute right-0 top-11 w-64 bg-[#121214] light:bg-[#ffffff] border border-white/15 light:border-stone-300 rounded-2xl overflow-hidden shadow-2xl z-50 py-1">

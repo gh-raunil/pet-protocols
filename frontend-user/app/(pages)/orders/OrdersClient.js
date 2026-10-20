@@ -31,6 +31,7 @@ import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { formatDateInTimeZone } from "@/lib/timeZone";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -760,33 +761,43 @@ export default function OrdersClient() {
                   <div className="flex items-center gap-2">
                     {/* Customer Cancellation Button */}
                     {canCancel && cancellingOrderId !== order._id && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCancellingOrderId(order._id);
-                          setCancelReason("");
-                        }}
-                        className="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                        title="Cancel order within cancellation grace period"
+                      <Tooltip
+                        content="Cancel this order before kitchen starts preparation. If paid online, full refund is automatically issued."
+                        placement="top"
                       >
-                        <XCircle size={13} />
-                        <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCancellingOrderId(order._id);
+                            setCancelReason("");
+                          }}
+                          className="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                          aria-label="Cancel order within grace period"
+                        >
+                          <XCircle size={13} />
+                          <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
+                        </button>
+                      </Tooltip>
                     )}
 
                     {/* Reorder Button */}
-                    <button
-                      type="button"
-                      disabled={reorderingOrderId === order._id}
-                      onClick={() => handleReorder(order)}
-                      className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer disabled:opacity-50"
+                    <Tooltip
+                      content="Add all available dishes from this order back to your cart for quick re-ordering"
+                      placement="top"
                     >
-                      <RotateCcw
-                        size={13}
-                        className={reorderingOrderId === order._id ? "animate-spin" : ""}
-                      />
-                      {reorderingOrderId === order._id ? "Checking..." : "Reorder"}
-                    </button>
+                      <button
+                        type="button"
+                        disabled={reorderingOrderId === order._id}
+                        onClick={() => handleReorder(order)}
+                        className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer disabled:opacity-50"
+                      >
+                        <RotateCcw
+                          size={13}
+                          className={reorderingOrderId === order._id ? "animate-spin" : ""}
+                        />
+                        {reorderingOrderId === order._id ? "Checking..." : "Reorder"}
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { useSession } from "next-auth/react";
 import useNotificationStore from "@/lib/notificationStore";
+import Tooltip from "../ui/Tooltip";
 
 export default function NotificationBell() {
   const { data: session } = useSession();
@@ -43,21 +44,27 @@ export default function NotificationBell() {
     );
   }
 
+  const tooltipText =
+    unreadCount > 0
+      ? `You have ${unreadCount} unread order update${unreadCount === 1 ? "" : "s"}`
+      : "Order updates & kitchen announcements";
+
   return (
-    <button
-      onClick={toggleNotifications}
-      aria-label="Open notifications"
-      title="Notifications & Updates"
-      className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] cursor-pointer"
-    >
-      <Bell size={20} />
-      {unreadCount > 0 && (
-        <span
-          className="absolute -top-1 -right-1 bg-[var(--brand-accent)] text-white text-[10px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold shadow-md shadow-[var(--brand-accent)]/30 animate-pulse"
-        >
-          {unreadCount > 99 ? "99+" : unreadCount}
-        </span>
-      )}
-    </button>
+    <Tooltip content={tooltipText} placement="bottom">
+      <button
+        onClick={toggleNotifications}
+        aria-label="Open notifications"
+        className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] cursor-pointer"
+      >
+        <Bell size={20} />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-1 -right-1 bg-[var(--brand-accent)] text-white text-[10px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold shadow-md shadow-[var(--brand-accent)]/30 animate-pulse"
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }

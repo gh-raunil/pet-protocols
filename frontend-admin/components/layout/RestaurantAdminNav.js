@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import { useTheme } from "../ui/ThemeProvider";
+import Tooltip, { HelpTooltip } from "../ui/Tooltip";
 
 export default function RestaurantAdminNav() {
   const pathname = usePathname();
@@ -415,13 +416,15 @@ export default function RestaurantAdminNav() {
                   <span>View</span>
                   <ArrowRight size={11} />
                 </Link>
-                <button
-                  onClick={handleDismissNotice}
-                  className="text-white/80 hover:text-white transition p-0.5 rounded hover:bg-black/20"
-                  title="Dismiss notice"
-                >
-                  <X size={13} />
-                </button>
+                <Tooltip content="Dismiss this announcement" placement="bottom">
+                  <button
+                    onClick={handleDismissNotice}
+                    className="text-white/80 hover:text-white transition p-0.5 rounded hover:bg-black/20"
+                    aria-label="Dismiss notice"
+                  >
+                    <X size={13} />
+                  </button>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -520,43 +523,52 @@ export default function RestaurantAdminNav() {
             {isRestaurantAdmin ? (
               <div className="flex items-center gap-2">
                 {/* Desktop Profile Pill — Scoped for Staff or Manager */}
-                <Link
-                  href="/profile"
-                  className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all text-xs font-semibold ${
-                    pathname === "/profile"
-                      ? isStaff
-                        ? "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 shadow-xs"
-                        : "bg-orange-500/10 dark:bg-orange-500/20 border-orange-500/40 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-xs"
-                      : "bg-stone-100/90 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 border-stone-200/80 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
-                  }`}
-                  title={isStaff ? "Staff Profile" : "Manager Profile"}
+                <Tooltip
+                  content={
+                    isStaff
+                      ? `Staff Member: ${session?.user?.name || "Staff"} (${staffRoles.join(", ") || "Staff"}) • Click to manage profile`
+                      : `Store Manager: ${session?.user?.name || "Manager"} • Click to manage restaurant profile & operations`
+                  }
+                  placement="bottom"
                 >
-                  <div
-                    className={`w-6 h-6 rounded-full overflow-hidden font-bold flex items-center justify-center text-[11px] shrink-0 ring-1 ${
-                      isStaff
-                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/30"
-                        : "bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/30"
+                  <Link
+                    href="/profile"
+                    className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all text-xs font-semibold ${
+                      pathname === "/profile"
+                        ? isStaff
+                          ? "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "bg-orange-500/10 dark:bg-orange-500/20 border-orange-500/40 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-xs"
+                        : "bg-stone-100/90 dark:bg-white/5 hover:bg-stone-200/80 dark:hover:bg-white/10 border-stone-200/80 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
                     }`}
+                    aria-label={isStaff ? "Staff Profile" : "Manager Profile"}
                   >
-                    {effectiveAvatar ? (
-                      <img
-                        src={effectiveAvatar}
-                        alt={session?.user?.name || (isStaff ? "Staff" : "Manager")}
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    ) : (
-                      <span>{userInitial}</span>
-                    )}
-                  </div>
-                  <span className="truncate max-w-[85px]">
-                    {session?.user?.name?.split(" ")[0] || (isStaff ? "Staff" : "Profile")}
-                  </span>
-                  {isStaff && staffRoles.length > 0 && (
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                      {staffRoles[0]}
+                    <div
+                      className={`w-6 h-6 rounded-full overflow-hidden font-bold flex items-center justify-center text-[11px] shrink-0 ring-1 ${
+                        isStaff
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/30"
+                          : "bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/30"
+                      }`}
+                    >
+                      {effectiveAvatar ? (
+                        <img
+                          src={effectiveAvatar}
+                          alt={session?.user?.name || (isStaff ? "Staff" : "Manager")}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <span>{userInitial}</span>
+                      )}
+                    </div>
+                    <span className="truncate max-w-[85px]">
+                      {session?.user?.name?.split(" ")[0] || (isStaff ? "Staff" : "Profile")}
                     </span>
-                  )}
-                </Link>
+                    {isStaff && staffRoles.length > 0 && (
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                        {staffRoles[0]}
+                      </span>
+                    )}
+                  </Link>
+                </Tooltip>
 
                 {/* Mobile Profile Avatar — Scoped for Staff or Manager */}
                 <Link

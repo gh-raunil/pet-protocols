@@ -8,6 +8,7 @@ import useCartStore from "@/lib/cartStore";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
+import Tooltip, { HelpTooltip } from "../ui/Tooltip";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -110,13 +111,15 @@ export default function CartDrawer() {
             )}
           </div>
 
-          <button
-            onClick={closeCart}
-            aria-label="Close cart drawer"
-            className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-          >
-            <X size={20} />
-          </button>
+          <Tooltip content="Close cart drawer" placement="left">
+            <button
+              onClick={closeCart}
+              aria-label="Close cart drawer"
+              className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            >
+              <X size={20} />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Empty state */}
@@ -161,8 +164,19 @@ export default function CartDrawer() {
                   <span>Subtotal</span>
                   <span className="font-semibold text-[var(--text-main)]">₹{subtotal}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Delivery fee</span>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-1">
+                    <span>Delivery fee</span>
+                    <HelpTooltip
+                      content={
+                        isFreeDelivery
+                          ? `Free delivery active! Your order meets the ₹${freeThreshold} free delivery threshold.`
+                          : `Standard delivery charge. Add items worth ₹${Math.max(0, freeThreshold - subtotal)} more to qualify for free delivery.`
+                      }
+                      title="Delivery Fee Info"
+                      side="top"
+                    />
+                  </span>
                   <span className="font-semibold text-[var(--text-main)]">
                     {deliveryFee === 0 ? (
                       <span className="text-emerald-500 font-bold uppercase tracking-wider text-[11px]">FREE</span>
@@ -244,37 +258,46 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
 
       {/* Quantity controls */}
       <div className="flex items-center gap-1.5 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1 shrink-0">
-        <button
-          type="button"
-          onClick={() => decreaseQty(item._id)}
-          aria-label={`Decrease quantity of ${item.name}`}
-          className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-        >
-          <Minus size={12} />
-        </button>
+        <Tooltip content="Reduce quantity" placement="top">
+          <button
+            type="button"
+            onClick={() => decreaseQty(item._id)}
+            aria-label={`Decrease quantity of ${item.name}`}
+            className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+          >
+            <Minus size={12} />
+          </button>
+        </Tooltip>
         <span className="w-5 text-center text-xs font-bold text-[var(--text-main)]">
           {qty}
         </span>
-        <button
-          type="button"
-          onClick={() => increaseQty(item._id)}
-          disabled={qty >= 20}
-          aria-label={`Increase quantity of ${item.name}`}
-          className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+        <Tooltip
+          content={qty >= 20 ? "Maximum limit of 20 items per dish reached" : "Add one more"}
+          placement="top"
         >
-          <Plus size={12} />
-        </button>
+          <button
+            type="button"
+            onClick={() => increaseQty(item._id)}
+            disabled={qty >= 20}
+            aria-label={`Increase quantity of ${item.name}`}
+            className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+          >
+            <Plus size={12} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Remove */}
-      <button
-        type="button"
-        onClick={() => removeItem(item._id)}
-        aria-label={`Remove ${item.name} from cart`}
-        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
-      >
-        <Trash2 size={15} />
-      </button>
+      <Tooltip content="Remove dish from your cart" placement="left">
+        <button
+          type="button"
+          onClick={() => removeItem(item._id)}
+          aria-label={`Remove ${item.name} from cart`}
+          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
+        >
+          <Trash2 size={15} />
+        </button>
+      </Tooltip>
     </div>
   );
 }

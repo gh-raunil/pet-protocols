@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import Tooltip from "@/components/ui/Tooltip";
 import {
   UtensilsCrossed,
   Search,
@@ -120,14 +121,16 @@ export default function AvailabilityClient() {
             </p>
           </div>
 
-          <button
-            onClick={() => loadProducts(false)}
-            disabled={refreshing || loading}
-            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-bold text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/10 transition shadow-2xs cursor-pointer"
-          >
-            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-            <span>Sync Dishes</span>
-          </button>
+          <Tooltip content="Refresh menu dishes from the restaurant database" position="left">
+            <button
+              onClick={() => loadProducts(false)}
+              disabled={refreshing || loading}
+              className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-bold text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/10 transition shadow-2xs cursor-pointer"
+            >
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+              <span>Sync Dishes</span>
+            </button>
+          </Tooltip>
         </div>
 
         {/* Search & Filter Row */}
@@ -233,28 +236,39 @@ export default function AvailabilityClient() {
 
                   {/* Status & Action */}
                   <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold ${
-                        isAvailable
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                          : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30"
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-rose-500"}`} />
-                      <span>{isAvailable ? "Available" : "Sold Out"}</span>
-                    </span>
+                    <Tooltip content={isAvailable ? "This dish is active and available for customer ordering" : "This dish is temporarily unavailable for ordering"} position="top">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold cursor-help ${
+                          isAvailable
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-rose-500"}`} />
+                        <span>{isAvailable ? "Available" : "Sold Out"}</span>
+                      </span>
+                    </Tooltip>
 
-                    <button
-                      onClick={() => toggleAvailability(product)}
-                      disabled={isUpdating}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50 ${
+                    <Tooltip
+                      content={
                         isAvailable
-                          ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 border border-rose-500/20"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                      }`}
+                          ? "Temporarily 86 / pause this dish so customers cannot order it during this shift"
+                          : "Mark this dish as back in stock and allow customer ordering immediately"
+                      }
+                      position="left"
                     >
-                      {isAvailable ? "Mark Sold Out" : "Make Available"}
-                    </button>
+                      <button
+                        onClick={() => toggleAvailability(product)}
+                        disabled={isUpdating}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50 ${
+                          isAvailable
+                            ? "bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 border border-rose-500/20"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                        }`}
+                      >
+                        {isAvailable ? "Mark Sold Out" : "Make Available"}
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               );

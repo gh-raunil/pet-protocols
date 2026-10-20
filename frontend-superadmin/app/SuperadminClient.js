@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import CustomSpinner from "@/components/ui/CustomSpinner";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 import { useHideOnScroll } from "@/hooks/useHideOnScroll";
 import {
   ShieldCheck,
@@ -939,29 +940,35 @@ export default function SuperadminClient() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateRestaurantModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/30 inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                >
-                  <PlusCircle size={14} />
-                  <span>New Restaurant</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewAdmin((prev) => ({ ...prev, restaurantId: restaurants[0]?._id || "" }));
-                    setIsCreateAdminModalOpen(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                >
-                  <Users size={14} />
-                  <span>Add Admin</span>
-                </button>
-                <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Sync
-                </span>
+                <Tooltip content="Register a new restaurant partner or cloud kitchen branch on the platform" position="bottom">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateRestaurantModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/30 inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                  >
+                    <PlusCircle size={14} />
+                    <span>New Restaurant</span>
+                  </button>
+                </Tooltip>
+                <Tooltip content="Create dashboard login credentials for restaurant staff, managers, or kitchen operators" position="bottom">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewAdmin((prev) => ({ ...prev, restaurantId: restaurants[0]?._id || "" }));
+                      setIsCreateAdminModalOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs inline-flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                  >
+                    <Users size={14} />
+                    <span>Add Admin</span>
+                  </button>
+                </Tooltip>
+                <Tooltip content="Metrics and status sync automatically across all branches in real-time" position="bottom">
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Sync
+                  </span>
+                </Tooltip>
               </div>
             </div>
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" data-purpose="platform-metrics">
@@ -1059,8 +1066,9 @@ export default function SuperadminClient() {
           {/* Card 5: Revenue */}
           <div className="bg-white dark:bg-slate-900/60 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800/90 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Gross Order Value
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <span>Gross Order Value</span>
+                <HelpTooltip text="Total value of all customer orders processed across all partner restaurants." position="top" />
               </span>
               <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-lg">
                 ₹
@@ -1072,7 +1080,10 @@ export default function SuperadminClient() {
               </span>
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>Take-Rate ({stats?.platformFeePercent ?? 5}%):</span>
+              <span className="flex items-center gap-1">
+                <span>Take-Rate ({stats?.platformFeePercent ?? 5}%):</span>
+                <HelpTooltip text="Platform commission percentage deducted from each order before restaurant payouts." position="top" />
+              </span>
               <span className="font-semibold text-indigo-600 dark:text-indigo-400">₹{(stats?.platformRevenue ?? Math.round(totalRevenue * 0.05)).toLocaleString("en-IN")}</span>
             </p>
           </div>
@@ -1209,25 +1220,37 @@ export default function SuperadminClient() {
                       {/* Actions */}
                       <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-2.5">
-                          <Link
-                            href={`/restaurant/${rest._id}`}
-                            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 rounded-lg transition shadow-xs inline-flex items-center gap-1.5"
-                            title="Manage features, logo, admins & link for this restaurant"
-                          >
-                            <span>Manage Branch</span>
-                            <span className="text-indigo-200">→</span>
-                          </Link>
-                          <button
-                            onClick={() => handleToggleRestaurantStatus(rest)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition inline-flex items-center shadow-xs border ${
+                          <Tooltip content="Configure branding, operational modules, commission rate, and staff accounts" position="left">
+                            <Link
+                              href={`/restaurant/${rest._id}`}
+                              className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 rounded-lg transition shadow-xs inline-flex items-center gap-1.5"
+                              title="Manage features, logo, admins & link for this restaurant"
+                            >
+                              <span>Manage Branch</span>
+                              <span className="text-indigo-200">→</span>
+                            </Link>
+                          </Tooltip>
+
+                          <Tooltip
+                            content={
                               rest.status === "active"
-                                ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
-                                : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
-                            }`}
-                            type="button"
+                                ? "Suspend this restaurant. Suspended restaurants cannot receive orders and staff cannot log in."
+                                : "Reactivate this restaurant to restore customer ordering and staff portal access."
+                            }
+                            position="left"
                           >
-                            {rest.status === "active" ? "Suspend" : "Reactivate"}
-                          </button>
+                            <button
+                              onClick={() => handleToggleRestaurantStatus(rest)}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition inline-flex items-center shadow-xs border ${
+                                rest.status === "active"
+                                  ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
+                                  : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
+                              }`}
+                              type="button"
+                            >
+                              {rest.status === "active" ? "Suspend" : "Reactivate"}
+                            </button>
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
@@ -1531,37 +1554,48 @@ export default function SuperadminClient() {
                                       {/* Actions */}
                                       <td className="py-3 px-5 text-right whitespace-nowrap">
                                         <div className="inline-flex items-center justify-end gap-1.5">
-                                          <button
-                                            onClick={() => {
-                                              setResetPasswordAdmin(adm);
-                                              setNewPasswordInput("");
-                                            }}
-                                            className="px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
-                                            type="button"
-                                            title="Reset Password"
-                                          >
-                                            <KeyRound className="w-3 h-3" />
-                                            <span>Reset</span>
-                                          </button>
-                                          <button
-                                            onClick={() => handleToggleAdminStatus(adm)}
-                                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border ${
+                                          <Tooltip content="Set a temporary password for this administrator so they can log back into their dashboard." position="left">
+                                            <button
+                                              onClick={() => {
+                                                setResetPasswordAdmin(adm);
+                                                setNewPasswordInput("");
+                                              }}
+                                              className="px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
+                                              type="button"
+                                            >
+                                              <KeyRound className="w-3 h-3" />
+                                              <span>Reset</span>
+                                            </button>
+                                          </Tooltip>
+                                          <Tooltip
+                                            content={
                                               adm.status === "active"
-                                                ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
-                                                : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
-                                            }`}
-                                            type="button"
+                                                ? "Revoke dashboard login access immediately without deleting their account."
+                                                : "Restore dashboard login access for this administrator."
+                                            }
+                                            position="left"
                                           >
-                                            {adm.status === "active" ? "Suspend" : "Reactivate"}
-                                          </button>
-                                          <button
-                                            onClick={() => handleRemoveAdmin(adm)}
-                                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
-                                            title="Delete Admin"
-                                            type="button"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
+                                            <button
+                                              onClick={() => handleToggleAdminStatus(adm)}
+                                              className={`px-2.5 py-1 text-xs font-medium rounded-md transition shadow-xs border ${
+                                                adm.status === "active"
+                                                  ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
+                                                  : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
+                                              }`}
+                                              type="button"
+                                            >
+                                              {adm.status === "active" ? "Suspend" : "Reactivate"}
+                                            </button>
+                                          </Tooltip>
+                                          <Tooltip content="Permanently delete this staff account and revoke all dashboard access. This cannot be undone." position="left">
+                                            <button
+                                              onClick={() => handleRemoveAdmin(adm)}
+                                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
+                                              type="button"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </Tooltip>
                                         </div>
                                       </td>
                                     </tr>
@@ -1678,37 +1712,48 @@ export default function SuperadminClient() {
                         {/* Actions */}
                         <td className="py-4 px-6 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                setResetPasswordAdmin(adm);
-                                setNewPasswordInput("");
-                              }}
-                              className="px-2.5 py-1.5 text-xs font-medium rounded-md transition shadow-sm border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
-                              type="button"
-                              title="Reset Password"
-                            >
-                              <KeyRound className="w-3.5 h-3.5" />
-                              <span>Reset</span>
-                            </button>
-                            <button
-                              onClick={() => handleToggleAdminStatus(adm)}
-                              className={`px-3 py-1.5 text-xs font-medium rounded-md transition shadow-sm border ${
+                            <Tooltip content="Set a temporary password for this administrator so they can log back into their dashboard." position="left">
+                              <button
+                                onClick={() => {
+                                  setResetPasswordAdmin(adm);
+                                  setNewPasswordInput("");
+                                }}
+                                className="px-2.5 py-1.5 text-xs font-medium rounded-md transition shadow-sm border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-600 hover:text-white dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-500/20 dark:hover:bg-amber-900/40 inline-flex items-center gap-1"
+                                type="button"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                                <span>Reset</span>
+                              </button>
+                            </Tooltip>
+                            <Tooltip
+                              content={
                                 adm.status === "active"
-                                  ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
-                                  : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
-                              }`}
-                              type="button"
+                                  ? "Revoke dashboard login access immediately without deleting their account."
+                                  : "Restore dashboard login access for this administrator."
+                              }
+                              position="left"
                             >
-                              {adm.status === "active" ? "Suspend" : "Reactivate"}
-                            </button>
-                            <button
-                              onClick={() => handleRemoveAdmin(adm)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
-                              title="Delete Admin"
-                              type="button"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              <button
+                                onClick={() => handleToggleAdminStatus(adm)}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition shadow-sm border ${
+                                  adm.status === "active"
+                                    ? "text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 dark:text-rose-300 dark:bg-rose-950/30 dark:border-rose-500/20 dark:hover:bg-rose-900/40"
+                                    : "text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-500/20 dark:hover:bg-emerald-900/40"
+                                }`}
+                                type="button"
+                              >
+                                {adm.status === "active" ? "Suspend" : "Reactivate"}
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Permanently delete this staff account and revoke all dashboard access. This cannot be undone." position="left">
+                              <button
+                                onClick={() => handleRemoveAdmin(adm)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-md transition inline-flex items-center justify-center border border-transparent hover:border-rose-200 dark:hover:border-rose-900/30"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </Tooltip>
                           </div>
                         </td>
                       </tr>
@@ -1869,19 +1914,20 @@ export default function SuperadminClient() {
                     onChange={(e) => setNewPasswordInput(e.target.value)}
                     className="w-full text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500 transition"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$";
-                      let pass = "";
-                      for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-                      setNewPasswordInput(pass);
-                    }}
-                    className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition"
-                    title="Generate Secure Password"
-                  >
-                    Generate
-                  </button>
+                  <Tooltip content="Auto-generate a strong 10-character random password" position="top">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$";
+                        let pass = "";
+                        for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+                        setNewPasswordInput(pass);
+                      }}
+                      className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition"
+                    >
+                      Generate
+                    </button>
+                  </Tooltip>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1.5">Minimum 6 characters. Passwords are securely hashed with bcrypt.</p>
               </div>
@@ -1941,23 +1987,27 @@ export default function SuperadminClient() {
                 {restaurantFeaturesInput.length} of {ALL_AVAILABLE_FEATURES.length} Modules Enabled
               </span>
               <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRestaurantFeaturesInput(ALL_AVAILABLE_FEATURES.map((f) => f.id))
-                  }
-                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  Enable All
-                </button>
+                <Tooltip content="Turn on all 8 operational modules (Kitchen, Delivery, Cashier, Inventory, etc.) for this branch" position="bottom">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRestaurantFeaturesInput(ALL_AVAILABLE_FEATURES.map((f) => f.id))
+                    }
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    Enable All
+                  </button>
+                </Tooltip>
                 <span className="text-slate-300 dark:text-slate-700">|</span>
-                <button
-                  type="button"
-                  onClick={() => setRestaurantFeaturesInput([])}
-                  className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
-                >
-                  Disable All
-                </button>
+                <Tooltip content="Turn off all operational modules for this branch, restricting dashboard tabs" position="bottom">
+                  <button
+                    type="button"
+                    onClick={() => setRestaurantFeaturesInput([])}
+                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                  >
+                    Disable All
+                  </button>
+                </Tooltip>
               </div>
             </div>
 

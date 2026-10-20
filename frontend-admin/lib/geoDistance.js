@@ -128,3 +128,102 @@ export function getOrderDistanceInfo(order, restaurant = null) {
     driverCoords: hasDriverCoords ? { lat: Number(driverLat), lng: Number(driverLng) } : null,
   };
 }
+
+/**
+ * Constructs a Mappls direction URL with staff current location and customer destination
+ * Format: https://www.mappls.com/direction?places={startLat},{startLng},{startLabel};{destLat},{destLng},{destLabel}
+/**
+ * Safely base64 encodes an ASCII string across browser and Node.js environments
+ */
+function safeBase64(str) {
+  if (typeof window !== "undefined" && typeof window.btoa === "function") {
+    return window.btoa(str);
+  }
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str, "utf-8").toString("base64");
+  }
+  return "";
+}
+
+/**
+ * Constructs a native Mappls Web directions URL that automatically populates
+ * the origin (staff live GPS or "Current Location") and customer destination,
+ * and directly triggers Mappls' route calculation engine.
+ * 
+ * Mappls Web routing schema:
+ * https://www.mappls.com/direction-from-{origin}?-to-{destination}?@zdata={base64Payload}
+ * 
+ * Where payload is:
+ * from+{originLng},{originLat}+to+{destLng},{destLat}+v+++{mode}+India@ind@21.127807@82.801626++0
+ * 
+ * @param {Object} params
+ * @param {number|string} [params.startLat] - Staff / origin latitude
+ * @param {number|string} [params.startLng] - Staff / origin longitude
+ * @param {string} [params.startLabel] - Friendly label for start location
+ * @param {number|string} params.destLat - Customer delivery destination latitude
+ * @param {number|string} params.destLng - Customer delivery destination longitude
+ * @param {string} [params.destLabel] - Customer name / destination label
+ * @param {string} [params.mode] - Transport mode: "driving" or "biking"
+ * @returns {string|null} Full Mappls directions URL
+ */
+export function buildMapplsDirectionUrl({
+  startLat,
+  startLng,
+  startLabel = "Current-Location",
+  destLat,
+  destLng,
+  destLabel = "Customer-Destination",
+  mode = "driving",
+}) {
+  if (!isValidCoordinate(destLat, destLng)) return null;
+
+  const hasStart = isValidCoordinate(startLat, startLng);
+
+  // Mappls requires clean URL path segments for labels without special query delimiters
+  const cleanDest = String(destLabel || "Customer-Destination")
+    .replace(/[^a-zA-Z0-9\s_-]/g, " ")
+    .trim()
+    .replace(/\s+/g, "-") || "Customer-Destination";
+
+  let cleanStart;
+  let startCoord = "";
+  if (hasStart) {
+    cleanStart = String(startLabel || "Current-Location")
+      .replace(/[^a-zA-Z0-9\s_-]/g, " ")
+      .trim()
+      .replace(/\s+/g, "-") || "Current-Location";
+    // Mappls zdata expects lng,lat
+    startCoord = `${Number(startLng).toFixed(6)},${Number(startLat).toFixed(6)}`;
+  } else {
+    // When start coordinate is not yet known, use Mappls' auto-GPS trigger keyword
+    cleanStart = "current-location";
+    startCoord = "";
+  }
+
+  // Mappls zdata expects destLng,destLat
+  const destCoord = `${Number(destLng).toFixed(6)},${Number(destLat).toFixed(6)}`;
+  const validMode = mode === "biking" ? "biking" : "driving";
+  const country = "India@ind@21.127807@82.801626";
+
+  const payload = `from+${startCoord}+to+${destCoord}+v+++${validMode}+${country}++0`;
+  const zdata = safeBase64(payload);
+
+  return `https://www.mappls.com/direction-from-${cleanStart}?-to-${cleanDest}?@zdata=${zdata}`;
+}
+
+/**
+ * Constructs a standard Google Maps Directions URL as an alternate navigation provider
+ */
+export function buildGoogleMapsDirectionUrl({
+  startLat,
+  startLng,
+  destLat,
+  destLng,
+}) {
+  if (!isValidCoordinate(destLat, destLng)) return null;
+  const originQuery = isValidCoordinate(startLat, startLng)
+    ? `&origin=${Number(startLat).toFixed(6)},${Number(startLng).toFixed(6)}`
+    : "";
+  return `https://www.google.com/maps/dir/?api=1${originQuery}&destination=${Number(destLat).toFixed(6)},${Number(destLng).toFixed(6)}&travelmode=driving`;
+}
+

@@ -11,6 +11,7 @@ import {
   LogOut,
   Building,
 } from "lucide-react";
+import Tooltip from "@/components/ui/Tooltip";
 
 export default function RestaurantAdminNav() {
   const pathname = usePathname();
@@ -32,9 +33,11 @@ export default function RestaurantAdminNav() {
             <span className="text-xl font-black tracking-tight text-white">
               PET <span className="text-orange-500">PROTOCOLS</span>
             </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-              RESTAURANT ADMIN
-            </span>
+            <Tooltip content="Restaurant Administrator Portal for kitchen staff and managers" position="bottom">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 cursor-help">
+                RESTAURANT ADMIN
+              </span>
+            </Tooltip>
           </Link>
 
           {session?.user?.restaurantName && (
@@ -71,13 +74,15 @@ export default function RestaurantAdminNav() {
             <p className="text-xs font-bold text-white">{session?.user?.name}</p>
             <p className="text-[11px] text-gray-400">{session?.user?.email}</p>
           </div>
-          <button
-            onClick={() => signOut({ callbackUrl: "/restaurant/login" })}
-            className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
-          >
-            <LogOut size={14} />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
+          <Tooltip content="Sign out of the restaurant administration portal" position="left">
+            <button
+              onClick={() => signOut({ callbackUrl: "/restaurant/login" })}
+              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </Tooltip>
         </div>
       </div>
     </header>

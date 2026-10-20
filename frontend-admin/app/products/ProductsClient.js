@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import NextImage from "next/image";
 import toast from "react-hot-toast";
+import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 import {
   UtensilsCrossed,
   PlusCircle,
@@ -676,57 +677,67 @@ export default function ProductsClient() {
           <div className="flex flex-wrap items-center gap-2.5">
             {/* View Switcher: Dishes vs Categories */}
             <div className="flex items-center gap-1 p-1 bg-stone-100 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-2xl shadow-xs">
-              <button
-                type="button"
-                onClick={() => setViewTab("dishes")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
-                  viewTab === "dishes"
-                    ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs"
-                    : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
-                }`}
-              >
-                <UtensilsCrossed size={14} />
-                <span>Dishes ({products.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewTab("categories")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
-                  viewTab === "categories"
-                    ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs"
-                    : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
-                }`}
-              >
-                <FolderTree size={14} />
-                <span>Categories ({launchedCategories.length})</span>
-              </button>
+              <Tooltip content="Show all dishes in a searchable card grid" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setViewTab("dishes")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                    viewTab === "dishes"
+                      ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  }`}
+                >
+                  <UtensilsCrossed size={14} />
+                  <span>Dishes ({products.length})</span>
+                </button>
+              </Tooltip>
+              <Tooltip content="Organize dishes grouped under menu categories" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => setViewTab("categories")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                    viewTab === "categories"
+                      ? "bg-white dark:bg-stone-800 text-orange-600 dark:text-orange-400 shadow-xs"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  }`}
+                >
+                  <FolderTree size={14} />
+                  <span>Categories ({launchedCategories.length})</span>
+                </button>
+              </Tooltip>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
-                setIsCategoryModalOpen(true);
-              }}
-              className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
-            >
-              <Sparkles size={16} className="text-stone-950" />
-              <span>Launch Category</span>
-            </button>
+            <Tooltip content="Create a new food category to organize dishes on your customer menu" position="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
+                  setIsCategoryModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
+              >
+                <Sparkles size={16} className="text-stone-950" />
+                <span>Launch Category</span>
+              </button>
+            </Tooltip>
 
-            <Link
-              href="/products/availability"
-              className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 transition text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl text-sm font-semibold border border-stone-200 dark:border-white/10 active:scale-95"
-            >
-              <CheckCircle2 size={16} className="text-emerald-500" /> Menu Availability
-            </Link>
+            <Tooltip content="Quickly pause or unpause items in bulk during rush hours without editing them" position="bottom">
+              <Link
+                href="/products/availability"
+                className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 transition text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl text-sm font-semibold border border-stone-200 dark:border-white/10 active:scale-95"
+              >
+                <CheckCircle2 size={16} className="text-emerald-500" /> Menu Availability
+              </Link>
+            </Tooltip>
 
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
-            >
-              <PlusCircle size={18} /> Add Dish
-            </button>
+            <Tooltip content="Add a new dish with photos, pricing, prep time, and dietary tags" position="bottom">
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
+              >
+                <PlusCircle size={18} /> Add Dish
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -800,17 +811,19 @@ export default function ProductsClient() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
-                  setIsCategoryModalOpen(true);
-                }}
-                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer shrink-0"
-              >
-                <Sparkles size={14} />
-                <span>+ Launch Category</span>
-              </button>
+              <Tooltip content="Create a new food category to organize dishes on your customer menu" position="bottom">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
+                    setIsCategoryModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  <Sparkles size={14} />
+                  <span>+ Launch Category</span>
+                </button>
+              </Tooltip>
             </div>
 
             {/* Detailed Category Cards Grid */}
@@ -877,28 +890,32 @@ export default function ProductsClient() {
                               {cat.description || "Fresh dishes prepared in this kitchen"}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditCategory(cat)}
-                            className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 text-stone-700 dark:text-stone-200 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
-                            title="Edit category image and details"
-                          >
-                            <Edit2 size={13} />
-                            <span>Edit</span>
-                          </button>
+                          <Tooltip content="Edit category title, cover image, and description" position="left">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCategory(cat)}
+                              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 text-stone-700 dark:text-stone-200 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+                              title="Edit category image and details"
+                            >
+                              <Edit2 size={13} />
+                              <span>Edit</span>
+                            </button>
+                          </Tooltip>
                         </div>
 
                         {/* Dishes Breakdown in this category */}
                         <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-white/5">
                           <div className="flex items-center justify-between text-xs font-bold text-stone-700 dark:text-stone-300">
                             <span>Dishes in this Category ({catDishes.length})</span>
-                            <button
-                              type="button"
-                              onClick={() => handleAddDishToCategory(cat.name)}
-                              className="text-orange-500 hover:text-orange-600 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
-                            >
-                              <PlusCircle size={13} /> Add Dish to Category
-                            </button>
+                            <Tooltip content={`Add a new dish pre-assigned to "${cat.name}"`} position="top">
+                              <button
+                                type="button"
+                                onClick={() => handleAddDishToCategory(cat.name)}
+                                className="text-orange-500 hover:text-orange-600 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                              >
+                                <PlusCircle size={13} /> Add Dish to Category
+                              </button>
+                            </Tooltip>
                           </div>
 
                           {catDishes.length > 0 ? (
@@ -933,25 +950,29 @@ export default function ProductsClient() {
                                   </div>
 
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleAvailability(dish)}
-                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition ${
-                                        dish.isAvailable
-                                          ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                          : "bg-stone-500/10 text-stone-400 border border-stone-500/20"
-                                      }`}
-                                    >
-                                      {dish.isAvailable ? "In Stock" : "Paused"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(dish)}
-                                      className="p-1 rounded-lg hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 cursor-pointer"
-                                      title="Edit dish"
-                                    >
-                                      <Edit2 size={12} />
-                                    </button>
+                                    <Tooltip content={dish.isAvailable ? "Pause ordering (marks out of stock without deleting)" : "Resume ordering (marks in stock)"} position="top">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleAvailability(dish)}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition ${
+                                          dish.isAvailable
+                                            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                            : "bg-stone-500/10 text-stone-400 border border-stone-500/20"
+                                        }`}
+                                      >
+                                        {dish.isAvailable ? "In Stock" : "Paused"}
+                                      </button>
+                                    </Tooltip>
+                                    <Tooltip content="Edit dish pricing and details" position="left">
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditModal(dish)}
+                                        className="p-1 rounded-lg hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 cursor-pointer"
+                                        title="Edit dish"
+                                      >
+                                        <Edit2 size={12} />
+                                      </button>
+                                    </Tooltip>
                                   </div>
                                 </div>
                               ))}
@@ -1047,35 +1068,41 @@ export default function ProductsClient() {
                         className="object-cover group-hover:scale-105 transition duration-300"
                       />
                       <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
-                        <span
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md ${
-                            product.type === "veg"
-                              ? "bg-emerald-600/90 text-white border-emerald-400/50"
-                              : "bg-red-600/90 text-white border-red-400/50"
-                          }`}
-                        >
-                          {product.type}
-                        </span>
+                        <Tooltip content={product.type === "veg" ? "Pure Vegetarian (Green Dot FSSAI compliant)" : "Non-Vegetarian (Red Dot FSSAI compliant)"} position="bottom">
+                          <span
+                            className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border backdrop-blur-md cursor-help ${
+                              product.type === "veg"
+                                ? "bg-emerald-600/90 text-white border-emerald-400/50"
+                                : "bg-red-600/90 text-white border-red-400/50"
+                            }`}
+                          >
+                            {product.type}
+                          </span>
+                        </Tooltip>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10">
                           {product.category}
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/70 text-amber-300 backdrop-blur-md border border-white/10 flex items-center gap-1">
-                          <Clock size={10} /> {product.preparationTime || 15}m prep
-                        </span>
+                        <Tooltip content="Estimated kitchen preparation & cooking time" position="bottom">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/70 text-amber-300 backdrop-blur-md border border-white/10 flex items-center gap-1 cursor-help">
+                            <Clock size={10} /> {product.preparationTime || 15}m prep
+                          </span>
+                        </Tooltip>
                       </div>
 
                       <div className="absolute top-3 right-3">
-                        <button
-                          onClick={() => handleToggleAvailability(product)}
-                          className={`text-xs font-bold px-3 py-1 rounded-full shadow-xs transition flex items-center gap-1 active:scale-95 cursor-pointer ${
-                            product.isAvailable
-                              ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                              : "bg-stone-800 text-stone-200 hover:bg-stone-700"
-                          }`}
-                          title="Click to toggle availability"
-                        >
-                          {product.isAvailable ? "In Stock" : "Out of Stock"}
-                        </button>
+                        <Tooltip content={product.isAvailable ? "Click to mark Out of Stock (86 dish). Preserves recipe, price, and photos." : "Click to mark In Stock and enable customer ordering."} position="left">
+                          <button
+                            onClick={() => handleToggleAvailability(product)}
+                            className={`text-xs font-bold px-3 py-1 rounded-full shadow-xs transition flex items-center gap-1 active:scale-95 cursor-pointer ${
+                              product.isAvailable
+                                ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                                : "bg-stone-800 text-stone-200 hover:bg-stone-700"
+                            }`}
+                            title="Click to toggle availability"
+                          >
+                            {product.isAvailable ? "In Stock" : "Out of Stock"}
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
 
@@ -1096,34 +1123,40 @@ export default function ProductsClient() {
                       </div>
 
                       <div className="pt-4 mt-4 border-t border-stone-100 dark:border-white/5 flex items-center justify-between text-xs">
-                        <span
-                          className={`inline-flex items-center gap-1 font-bold ${
-                            product.isAvailable ? "text-emerald-600" : "text-stone-400"
-                          }`}
-                        >
+                        <Tooltip content={product.isAvailable ? "This dish is visible on customer menus and can be ordered right now" : "This dish is temporarily hidden from ordering"} position="top">
                           <span
-                            className={`w-2 h-2 rounded-full ${
-                              product.isAvailable ? "bg-emerald-500 animate-pulse" : "bg-stone-400"
+                            className={`inline-flex items-center gap-1 font-bold cursor-help ${
+                              product.isAvailable ? "text-emerald-600" : "text-stone-400"
                             }`}
-                          />
-                          {product.isAvailable ? "Accepting Orders" : "Temporarily Paused"}
-                        </span>
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                product.isAvailable ? "bg-emerald-500 animate-pulse" : "bg-stone-400"
+                              }`}
+                            />
+                            {product.isAvailable ? "Accepting Orders" : "Temporarily Paused"}
+                          </span>
+                        </Tooltip>
 
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditModal(product)}
-                            className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 transition active:scale-95 cursor-pointer"
-                            title="Edit dish details"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProduct(product)}
-                            className="p-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 transition active:scale-95 cursor-pointer"
-                            title="Delete dish"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <Tooltip content="Edit dish pricing, description, photo, prep time, and dietary options" position="top">
+                            <button
+                              onClick={() => openEditModal(product)}
+                              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-200 transition active:scale-95 cursor-pointer"
+                              title="Edit dish details"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Permanently delete this dish from your restaurant menu. This cannot be undone." position="top">
+                            <button
+                              onClick={() => handleDeleteProduct(product)}
+                              className="p-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 transition active:scale-95 cursor-pointer"
+                              title="Delete dish"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </Tooltip>
                         </div>
                       </div>
                     </div>
@@ -1177,9 +1210,12 @@ export default function ProductsClient() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      Price (₹) <span className="text-orange-500">*</span>
-                    </label>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                        Price (₹) <span className="text-orange-500">*</span>
+                      </label>
+                      <HelpTooltip text="Dish menu price charged to customers. Keep this updated for food cost control." />
+                    </div>
                     <input
                       type="number"
                       required
@@ -1193,9 +1229,12 @@ export default function ProductsClient() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      Prep Time (mins)
-                    </label>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                        Prep Time (mins)
+                      </label>
+                      <HelpTooltip text="Average kitchen cooking & packaging time. Helps compute customer delivery ETA." />
+                    </div>
                     <input
                       type="number"
                       min="1"
@@ -1211,9 +1250,12 @@ export default function ProductsClient() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      Dietary Type
-                    </label>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                        Dietary Type
+                      </label>
+                      <HelpTooltip text="FSSAI standard: Pure Veg displays green dot emblem; Non-Veg displays red dot emblem." />
+                    </div>
                     <select
                       value={modalForm.type}
                       onChange={(e) => setModalForm((prev) => ({ ...prev, type: e.target.value }))}
@@ -1225,9 +1267,12 @@ export default function ProductsClient() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      Category <span className="text-orange-500">*</span>
-                    </label>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+                        Category <span className="text-orange-500">*</span>
+                      </label>
+                      <HelpTooltip text="Menu section where this dish will be organized on the customer-facing app." />
+                    </div>
                     <select
                       value={modalForm.category}
                       onChange={(e) =>
