@@ -110,10 +110,14 @@ export function getOrderDistanceInfo(order, restaurant = null) {
   // Max delivery radius from restaurant delivery settings or default 10km
   const maxRangeKm = Number(restObj?.deliverySettings?.deliveryRadiusKm) || DEFAULT_DELIVERY_RADIUS_KM;
 
-  const isPickup =
-    String(order.paymentMethod || "").toLowerCase().includes("pickup") ||
-    String(order.notes || "").toLowerCase().includes("[pickup]") ||
-    String(order.address?.addressType || "").toLowerCase().includes("pickup");
+  const isPickup = typeof order.isPickupOrder === "function"
+    ? order.isPickupOrder()
+    : (
+        String(order.orderType || "").toLowerCase().trim() === "pickup" ||
+        String(order.paymentMethod || "").toLowerCase().includes("pickup") ||
+        String(order.notes || "").toLowerCase().includes("[pickup]") ||
+        String(order.address?.addressType || "").toLowerCase().includes("pickup")
+      );
 
   const isOutOfRange = !isPickup && distanceKm !== null && distanceKm > maxRangeKm;
 

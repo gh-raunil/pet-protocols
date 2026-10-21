@@ -48,11 +48,24 @@ const WasteSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    order: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+      index: true,
+    },
+    opKey: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
   },
   { timestamps: true }
 );
 
 WasteSchema.index({ restaurant: 1, date: -1 });
+WasteSchema.index({ order: 1, ingredient: 1 });
 
 delete mongoose.models.Waste;
 

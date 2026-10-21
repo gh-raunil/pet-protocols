@@ -152,6 +152,66 @@ export default function OrderingSection({ form, onChange, onSave, saving }) {
               <div className="w-11 h-6 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
             </label>
           </div>
+
+          {/* Auto-Dismiss Stale / Uncollected Ready Orders */}
+          <div className="pt-3 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+                Auto-Dismiss Uncollected Orders
+              </div>
+              <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">
+                Prevent infinite waiting by automatically dismissing ready orders left uncollected after a timeout
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={orderingSettings.autoDismissUncollectedOrders ?? true}
+                onChange={(e) => updateOrdering("autoDismissUncollectedOrders", e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+            </label>
+          </div>
+
+          {/* Uncollected Order Timeout (Minutes) */}
+          {(orderingSettings.autoDismissUncollectedOrders ?? true) && (
+            <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+                  Ready / Uncollected Timeout (Minutes)
+                </div>
+                <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">
+                  Orders sitting in Ready status longer than this duration are dismissed / marked undelivered
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {[45, 50, 60, 90].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => updateOrdering("uncollectedTimeoutMinutes", mins)}
+                    className={`px-2 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                      (orderingSettings.uncollectedTimeoutMinutes ?? 60) === mins
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min="10"
+                  max="240"
+                  value={orderingSettings.uncollectedTimeoutMinutes ?? 60}
+                  onChange={(e) => updateOrdering("uncollectedTimeoutMinutes", parseInt(e.target.value, 10) || 60)}
+                  className="w-20 px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs sm:text-sm font-semibold outline-none focus:border-orange-500 text-center"
+                />
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">mins</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>

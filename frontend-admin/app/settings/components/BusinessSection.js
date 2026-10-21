@@ -10,9 +10,8 @@ import {
   Copy,
   Zap,
   Check,
-  Calendar,
-  Sparkles,
-  ArrowRight,
+  ArrowDown,
+  ChevronDown,
 } from "lucide-react";
 
 const DAYS_OF_WEEK = [
@@ -26,14 +25,14 @@ const DAYS_OF_WEEK = [
 ];
 
 const QUICK_PRESETS = [
-  { label: "Standard Dining", open: "09:00", close: "23:00", desc: "09:00 AM – 11:00 PM" },
-  { label: "Breakfast to Dinner", open: "08:00", close: "22:00", desc: "08:00 AM – 10:00 PM" },
-  { label: "Casual Hours", open: "10:00", close: "22:00", desc: "10:00 AM – 10:00 PM" },
-  { label: "Late Night", open: "11:00", close: "02:00", desc: "11:00 AM – 02:00 AM" },
-  { label: "24 Hours Open", open: "00:00", close: "23:59", desc: "Open 24 Hours" },
+  { label: "Standard dining", open: "09:00", close: "23:00", desc: "09:00 AM – 11:00 PM" },
+  { label: "Breakfast to dinner", open: "08:00", close: "22:00", desc: "08:00 AM – 10:00 PM" },
+  { label: "Casual hours", open: "10:00", close: "22:00", desc: "10:00 AM – 10:00 PM" },
+  { label: "Late night", open: "11:00", close: "02:00", desc: "11:00 AM – 02:00 AM" },
+  { label: "24 hours", open: "00:00", close: "23:59", desc: "Open 24 Hours" },
 ];
 
-// Helper to convert "21:00" to "09:00 PM"
+// Helper to convert "21:00" to "09:00 PM", "00:00" to "12:00 AM", etc.
 function formatTime12(timeStr) {
   if (!timeStr) return "";
   const parts = String(timeStr).split(":");
@@ -55,47 +54,56 @@ function generateTimeOptions(is12Hour) {
       const hStr = String(h).padStart(2, "0");
       const mStr = String(m).padStart(2, "0");
       const val = `${hStr}:${mStr}`;
-      let label = val;
-      if (is12Hour) {
-        label = formatTime12(val);
-      }
+      const label = is12Hour ? formatTime12(val) : val;
       options.push({ value: val, label });
     }
   }
   options.push({
     value: "23:59",
-    label: is12Hour ? "11:59 PM (Midnight)" : "23:59",
+    label: is12Hour ? "11:59 PM" : "23:59",
   });
   return options;
 }
 
-// Sleek, unified single-select time component
-function TimeSelect({ value, onChange, is12Hour, className = "" }) {
+// Sleek, compact time selector matching modern SaaS admin proportions
+function TimeSelect({ value, onChange, is12Hour, disabled = false, className = "", id }) {
   const options = useMemo(() => generateTimeOptions(is12Hour), [is12Hour]);
 
   const hasValue = options.some((o) => o.value === value);
   const displayOptions = useMemo(() => {
     if (!value || hasValue) return options;
     const customLabel = is12Hour ? formatTime12(value) : value;
-    return [{ value, label: `${customLabel}` }, ...options];
+    return [{ value, label: customLabel }, ...options];
   }, [options, value, hasValue, is12Hour]);
 
   return (
-    <select
-      value={value || "08:00"}
-      onChange={(e) => onChange(e.target.value)}
-      className={`bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl px-2 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 hover:border-orange-500 focus:border-orange-500 outline-none cursor-pointer transition-colors shadow-2xs w-auto min-w-[95px] max-w-[135px] ${className}`}
-    >
-      {displayOptions.map((opt) => (
-        <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <div className="relative w-full">
+      <select
+        id={id}
+        value={value || "08:00"}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        aria-label={id || "Select time"}
+        className={`w-full appearance-none bg-zinc-900/90 dark:bg-[#0c0e14] border border-zinc-700/70 dark:border-zinc-800 hover:border-zinc-500 dark:hover:border-zinc-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 rounded-lg px-3 py-1.5 sm:py-2 pr-8 text-xs font-medium text-zinc-100 outline-none transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs h-8.5 sm:h-9 ${className}`}
+      >
+        {displayOptions.map((opt) => (
+          <option
+            key={opt.value}
+            value={opt.value}
+            className="bg-zinc-900 text-white py-1"
+          >
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-zinc-400">
+        <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+      </div>
+    </div>
   );
 }
 
-export default function BusinessSection({ form, onChange, onSave, saving }) {
+export default function BusinessSection({ form, onChange, onSave, saving, hasUnsavedChanges }) {
   const [liveTime, setLiveTime] = useState("");
   const [notification, setNotification] = useState("");
 
@@ -197,7 +205,7 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
     saveWeeklyWithSyncedOpening(updated);
   }
 
-  // FAST MASTER BUILDER ACTIONS
+  // Master Builder bulk actions
   function applyBuilderSchedule(target = "all") {
     const updated = { ...weeklyHours };
     const targetDays =
@@ -218,7 +226,12 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
     const timeLabel = is12Hour
       ? `${formatTime12(builderOpen)} – ${formatTime12(builderClose)}`
       : `${builderOpen} – ${builderClose}`;
-    const targetLabel = target === "weekdays" ? "Weekdays (Mon–Fri)" : target === "weekends" ? "Weekends (Sat–Sun)" : "All 7 Days";
+    const targetLabel =
+      target === "weekdays"
+        ? "Weekdays (Mon–Fri)"
+        : target === "weekends"
+        ? "Weekends (Sat–Sun)"
+        : "All 7 Days";
     notify(`Applied ${timeLabel} to ${targetLabel}!`);
   }
 
@@ -233,7 +246,9 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
     });
     saveWeeklyWithSyncedOpening(updated);
     const dayName = DAYS_OF_WEEK.find((d) => d.key === sourceDayKey)?.label || sourceDayKey;
-    const timeLabel = source.isOpen ? `${formatTime12(source.slots[0]?.open)} – ${formatTime12(source.slots[0]?.close)}` : "Closed";
+    const timeLabel = source.isOpen
+      ? `${formatTime12(source.slots[0]?.open)} – ${formatTime12(source.slots[0]?.close)}`
+      : "Closed";
     notify(`Copied ${dayName} (${timeLabel}) to all 7 days!`);
   }
 
@@ -264,50 +279,42 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
   const activeSyncedHours = deriveOpeningHours(weeklyHours);
 
   return (
-    <div className="space-y-6 pb-24 sm:pb-8">
-      {/* Page Title */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">Operating Hours</h1>
-        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Set your live restaurant availability and weekly operating schedule.
-        </p>
-      </div>
-
-      {/* QUICK STATUS CARD */}
-      <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 transition-colors">
-        <div className="flex items-center gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
-          <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400 shrink-0">
-            <Store className="w-5 h-5" />
+    <div className="max-w-3xl space-y-4 pb-16 sm:pb-6">
+      {/* ── STORE STATUS RIGHT NOW (EMERGENCY / LIVE OVERRIDE) ──────────────── */}
+      <section className="bg-zinc-900/60 dark:bg-[#12141c] border border-zinc-800 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3 transition-colors">
+        <div className="flex items-center gap-2.5 pb-2.5 border-b border-zinc-800/80">
+          <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
+            <Store className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h2 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-white">Store Status Right Now</h2>
-            <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">Master switch to accept or pause incoming orders</p>
+            <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">Store Status Right Now</h2>
+            <p className="text-[11px] text-zinc-400">Master switch to accept or pause incoming orders</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Open / Closed Toggle */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Open / Closed Master Switch */}
           <button
             type="button"
             onClick={() => onChange("isOpen", !form.isOpen)}
-            className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+            className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
               form.isOpen && !form.isTemporarilyClosed
-                ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200"
-                : "bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-400"
+                ? "bg-emerald-950/20 border-emerald-500/40 text-emerald-200"
+                : "bg-zinc-950/40 border-zinc-800 text-zinc-400"
             }`}
           >
             <div>
               <div className="flex items-center gap-2">
                 <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    form.isOpen && !form.isTemporarilyClosed ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"
+                  className={`w-2 h-2 rounded-full ${
+                    form.isOpen && !form.isTemporarilyClosed ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"
                   }`}
                 />
-                <span className="text-sm font-bold">
+                <span className="text-xs font-bold text-white">
                   Restaurant is: {form.isOpen && !form.isTemporarilyClosed ? "Open" : "Closed"}
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              <p className="text-[11px] text-zinc-400 mt-0.5">
                 {form.isOpen && !form.isTemporarilyClosed
                   ? "Dishes are active and customers can order"
                   : "Ordering paused across customer app"}
@@ -315,22 +322,22 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
             </div>
           </button>
 
-          {/* Temporarily Closed Toggle */}
+          {/* Temporarily Closed Switch */}
           <button
             type="button"
             onClick={() => onChange("isTemporarilyClosed", !form.isTemporarilyClosed)}
-            className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+            className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
               form.isTemporarilyClosed
-                ? "bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-200"
-                : "bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-400"
+                ? "bg-amber-950/20 border-amber-500/40 text-amber-200"
+                : "bg-zinc-950/40 border-zinc-800 text-zinc-400"
             }`}
           >
             <div>
               <div className="flex items-center gap-2">
-                <AlertTriangle className={`w-4 h-4 ${form.isTemporarilyClosed ? "text-amber-500" : "text-zinc-400"}`} />
-                <span className="text-sm font-bold">Temporarily Closed</span>
+                <AlertTriangle className={`w-3.5 h-3.5 ${form.isTemporarilyClosed ? "text-amber-400" : "text-zinc-500"}`} />
+                <span className="text-xs font-bold text-white">Temporarily Closed</span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              <p className="text-[11px] text-zinc-400 mt-0.5">
                 {form.isTemporarilyClosed ? "Kitchen paused for event or maintenance" : "Click for short breaks or holiday closure"}
               </p>
             </div>
@@ -338,20 +345,20 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
         </div>
 
         {form.isTemporarilyClosed && (
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
-            <label className="block text-xs font-semibold text-amber-800 dark:text-amber-300">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+            <label className="block text-[11px] font-semibold text-amber-300">
               Select reason displayed to customers:
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {["Holiday", "Kitchen Maintenance", "Private Event", "Heavy Rain", "Staff Shortage"].map((reason) => (
                 <button
                   key={reason}
                   type="button"
                   onClick={() => onChange("closureReason", reason)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border cursor-pointer transition-colors ${
                     form.closureReason === reason
                       ? "bg-amber-500 text-white border-amber-500 font-semibold shadow-xs"
-                      : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700 hover:border-amber-400"
+                      : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-amber-400"
                   }`}
                 >
                   {reason}
@@ -363,319 +370,368 @@ export default function BusinessSection({ form, onChange, onSave, saving }) {
               value={form.closureReason || ""}
               onChange={(e) => onChange("closureReason", e.target.value)}
               placeholder="Or custom message (e.g. Opening back up at 2 PM)"
-              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs outline-none focus:border-amber-500"
+              className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-white text-xs outline-none focus:border-amber-500"
             />
           </div>
         )}
       </section>
 
-      {/* WEEKLY SCHEDULE SECTION */}
-      <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-6 shadow-sm space-y-5 transition-colors">
-        {/* Top Card Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-white">Weekly Operating Schedule</h2>
-              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400">Regular open & close times per day</p>
+      {/* ── NOTIFICATION BANNER ─────────────────────────────────────────────── */}
+      {notification && (
+        <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center justify-between shadow-xs animate-in fade-in">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            {notification}
+          </span>
+          <button
+            type="button"
+            onClick={() => setNotification("")}
+            className="text-emerald-400 hover:underline font-bold ml-2 cursor-pointer text-xs"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* ── WEEKLY OPERATING SCHEDULE CARD ──────────────────────────────────── */}
+      <section className="bg-zinc-900/60 dark:bg-[#12141c] border border-zinc-800 rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 transition-colors">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+              Weekly Operating Schedule
+            </h1>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Manage opening hours for every day of the week.
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Schedule active
+            </span>
+          </div>
+        </div>
+
+        {/* Timezone Selector Bar */}
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-zinc-950/70 dark:bg-[#0c0e14] border border-zinc-800 text-xs text-zinc-300">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Globe className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span className="text-[11px] text-zinc-400 font-medium shrink-0">Timezone</span>
+            <div className="relative flex-1 min-w-0 max-w-xs">
+              <select
+                value={currentTimezone}
+                onChange={(e) => updateTimezone(e.target.value)}
+                aria-label="Restaurant timezone"
+                className="w-full appearance-none bg-transparent text-zinc-100 font-semibold outline-none cursor-pointer text-xs hover:text-orange-400 transition-colors pr-5"
+              >
+                <option value="Asia/Kolkata" className="bg-zinc-900 text-white">Asia/Kolkata (IST)</option>
+                <option value="Asia/Dubai" className="bg-zinc-900 text-white">Asia/Dubai (GST)</option>
+                <option value="Asia/Singapore" className="bg-zinc-900 text-white">Asia/Singapore (SGT)</option>
+                <option value="Asia/Bangkok" className="bg-zinc-900 text-white">Asia/Bangkok (ICT)</option>
+                <option value="Europe/London" className="bg-zinc-900 text-white">Europe/London (GMT)</option>
+                <option value="Europe/Paris" className="bg-zinc-900 text-white">Europe/Paris (CET)</option>
+                <option value="America/New_York" className="bg-zinc-900 text-white">America/New_York (EST)</option>
+                <option value="America/Chicago" className="bg-zinc-900 text-white">America/Chicago (CST)</option>
+                <option value="America/Los_Angeles" className="bg-zinc-900 text-white">America/Los_Angeles (PST)</option>
+                <option value="UTC" className="bg-zinc-900 text-white">UTC (Universal)</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-zinc-400">
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </div>
             </div>
           </div>
 
-          {/* Header Controls: Timezone + 12h/24h toggle */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 12-Hour vs 24-Hour Switcher */}
-            <div className="inline-flex rounded-xl border border-zinc-200 dark:border-zinc-700/80 p-0.5 bg-zinc-100 dark:bg-zinc-800/90 text-xs shadow-2xs">
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+            {/* 12h / 24h toggle */}
+            <div className="inline-flex rounded-lg border border-zinc-800 p-0.5 bg-zinc-900 text-xs shadow-2xs">
               <button
                 type="button"
                 onClick={() => setTimeFormat("12-hour")}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  is12Hour
-                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  is12Hour ? "bg-zinc-800 text-white shadow-xs" : "text-zinc-400 hover:text-white"
                 }`}
               >
-                12-Hour (AM/PM)
+                12h
               </button>
               <button
                 type="button"
                 onClick={() => setTimeFormat("24-hour")}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  !is12Hour
-                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                  !is12Hour ? "bg-zinc-800 text-white shadow-xs" : "text-zinc-400 hover:text-white"
                 }`}
               >
-                24-Hour
+                24h
               </button>
             </div>
 
-            {/* Timezone Dropdown */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 text-xs">
-              <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <select
-                value={currentTimezone}
-                onChange={(e) => updateTimezone(e.target.value)}
-                className="bg-transparent text-zinc-900 dark:text-white font-bold outline-none cursor-pointer text-xs"
-              >
-                <option value="Asia/Kolkata">Asia/Kolkata (IST 🇮🇳)</option>
-                <option value="Asia/Dubai">Asia/Dubai (GST 🇦🇪)</option>
-                <option value="Asia/Singapore">Asia/Singapore (SGT 🇸🇬)</option>
-                <option value="Asia/Bangkok">Asia/Bangkok (ICT 🇹🇭)</option>
-                <option value="Europe/London">Europe/London (GMT 🇬🇧)</option>
-                <option value="Europe/Paris">Europe/Paris (CET 🇪🇺)</option>
-                <option value="America/New_York">America/New_York (EST 🇺🇸)</option>
-                <option value="America/Chicago">America/Chicago (CST 🇺🇸)</option>
-                <option value="America/Los_Angeles">America/Los_Angeles (PST 🇺🇸)</option>
-                <option value="UTC">UTC (Universal 🌐)</option>
-              </select>
-            </div>
-
-            {/* Live Clock Badge */}
+            {/* Live clock */}
             {liveTime && (
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                🕒 {liveTime}
+              <span className="font-mono text-[11px] font-semibold text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                {liveTime}
               </span>
             )}
           </div>
         </div>
 
-        {/* Live Notification Banner */}
-        {notification && (
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-semibold">
-              <Check className="w-4 h-4 text-emerald-500" />
-              {notification}
-            </span>
-            <button
-              type="button"
-              onClick={() => setNotification("")}
-              className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold ml-2 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* FAST SCHEDULE BUILDER CARD */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-orange-500 shrink-0" />
-              <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+        {/* ── QUICK SCHEDULE BUILDER CARD ──────────────────────────────────── */}
+        <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-zinc-950/80 dark:bg-[#0c0e14] border border-zinc-800 space-y-3">
+          {/* Card Top Title Row */}
+          <div className="flex items-start justify-between gap-2.5">
+            <div>
+              <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
                 Quick Schedule Builder
-              </span>
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 hidden md:inline">
-                — Choose hours once and apply instantly across your week
-              </span>
+              </h2>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                Set hours once, then apply to selected days.
+              </p>
             </div>
 
-            {/* Bulk All Open / Close */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => toggleAllDays(true)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-400 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
-              >
-                Open All
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleAllDays(false)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
-              >
-                Close All
-              </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Zap className="w-4 h-4 text-orange-500" />
             </div>
           </div>
 
-          {/* Builder Controls Strip */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <div className="flex items-center gap-2 bg-white dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl px-3 py-1.5 shadow-xs">
-              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">Opens:</span>
-              <TimeSelect value={builderOpen} onChange={setBuilderOpen} is12Hour={is12Hour} />
-              <span className="text-zinc-400 font-bold text-xs">—</span>
-              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">Closes:</span>
-              <TimeSelect value={builderClose} onChange={setBuilderClose} is12Hour={is12Hour} />
+          {/* Opening & Closing time inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            <div>
+              <label htmlFor="builder-open" className="text-[11px] text-zinc-400 font-medium mb-1 block">
+                Opening time
+              </label>
+              <TimeSelect
+                id="builder-open"
+                value={builderOpen}
+                onChange={setBuilderOpen}
+                is12Hour={is12Hour}
+              />
             </div>
 
-            {/* Apply Buttons */}
-            <button
-              type="button"
-              onClick={() => applyBuilderSchedule("all")}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
-              title="Apply these hours to all 7 days"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>Apply to All 7 Days</span>
-            </button>
+            <div>
+              <label htmlFor="builder-close" className="text-[11px] text-zinc-400 font-medium mb-1 block">
+                Closing time
+              </label>
+              <TimeSelect
+                id="builder-close"
+                value={builderClose}
+                onChange={setBuilderClose}
+                is12Hour={is12Hour}
+              />
+            </div>
+          </div>
 
+          {/* Primary Action Button */}
+          <button
+            type="button"
+            onClick={() => applyBuilderSchedule("all")}
+            className="w-full py-2 sm:py-2.5 rounded-full bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-[0.99] cursor-pointer"
+            title="Apply hours to all 7 days"
+          >
+            <Copy className="w-3.5 h-3.5 text-zinc-800" />
+            <span>Apply hours to all 7 days</span>
+          </button>
+
+          {/* Secondary Actions (Mon-Fri and Sat-Sun) */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => applyBuilderSchedule("weekdays")}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 transition cursor-pointer"
+              className="py-1.5 sm:py-2 rounded-full border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs font-medium flex items-center justify-center transition active:scale-[0.99] cursor-pointer"
+              title="Apply to Monday through Friday"
             >
-              Mon–Fri Only
+              Mon–Fri
             </button>
 
             <button
               type="button"
               onClick={() => applyBuilderSchedule("weekends")}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 transition cursor-pointer"
+              className="py-1.5 sm:py-2 rounded-full border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs font-medium flex items-center justify-center transition active:scale-[0.99] cursor-pointer"
+              title="Apply to Saturday and Sunday"
             >
-              Sat–Sun Only
+              Sat–Sun
             </button>
           </div>
 
-          {/* Quick Presets Row */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-orange-500/10 dark:border-zinc-800">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mr-1">Presets:</span>
-            {QUICK_PRESETS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => applyPreset(p)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/90 dark:bg-zinc-800/90 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-zinc-700 dark:text-zinc-300 hover:text-orange-600 dark:hover:text-orange-400 border border-zinc-200/80 dark:border-zinc-700/80 transition cursor-pointer"
-              >
-                <span className="font-bold">{p.label}</span>{" "}
-                <span className="text-[10px] text-zinc-400 font-mono">
-                  ({is12Hour ? p.desc : `${p.open} - ${p.close}`})
-                </span>
-              </button>
-            ))}
+          {/* Presets and Open/Close All Row */}
+          <div className="pt-2 border-t border-zinc-800/80 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-zinc-400 font-medium">Quick presets</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleAllDays(true)}
+                  className="text-[11px] font-semibold text-zinc-400 hover:text-emerald-400 transition cursor-pointer"
+                >
+                  Open all
+                </button>
+                <span className="text-zinc-600 text-xs">•</span>
+                <button
+                  type="button"
+                  onClick={() => toggleAllDays(false)}
+                  className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                >
+                  Close all
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white transition cursor-pointer"
+                  title={`Apply ${p.desc}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Live Customer Sync Notice */}
-        <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-zinc-700 dark:text-zinc-300">
+        {/* ── TIMEZONE INFORMATION BANNER ─────────────────────────────────── */}
+        <div className="p-2.5 sm:p-3 rounded-xl bg-zinc-950/60 dark:bg-[#0c0e14] border border-zinc-800/80 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-zinc-300">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+            <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
             <span>
-              Storefront active clock: <strong>{currentTimezone}</strong>. Customers see:{" "}
-              <strong className="text-orange-600 dark:text-orange-400 font-bold">{activeSyncedHours}</strong>.
+              Storefront active clock: <strong className="text-white font-semibold">{currentTimezone}</strong>. Customers see:{" "}
+              <strong className="text-orange-400 font-bold">{activeSyncedHours}</strong>
             </span>
           </div>
           {currentTimezone !== "Asia/Kolkata" && (
             <button
               type="button"
               onClick={() => updateTimezone("Asia/Kolkata")}
-              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
+              className="text-[11px] font-bold text-orange-400 hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
             >
-              <RotateCcw className="w-3 h-3" /> Reset to India (IST 🇮🇳)
+              <RotateCcw className="w-3 h-3" /> Reset to India (IST)
             </button>
           )}
         </div>
 
-        {/* DAYS OF THE WEEK LIST */}
-        <div className="space-y-2.5">
-          {DAYS_OF_WEEK.map(({ key, label, isWeekend }) => {
-            const dayData = weeklyHours[key] || { isOpen: true, slots: [{ open: "08:00", close: "21:00" }] };
-            const isOpen = dayData.isOpen ?? true;
-            const slot = dayData.slots?.[0] || { open: "08:00", close: "21:00" };
+        {/* ── DAILY HOURS SECTION ─────────────────────────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+              Daily hours
+            </h2>
+            <span className="text-[11px] text-zinc-400 font-medium">7 days</span>
+          </div>
 
-            return (
-              <div
-                key={key}
-                className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col xl:flex-row xl:items-center justify-between gap-3 transition-all min-w-0 ${
-                  isOpen
-                    ? "bg-zinc-50/70 dark:bg-zinc-900/40 border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700"
-                    : "bg-zinc-100/40 dark:bg-zinc-900/20 border-zinc-200/50 dark:border-zinc-800/50 opacity-60"
-                }`}
-              >
-                {/* Left Side: Day Identity + Open/Closed Switch */}
-                <div className="flex items-center justify-between sm:justify-start gap-3 min-w-0">
-                  <div className="flex items-center gap-2 min-w-[120px] sm:min-w-[130px]">
-                    <span className="text-xs sm:text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
-                      {label}
-                    </span>
-                    {isWeekend ? (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
-                        Weekend
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 shrink-0">
-                        Weekday
-                      </span>
-                    )}
-                  </div>
+          <div className="space-y-2">
+            {DAYS_OF_WEEK.map(({ key, label, isWeekend }, idx) => {
+              const dayData = weeklyHours[key] || { isOpen: true, slots: [{ open: "08:00", close: "21:00" }] };
+              const isOpen = dayData.isOpen ?? true;
+              const slot = dayData.slots?.[0] || { open: "08:00", close: "21:00" };
 
-                  {/* Open / Closed Toggle Pill */}
-                  <div className="inline-flex rounded-xl border border-zinc-200 dark:border-zinc-700/80 p-0.5 bg-white dark:bg-zinc-800 text-xs shadow-2xs shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => updateDayIsOpen(key, true)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        isOpen
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                      }`}
-                    >
-                      Open
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateDayIsOpen(key, false)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        !isOpen
-                          ? "bg-zinc-600 dark:bg-zinc-700 text-white shadow-xs"
-                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-                      }`}
-                    >
-                      Closed
-                    </button>
-                  </div>
-                </div>
+              return (
+                <div key={key}>
+                  <div
+                    className={`p-3 sm:p-3.5 rounded-xl border transition-all ${
+                      isOpen
+                        ? "bg-zinc-950/70 dark:bg-[#0c0e14] border-zinc-800 hover:border-zinc-700/80"
+                        : "bg-zinc-950/30 dark:bg-[#090b10] border-zinc-800/40 opacity-70"
+                    }`}
+                  >
+                    {/* Day Name, Badge & Open/Closed Status Button */}
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div>
+                        <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+                          {label}
+                        </h3>
+                        <div className="mt-0.5">
+                          {isWeekend ? (
+                            <span className="text-[10px] font-medium text-violet-400">
+                              Weekend
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-zinc-400">
+                              Weekday
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                {/* Right Side: Hours Pickers + Copy Action */}
-                <div className="flex items-center justify-between xl:justify-end gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap min-w-0">
-                  {isOpen ? (
-                    <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap sm:flex-nowrap min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] font-semibold text-zinc-400 shrink-0">Opens:</span>
+                      {/* Interactive Open/Closed Status Badge */}
+                      <button
+                        type="button"
+                        onClick={() => updateDayIsOpen(key, !isOpen)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isOpen
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"
+                        }`}
+                        title={`Click to mark ${label} as ${isOpen ? "Closed" : "Open"}`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isOpen ? "bg-emerald-400" : "bg-zinc-500"
+                          }`}
+                        />
+                        <span>{isOpen ? "Open" : "Closed"}</span>
+                      </button>
+                    </div>
+
+                    {/* Opening & Closing Selectors */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 mt-2">
+                      <div>
+                        <label htmlFor={`${key}-open`} className="text-[10px] text-zinc-400 font-medium mb-0.5 block">
+                          Opens
+                        </label>
                         <TimeSelect
+                          id={`${key}-open`}
                           value={slot.open || "08:00"}
                           onChange={(val) => updateDaySlot(key, "open", val)}
                           is12Hour={is12Hour}
+                          disabled={!isOpen}
                         />
                       </div>
 
-                      <span className="text-zinc-400 font-bold text-xs shrink-0">—</span>
-
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] font-semibold text-zinc-400 shrink-0">Closes:</span>
+                      <div>
+                        <label htmlFor={`${key}-close`} className="text-[10px] text-zinc-400 font-medium mb-0.5 block">
+                          Closes
+                        </label>
                         <TimeSelect
+                          id={`${key}-close`}
                           value={slot.close || "21:00"}
                           onChange={(val) => updateDaySlot(key, "close", val)}
                           is12Hour={is12Hour}
+                          disabled={!isOpen}
                         />
                       </div>
                     </div>
-                  ) : (
-                    <div className="py-1">
-                      <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 bg-zinc-200/50 dark:bg-zinc-800/50 px-3 py-1 rounded-lg">
-                        Closed all day
-                      </span>
+
+                    {/* Bottom Row: Copy hours */}
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="button"
+                        onClick={() => copyDayToAll(key)}
+                        disabled={!isOpen}
+                        className="text-[11px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={`Copy ${label}'s timing to all 7 days`}
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copy hours</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Down-Arrow Connector between consecutive days */}
+                  {idx < DAYS_OF_WEEK.length - 1 && (
+                    <div className="flex justify-center -my-1.5 relative z-10 pointer-events-none">
+                      <div className="w-5 h-5 rounded-full bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-400 shadow-2xs">
+                        <ArrowDown className="w-2.5 h-2.5" />
+                      </div>
                     </div>
                   )}
-
-                  {/* Copy to All Button with guaranteed containment */}
-                  <button
-                    type="button"
-                    onClick={() => copyDayToAll(key)}
-                    disabled={!isOpen}
-                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/20 border border-zinc-200 dark:border-zinc-700/80 hover:border-orange-500/40 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ml-auto sm:ml-0"
-                    title={`Apply ${label}'s timing to all 7 days`}
-                    aria-label={`Apply ${label}'s timing to all 7 days`}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">Copy to all</span>
-                  </button>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+
       </section>
     </div>
   );

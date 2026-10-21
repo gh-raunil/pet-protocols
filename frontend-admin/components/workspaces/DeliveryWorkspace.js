@@ -87,9 +87,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const gpsTransmitter = useDeliveryGpsTransmitter();
   const [staffDeviceCoords, setStaffDeviceCoords] = useState(null);
 
-  // Auto-acquire and watch staff device geolocation so Mappls navigation can immediately use staff's live location
+  // Auto-acquire and watch staff device geolocation ONLY for delivery staff (managers do not share live GPS)
   useEffect(() => {
-    if (typeof window === "undefined" || !navigator.geolocation) return;
+    if (isManager || typeof window === "undefined" || !navigator.geolocation) return;
 
     let isCancelled = false;
     navigator.geolocation.getCurrentPosition(
@@ -128,7 +128,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         } catch {}
       }
     };
-  }, []);
+  }, [isManager]);
 
   const isOrderCod = (order) => {
     if (!order) return false;
@@ -233,17 +233,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           toast.success("Order marked delivered! Customer and Kitchen Manager notified.", { icon: "🎉" });
         }
 
-        // Auto-start GPS when transitioning to out_for_delivery if not pickup
         if (newStatus === "out_for_delivery") {
-          if (!isPickupOrder(currentOrder)) {
-            gpsTransmitter.startTracking(currentOrder?.orderId || orderId, {
-              ...currentOrder,
-              status: "out_for_delivery",
-            });
-            toast.success("Transit started: Device GPS tracking activated.");
-          } else {
-            toast("Counter pickup: Live GPS tracking is not required.", { icon: "🛍️" });
-          }
+          toast.success("Order dispatched! Delivery staff can now share their live GPS location from their mobile device.");
         } else if (newStatus === "delivered" || newStatus === "cancelled") {
           // Teardown GPS when delivered or cancelled
           if (
@@ -1063,6 +1054,18 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           Total: ₹{(order.totalAmount || 0).toFixed(2)}
                         </span>
                       </div>
+
+                      {order.assignedDeliveryStaff?.name && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                          <span>🛵</span>
+                          <span>
+                            {isMyOrder(order)
+                              ? "Assigned to You"
+                              : `Delivery Boy: ${order.assignedDeliveryStaff.name}`}
+                            {order.assignedDeliveryStaff.phone ? ` (${order.assignedDeliveryStaff.phone})` : ""}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1092,7 +1095,21 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     {order.status === "out_for_delivery" && (
                       <>
                         {!isPickup && (
-                          isOrderTracking ? (
+                          isManager ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">
+                              {order.deliveryTracking?.isLive ? (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>Driver Live GPS Active</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-stone-400" />
+                                  <span>Awaiting Driver Live GPS</span>
+                                </>
+                              )}
+                            </span>
+                          ) : isOrderTracking ? (
                             <Tooltip content="Stop sharing your live GPS coordinates for this delivery" position="top">
                               <button
                                 onClick={() => gpsTransmitter.stopTracking("stopped")}
@@ -1100,18 +1117,18 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                 title="Stop sending GPS coordinates for this order"
                               >
                                 <Power size={13} />
-                                <span>Stop GPS</span>
+                                <span>Stop Sharing GPS</span>
                               </button>
                             </Tooltip>
                           ) : (
-                            <Tooltip content="Transmit your phone's real-time GPS location to the customer's live tracking map" position="top">
+                            <Tooltip content="Transmit your phone's real-time GPS location to the customer and restaurant manager" position="top">
                               <button
                                 onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
                                 title="Start transmitting real device GPS for this active delivery"
                               >
                                 <Navigation size={13} />
-                                <span>Share Live GPS</span>
+                                <span>Share Live GPS Location</span>
                               </button>
                             </Tooltip>
                           )
@@ -1550,13 +1567,13 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                       <DeliveryRouteMap
                         origin={
-                          gpsTransmitter.lastLocation?.latitude
+                          !isManager && gpsTransmitter.lastLocation?.latitude
                             ? {
                                 lat: gpsTransmitter.lastLocation.latitude,
                                 lng: gpsTransmitter.lastLocation.longitude,
                                 heading: gpsTransmitter.lastLocation.heading,
                               }
-                            : staffDeviceCoords?.latitude
+                            : !isManager && staffDeviceCoords?.latitude
                             ? {
                                 lat: staffDeviceCoords.latitude,
                                 lng: staffDeviceCoords.longitude,
@@ -1570,6 +1587,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               }
                             : null
                         }
+                        isManagerView={isManager}
                         restaurant={order.restaurant}
                         deliveryTracking={order.deliveryTracking}
                         destination={{

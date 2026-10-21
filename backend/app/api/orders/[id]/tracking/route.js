@@ -104,10 +104,11 @@ export async function GET(request, { params }) {
     const lastUpdatedMs = lastUpdateDate ? new Date(lastUpdateDate).getTime() : null;
     const isStale = Boolean(lastUpdatedMs && (now - lastUpdatedMs > 180 * 1000)); // 180 seconds threshold
 
-    // Driver display information for transit
+    // Driver / Delivery staff display information
     let driverInfo = null;
-    if (order.status === "out_for_delivery" && order.assignedDeliveryStaff?.name) {
+    if (order.assignedDeliveryStaff?.name) {
       driverInfo = {
+        id: order.assignedDeliveryStaff.id || null,
         name: order.assignedDeliveryStaff.name,
         phone: order.assignedDeliveryStaff.phone || null,
       };
@@ -158,6 +159,7 @@ export async function GET(request, { params }) {
       isStale: isActivelyDelivering ? isStale : false,
       location: locationData,
       driver: driverInfo,
+      assignedDeliveryStaff: driverInfo,
       startedAt: tracking.startedAt || null,
       endedAt: tracking.endedAt || null,
       lastUpdatedAt: tracking.lastUpdatedAt || null,

@@ -188,6 +188,8 @@ const RestaurantSchema = new mongoose.Schema(
       requireOrderConfirmation: { type: Boolean, default: true },
       estimatedProcessingMinutes: { type: Number, default: 20 },
       autoCancelTimeoutMinutes: { type: Number, default: 15 },
+      uncollectedTimeoutMinutes: { type: Number, default: 60, min: 10, max: 240 },
+      autoDismissUncollectedOrders: { type: Boolean, default: true },
     },
     orderLimits: {
       minOrderAmount: { type: Number, default: 0 },

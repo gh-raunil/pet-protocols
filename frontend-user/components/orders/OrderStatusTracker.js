@@ -169,6 +169,7 @@ export default function OrderStatusTracker({
   statusHistory = [],
   notes = "",
   createdAt = null,
+  assignedDeliveryStaff = null,
 }) {
   const isCancelled = status?.toLowerCase() === "cancelled";
   const isFailed = paymentStatus?.toLowerCase() === "failed";
@@ -287,6 +288,33 @@ export default function OrderStatusTracker({
               <p className="font-bold">Kitchen Note</p>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5 leading-relaxed">{notes}</p>
             </div>
+          </div>
+        )}
+
+        {/* Delivery Partner Details / Which Staff Took the Order */}
+        {assignedDeliveryStaff?.name && !isPickup && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 text-sm">
+                🛵
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-stone-900 dark:text-white truncate">
+                  Delivery Partner: {assignedDeliveryStaff.name}
+                </p>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {status === "out_for_delivery" ? "On the way with your food parcel" : "Assigned staff taking order for delivery"}
+                </p>
+              </div>
+            </div>
+            {assignedDeliveryStaff.phone && (
+              <a
+                href={`tel:${assignedDeliveryStaff.phone}`}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition border border-emerald-500/25 shrink-0"
+              >
+                Call Partner
+              </a>
+            )}
           </div>
         )}
 

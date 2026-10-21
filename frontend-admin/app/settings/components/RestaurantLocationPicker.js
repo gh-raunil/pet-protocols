@@ -120,7 +120,6 @@ export default function RestaurantLocationPicker({
   const [currentLat, setCurrentLat] = useState(hasValidCoords ? initialLat : DEFAULT_LAT);
   const [currentLng, setCurrentLng] = useState(hasValidCoords ? initialLng : DEFAULT_LNG);
   const [isMoving, setIsMoving] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -430,83 +429,7 @@ export default function RestaurantLocationPicker({
     });
   }, [radiusKm, showRadius]);
 
-  // Handle "Detect Current Live Location"
-  const handleDetectLiveLocation = useCallback(() => {
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      setFeedback({
-        type: "error",
-        message: "Geolocation is not supported by your browser.",
-      });
-      return;
-    }
 
-    setIsLocating(true);
-    setFeedback({
-      type: "info",
-      message: "Acquiring live GPS coordinates...",
-    });
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        setIsLocating(false);
-        const userLat = pos.coords.latitude;
-        const userLng = pos.coords.longitude;
-        const accuracy = Math.round(pos.coords.accuracy);
-
-        // Smoothly fly map to user's live position under the center pin
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([userLat, userLng], 17, { duration: 1.2 });
-        }
-        if (circleRef.current) {
-          circleRef.current.setLatLng([userLat, userLng]);
-        }
-
-        // Reverse geocoding to auto-fill address fields if empty
-        let extraFields = {};
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}&zoom=18&addressdetails=1`,
-            { headers: { "Accept-Language": "en" } }
-          );
-          const data = await res.json();
-          if (data && data.address) {
-            const addr = data.address;
-            const streetVal = [
-              addr.building || addr.house_number,
-              addr.road || addr.suburb || addr.neighbourhood,
-            ]
-              .filter(Boolean)
-              .join(", ");
-
-            extraFields = {
-              street: address.street || streetVal || "",
-              city: address.city || addr.city || addr.town || addr.county || "",
-              state: address.state || addr.state || "",
-              pincode: address.pincode || addr.postcode || "",
-            };
-          }
-        } catch (err) {
-          // Silent fallback
-        }
-
-        applyCoordinates(userLat, userLng, extraFields);
-        setFeedback({
-          type: "success",
-          message: `Live location locked! (Accuracy: ±${accuracy}m)`,
-        });
-      },
-      (err) => {
-        setIsLocating(false);
-        let msg = "Could not acquire location.";
-        if (err.code === 1) msg = "Location permission denied. Please allow location access in your browser.";
-        else if (err.code === 2) msg = "Position unavailable. Please check your network/GPS connection.";
-        else if (err.code === 3) msg = "Location acquisition timed out.";
-
-        setFeedback({ type: "error", message: msg });
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    );
-  }, [address, applyCoordinates]);
 
   // Handle Search Location by place name / landmark
   async function handleSearchPlace(e) {
@@ -565,18 +488,18 @@ export default function RestaurantLocationPicker({
 
   return (
     <div className="mt-4 pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80 space-y-3 font-jakarta">
-      {/* Header & Quick Action Buttons */}
+      {/* Header & Fixed Location Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <div className="flex items-center gap-2">
             <label className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-orange-500" />
-              <span>Restaurant Live Location & Center Pin</span>
+              <span>Restaurant Fixed Location & Dispatch Address Pin</span>
             </label>
             {hasValidCoords ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="w-3 h-3" />
-                <span>Location Set</span>
+                <span>Fixed Location Set</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
@@ -586,24 +509,9 @@ export default function RestaurantLocationPicker({
             )}
           </div>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Pan and drag the map to align your kitchen or dispatch gate directly under the center pin.
+            Set your restaurant&apos;s static address using the search bar or by dragging the map pin. This fixed location is used for order routing and customer pickup. Restaurant live GPS is never tracked.
           </p>
         </div>
-
-        {/* Action Button: Detect Live Location */}
-        <button
-          type="button"
-          onClick={handleDetectLiveLocation}
-          disabled={isLocating}
-          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-xs shadow-xs hover:shadow-orange-500/25 transition cursor-pointer shrink-0"
-        >
-          {isLocating ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Crosshair className="w-3.5 h-3.5" />
-          )}
-          <span>{isLocating ? "Acquiring GPS..." : "Detect Live Location"}</span>
-        </button>
       </div>
 
       {/* Search Place / Landmark Form */}

@@ -154,6 +154,7 @@ const OrderSchema = new mongoose.Schema(
       recipientName: { type: String, default: "" },
       recipientPhone: { type: String, default: "" },
       isDifferentRecipient: { type: Boolean, default: false },
+      addressType: { type: String, default: null },
     },
     customerLocation: {
       latitude: { type: Number, default: null },
@@ -197,6 +198,11 @@ const OrderSchema = new mongoose.Schema(
     payloadHash: {
       type: String,
       default: null,
+    },
+    orderType: {
+      type: String,
+      enum: ["delivery", "pickup"],
+      default: undefined,
     },
     paymentStatus: {
       type: String,
@@ -358,6 +364,28 @@ const OrderSchema = new mongoose.Schema(
       attemptCount: { type: Number, default: 0 },
       lastAttemptAt: { type: Date, default: null },
     },
+    wasteLogging: {
+      status: {
+        type: String,
+        enum: ["not_applicable", "pending", "in_progress", "completed", "failed"],
+        default: "not_applicable",
+      },
+      leaseToken: { type: String, default: null },
+      leaseExpiresAt: { type: Date, default: null },
+      loggedIngredients: [
+        {
+          ingredient: { type: mongoose.Schema.Types.ObjectId, ref: "Ingredient" },
+          ingredientName: { type: String, default: "" },
+          quantity: { type: Number, default: 0 },
+          unit: { type: String, default: "" },
+          opKey: { type: String, default: "" },
+          loggedAt: { type: Date, default: Date.now },
+        },
+      ],
+      lastError: { type: String, default: null },
+      attemptCount: { type: Number, default: 0 },
+      lastAttemptAt: { type: Date, default: null },
+    },
     assignedDeliveryStaff: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       name: { type: String, default: "" },
@@ -477,17 +505,36 @@ OrderSchema.methods.addStatusTransition = function (nextStatus, actor = {}, note
   return true;
 };
 
-// Detect if order is a customer counter pickup rather than a delivery
-OrderSchema.methods.isPickupOrder = function () {
-  const method = String(this.paymentMethod || "").toLowerCase();
-  const notes = String(this.notes || "").toLowerCase();
-  const addressType = String(this.address?.addressType || "").toLowerCase();
+// Canonical static helper to detect if order is a customer counter pickup rather than a delivery
+OrderSchema.statics.isPickupOrder = function (order) {
+  if (!order) return false;
+
+  // 1. Explicit orderType takes precedence if defined
+  const rawType = order.orderType;
+  if (rawType && typeof rawType === "string") {
+    const orderType = rawType.toLowerCase().trim();
+    if (orderType === "pickup") return true;
+    if (orderType === "delivery") return false;
+  }
+
+  // 2. Legacy / historical pickup indicators (for orders without explicit orderType)
+  const method = String(order.paymentMethod || "").toLowerCase().trim();
+  const notes = String(order.notes || "").toLowerCase().trim();
+  const addressType = String(order.address?.addressType || "").toLowerCase().trim();
+
   return (
     method.includes("pickup") ||
     method.includes("cop") ||
     notes.includes("[pickup]") ||
+    notes.includes("counter pickup") ||
+    notes.includes("pickup") ||
     addressType.includes("pickup")
   );
+};
+
+// Instance method delegation
+OrderSchema.methods.isPickupOrder = function () {
+  return (this.constructor.isPickupOrder || OrderSchema.statics.isPickupOrder)(this);
 };
 
 // Start live delivery tracking session on authorized delivery dispatch

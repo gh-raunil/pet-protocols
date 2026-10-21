@@ -115,6 +115,8 @@ export default function SettingsClient() {
       requireOrderConfirmation: true,
       estimatedProcessingMinutes: 20,
       autoCancelTimeoutMinutes: 15,
+      uncollectedTimeoutMinutes: 60,
+      autoDismissUncollectedOrders: true,
     },
     orderLimits: { minOrderAmount: 0, maxOrderAmount: 50000, maxItemsPerOrder: 30 },
     cancellationSettings: {
@@ -449,6 +451,7 @@ export default function SettingsClient() {
                     onChange={handleFieldChange}
                     onSave={handleSaveSettings}
                     saving={saving}
+                    hasUnsavedChanges={hasUnsavedChanges}
                   />
                 )}
 

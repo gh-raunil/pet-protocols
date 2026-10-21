@@ -30,13 +30,29 @@ import { getOrderElapsedInfo, handlePrintKOT } from "../orders/OrdersClient";
 
 export function formatOrderId(order) {
   if (!order) return "#PET-0000";
-  if (order.orderId) {
-    if (order.orderId.startsWith("PET-")) return `#${order.orderId}`;
-    if (order.orderId.startsWith("ORD_")) return `#${order.orderId.replace("ORD_", "PET-")}`;
-    return `#PET-${order.orderId.slice(-6).toUpperCase()}`;
+  const rawId = (order.orderId || order._id || "").toString().trim();
+  if (rawId.startsWith("ORD_")) {
+    const parts = rawId.split("_");
+    if (parts.length >= 3 && parts[parts.length - 1]) {
+      return `#PET-${parts[parts.length - 1].toUpperCase()}`;
+    }
+    const clean = rawId.replace(/^ORD_/i, "");
+    if (clean.length > 8) {
+      return `#PET-${clean.slice(-6).toUpperCase()}`;
+    }
+    return `#PET-${clean.toUpperCase()}`;
   }
-  const idStr = (order._id || "").toString();
-  return `#PET-${idStr.slice(-6).toUpperCase()}`;
+  if (rawId.startsWith("PET-")) {
+    const clean = rawId.replace(/^PET-/i, "");
+    if (clean.length > 8) {
+      return `#PET-${clean.slice(-6).toUpperCase()}`;
+    }
+    return `#${rawId.toUpperCase()}`;
+  }
+  if (rawId.length > 10) {
+    return `#PET-${rawId.slice(-6).toUpperCase()}`;
+  }
+  return rawId ? `#${rawId.toUpperCase()}` : "#PET-0000";
 }
 
 export default function DashboardClient() {

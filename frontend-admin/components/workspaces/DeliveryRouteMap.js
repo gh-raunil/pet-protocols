@@ -18,6 +18,7 @@ export default function DeliveryRouteMap({
   orderId = "",
   recipientName = "",
   initialStatus = "out_for_delivery",
+  isManagerView = false,
 }) {
   return (
     <div className="w-full">
@@ -30,7 +31,8 @@ export default function DeliveryRouteMap({
         deliveryTracking={deliveryTracking}
         origin={origin}
         recipientName={recipientName}
-        isStaffView={true}
+        isStaffView={!isManagerView}
+        isManagerView={isManagerView}
       />
     </div>
   );

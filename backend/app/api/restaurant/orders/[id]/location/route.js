@@ -15,7 +15,8 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
-    const { restaurantId, user } = auth;
+    const { restaurantId, user, isAdmin } = auth;
+    const isManagerOrAdmin = Boolean(isAdmin || ["admin", "manager", "restaurant_admin"].includes(user?.role));
     const resolvedParams = params ? await params : {};
     const { id } = resolvedParams;
 
@@ -75,13 +76,12 @@ export async function PUT(request, { params }) {
     }
 
     // Delivery staff authorization check:
-    // If a specific driver is assigned, only that driver, a manager, or restaurant admin can update location
+    // Only the assigned delivery staff member can broadcast live GPS.
+    // Managers/admins do not broadcast restaurant GPS.
     const isAssignedDriver = order.assignedDeliveryStaff?.id &&
       order.assignedDeliveryStaff.id.toString() === user._id.toString();
-    const isManagerOrAdmin = ["restaurant_admin", "admin", "superadmin"].includes(user.role) ||
-      (Array.isArray(user.staffRoles) && user.staffRoles.includes("Manager"));
 
-    if (order.assignedDeliveryStaff?.id && !isAssignedDriver && !isManagerOrAdmin) {
+    if (order.assignedDeliveryStaff?.id && !isAssignedDriver) {
       return NextResponse.json({
         success: false,
         message: "You are not the currently assigned delivery staff for this order.",
@@ -104,23 +104,53 @@ export async function PUT(request, { params }) {
       }, { status: 400 });
     }
 
-    // If driver is not assigned yet, assign the reporting staff member
+    // If driver is not assigned yet, verify Delivery role and assign the reporting staff member
     if (!order.assignedDeliveryStaff?.id) {
-      order.assignedDeliveryStaff = {
+      const isDeliveryStaff = Array.isArray(user.staffRoles) && user.staffRoles.includes("Delivery");
+      if (!isDeliveryStaff && !auth.isAdmin) {
+        return NextResponse.json({
+          success: false,
+          message: "Only staff with the 'Delivery' role can claim and broadcast GPS for an order.",
+        }, { status: 403 });
+      }
+
+      const assignedStaffDoc = {
         id: user._id,
         name: user.name || "Delivery Staff",
         phone: user.phone || "",
         email: user.email || "",
         assignedAt: new Date(),
       };
-      await Order.updateOne(
-        { _id: order._id },
+
+      const claimResult = await Order.updateOne(
+        {
+          _id: order._id,
+          $or: [
+            { assignedDeliveryStaff: null },
+            { "assignedDeliveryStaff.id": null },
+            { "assignedDeliveryStaff.id": { $exists: false } },
+          ],
+        },
         {
           $set: {
-            assignedDeliveryStaff: order.assignedDeliveryStaff,
+            assignedDeliveryStaff: assignedStaffDoc,
           },
         }
       );
+
+      if (claimResult.modifiedCount > 0) {
+        order.assignedDeliveryStaff = assignedStaffDoc;
+      } else {
+        // Another driver claimed the order concurrently
+        const refreshed = await Order.findById(order._id);
+        if (refreshed?.assignedDeliveryStaff?.id && refreshed.assignedDeliveryStaff.id.toString() !== user._id.toString()) {
+          return NextResponse.json({
+            success: false,
+            message: "This order was already claimed by another delivery driver.",
+          }, { status: 403 });
+        }
+        order.assignedDeliveryStaff = refreshed?.assignedDeliveryStaff;
+      }
     }
 
     // Auto-heal / activate tracking session if order is actively out for delivery

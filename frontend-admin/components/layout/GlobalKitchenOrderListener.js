@@ -7,7 +7,7 @@ import { playChime } from "@/lib/soundChimes";
 import { Bell, ArrowRight, X, Sparkles, ChefHat, Truck, MapPin } from "lucide-react";
 import { useWebPush } from "@/hooks/useWebPush";
 
-export default function GlobalKitchenOrderListener() {
+export default function GlobalKitchenOrderListener({ onPendingCountChange }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -52,8 +52,25 @@ export default function GlobalKitchenOrderListener() {
         const data = await res.json();
 
         if (data.success && Array.isArray(data.orders)) {
+          const currentCount = data.orders.length;
+
+          // Always report count to parent & broadcast real-time count of unresponded orders
+          if (onPendingCountChange) {
+            onPendingCountChange(currentCount);
+          }
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("pet_protocols_pending_orders_count", String(currentCount));
+            } catch (e) {}
+            window.dispatchEvent(
+              new CustomEvent("pet_protocols_unresponded_orders_count", {
+                detail: { count: currentCount },
+              })
+            );
+          }
+
           if (initialLoadRef.current) {
-            // First run: just record all existing pending order IDs so we don't alert old ones
+            // First run: record all existing pending order IDs so we don't alert old ones
             data.orders.forEach((o) => seenOrderIdsRef.current.add(o._id));
             initialLoadRef.current = false;
             return;
@@ -62,10 +79,12 @@ export default function GlobalKitchenOrderListener() {
           // Check if any order is new
           const newOrders = data.orders.filter((o) => !seenOrderIdsRef.current.has(o._id));
 
+          // Keep seenOrderIds synchronized with current pending orders
+          const currentPendingIds = new Set(data.orders.map((o) => o._id));
+          seenOrderIdsRef.current = currentPendingIds;
+
           if (newOrders.length > 0 && isMounted) {
             const newest = newOrders[0];
-            // Add to seen set
-            newOrders.forEach((o) => seenOrderIdsRef.current.add(o._id));
 
             // Check if user has sound alerts enabled in local settings (default true)
             const soundEnabled = localStorage.getItem("pet_kitchen_sound_alerts") !== "false";
@@ -98,14 +117,30 @@ export default function GlobalKitchenOrderListener() {
     // Run initial check
     checkNewOrders();
 
+    // Event listener to immediately re-check on order respond or window focus
+    function handleImmediateCheck() {
+      checkNewOrders();
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("pet_protocols_refresh_pending_orders", handleImmediateCheck);
+      window.addEventListener("pet_protocols_order_responded", handleImmediateCheck);
+      window.addEventListener("focus", handleImmediateCheck);
+    }
+
     // Poll every 8 seconds
     const interval = setInterval(checkNewOrders, 8000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("pet_protocols_refresh_pending_orders", handleImmediateCheck);
+        window.removeEventListener("pet_protocols_order_responded", handleImmediateCheck);
+        window.removeEventListener("focus", handleImmediateCheck);
+      }
     };
-  }, [status, session]);
+  }, [status, session, onPendingCountChange]);
 
   if (!activeAlert && !showPushPrompt) return null;
 

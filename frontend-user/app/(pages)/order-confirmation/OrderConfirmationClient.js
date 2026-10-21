@@ -448,6 +448,7 @@ export default function OrderConfirmationClient() {
           statusHistory={order.statusHistory || []}
           notes={order.notes || ""}
           createdAt={order.createdAt}
+          assignedDeliveryStaff={order.assignedDeliveryStaff}
         />
         <LiveDeliveryMap
           orderId={order.orderId || order._id}

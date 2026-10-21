@@ -303,6 +303,7 @@ export async function POST(request) {
           paymentStatus,
           paymentMethod: finalPaymentMethod,
           status: "pending",
+          orderType: body.orderType === "pickup" ? "pickup" : "delivery",
           notes: body.orderType === "pickup" ? `[PICKUP] ${notes}` : notes,
           idempotencyKey: scopedKey,
           payloadHash,
@@ -546,22 +547,44 @@ export async function PATCH(request) {
         }, { status: 400 });
       }
 
-      // Cancel order
-      if (typeof order.addStatusTransition === 'function') {
-        order.addStatusTransition(
-          'cancelled',
-          {
-            userId: currentUser?._id,
-            role: session.user?.role || 'customer',
-            name: currentUser?.name || session.user?.name || 'Customer',
+      // Cancel order atomically to avoid racing against kitchen order acceptance
+      const cancelNote = `Cancellation reason: ${reason}`;
+      const cancelledDoc = await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          status: 'pending',
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            notes: order.notes ? `${order.notes} | ${cancelNote}` : cancelNote,
           },
-          `Cancellation reason: ${reason}`
-        );
-      } else {
-        order.status = 'cancelled';
+          $push: {
+            statusHistory: {
+              status: 'cancelled',
+              changedAt: new Date(),
+              changedBy: {
+                userId: currentUser?._id,
+                role: session.user?.role || 'customer',
+                name: currentUser?.name || session.user?.name || 'Customer',
+              },
+              note: cancelNote,
+            },
+          },
+          $inc: { __v: 1 },
+        },
+        { returnDocument: 'after' }
+      );
+
+      if (!cancelledDoc) {
+        return NextResponse.json({
+          success: false,
+          conflict: true,
+          message: 'Order status was modified concurrently. The order can no longer be self-cancelled.',
+        }, { status: 409 });
       }
-      order.notes = order.notes ? `${order.notes} | Cancellation reason: ${reason}` : `Cancellation reason: ${reason}`;
-      await order.save();
+
+      order = cancelledDoc;
     }
 
     // Restore stock if previously deducted or partially deducted

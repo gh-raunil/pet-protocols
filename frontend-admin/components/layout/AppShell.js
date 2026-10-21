@@ -23,13 +23,16 @@ export default function AppShell({ children }) {
   // Kitchen active status state
   const [kitchenActive, setKitchenActive] = useState(true);
 
+  // Real-time unresponded new orders count
+  const [unrespondedOrdersCount, setUnrespondedOrdersCount] = useState(0);
+
   // Superadmin broadcast notice
   const [activeNotice, setActiveNotice] = useState(null);
 
   // Check auth routes
   const isAuthPage = pathname === "/login" || pathname === "/login/staff";
 
-  // Hydrate collapsed state from localStorage
+  // Hydrate collapsed state and pending count from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("pet_admin_sidebar_collapsed");
@@ -40,18 +43,32 @@ export default function AppShell({ children }) {
       if (storedKitchen !== null) {
         setKitchenActive(storedKitchen !== "false");
       }
-    }
-  }, []);
-
-  // Listen for storage events (e.g. kitchen active toggled in another tab or component)
-  useEffect(() => {
-    function handleStorage(e) {
-      if (e.key === "restaurant_kitchen_active") {
-        setKitchenActive(e.newValue !== "false");
+      const storedCount = localStorage.getItem("pet_protocols_pending_orders_count");
+      if (storedCount !== null) {
+        setUnrespondedOrdersCount(Number(storedCount) || 0);
       }
+
+      function handleCountEvent(e) {
+        if (e.detail && typeof e.detail.count === "number") {
+          setUnrespondedOrdersCount(e.detail.count);
+        }
+      }
+
+      function handleStorage(e) {
+        if (e.key === "restaurant_kitchen_active") {
+          setKitchenActive(e.newValue !== "false");
+        } else if (e.key === "pet_protocols_pending_orders_count") {
+          setUnrespondedOrdersCount(Number(e.newValue) || 0);
+        }
+      }
+
+      window.addEventListener("pet_protocols_unresponded_orders_count", handleCountEvent);
+      window.addEventListener("storage", handleStorage);
+      return () => {
+        window.removeEventListener("pet_protocols_unresponded_orders_count", handleCountEvent);
+        window.removeEventListener("storage", handleStorage);
+      };
     }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   function toggleSidebarCollapse() {
@@ -146,7 +163,7 @@ export default function AppShell({ children }) {
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-main)] font-jakarta flex">
       {/* Background kitchen order listener & sound alert manager */}
-      <GlobalKitchenOrderListener />
+      <GlobalKitchenOrderListener onPendingCountChange={setUnrespondedOrdersCount} />
 
       {/* Main SaaS Collapsible Sidebar */}
       <Sidebar
@@ -156,6 +173,7 @@ export default function AppShell({ children }) {
         onCloseMobile={() => setMobileOpen(false)}
         kitchenActive={kitchenActive}
         activeNotice={activeNotice}
+        unrespondedCount={unrespondedOrdersCount}
       />
 
       {/* Main Content Area with Dynamic Padding for Collapsed vs Expanded Sidebar */}

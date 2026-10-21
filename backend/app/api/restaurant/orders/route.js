@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
+import User from "@/models/User";
+import Waste from "@/models/Waste";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
 import { executeOrderRefund, retryFailedDeduction } from "@/lib/refundService";
 import { notifyOrderEvent, sendPushToUser } from "@/lib/pushService";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
+import { processStalePickupOrders, logWasteForOrder } from "@/lib/orderMaintenanceService";
 
 let _requireRestaurantAdmin = requireRestaurantAdmin;
 export function _setTestRequireRestaurantAdmin(fn) {
   _requireRestaurantAdmin = fn;
 }
 
-// GET — List orders for this restaurant
+// GET — List orders for this restaurant (Strictly Read-Only)
 export async function GET(request) {
   try {
     const auth = await _requireRestaurantAdmin({ allowStaff: true, requiredPermission: "orders_view" });
@@ -160,6 +163,22 @@ export async function PUT(request) {
       cancellationReason,
     } = body;
 
+    if (action === "dismiss_stale_pickups") {
+      if (auth.isStaff && !auth.isAdmin && !auth.staffRoles.includes("Manager")) {
+        return NextResponse.json(
+          { success: false, message: "Only managers or restaurant admins can trigger stale pickup maintenance." },
+          { status: 403 }
+        );
+      }
+      await connectDB();
+      const maintenanceRes = await processStalePickupOrders({ restaurantId });
+      return NextResponse.json({
+        success: true,
+        message: `Processed stale pickup maintenance: ${maintenanceRes.processedCount} order(s) cancelled.`,
+        results: maintenanceRes,
+      });
+    }
+
     if (!orderId && (!orderIds || !orderIds.length)) {
       return NextResponse.json({ success: false, message: "Order ID is required." }, { status: 400 });
     }
@@ -269,34 +288,49 @@ export async function PUT(request) {
     }
 
     const previousStatus = order.status;
+    const isPickup = typeof order.isPickupOrder === "function" ? order.isPickupOrder() : order.orderType === "pickup";
+
     if (status) {
       if (!["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"].includes(status)) {
         return NextResponse.json({ success: false, message: `Invalid status '${status}'.` }, { status: 400 });
       }
 
-      // Role-based transition guard for staff
+      // Pickup orders cannot transition to out_for_delivery
+      if (status === "out_for_delivery" && isPickup) {
+        return NextResponse.json(
+          { success: false, message: "Pickup orders do not transition to 'out_for_delivery'. Mark as 'ready' and 'delivered' at counter." },
+          { status: 400 }
+        );
+      }
+
+      // Rule #3: Default-deny role-based transition guard for staff
       if (auth.isStaff && !auth.isAdmin) {
-        const isDeliveryStaff = auth.staffRoles.includes("Delivery");
-        const isKitchenStaff = auth.staffRoles.includes("Kitchen");
-        const isManager = auth.staffRoles.includes("Manager");
+        const userRoles = Array.isArray(auth.staffRoles) ? auth.staffRoles : [];
+        const isManager = userRoles.includes("Manager");
 
         if (!isManager) {
-          if (isDeliveryStaff && !isKitchenStaff) {
-            // Delivery staff can only transition to out_for_delivery or delivered
-            if (!["out_for_delivery", "delivered"].includes(status)) {
-              return NextResponse.json(
-                { success: false, message: "Delivery staff can only transition orders to 'out_for_delivery' or 'delivered'." },
-                { status: 403 }
-              );
+          const allowedTransitions = new Set();
+
+          for (const role of userRoles) {
+            if (role === "Kitchen") {
+              ["confirmed", "preparing", "ready", "cancelled"].forEach((s) => allowedTransitions.add(s));
+            } else if (role === "Delivery") {
+              ["out_for_delivery", "delivered"].forEach((s) => allowedTransitions.add(s));
+            } else if (role === "Cashier") {
+              if (isPickup) {
+                ["confirmed", "ready", "delivered"].forEach((s) => allowedTransitions.add(s));
+              }
             }
-          } else if (isKitchenStaff && !isDeliveryStaff) {
-            // Kitchen staff can only transition to confirmed, preparing, ready, or cancelled
-            if (!["confirmed", "preparing", "ready", "cancelled"].includes(status)) {
-              return NextResponse.json(
-                { success: false, message: "Kitchen staff can only transition orders to 'confirmed', 'preparing', or 'ready'." },
-                { status: 403 }
-              );
-            }
+          }
+
+          if (!allowedTransitions.has(status)) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: `Access denied. Staff role(s) [${userRoles.join(", ")}] not authorized to transition ${isPickup ? "pickup" : "delivery"} order to '${status}'.`,
+              },
+              { status: 403 }
+            );
           }
         }
       }
@@ -335,83 +369,47 @@ export async function PUT(request) {
           { status: 400 }
         );
       }
+    }
 
-      const distInfo = getOrderDistanceInfo(order, auth.restaurant);
-      const effectiveDistance = deliveryDistanceKm ?? distInfo.distanceKm;
-
-      if (acceptedOutOfRange) {
-        order.acceptedOutOfRange = true;
-        order.isOutOfRange = true;
-        order.deliveryDistanceKm = effectiveDistance ?? order.deliveryDistanceKm;
-        order.acceptedOutOfRangeBy = {
-          userId: auth.user?._id ? String(auth.user._id) : null,
-          name: auth.user?.name || "Manager",
-          role: auth.user?.role || "restaurant_admin",
-          acceptedAt: new Date(),
+    // Driver assignment validation (Rule #4 & Finding B & G)
+    let validatedDriverDoc = null;
+    if (assignedDeliveryStaff && assignedDeliveryStaff.id) {
+      const driverUser = await User.findOne({
+        _id: assignedDeliveryStaff.id,
+        restaurant: restaurantId,
+        role: "staff",
+        staffRoles: "Delivery",
+        status: "active",
+      });
+      if (!driverUser) {
+        return NextResponse.json(
+          { success: false, message: "Selected staff member is not an active delivery driver for this restaurant." },
+          { status: 400 }
+        );
+      }
+      validatedDriverDoc = {
+        id: driverUser._id,
+        name: driverUser.name,
+        phone: driverUser.phone || "",
+        email: driverUser.email || "",
+        assignedAt: new Date(),
+      };
+    } else if (status === "out_for_delivery" && !order.assignedDeliveryStaff?.id) {
+      // If no driver specified and order has no assigned driver:
+      // Only auto-assign if the actor is an actual delivery driver self-dispatching
+      const isActorDriver = auth.isStaff && Array.isArray(auth.staffRoles) && auth.staffRoles.includes("Delivery");
+      if (isActorDriver && !isPickup) {
+        validatedDriverDoc = {
+          id: auth.user._id,
+          name: auth.user.name || "Delivery Staff",
+          phone: auth.user.phone || "",
+          email: auth.user.email || "",
+          assignedAt: new Date(),
         };
       }
-
-      if (cancellationReason) {
-        order.cancellationReason = cancellationReason;
-      }
-
-      const transitionNote =
-        notes ||
-        (acceptedOutOfRange
-          ? `Accepted out-of-range order (${effectiveDistance ? effectiveDistance.toFixed(1) : "10+"} km > 10 km limit) by ${auth.user?.name || "Manager"}`
-          : (status === "cancelled" ? (cancellationReason || "Cancelled by restaurant staff") : ""));
-
-      if (typeof order.addStatusTransition === "function") {
-        order.addStatusTransition(
-          status,
-          {
-            userId: auth.user?._id,
-            role: auth.user?.role || "restaurant_admin",
-            name: auth.user?.name || "Restaurant Staff",
-          },
-          transitionNote
-        );
-      } else {
-        order.status = status;
-      }
-
-      // Explicit guarantee: activate live tracking and assign driver on out_for_delivery
-      if (status === "out_for_delivery") {
-        const isPickup = typeof order.isPickupOrder === "function" ? order.isPickupOrder() : false;
-        if (!isPickup) {
-          if (typeof order.startDeliveryTracking === "function") {
-            order.startDeliveryTracking({
-              userId: auth.user?._id,
-              role: auth.user?.role || "restaurant_staff",
-              name: auth.user?.name || "Delivery Staff",
-            });
-          } else {
-            order.deliveryTracking = order.deliveryTracking || {};
-            order.deliveryTracking.isLive = true;
-            order.deliveryTracking.startedAt = order.deliveryTracking.startedAt || new Date();
-            order.deliveryTracking.endedAt = null;
-            order.deliveryTracking.endReason = null;
-          }
-        }
-        if (!order.assignedDeliveryStaff?.id && auth.user?._id) {
-          order.assignedDeliveryStaff = {
-            id: auth.user._id,
-            name: auth.user.name || "Delivery Staff",
-            phone: auth.user.phone || "",
-            email: auth.user.email || "",
-            assignedAt: new Date(),
-          };
-        }
-      } else if (["delivered", "cancelled"].includes(status)) {
-        if (typeof order.stopDeliveryTracking === "function") {
-          order.stopDeliveryTracking(status === "delivered" ? "delivered" : "cancelled");
-        } else if (order.deliveryTracking) {
-          order.deliveryTracking.isLive = false;
-          order.deliveryTracking.endedAt = new Date();
-          order.deliveryTracking.endReason = status === "delivered" ? "delivered" : "cancelled";
-        }
-      }
+      // If manager dispatches, validatedDriverDoc remains null so the delivery driver can claim on first GPS ping
     }
+
     if (paymentStatus) {
       if (paymentStatus === "refunded" && order.refundDetails?.status !== "processed") {
         return NextResponse.json(
@@ -426,45 +424,109 @@ export async function PUT(request) {
         );
       }
 
-      // Guard: Cash on delivery orders cannot be marked as paid before being picked up (must be out_for_delivery or delivered)
+      // Guard: Cash on delivery/pickup orders validation (Finding E)
       const isCodMethod = String(order.paymentMethod || "").toLowerCase().includes("cod") || String(order.paymentMethod || "").toLowerCase().includes("cash");
       if (paymentStatus === "paid" && isCodMethod) {
         const targetStatus = status || order.status;
-        if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
-          return NextResponse.json(
-            { success: false, message: "Cash on delivery orders cannot be marked as paid before being picked up for delivery." },
-            { status: 400 }
-          );
+        if (isPickup) {
+          if (!["confirmed", "ready", "delivered"].includes(targetStatus)) {
+            return NextResponse.json(
+              { success: false, message: "Cash on pickup cannot be marked as paid before the order is ready or delivered." },
+              { status: 400 }
+            );
+          }
+        } else {
+          if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
+            return NextResponse.json(
+              { success: false, message: "Cash on delivery orders cannot be marked as paid before being picked up for delivery." },
+              { status: 400 }
+            );
+          }
         }
       }
+    }
 
-      order.paymentStatus = paymentStatus;
-    }
-    if (typeof notes === "string") order.notes = notes;
-    if (assignedDeliveryStaff) {
-      order.assignedDeliveryStaff = {
-        id: assignedDeliveryStaff.id || auth.user?._id,
-        name: assignedDeliveryStaff.name || auth.user?.name || "Delivery Staff",
-        phone: assignedDeliveryStaff.phone || auth.user?.phone || "",
-        email: assignedDeliveryStaff.email || auth.user?.email || "",
-        assignedAt: new Date(),
-      };
-    }
     if (codPaymentHandler) {
       const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
-
-      // Guard: Cash collection cannot be recorded before picking up the order
       if (isCollected) {
         const targetStatus = status || order.status;
-        if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
-          return NextResponse.json(
-            { success: false, message: "Cash on delivery cannot be collected before the order is picked up for delivery." },
-            { status: 400 }
-          );
+        if (isPickup) {
+          if (!["confirmed", "ready", "delivered"].includes(targetStatus)) {
+            return NextResponse.json(
+              { success: false, message: "Cash on pickup cannot be collected before the order is ready or delivered." },
+              { status: 400 }
+            );
+          }
+        } else {
+          if (targetStatus !== "out_for_delivery" && targetStatus !== "delivered") {
+            return NextResponse.json(
+              { success: false, message: "Cash on delivery cannot be collected before the order is picked up for delivery." },
+              { status: 400 }
+            );
+          }
         }
       }
+    }
 
-      order.codPaymentHandler = {
+    const distInfo = getOrderDistanceInfo(order, auth.restaurant);
+    const effectiveDistance = deliveryDistanceKm ?? distInfo.distanceKm;
+
+    const transitionNote =
+      notes ||
+      (acceptedOutOfRange
+        ? `Accepted out-of-range order (${effectiveDistance ? effectiveDistance.toFixed(1) : "10+"} km > 10 km limit) by ${auth.user?.name || "Manager"}`
+        : (status === "cancelled" ? (cancellationReason || "Cancelled by restaurant staff") : ""));
+
+    // Rule #6: Atomic conditional state update to prevent race conditions & lost updates
+    const atomicQuery = {
+      _id: order._id,
+      restaurant: restaurantId,
+      status: previousStatus,
+    };
+
+    const setFields = {};
+    if (status) {
+      setFields.status = status;
+    }
+    if (paymentStatus) {
+      setFields.paymentStatus = paymentStatus;
+    }
+    if (typeof notes === "string") {
+      setFields.notes = notes;
+    }
+    if (acceptedOutOfRange) {
+      setFields.acceptedOutOfRange = true;
+      setFields.isOutOfRange = true;
+      setFields.deliveryDistanceKm = effectiveDistance ?? order.deliveryDistanceKm;
+      setFields.acceptedOutOfRangeBy = {
+        userId: auth.user?._id ? String(auth.user._id) : null,
+        name: auth.user?.name || "Manager",
+        role: auth.user?.role || "restaurant_admin",
+        acceptedAt: new Date(),
+      };
+    }
+    if (cancellationReason) {
+      setFields.cancellationReason = cancellationReason;
+    }
+
+    if (status === "out_for_delivery" && !isPickup) {
+      setFields["deliveryTracking.isLive"] = true;
+      setFields["deliveryTracking.startedAt"] = order.deliveryTracking?.startedAt || new Date();
+      setFields["deliveryTracking.endedAt"] = null;
+      setFields["deliveryTracking.endReason"] = null;
+    } else if (["delivered", "cancelled"].includes(status)) {
+      setFields["deliveryTracking.isLive"] = false;
+      setFields["deliveryTracking.endedAt"] = new Date();
+      setFields["deliveryTracking.endReason"] = status === "delivered" ? "delivered" : "cancelled";
+    }
+
+    if (validatedDriverDoc) {
+      setFields.assignedDeliveryStaff = validatedDriverDoc;
+    }
+
+    if (codPaymentHandler) {
+      const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
+      setFields.codPaymentHandler = {
         id: codPaymentHandler.id || auth.user?._id,
         name: codPaymentHandler.name || auth.user?.name || "Delivery Staff",
         phone: codPaymentHandler.phone || auth.user?.phone || "",
@@ -476,40 +538,87 @@ export async function PUT(request) {
           : Boolean(order.codPaymentHandler?.settledWithManager),
         settledAt: codPaymentHandler.settledWithManager ? (order.codPaymentHandler?.settledAt || new Date()) : null,
       };
-      if (order.codPaymentHandler.collected) {
-        order.paymentStatus = "paid";
+      if (isCollected) {
+        setFields.paymentStatus = "paid";
       }
     }
-    await order.save();
 
+    const updateOperation = {
+      $set: setFields,
+      $inc: { __v: 1 },
+    };
+
+    if (status && status !== previousStatus) {
+      updateOperation.$push = {
+        statusHistory: {
+          status,
+          changedAt: new Date(),
+          changedBy: {
+            userId: auth.user?._id,
+            role: auth.user?.role || "restaurant_admin",
+            name: auth.user?.name || "Restaurant Staff",
+          },
+          note: transitionNote,
+        },
+      };
+    }
+
+    const updatedOrder = await Order.findOneAndUpdate(atomicQuery, updateOperation, { returnDocument: "after" });
+
+    if (!updatedOrder) {
+      return NextResponse.json(
+        {
+          success: false,
+          conflict: true,
+          message: `Conflict: Order status was concurrently modified from '${previousStatus}'. Please reload and retry.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Side effects executed strictly AFTER atomic state transition commits
     let stockRestorationResult = null;
     let refundResult = null;
+
     if (status === "cancelled") {
-      if (!order.stockRestored) {
-        stockRestorationResult = await restoreStockForOrder(order);
+      const isPreparedFood = ["ready", "out_for_delivery", "preparing"].includes(previousStatus);
+
+      if (isPreparedFood) {
+        // Rule #2: Prepared food is discarded. Log Waste; do not restore raw stock
+        await Order.updateOne(
+          { _id: updatedOrder._id },
+          { $set: { stockRestored: true, "stockRestoration.status": "completed", "wasteLogging.status": "pending" } }
+        );
+        const wasteRes = await logWasteForOrder(updatedOrder, {
+          reasonNote: `Prepared food discarded on cancellation of order #${updatedOrder.orderId || updatedOrder._id} (prior status: ${previousStatus})`,
+        });
+        stockRestorationResult = { success: wasteRes.success, message: "Prepared food discarded and logged as waste." };
+      } else if (!updatedOrder.stockRestored) {
+        // Unprepared order: restore raw ingredient stock safely
+        stockRestorationResult = await restoreStockForOrder(updatedOrder);
       }
 
-      // Execute refund if eligible
+      // Rule #1: Execute safe full-refund if eligible
       const isRefundEligible =
-        ['paid', 'refund_pending'].includes(order.paymentStatus) &&
-        (order.paymentMethod?.toLowerCase().includes("razorpay") || order.paymentMethod?.toLowerCase().includes("online"));
+        ['paid', 'refund_pending'].includes(updatedOrder.paymentStatus) &&
+        (updatedOrder.paymentMethod?.toLowerCase().includes("razorpay") || updatedOrder.paymentMethod?.toLowerCase().includes("online"));
 
       if (isRefundEligible) {
-        if (order.refundDetails?.status !== 'processed') {
+        if (updatedOrder.refundDetails?.status !== 'processed') {
           try {
             refundResult = await executeOrderRefund({
-              orderId: order._id,
-              reason: notes || "Cancelled by restaurant admin",
+              orderId: updatedOrder._id,
+              reason: transitionNote || "Cancelled by restaurant staff",
               initiatedBy: "restaurant",
             });
           } catch (refErr) {
-            console.warn(`[Restaurant Cancel] Refund warning for order ${order._id}:`, refErr.message);
+            console.warn(`[Restaurant Cancel] Refund warning for order ${updatedOrder._id}:`, refErr.message);
             refundResult = { success: false, error: refErr.message };
           }
         } else {
           refundResult = { success: true, alreadyRefunded: true };
         }
-      } else if (order.paymentStatus === 'reconciliation_required' || order.refundDetails?.status === 'reconciliation_required') {
+      } else if (updatedOrder.paymentStatus === 'reconciliation_required' || updatedOrder.refundDetails?.status === 'reconciliation_required') {
         refundResult = {
           success: false,
           status: 'reconciliation_required',
@@ -521,24 +630,24 @@ export async function PUT(request) {
 
     // Send Web Push notification if order status changed
     if (status && status !== previousStatus) {
-      Order.findById(order._id)
+      Order.findById(updatedOrder._id)
         .populate('restaurant', 'name slug phone')
         .populate('user', 'name email phone')
         .then((populated) => {
-          notifyOrderEvent(populated || order, 'status_update', {
+          notifyOrderEvent(populated || updatedOrder, 'status_update', {
             status,
             previousStatus,
-            reason: notes,
+            reason: transitionNote,
           }).catch((pushErr) => {
             console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
           });
         })
         .catch(() => {
-          notifyOrderEvent(order, 'status_update', { status, previousStatus, reason: notes }).catch(() => {});
+          notifyOrderEvent(updatedOrder, 'status_update', { status, previousStatus, reason: transitionNote }).catch(() => {});
         });
     }
 
-    const refreshedOrder = await Order.findById(order._id);
+    const refreshedOrder = await Order.findById(updatedOrder._id);
 
     let cancelMessage = "Order updated successfully";
     if (status === "cancelled") {
@@ -589,4 +698,5 @@ export async function PUT(request) {
 }
 
 export const PATCH = PUT;
+
 

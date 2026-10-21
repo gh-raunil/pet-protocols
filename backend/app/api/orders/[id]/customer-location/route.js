@@ -82,20 +82,20 @@ export async function PATCH(request, { params }) {
     }
 
     const now = new Date();
-    order.customerLocation = {
+    const customerLocation = {
       latitude: lat,
       longitude: lng,
       accuracy,
       updatedAt: now,
     };
 
-    // If destination address does not have coordinates, also backfill them
+    const setFields = { customerLocation };
     if (order.address && (order.address.latitude === null || order.address.latitude === undefined)) {
-      order.address.latitude = lat;
-      order.address.longitude = lng;
+      setFields["address.latitude"] = lat;
+      setFields["address.longitude"] = lng;
     }
 
-    await order.save();
+    await Order.updateOne({ _id: order._id }, { $set: setFields });
 
     return NextResponse.json({
       success: true,

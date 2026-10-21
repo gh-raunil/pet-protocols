@@ -35,6 +35,7 @@ import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
 import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
+import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
@@ -264,6 +265,19 @@ export default function OrdersClient() {
   const [outOfRangePrompt, setOutOfRangePrompt] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
+  const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
+
+  const toggleLiveMap = (orderId) => {
+    setExpandedMapOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
 
   // Kitchen Alert, Audio & Operational States
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -414,6 +428,7 @@ export default function OrdersClient() {
       const data = await res.json();
       if (data.success) {
         const orderObj = orders.find((o) => o._id === orderId);
+        const wasPending = orderObj?.status === "pending";
         const displayId = formatOrderId(orderObj || { _id: orderId });
         setFeedback({
           type: "success",
@@ -429,6 +444,28 @@ export default function OrdersClient() {
           next.delete(orderId);
           return next;
         });
+
+        // If a pending order was responded to, immediately broadcast reduced count & sync
+        if (wasPending && nextStatus !== "pending" && typeof window !== "undefined") {
+          const remainingPending = orders.filter(
+            (o) => o._id !== orderId && o.status === "pending"
+          ).length;
+
+          try {
+            localStorage.setItem("pet_protocols_pending_orders_count", String(remainingPending));
+          } catch (e) {}
+
+          window.dispatchEvent(
+            new CustomEvent("pet_protocols_unresponded_orders_count", {
+              detail: { count: remainingPending },
+            })
+          );
+          window.dispatchEvent(
+            new CustomEvent("pet_protocols_order_responded", {
+              detail: { orderId, nextStatus },
+            })
+          );
+        }
       } else {
         setFeedback({ type: "error", message: data.message });
       }
@@ -916,19 +953,29 @@ export default function OrdersClient() {
 
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto subtle-scrollbar pb-1.5 w-full min-w-0">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterStatus(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer ${
-                filterStatus === tab.id
-                  ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-sm"
-                  : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10 hover:bg-stone-100/60 dark:hover:bg-white/10"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {statusTabs.map((tab) => {
+            const isPendingTab = tab.id === "pending";
+            const pendingCount = isPendingTab ? orders.filter((o) => o.status === "pending").length : 0;
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  filterStatus === tab.id
+                    ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-sm"
+                    : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10 hover:bg-stone-100/60 dark:hover:bg-white/10"
+                }`}
+              >
+                <span>{tab.label}</span>
+                {isPendingTab && pendingCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── ORDERS LIST ─────────────────────────────────────────── */}
@@ -1076,6 +1123,29 @@ export default function OrdersClient() {
                           </div>
                         )}
 
+                        {/* Delivery Boy Details / Which Staff Took the Order */}
+                        {order.assignedDeliveryStaff?.name ? (
+                          <div className="text-[11px] bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-200 p-2 rounded-xl flex items-center justify-between">
+                            <span className="font-semibold flex items-center gap-1.5 truncate">
+                              <span>🛵</span>
+                              <span>Delivery Boy: {order.assignedDeliveryStaff.name}</span>
+                            </span>
+                            {order.assignedDeliveryStaff.phone && (
+                              <a
+                                href={`tel:${order.assignedDeliveryStaff.phone}`}
+                                className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold hover:underline shrink-0"
+                              >
+                                {order.assignedDeliveryStaff.phone}
+                              </a>
+                            )}
+                          </div>
+                        ) : !isPickup && (order.status === "out_for_delivery" || order.status === "ready") ? (
+                          <div className="text-[10px] bg-stone-100 dark:bg-white/5 text-stone-500 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <span>🛵</span>
+                            <span>Delivery Boy: Awaiting pickup assignment</span>
+                          </div>
+                        ) : null}
+
                         {/* Special Note if any */}
                         {order.notes && (
                           <div className="text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
@@ -1160,15 +1230,18 @@ export default function OrdersClient() {
 
                         {order.status === "preparing" && (
                           isPickup ? (
-                            <Tooltip content="Mark food packed and ready for counter pickup by customer" position="top">
+                            <Tooltip fullWidth className="w-full" content="Mark food packed and ready for counter pickup by customer" position="top">
                               <button
                                 type="button"
                                 disabled={updatingOrderId === order._id}
                                 onClick={() => handleUpdateStatus(order._id, "ready")}
-                                className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] transition-all duration-200 shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/35 border border-emerald-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                               >
-                                <CheckCircle2 size={13} />
+                                <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                                  <PackageCheck size={13} className="text-white" />
+                                </div>
                                 <span>Mark Ready for Pickup</span>
+                                <span className="text-[10px] opacity-80 font-bold ml-0.5">✓</span>
                               </button>
                             </Tooltip>
                           ) : (
@@ -1376,6 +1449,39 @@ export default function OrdersClient() {
                                 </span>
                               </div>
                             )}
+
+                            {/* Delivery Boy / Staff Assigned */}
+                            {order.assignedDeliveryStaff?.name ? (
+                              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
+                                <span className="font-bold uppercase tracking-wider text-[10px] text-blue-600 dark:text-blue-400 block">
+                                  Delivery Boy / Assigned Staff
+                                </span>
+                                <div className="flex items-center justify-between gap-2 mt-1">
+                                  <span className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                                    <span>🛵</span>
+                                    <span>{order.assignedDeliveryStaff.name}</span>
+                                  </span>
+                                  {order.assignedDeliveryStaff.phone && (
+                                    <a
+                                      href={`tel:${order.assignedDeliveryStaff.phone}`}
+                                      className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                      {order.assignedDeliveryStaff.phone}
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ) : !isPickup ? (
+                              <div className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 text-[11px] text-stone-500 flex items-center gap-1.5">
+                                <span>🛵</span>
+                                <span>Delivery Boy: Awaiting driver pickup</span>
+                              </div>
+                            ) : (
+                              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1.5">
+                                <span>🛍️</span>
+                                <span>Counter Self-Pickup Order</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Highlighted Special Cooking Instructions */}
@@ -1466,6 +1572,33 @@ export default function OrdersClient() {
                         </div>
                       </div>
 
+                      {/* Live Delivery Map for Manager (Static Restaurant + Staff Live GPS + Customer Doorstep) */}
+                      {expandedMapOrderIds.has(order._id) && (
+                        <div className="my-3 rounded-2xl overflow-hidden border border-blue-500/30 bg-stone-900 shadow-md">
+                          <div className="p-2.5 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between text-xs">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                              <Radio size={14} className="animate-pulse text-blue-500" />
+                              <span>Live Delivery Dispatch Map</span>
+                            </span>
+                            <span className="text-[11px] text-stone-400">
+                              Restaurant (Fixed) • Driver (Live GPS) • Customer (Doorstep)
+                            </span>
+                          </div>
+                          <div className="p-2">
+                            <LiveDeliveryMap
+                              orderId={order.orderId || order._id}
+                              initialStatus={order.status}
+                              restaurant={order.restaurant}
+                              destination={order.address}
+                              deliveryTracking={order.deliveryTracking}
+                              recipientName={order.address?.fullName}
+                              isStaffView={false}
+                              isManagerView={true}
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Primary One-Click Action Stepper Bar */}
                       <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                         {/* Print KOT Button */}
@@ -1532,9 +1665,9 @@ export default function OrdersClient() {
                                   type="button"
                                   disabled={updatingOrderId === order._id}
                                   onClick={() => handleUpdateStatus(order._id, "ready")}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all shadow-sm border border-emerald-400/30 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
-                                  <CheckCircle2 size={14} />
+                                  <PackageCheck size={14} />
                                   <span>Mark Ready for Pickup</span>
                                 </button>
                               </Tooltip>
@@ -1582,17 +1715,32 @@ export default function OrdersClient() {
                           )}
 
                           {order.status === "out_for_delivery" && (
-                            <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "delivered")}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <Truck size={14} />
-                                <span>Confirm Order Delivered</span>
-                              </button>
-                            </Tooltip>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {!isPickup && (
+                                <Tooltip content="View live delivery route showing restaurant, delivery staff GPS, and customer doorstep" position="top">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleLiveMap(order._id)}
+                                    className="px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <MapPin size={13} />
+                                    <span>{expandedMapOrderIds.has(order._id) ? "Hide Live Map" : "View Live Route"}</span>
+                                  </button>
+                                </Tooltip>
+                              )}
+
+                              <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
+                                <button
+                                  type="button"
+                                  disabled={updatingOrderId === order._id}
+                                  onClick={() => handleUpdateStatus(order._id, "delivered")}
+                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Truck size={14} />
+                                  <span>Confirm Order Delivered</span>
+                                </button>
+                              </Tooltip>
+                            </div>
                           )}
 
                           {order.status === "delivered" && (

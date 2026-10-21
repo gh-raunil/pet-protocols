@@ -43,6 +43,7 @@ export default function Sidebar({
   onCloseMobile,
   kitchenActive,
   activeNotice,
+  unrespondedCount = 0,
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -64,6 +65,25 @@ export default function Sidebar({
   const [enabledFeatures, setEnabledFeatures] = useState(
     session?.user?.enabledFeatures !== undefined ? session.user.enabledFeatures : null
   );
+
+  const [effectivePendingCount, setEffectivePendingCount] = useState(unrespondedCount);
+
+  useEffect(() => {
+    setEffectivePendingCount(unrespondedCount);
+  }, [unrespondedCount]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function handleCountUpdate(e) {
+      if (e.detail && typeof e.detail.count === "number") {
+        setEffectivePendingCount(e.detail.count);
+      }
+    }
+    window.addEventListener("pet_protocols_unresponded_orders_count", handleCountUpdate);
+    return () => {
+      window.removeEventListener("pet_protocols_unresponded_orders_count", handleCountUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     if (session?.user?.enabledFeatures !== undefined) {
@@ -118,7 +138,14 @@ export default function Sidebar({
           title: "Operations",
           items: [
             { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: "Hub" },
-            { href: "/orders", label: "Live Orders", icon: ShoppingBag, badge: "Live" },
+            {
+              href: "/orders",
+              label: "Live Orders",
+              icon: ShoppingBag,
+              badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : "Live",
+              isAlertBadge: effectivePendingCount > 0,
+              alertCount: effectivePendingCount,
+            },
             { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
             { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
           ].filter((item) => isFeatureEnabled(item.href)),
@@ -182,7 +209,14 @@ export default function Sidebar({
             title: "Manager Operations",
             items: [
               { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-              { href: "/orders", label: "Live Orders", icon: ShoppingBag, badge: "Live" },
+              {
+                href: "/orders",
+                label: "Live Orders",
+                icon: ShoppingBag,
+                badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : "Live",
+                isAlertBadge: effectivePendingCount > 0,
+                alertCount: effectivePendingCount,
+              },
               { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
               { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
             ].filter((item) => isFeatureEnabled(item.href)),
@@ -234,7 +268,7 @@ export default function Sidebar({
         ],
       },
     ];
-  }, [isLeadAdmin, isStaff, staffRoles, enabledFeatures, activeNotice]);
+  }, [isLeadAdmin, isStaff, staffRoles, enabledFeatures, activeNotice, effectivePendingCount]);
 
   const handleLogout = async () => {
     try {
@@ -280,14 +314,21 @@ export default function Sidebar({
             : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100/80 dark:hover:bg-white/5 border-l-3 border-transparent"
         }`}
       >
-        <Icon
-          size={18}
-          className={`shrink-0 transition-colors ${
-            isActive
-              ? "text-orange-600 dark:text-orange-400"
-              : "text-stone-400 dark:text-stone-500 group-hover:text-stone-800 dark:group-hover:text-white"
-          }`}
-        />
+        <div className="relative shrink-0 flex items-center justify-center">
+          <Icon
+            size={18}
+            className={`transition-colors ${
+              isActive
+                ? "text-orange-600 dark:text-orange-400"
+                : "text-stone-400 dark:text-stone-500 group-hover:text-stone-800 dark:group-hover:text-white"
+            }`}
+          />
+          {collapsed && !mobileOpen && item.alertCount > 0 && (
+            <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[8px] font-black px-1 min-w-[15px] h-[15px] rounded-full flex items-center justify-center animate-pulse shadow-xs border border-white dark:border-[#0b0f19]">
+              {item.alertCount > 99 ? "99+" : item.alertCount}
+            </span>
+          )}
+        </div>
 
         {(!collapsed || mobileOpen) && (
           <span className="truncate flex-1">{item.label}</span>
@@ -295,8 +336,10 @@ export default function Sidebar({
 
         {(!collapsed || mobileOpen) && item.badge && (
           <span
-            className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md shrink-0 ${
-              isActive
+            className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md shrink-0 transition-all ${
+              item.isAlertBadge
+                ? "bg-rose-500 text-white animate-pulse shadow-xs font-black tracking-wide"
+                : isActive
                 ? "bg-orange-500 text-white"
                 : "bg-stone-100 dark:bg-white/10 text-stone-500 dark:text-stone-400"
             }`}
@@ -313,7 +356,14 @@ export default function Sidebar({
 
     if (collapsed && !mobileOpen) {
       return (
-        <Tooltip content={item.label} placement="right">
+        <Tooltip
+          content={
+            item.alertCount > 0
+              ? `${item.label} (${item.alertCount} unresponded)`
+              : item.label
+          }
+          placement="right"
+        >
           <div>{content}</div>
         </Tooltip>
       );

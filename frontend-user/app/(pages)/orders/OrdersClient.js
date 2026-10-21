@@ -643,6 +643,7 @@ export default function OrdersClient() {
                   statusHistory={order.statusHistory || []}
                   notes={order.notes || ""}
                   createdAt={order.createdAt}
+                  assignedDeliveryStaff={order.assignedDeliveryStaff}
                 />
                 {order.status === "out_for_delivery" && !isPickup && (
                   <div className="pt-3">

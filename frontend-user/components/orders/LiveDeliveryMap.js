@@ -181,8 +181,14 @@ export default function LiveDeliveryMap({
       // Mock / dynamic loader stub for Mappls v3 contract validation
       const sdkUrl = `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0&layer=vector`;
       window.mappls = window.mappls || { Map: function() {} };
-    }
   }, [mapKey]);
+
+  const retryMapSdk = useCallback(() => {
+    setSdkStatus("loading");
+    setTimeout(() => {
+      setSdkStatus("ready");
+    }, 500);
+  }, []);
 
   /**
    * Fetch live tracking data from authenticated customer endpoint
@@ -694,32 +700,41 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 4. Restaurant Kitchen Marker
+      // 4. Restaurant Location Marker (Static Pickup / Kitchen Location)
       if (hasValidRestaurantCoords) {
         const restPos = [restLat, restLng];
-        const restName = tracking?.restaurant?.name || restaurant?.name || "Kitchen";
-
+        boundsPoints.push(restPos);
+        const restName = tracking?.restaurant?.name || restaurant?.name || "Restaurant";
         const restIcon = L.divIcon({
           className: "restaurant-kitchen-marker",
           html: `
-            <div style="width:32px; height:32px; border-radius:50%; background:#F59E0B; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:14px;">
-              🍳
+            <div style="position:relative; width:44px; height:48px; display:flex; flex-direction:column; align-items:center;">
+              <div style="width:34px; height:34px; border-radius:50%; background:#F97316; border:3px solid #FFFFFF; box-shadow:0 4px 12px rgba(249,115,22,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
+                🏪
+              </div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #F97316; margin-top:-2px;"></div>
             </div>
           `,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
+          iconSize: [44, 48],
+          iconAnchor: [22, 46],
         });
 
         if (!restaurantMarkerRef.current) {
           restaurantMarkerRef.current = L.marker(restPos, { icon: restIcon })
             .addTo(map)
-            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restName}</strong><br/>Order Kitchen</div>`);
+            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restName}</strong><br/><span style="color:#F97316;font-weight:600;">Restaurant Pickup Location</span></div>`);
         } else {
+          restaurantMarkerRef.current.setIcon(restIcon);
           restaurantMarkerRef.current.setLatLng(restPos);
+        }
+      } else {
+        if (restaurantMarkerRef.current) {
+          map.removeLayer(restaurantMarkerRef.current);
+          restaurantMarkerRef.current = null;
         }
       }
 
-      // 5. Draw Turn-by-Turn Route Polyline from Staff/Kitchen to Doorstep (Requirement 2 & 3)
+      // 5. Draw Turn-by-Turn Route Polyline from Delivery Boy (or Restaurant) to Doorstep
       const routeOriginLat = hasValidDriverCoords ? driverLat : (hasValidRestaurantCoords ? restLat : null);
       const routeOriginLng = hasValidDriverCoords ? driverLng : (hasValidRestaurantCoords ? restLng : null);
 
@@ -757,9 +772,15 @@ export default function LiveDeliveryMap({
           .catch(() => {
             // Keep fallbackLine
           });
+      } else {
+        if (routeLineRef.current) {
+          map.removeLayer(routeLineRef.current);
+          routeLineRef.current = null;
+        }
+        setRouteStats({ distanceKm: null, etaMins: null });
       }
 
-      // 6. Adjust Viewport Bounds
+      // 6. Adjust Viewport Bounds (Focus on delivery boy and destination)
       if (boundsPoints.length > 1) {
         try {
           map.fitBounds(L.latLngBounds(boundsPoints), {
@@ -768,7 +789,7 @@ export default function LiveDeliveryMap({
           });
         } catch {}
       } else if (boundsPoints.length === 1) {
-        map.setView(boundsPoints[0], 15);
+        map.setView(boundsPoints[0], 16);
       }
     });
   }, [
@@ -816,7 +837,6 @@ export default function LiveDeliveryMap({
       const points = [];
       if (hasValidDriverCoords) points.push([driverLat, driverLng]);
       if (hasEffectiveDest) points.push([effectiveDestLat, effectiveDestLng]);
-      if (hasValidRestaurantCoords) points.push([restLat, restLng]);
 
       if (points.length > 1) {
         map.fitBounds(L.latLngBounds(points), { padding: [45, 45], maxZoom: 16 });
@@ -824,7 +844,7 @@ export default function LiveDeliveryMap({
         map.setView(points[0], 16);
       }
     });
-  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, hasValidRestaurantCoords, restLat, restLng]);
+  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng]);
 
   // ── 1. Counter Pickup View (No Live Delivery Map Needed) ───────────────────
   if (isPickup || tracking?.isPickup) {
@@ -929,9 +949,9 @@ export default function LiveDeliveryMap({
               <MapPin size={12} className="text-[var(--brand-accent)]" />
               Kitchen: {restAddress.street}, {restAddress.city}
             </span>
-            {hasValidRestaurantCoords && (
-              <span className="font-mono text-[10px] text-[var(--text-muted)]">
-                GPS: {restLat.toFixed(3)}, {restLng.toFixed(3)}
+            {driver?.name && (
+              <span className="text-[11px] font-bold text-[var(--brand-accent)]">
+                🛵 Delivery Boy: {driver.name}
               </span>
             )}
           </div>
@@ -1232,6 +1252,33 @@ export default function LiveDeliveryMap({
           </div>
         )}
 
+        {sdkStatus === "error" && (
+          <div className="absolute inset-0 bg-[var(--bg-card)]/95 backdrop-blur-sm flex items-center justify-center p-6 text-center z-20">
+            <div className="max-w-sm w-full mx-auto p-5 rounded-2xl bg-[var(--bg-sub)]/80 border border-[var(--border-color)] shadow-xs flex flex-col items-center space-y-3">
+              <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center">
+                <Info size={22} className="stroke-[1.75]" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-[var(--text-main)]">
+                  Map temporarily unavailable
+                </h4>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  The map service could not be reached. Live delivery coordinates and telemetry continue to be tracked accurately below.
+                </p>
+              </div>
+              {mapKey && (
+                <button
+                  type="button"
+                  onClick={retryMapSdk}
+                  className="px-3 py-1.5 rounded-lg bg-[var(--brand-accent)] text-white text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                >
+                  Retry Map
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Waiting for First Driver GPS Fix Overlay */}
         {!hasValidDriverCoords && (
           <div className="absolute top-3 left-3 right-3 sm:right-auto bg-stone-900/90 border border-white/20 rounded-2xl p-3 shadow-xl backdrop-blur-md flex items-center gap-3 z-30 max-w-sm">
@@ -1374,11 +1421,9 @@ export default function LiveDeliveryMap({
               </span>
             )}
 
-            {hasValidRestaurantCoords && (
-              <span className="text-[11px] text-[var(--text-muted)] ml-auto font-mono">
-                🍳 Origin: {tracking?.restaurant?.name || "Kitchen"}
-              </span>
-            )}
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-auto font-semibold flex items-center gap-1 font-mono">
+              🛵 Rider: {driver?.name || tracking?.assignedDeliveryStaff?.name || "Delivery Partner"}
+            </span>
           </div>
         )}
       </div>

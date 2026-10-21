@@ -363,3 +363,90 @@ html.dark body .scrollbar-thin-accent::-webkit-scrollbar-thumb:hover {
   height: 100% !important;
   background-color: #141518 !important;
 }
+
+/* ── POS Thermal Receipt & Invoice Print Styles ─────────────────────── */
+@media print {
+  /* Force clean white paper & crisp black text for thermal & standard printers */
+  html,
+  body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely suppress all browser app chrome, sidebars, headers, floating widgets, and action buttons */
+  aside,
+  header,
+  nav,
+  .no-print,
+  [data-no-print="true"] {
+    display: none !important;
+  }
+
+  /* Remove sidebar dynamic margin on main container */
+  .md\:pl-\[72px\],
+  .md\:pl-\[260px\] {
+    padding-left: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  @page {
+    size: auto;
+    margin: 3mm 2mm;
+  }
+
+  /* Modal backdrop & card isolation for printing */
+  .pos-receipt-backdrop {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    display: block !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .pos-receipt-modal {
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    max-width: 80mm !important;
+    width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  .pos-receipt-paper {
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 1mm 0mm !important;
+    font-family: 'Courier New', Courier, monospace, system-ui !important;
+  }
+
+  .pos-receipt-paper * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+}

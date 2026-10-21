@@ -29,6 +29,7 @@ export default function Tooltip({
   delay = 150,
   className = "",
   disabled = false,
+  fullWidth = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, actualPlacement: placement });
@@ -180,7 +181,7 @@ export default function Tooltip({
         }
       }}
       aria-describedby={isOpen ? id : undefined}
-      className="inline-flex max-w-full"
+      className={`max-w-full ${fullWidth || className?.includes("w-full") ? "w-full flex" : "inline-flex"}`}
     >
       {children}
     </span>

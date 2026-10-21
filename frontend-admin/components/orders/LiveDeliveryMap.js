@@ -147,6 +147,7 @@ export default function LiveDeliveryMap({
   origin = null, // live staff transmitter location
   recipientName = "",
   isStaffView = false,
+  isManagerView = false,
   onStatusUpdate = null,
 }) {
   const [tracking, setTracking] = useState(null);
@@ -296,9 +297,9 @@ export default function LiveDeliveryMap({
   // Staff device geolocation state
   const [deviceCoords, setDeviceCoords] = useState(null);
 
-  // Auto-acquire staff device geolocation if in staff view and origin is not explicitly transmitting
+  // Auto-acquire staff device geolocation if in staff view, not in manager view, and origin is not explicitly transmitting
   useEffect(() => {
-    if (!isStaffView || typeof window === "undefined" || !navigator.geolocation) return;
+    if (!isStaffView || isManagerView || typeof window === "undefined" || !navigator.geolocation) return;
 
     let isCancelled = false;
     navigator.geolocation.getCurrentPosition(
@@ -341,7 +342,7 @@ export default function LiveDeliveryMap({
         } catch {}
       }
     };
-  }, [isStaffView]);
+  }, [isStaffView, isManagerView]);
 
   /**
    * Coordinate resolution
@@ -392,14 +393,14 @@ export default function LiveDeliveryMap({
     origin?.lat ??
     tracking?.location?.latitude ??
     deliveryTracking?.currentLocation?.latitude ??
-    (isStaffView ? deviceCoords?.latitude : null);
+    (isStaffView && !isManagerView ? deviceCoords?.latitude : null);
 
   const rawDriverLng =
     origin?.longitude ??
     origin?.lng ??
     tracking?.location?.longitude ??
     deliveryTracking?.currentLocation?.longitude ??
-    (isStaffView ? deviceCoords?.longitude : null);
+    (isStaffView && !isManagerView ? deviceCoords?.longitude : null);
 
   const hasRawDriverCoords = isValidCoordinate(rawDriverLat, rawDriverLng);
 
@@ -411,16 +412,10 @@ export default function LiveDeliveryMap({
     hasEffectiveDest &&
     haversineDistance(rawDriverLat, rawDriverLng, effectiveDestLat, effectiveDestLng) < 0.04;
 
+  // Keep driver coordinates strictly to actual reported driver GPS.
+  // NEVER fall back to restaurant coordinates as driver location!
   let driverLat = hasRawDriverCoords ? rawDriverLat : null;
   let driverLng = hasRawDriverCoords ? rawDriverLng : null;
-
-  if (isDriverIdenticalToDest && currentStatus === "out_for_delivery" && hasValidRestaurantCoords) {
-    driverLat = restLat;
-    driverLng = restLng;
-  } else if (!hasRawDriverCoords && currentStatus === "out_for_delivery" && hasValidRestaurantCoords) {
-    driverLat = restLat;
-    driverLng = restLng;
-  }
 
   const hasValidDriverCoords = isValidCoordinate(driverLat, driverLng);
 
@@ -714,20 +709,19 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 4. Restaurant Kitchen Marker (🍳)
+      // 4. Restaurant Location Marker (Static Kitchen / Dispatch Gate)
       if (hasValidRestaurantCoords) {
         const restPos = [restLat, restLng];
         boundsPoints.push(restPos);
-        const restName = tracking?.restaurant?.name || restaurant?.name || "Kitchen";
-
+        const restName = tracking?.restaurant?.name || restaurant?.name || "Restaurant";
         const restIcon = L.divIcon({
           className: "restaurant-kitchen-marker",
           html: `
             <div style="position:relative; width:44px; height:48px; display:flex; flex-direction:column; align-items:center;">
-              <div style="width:34px; height:34px; border-radius:50%; background:#F59E0B; border:3px solid #FFFFFF; box-shadow:0 4px 10px rgba(245,158,11,0.5); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
-                🍳
+              <div style="width:34px; height:34px; border-radius:50%; background:#F97316; border:3px solid #FFFFFF; box-shadow:0 4px 12px rgba(249,115,22,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
+                🏪
               </div>
-              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #F59E0B; margin-top:-2px;"></div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #F97316; margin-top:-2px;"></div>
             </div>
           `,
           iconSize: [44, 48],
@@ -737,14 +731,19 @@ export default function LiveDeliveryMap({
         if (!restaurantMarkerRef.current) {
           restaurantMarkerRef.current = L.marker(restPos, { icon: restIcon })
             .addTo(map)
-            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restName}</strong><br/>Pickup Kitchen</div>`);
+            .bindPopup(`<div style="font-family:sans-serif;font-size:12px;padding:2px;"><strong>${restName}</strong><br/><span style="color:#F97316;font-weight:600;">Restaurant Pickup Location</span></div>`);
         } else {
           restaurantMarkerRef.current.setIcon(restIcon);
           restaurantMarkerRef.current.setLatLng(restPos);
         }
+      } else {
+        if (restaurantMarkerRef.current) {
+          map.removeLayer(restaurantMarkerRef.current);
+          restaurantMarkerRef.current = null;
+        }
       }
 
-      // 5. Turn-by-Turn Road Route Polyline from Staff/Kitchen to Doorstep
+      // 5. Turn-by-Turn Road Route Polyline from Delivery Boy (or Restaurant) to Destination Doorstep
       const routeOriginLat = hasValidDriverCoords ? driverLat : (hasValidRestaurantCoords ? restLat : null);
       const routeOriginLng = hasValidDriverCoords ? driverLng : (hasValidRestaurantCoords ? restLng : null);
 
@@ -782,17 +781,15 @@ export default function LiveDeliveryMap({
           .catch(() => {
             // Keep fallbackLine
           });
-      }
-
-      // 6. Viewport fitting: Ensure bounds ALWAYS includes both kitchen and destination
-      // This prevents collapsing into a single rooftop when driver/customer coordinates overlap
-      if (hasValidRestaurantCoords && hasEffectiveDest) {
-        const kitchenInBounds = boundsPoints.some(([lat, lng]) => Math.abs(lat - restLat) < 0.0001 && Math.abs(lng - restLng) < 0.0001);
-        if (!kitchenInBounds) {
-          boundsPoints.push([restLat, restLng]);
+      } else {
+        if (routeLineRef.current) {
+          map.removeLayer(routeLineRef.current);
+          routeLineRef.current = null;
         }
+        setRouteStats({ distanceKm: null, etaMins: null });
       }
 
+      // 6. Viewport fitting: Focus on delivery boy and destination (no restaurant pin)
       if (boundsPoints.length > 1) {
         try {
           map.fitBounds(L.latLngBounds(boundsPoints), {
@@ -801,7 +798,7 @@ export default function LiveDeliveryMap({
           });
         } catch {}
       } else if (boundsPoints.length === 1) {
-        map.setView(boundsPoints[0], 15);
+        map.setView(boundsPoints[0], 16);
       }
     });
   }, [
@@ -850,7 +847,6 @@ export default function LiveDeliveryMap({
       const points = [];
       if (hasValidDriverCoords) points.push([driverLat, driverLng]);
       if (hasEffectiveDest) points.push([effectiveDestLat, effectiveDestLng]);
-      if (hasValidRestaurantCoords) points.push([restLat, restLng]);
 
       if (points.length > 1) {
         map.fitBounds(L.latLngBounds(points), { padding: isFullscreen ? [80, 80] : [50, 50], maxZoom: 16 });
@@ -858,7 +854,7 @@ export default function LiveDeliveryMap({
         map.setView(points[0], 16);
       }
     });
-  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, hasValidRestaurantCoords, restLat, restLng, isFullscreen]);
+  }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, isFullscreen]);
 
   // Terminal state
   if (currentStatus === "delivered") {
@@ -943,6 +939,8 @@ export default function LiveDeliveryMap({
                     ? "⚠️ GPS Signal Stale"
                     : hasValidDriverCoords
                     ? "● Live GPS Connected"
+                    : currentStatus === "out_for_delivery"
+                    ? "📡 Awaiting Delivery Staff Live GPS"
                     : "⏳ Ready for Driver Dispatch"}
                 </span>
 
@@ -958,29 +956,28 @@ export default function LiveDeliveryMap({
           {/* Right Block: External Maps App Link + Action Buttons */}
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
             {hasEffectiveDest && (() => {
-              const effectiveOriginLat = driverLat ?? deviceCoords?.latitude ?? restLat;
-              const effectiveOriginLng = driverLng ?? deviceCoords?.longitude ?? restLng;
-              const isKitchenFallback = (!driverLat && !deviceCoords?.latitude) || (effectiveOriginLat === restLat && effectiveOriginLng === restLng);
-              const originLabel = isKitchenFallback
-                ? (restaurant?.name || "Kitchen Location")
-                : "Staff Location";
+              const effectiveOriginLat = driverLat ?? deviceCoords?.latitude;
+              const effectiveOriginLng = driverLng ?? deviceCoords?.longitude;
+              const originLabel = "Delivery Staff Location";
               const destLabel = recipientName || destObj?.street || "Customer Destination";
 
-              const mapplsNavUrl = buildMapplsDirectionUrl({
-                startLat: effectiveOriginLat,
-                startLng: effectiveOriginLng,
-                startLabel: originLabel,
-                destLat: effectiveDestLat,
-                destLng: effectiveDestLng,
-                destLabel: destLabel,
-                mode: "driving",
-              });
+              const mapplsNavUrl = effectiveOriginLat && effectiveOriginLng
+                ? buildMapplsDirectionUrl({
+                    startLat: effectiveOriginLat,
+                    startLng: effectiveOriginLng,
+                    startLabel: originLabel,
+                    destLat: effectiveDestLat,
+                    destLng: effectiveDestLng,
+                    destLabel: destLabel,
+                    mode: "driving",
+                  })
+                : `https://www.mappls.com/search?q=${encodeURIComponent(destLabel)}&lat=${effectiveDestLat}&lng=${effectiveDestLng}`;
 
               const handleMapplsClick = (e) => {
                 // If we already have full Mappls URL with live staff origin coordinates, proceed directly
                 if (mapplsNavUrl && effectiveOriginLat && effectiveOriginLng) return;
 
-                if (typeof window !== "undefined" && navigator.geolocation) {
+                if (!isManagerView && typeof window !== "undefined" && navigator.geolocation) {
                   e.preventDefault();
                   const newTab = window.open("about:blank", "_blank");
                   navigator.geolocation.getCurrentPosition(
@@ -1353,11 +1350,9 @@ export default function LiveDeliveryMap({
             </span>
           )}
 
-          {hasValidRestaurantCoords && (
-            <span className="text-[11px] text-[var(--text-muted)] ml-auto font-mono">
-              🍳 Kitchen: {tracking?.restaurant?.name || restaurant?.name || "Restaurant"}
-            </span>
-          )}
+          <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-auto font-semibold flex items-center gap-1 font-mono">
+            🛵 Rider: {driver?.name || tracking?.assignedDeliveryStaff?.name || "Delivery Staff"}
+          </span>
         </div>
       </div>
     </div>
