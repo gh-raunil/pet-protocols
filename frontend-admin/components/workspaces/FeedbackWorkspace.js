@@ -22,7 +22,7 @@ import {
   HelpCircle,
   ThumbsUp,
 } from "lucide-react";
-import { toast } from "../ui/ToastProvider";
+import toast from "react-hot-toast";
 
 const COMPLAINT_LABELS = {
   food_quality: "Food Quality",
