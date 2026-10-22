@@ -173,7 +173,7 @@ export async function POST(request) {
     // Fallback: If client did not provide an idempotency key, compute a deterministic server-side key
     // bounded by user/phone, items, address, and a 1-minute bucket so rapid double-clicks are de-duplicated safely.
     if (!idempotencyKey) {
-      const itemsFingerprint = (items || []).map((i) => `${i.product || i._id}_${i.quantity}`).sort().join('|');
+      const itemsFingerprint = (items || []).map((i) => `${i.product || i._id}_${i.variantName || 'def'}_${i.quantity}`).sort().join('|');
       const userFingerprint = userId?.toString() || address?.phone || 'anon';
       const timeBucket = Math.floor(Date.now() / 60000);
       idempotencyKey = `server_fallback_${crypto.createHash('sha256').update(`${userFingerprint}:${itemsFingerprint}:${address?.street || ''}:${timeBucket}`).digest('hex').substring(0, 32)}`;
@@ -201,6 +201,7 @@ export async function POST(request) {
           product: (i.product?._id || i.product)?.toString(),
           quantity: i.quantity,
           price: i.price,
+          variantName: i.variantName || null,
         })),
         totalAmount: o.totalAmount,
       })),

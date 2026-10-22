@@ -154,13 +154,21 @@ export function handlePrintKOT(order) {
   const paymentMode = order.paymentMethod || (order.paymentStatus === "pending" ? "Cash on Delivery (COD)" : "Paid Online");
   const isCod = paymentMode.toLowerCase().includes("cod") || paymentMode.toLowerCase().includes("cash") || order.paymentStatus === "pending";
 
-  const itemsHtml = (order.items || []).map((it) => `
-    <tr style="border-bottom: 1px dashed #bbb;">
-      <td style="padding: 5px 0; font-weight: bold; font-size: 13px;">${it.quantity}x</td>
-      <td style="padding: 5px 4px; font-size: 13px;">${it.name}</td>
-      <td style="padding: 5px 0; text-align: right; font-size: 13px;">₹${(it.price || 0) * (it.quantity || 1)}</td>
-    </tr>
-  `).join("");
+  const itemsHtml = (order.items || []).map((it) => {
+    const variantTag = it.variantName ? `<span style="font-weight:bold; color:#d97706;">[${it.variantName}]</span> ` : "";
+    const portionTag = (it.servingLabel || (it.portionQuantity ? `${it.portionQuantity} ${it.portionUnit || ""}` : "")) + (it.size ? ` (${it.size})` : "");
+    const metaLine = (variantTag || portionTag) ? `<div style="font-size:10px; color:#555;">${variantTag}${portionTag}</div>` : "";
+    return `
+      <tr style="border-bottom: 1px dashed #bbb;">
+        <td style="padding: 5px 0; font-weight: bold; font-size: 13px;">${it.quantity}x</td>
+        <td style="padding: 5px 4px; font-size: 13px;">
+          ${it.name}
+          ${metaLine}
+        </td>
+        <td style="padding: 5px 0; text-align: right; font-size: 13px;">₹${(it.price || 0) * (it.quantity || 1)}</td>
+      </tr>
+    `;
+  }).join("");
 
   const printWindow = window.open("", "_blank", "width=380,height=600");
   if (!printWindow) {
@@ -1520,9 +1528,24 @@ export default function OrdersClient() {
                                   <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
                                     {item.quantity}×
                                   </span>
-                                  <span className="font-semibold truncate text-stone-900 dark:text-white">
-                                    {item.name}
-                                  </span>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-semibold truncate text-stone-900 dark:text-white">
+                                      {item.name}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                                      {item.variantName && (
+                                        <span className="font-bold text-amber-600 dark:text-amber-400">
+                                          [{item.variantName}]
+                                        </span>
+                                      )}
+                                      {(item.servingLabel || item.portionQuantity || item.size) && (
+                                        <span className="text-stone-400">
+                                          {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
+                                          {item.size ? ` (${item.size})` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                                 <span className="font-mono text-stone-500 dark:text-stone-400 text-xs shrink-0 ml-2">
                                   ₹{(item.price || 0) * (item.quantity || 1)}

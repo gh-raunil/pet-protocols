@@ -44,6 +44,65 @@ export const PRESET_FOOD_PHOTOS = [
   { label: "Coffee & Tea", url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80", icon: "☕" },
 ];
 
+export const PORTION_UNITS = [
+  { value: "piece", label: "Piece / Pieces" },
+  { value: "plate", label: "Plate" },
+  { value: "bowl", label: "Bowl" },
+  { value: "serving", label: "Serving" },
+  { value: "g", label: "Gram (g)" },
+  { value: "kg", label: "Kilogram (kg)" },
+  { value: "ml", label: "Millilitre (ml)" },
+  { value: "l", label: "Litre (L)" },
+  { value: "slice", label: "Slice" },
+  { value: "custom", label: "Other / Custom" },
+];
+
+export function getPortionPreviewText(price, portion, hasVariants, variants) {
+  if (hasVariants && Array.isArray(variants) && variants.length > 0) {
+    const validPrices = variants.map((v) => Number(v.price)).filter((p) => !isNaN(p) && p >= 0);
+    const minP = validPrices.length > 0 ? Math.min(...validPrices) : price;
+    const maxP = validPrices.length > 0 ? Math.max(...validPrices) : price;
+    const priceText = minP === maxP ? `₹${minP || 0}` : `₹${minP} – ₹${maxP}`;
+    const variantSummaries = variants
+      .map((v) => {
+        if (!v.name) return "";
+        const portionTxt = v.servingLabel || (v.portionQuantity ? `${v.portionQuantity} ${v.portionUnit || ""}`.trim() : "");
+        return portionTxt ? `${v.name} (${portionTxt})` : v.name;
+      })
+      .filter(Boolean)
+      .join(" · ");
+    return `${priceText} · ${variantSummaries || `${variants.length} sizes available`}`;
+  }
+
+  const p = price !== "" && price !== undefined && !isNaN(Number(price)) ? `₹${price}` : "₹—";
+  if (!portion) return p;
+
+  const q = portion.quantity !== "" && portion.quantity !== null && portion.quantity !== undefined
+    ? portion.quantity
+    : "";
+  const u = portion.unit === "custom"
+    ? portion.customUnit || ""
+    : portion.unit || "";
+  const label = portion.servingLabel ? portion.servingLabel.trim() : "";
+  const size = portion.size ? portion.size.trim() : "";
+
+  let portionPart = "";
+  if (q && u) {
+    portionPart = `${q} ${u}`;
+  } else if (u) {
+    portionPart = u;
+  }
+
+  if (label) {
+    portionPart = portionPart ? `${portionPart} (${label})` : label;
+  }
+  if (size) {
+    portionPart = portionPart ? `${portionPart} · ${size}` : size;
+  }
+
+  return portionPart ? `${p} · ${portionPart}` : p;
+}
+
 export function getProductFallbackImage(product) {
   const cat = (product?.category || "").toLowerCase();
   const name = (product?.name || "").toLowerCase();
@@ -219,6 +278,15 @@ export default function ProductsClient() {
     preparationTime: 15,
     isAvailable: true,
     isFeatured: false,
+    portion: {
+      quantity: "",
+      unit: "piece",
+      customUnit: "",
+      servingLabel: "",
+      size: "",
+    },
+    hasVariants: false,
+    variants: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -361,6 +429,41 @@ export default function ProductsClient() {
     }
   }
 
+  // Variant row management helpers for Add / Edit dish form
+  function handleAddVariantRow() {
+    setModalForm((prev) => ({
+      ...prev,
+      variants: [
+        ...(prev.variants || []),
+        {
+          id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: "",
+          price: "",
+          portionQuantity: "",
+          portionUnit: prev.portion?.unit || "piece",
+          servingLabel: "",
+          size: "",
+          isAvailable: true,
+        },
+      ],
+    }));
+  }
+
+  function handleUpdateVariantRow(index, field, value) {
+    setModalForm((prev) => {
+      const updated = [...(prev.variants || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, variants: updated };
+    });
+  }
+
+  function handleRemoveVariantRow(index) {
+    setModalForm((prev) => {
+      const updated = (prev.variants || []).filter((_, i) => i !== index);
+      return { ...prev, variants: updated };
+    });
+  }
+
   // Open Edit Category Modal
   function handleOpenEditCategory(cat) {
     setEditingCategory(cat);
@@ -431,6 +534,15 @@ export default function ProductsClient() {
       preparationTime: 15,
       isAvailable: true,
       isFeatured: false,
+      portion: {
+        quantity: "",
+        unit: "piece",
+        customUnit: "",
+        servingLabel: "",
+        size: "",
+      },
+      hasVariants: false,
+      variants: [],
     });
     setIsModalOpen(true);
   }
@@ -453,6 +565,15 @@ export default function ProductsClient() {
       preparationTime: 15,
       isAvailable: true,
       isFeatured: false,
+      portion: {
+        quantity: "",
+        unit: "piece",
+        customUnit: "",
+        servingLabel: "",
+        size: "",
+      },
+      hasVariants: false,
+      variants: [],
     });
     setIsModalOpen(true);
   }
@@ -469,6 +590,28 @@ export default function ProductsClient() {
       setImageMode("file");
     }
     const isExisting = selectableCategories.filter((c) => c !== "Other").includes(product.category);
+
+    const existingPortion = product.portion || {
+      quantity: "",
+      unit: "piece",
+      customUnit: "",
+      servingLabel: "",
+      size: "",
+    };
+
+    const existingVariants = Array.isArray(product.variants)
+      ? product.variants.map((v, i) => ({
+          id: v._id || `var_${i}_${Date.now()}`,
+          name: v.name || "",
+          price: v.price !== undefined ? v.price : "",
+          portionQuantity: v.portionQuantity !== undefined && v.portionQuantity !== null ? v.portionQuantity : "",
+          portionUnit: v.portionUnit || "piece",
+          servingLabel: v.servingLabel || "",
+          size: v.size || "",
+          isAvailable: v.isAvailable !== false,
+        }))
+      : [];
+
     setModalForm({
       _id: product._id,
       name: product.name,
@@ -481,6 +624,15 @@ export default function ProductsClient() {
       preparationTime: product.preparationTime || 15,
       isAvailable: product.isAvailable !== false,
       isFeatured: !!product.isFeatured,
+      portion: {
+        quantity: existingPortion.quantity !== null && existingPortion.quantity !== undefined ? existingPortion.quantity : "",
+        unit: existingPortion.unit || "piece",
+        customUnit: existingPortion.customUnit || "",
+        servingLabel: existingPortion.servingLabel || "",
+        size: existingPortion.size || "",
+      },
+      hasVariants: Boolean(product.hasVariants && existingVariants.length > 0),
+      variants: existingVariants,
     });
     setIsModalOpen(true);
   }
@@ -546,6 +698,54 @@ export default function ProductsClient() {
       }
 
       const defaultImage = getProductFallbackImage({ category: finalCategory, name: modalForm.name });
+
+      const hasVariants = Boolean(modalForm.hasVariants);
+      let variantsPayload = [];
+      if (hasVariants) {
+        if (!Array.isArray(modalForm.variants) || modalForm.variants.length === 0) {
+          toast.error("Please add at least one variant or disable multiple sizes.");
+          setSubmitting(false);
+          return;
+        }
+        for (const v of modalForm.variants) {
+          if (!v.name?.trim()) {
+            toast.error("Each variant must have a name (e.g. Small, Medium, Large).");
+            setSubmitting(false);
+            return;
+          }
+          if (v.price === "" || isNaN(Number(v.price)) || Number(v.price) < 0) {
+            toast.error(`Please provide a valid price for variant "${v.name}".`);
+            setSubmitting(false);
+            return;
+          }
+          variantsPayload.push({
+            name: v.name.trim(),
+            price: Number(v.price),
+            portionQuantity: v.portionQuantity !== "" && v.portionQuantity !== null ? Number(v.portionQuantity) : null,
+            portionUnit: v.portionUnit ? v.portionUnit.trim() : null,
+            servingLabel: v.servingLabel ? v.servingLabel.trim() : null,
+            size: v.size ? v.size.trim() : null,
+            isAvailable: v.isAvailable !== false,
+          });
+        }
+      }
+
+      const portionObj = modalForm.portion || {};
+      const hasPortionData =
+        (portionObj.quantity !== "" && portionObj.quantity !== null && portionObj.quantity !== undefined) ||
+        (portionObj.servingLabel && portionObj.servingLabel.trim()) ||
+        (portionObj.size && portionObj.size.trim());
+
+      const portionPayload = hasPortionData
+        ? {
+            quantity: portionObj.quantity !== "" && portionObj.quantity !== null ? Number(portionObj.quantity) : null,
+            unit: portionObj.unit === "custom" ? (portionObj.customUnit?.trim() || "unit") : (portionObj.unit || "piece"),
+            customUnit: portionObj.customUnit?.trim() || null,
+            servingLabel: portionObj.servingLabel?.trim() || null,
+            size: portionObj.size?.trim() || null,
+          }
+        : null;
+
       const payload = {
         name: modalForm.name.trim(),
         description: modalForm.description?.trim() || "",
@@ -556,6 +756,9 @@ export default function ProductsClient() {
         preparationTime: Number(modalForm.preparationTime) || 15,
         isAvailable: modalForm.isAvailable !== false,
         isFeatured: Boolean(modalForm.isFeatured),
+        portion: portionPayload,
+        hasVariants,
+        variants: variantsPayload,
       };
 
       const url = isEditing
@@ -1108,9 +1311,34 @@ export default function ProductsClient() {
                             {product.name}
                           </h3>
                           <span className="font-black text-lg text-orange-600 dark:text-orange-400 shrink-0">
-                            ₹{product.price}
+                            {product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0
+                              ? `From ₹${Math.min(...product.variants.map((v) => Number(v.price) || product.price))}`
+                              : `₹${product.price}`}
                           </span>
                         </div>
+
+                        {/* Transparent Portion / Variant Metadata Pill */}
+                        {product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0 ? (
+                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                            <span className="text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-500/10 border border-indigo-500/25 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                              <span>🍕</span>
+                              <span>{product.variants.length} Sizes</span>
+                            </span>
+                            <span className="text-[10px] text-stone-500 dark:text-stone-400 font-medium truncate max-w-[200px]">
+                              {product.variants.map((v) => v.name).join(" · ")}
+                            </span>
+                          </div>
+                        ) : product.portion?.servingLabel || (product.portion?.quantity && product.portion?.unit) ? (
+                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                            <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                              <span>⚖️</span>
+                              <span>
+                                {product.portion.servingLabel || `${product.portion.quantity} ${product.portion.unit}`}
+                                {product.portion.size ? ` · ${product.portion.size}` : ""}
+                              </span>
+                            </span>
+                          </div>
+                        ) : null}
                         <p className="text-stone-500 dark:text-stone-400 text-xs line-clamp-2 leading-relaxed">
                           {product.description || "No description provided."}
                         </p>
@@ -1300,6 +1528,271 @@ export default function ProductsClient() {
                     />
                   </div>
                 )}
+
+                {/* ── PORTION & SERVING SIZE SECTION ──────────────────── */}
+                <div className="p-4 rounded-2xl bg-orange-500/[0.04] dark:bg-white/[0.02] border border-orange-500/20 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">⚖️</span>
+                      <label className="text-xs font-black text-stone-900 dark:text-white uppercase tracking-wider">
+                        Serving Size & Food Portion
+                      </label>
+                    </div>
+                    <span className="text-[10px] text-stone-400 font-medium">Transparent Pricing</span>
+                  </div>
+
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-normal">
+                    Clearly inform customers how much food they receive for the price (e.g. 2 pieces, 250 ml bowl, 100 g).
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1">
+                        Serving Qty
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="e.g. 2, 250, 100"
+                        value={modalForm.portion?.quantity ?? ""}
+                        onChange={(e) =>
+                          setModalForm((prev) => ({
+                            ...prev,
+                            portion: { ...prev.portion, quantity: e.target.value },
+                          }))
+                        }
+                        className="w-full bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1">
+                        Portion Unit
+                      </label>
+                      <select
+                        value={modalForm.portion?.unit || "piece"}
+                        onChange={(e) =>
+                          setModalForm((prev) => ({
+                            ...prev,
+                            portion: { ...prev.portion, unit: e.target.value },
+                          }))
+                        }
+                        className="w-full bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white focus:border-orange-500 outline-none font-medium cursor-pointer"
+                      >
+                        {PORTION_UNITS.map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1">
+                        Physical Size <span className="text-[10px] text-stone-400 lowercase font-normal">(opt)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 8 inches, Regular"
+                        value={modalForm.portion?.size ?? ""}
+                        onChange={(e) =>
+                          setModalForm((prev) => ({
+                            ...prev,
+                            portion: { ...prev.portion, size: e.target.value },
+                          }))
+                        }
+                        className="w-full bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {modalForm.portion?.unit === "custom" && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1">
+                        Custom Unit Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Scoop, Glass, Pack, Bottle..."
+                        value={modalForm.portion?.customUnit ?? ""}
+                        onChange={(e) =>
+                          setModalForm((prev) => ({
+                            ...prev,
+                            portion: { ...prev.portion, customUnit: e.target.value },
+                          }))
+                        }
+                        className="w-full bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none font-medium"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1">
+                      Serving Description <span className="text-[10px] text-stone-400 lowercase font-normal">(customer label)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2 pieces per plate, 250 ml bowl, serves 1-2"
+                      value={modalForm.portion?.servingLabel ?? ""}
+                      onChange={(e) =>
+                        setModalForm((prev) => ({
+                          ...prev,
+                          portion: { ...prev.portion, servingLabel: e.target.value },
+                        }))
+                      }
+                      className="w-full bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none font-medium"
+                    />
+                  </div>
+
+                  {/* Live Customer Preview Pill */}
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400 shrink-0">
+                        Live Preview:
+                      </span>
+                      <span className="text-xs font-black text-stone-900 dark:text-white font-mono truncate">
+                        {getPortionPreviewText(
+                          modalForm.price,
+                          modalForm.portion,
+                          modalForm.hasVariants,
+                          modalForm.variants
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-stone-400 shrink-0">Seen by customers</span>
+                  </div>
+                </div>
+
+                {/* ── MULTIPLE SIZES / PRICING VARIANTS ───────────────── */}
+                <div className="p-4 rounded-2xl bg-stone-50 dark:bg-white/[0.02] border border-stone-200/80 dark:border-white/10 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(modalForm.hasVariants)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setModalForm((prev) => ({
+                            ...prev,
+                            hasVariants: checked,
+                            variants:
+                              checked && (!prev.variants || prev.variants.length === 0)
+                                ? [
+                                    {
+                                      id: `var_${Date.now()}_1`,
+                                      name: "Small",
+                                      price: prev.price || "149",
+                                      portionQuantity: prev.portion?.quantity || "1",
+                                      portionUnit: prev.portion?.unit || "serving",
+                                      servingLabel: "Serves 1",
+                                      size: "",
+                                      isAvailable: true,
+                                    },
+                                    {
+                                      id: `var_${Date.now()}_2`,
+                                      name: "Medium",
+                                      price: prev.price ? String(Math.round(Number(prev.price) * 1.5)) : "249",
+                                      portionQuantity: prev.portion?.quantity ? String(Number(prev.portion.quantity) * 2) : "2",
+                                      portionUnit: prev.portion?.unit || "serving",
+                                      servingLabel: "Serves 2",
+                                      size: "",
+                                      isAvailable: true,
+                                    },
+                                  ]
+                                : prev.variants,
+                          }));
+                        }}
+                        className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-stone-900 dark:text-white">
+                        Multiple Sizes / Pricing Variants (e.g. Small / Medium / Large)
+                      </span>
+                    </label>
+                  </div>
+
+                  {modalForm.hasVariants && (
+                    <div className="space-y-3 pt-1">
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                        Configure size variants with individual pricing and portions. Customers will choose their desired size on the menu.
+                      </p>
+
+                      <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                        {(modalForm.variants || []).map((variant, idx) => (
+                          <div
+                            key={variant.id || idx}
+                            className="p-3 rounded-xl bg-white dark:bg-stone-900/80 border border-stone-200 dark:border-white/10 space-y-2 shadow-xs"
+                          >
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                              <div className="sm:col-span-4">
+                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
+                                  Variant Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="e.g. Regular / 250g / Large"
+                                  value={variant.name}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "name", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-medium focus:border-orange-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-3">
+                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
+                                  Price (₹) *
+                                </label>
+                                <input
+                                  type="number"
+                                  required
+                                  min="0"
+                                  placeholder="149"
+                                  value={variant.price}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "price", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-mono font-bold focus:border-orange-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-4">
+                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
+                                  Portion / Size
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 250 ml / 8 inches"
+                                  value={variant.servingLabel || ""}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "servingLabel", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-medium focus:border-orange-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-1 flex items-center justify-end pt-3 sm:pt-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveVariantRow(idx)}
+                                  disabled={(modalForm.variants || []).length <= 1}
+                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                                  title="Delete variant"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddVariantRow}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs font-bold hover:bg-orange-500/10 transition cursor-pointer"
+                      >
+                        <PlusCircle size={14} />
+                        <span>+ Add Another Variant</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* Dish Image Source */}
                 <div>

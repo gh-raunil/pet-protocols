@@ -89,17 +89,88 @@ export async function calculateOrderDetails({
       itemsByRestaurant.set(restId, []);
     }
 
-    const authoritativePrice = Number(dbProd.price) || 0;
+    let authoritativePrice = Number(dbProd.price) || 0;
+    let snapshotVariantName = null;
+    let snapshotPortionQuantity = dbProd.portion?.quantity ?? null;
+    let snapshotPortionUnit = dbProd.portion?.unit ?? null;
+    let snapshotServingLabel = dbProd.portion?.servingLabel ?? null;
+    let snapshotSize = dbProd.portion?.size ?? null;
+
+    if (item.variantName && typeof item.variantName === "string" && item.variantName.trim()) {
+      const cleanVarName = item.variantName.trim();
+      const variantsList = Array.isArray(dbProd.variants) ? dbProd.variants : [];
+      const matchedVariant = variantsList.find(
+        (v) => v.name && v.name.trim().toLowerCase() === cleanVarName.toLowerCase()
+      );
+
+      if (!matchedVariant) {
+        return {
+          success: false,
+          status: 400,
+          message: `Variant '${cleanVarName}' for dish '${dbProd.name}' is invalid or no longer exists.`,
+        };
+      }
+
+      if (matchedVariant.isAvailable === false) {
+        return {
+          success: false,
+          status: 400,
+          message: `Variant '${matchedVariant.name}' for '${dbProd.name}' is currently out of stock.`,
+        };
+      }
+
+      authoritativePrice = Number(matchedVariant.price);
+      if (isNaN(authoritativePrice) || authoritativePrice < 0) {
+        authoritativePrice = Number(dbProd.price) || 0;
+      }
+
+      snapshotVariantName = matchedVariant.name;
+      if (matchedVariant.portionQuantity != null) {
+        snapshotPortionQuantity = matchedVariant.portionQuantity;
+      }
+      if (matchedVariant.portionUnit) {
+        snapshotPortionUnit = matchedVariant.portionUnit;
+      }
+      if (matchedVariant.servingLabel) {
+        snapshotServingLabel = matchedVariant.servingLabel;
+      }
+      if (matchedVariant.size) {
+        snapshotSize = matchedVariant.size;
+      }
+    }
+
     const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+
+    let optionsTotal = 0;
+    const sanitizedOptions = [];
+    if (Array.isArray(item.selectedOptions)) {
+      for (const opt of item.selectedOptions) {
+        if (opt && (opt.name || opt.title)) {
+          const optPrice = Math.max(0, Number(opt.price) || 0);
+          optionsTotal += optPrice;
+          sanitizedOptions.push({
+            name: String(opt.name || opt.title),
+            price: optPrice,
+          });
+        }
+      }
+    }
 
     itemsByRestaurant.get(restId).push({
       product: dbProd._id.toString(),
       name: dbProd.name,
       price: authoritativePrice,
       quantity: qty,
+      selectedOptions: sanitizedOptions,
+      optionsTotal,
       image: dbProd.image || '',
       category: dbProd.category || '',
       foodType: dbProd.foodType || dbProd.type || 'veg',
+      variantName: snapshotVariantName,
+      portionQuantity: snapshotPortionQuantity,
+      portionUnit: snapshotPortionUnit,
+      servingLabel: snapshotServingLabel,
+      size: snapshotSize,
     });
   }
 
@@ -150,8 +221,8 @@ export async function calculateOrderDetails({
       };
     }
 
-    // Subtotal from authoritative DB prices
-    const restSubtotal = restItems.reduce((sum, it) => sum + it.price * it.quantity, 0);
+    // Subtotal from authoritative DB prices + add-ons
+    const restSubtotal = restItems.reduce((sum, it) => sum + (it.price + (it.optionsTotal || 0)) * it.quantity, 0);
 
     // Minimum order check
     const minOrder = restDoc?.orderLimits?.minOrderAmount ?? 0;

@@ -3,10 +3,15 @@ import connectDB from "@/lib/db";
 import Product from "@/models/Product";
 import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 
+let _requireRestaurantAdmin = requireRestaurantAdmin;
+export function _setTestRequireRestaurantAdmin(fn) {
+  _requireRestaurantAdmin = fn;
+}
+
 // GET — List products belonging to this restaurant
 export async function GET(request) {
   try {
-    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_view" });
+    const auth = await _requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_view" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -38,7 +43,7 @@ export async function GET(request) {
 // POST — Create a product for this restaurant
 export async function POST(request) {
   try {
-    const auth = await requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_manage" });
+    const auth = await _requireRestaurantAdmin({ allowStaff: true, requiredPermission: "products_manage" });
     if (auth.error) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
@@ -55,19 +60,95 @@ export async function POST(request) {
       );
     }
 
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return NextResponse.json(
+        { success: false, message: "Price must be a valid non-negative amount." },
+        { status: 400 }
+      );
+    }
+
+    let sanitizedPortion = null;
+    if (body.portion && typeof body.portion === "object") {
+      const q = body.portion.quantity !== undefined && body.portion.quantity !== "" && body.portion.quantity !== null
+        ? Number(body.portion.quantity)
+        : null;
+      if (q !== null && (isNaN(q) || q <= 0)) {
+        return NextResponse.json(
+          { success: false, message: "Portion quantity must be a positive number." },
+          { status: 400 }
+        );
+      }
+      sanitizedPortion = {
+        quantity: q,
+        unit: body.portion.unit ? String(body.portion.unit).trim() : null,
+        customUnit: body.portion.customUnit ? String(body.portion.customUnit).trim().slice(0, 50) : null,
+        servingLabel: body.portion.servingLabel ? String(body.portion.servingLabel).trim().slice(0, 100) : null,
+        size: body.portion.size ? String(body.portion.size).trim().slice(0, 50) : null,
+      };
+    }
+
+    let sanitizedHasVariants = Boolean(body.hasVariants);
+    let sanitizedVariants = [];
+    if (sanitizedHasVariants) {
+      if (!Array.isArray(body.variants) || body.variants.length === 0) {
+        return NextResponse.json(
+          { success: false, message: "At least one variant must be defined when multiple variants are enabled." },
+          { status: 400 }
+        );
+      }
+      for (const v of body.variants) {
+        if (!v || !v.name || !String(v.name).trim()) {
+          return NextResponse.json(
+            { success: false, message: "All variants must have a name (e.g. Small, Medium, Large)." },
+            { status: 400 }
+          );
+        }
+        const vPrice = Number(v.price);
+        if (isNaN(vPrice) || vPrice < 0) {
+          return NextResponse.json(
+            { success: false, message: `Price for variant '${v.name}' must be a valid non-negative number.` },
+            { status: 400 }
+          );
+        }
+        const vQty = v.portionQuantity !== undefined && v.portionQuantity !== "" && v.portionQuantity !== null
+          ? Number(v.portionQuantity)
+          : null;
+        if (vQty !== null && (isNaN(vQty) || vQty <= 0)) {
+          return NextResponse.json(
+            { success: false, message: `Portion quantity for variant '${v.name}' must be positive.` },
+            { status: 400 }
+          );
+        }
+
+        sanitizedVariants.push({
+          name: String(v.name).trim().slice(0, 100),
+          price: vPrice,
+          portionQuantity: vQty,
+          portionUnit: v.portionUnit ? String(v.portionUnit).trim() : null,
+          servingLabel: v.servingLabel ? String(v.servingLabel).trim().slice(0, 100) : null,
+          size: v.size ? String(v.size).trim().slice(0, 50) : null,
+          isAvailable: v.isAvailable !== false,
+        });
+      }
+    }
+
     await connectDB();
 
     const product = await Product.create({
       restaurant: restaurantId,
       name: name.trim(),
       description: description || "",
-      price: Number(price),
+      price: numPrice,
       image: image || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500",
       category,
       type,
       preparationTime: Number(preparationTime) || 15,
       isAvailable: isAvailable !== false,
       isFeatured: !!isFeatured,
+      portion: sanitizedPortion,
+      hasVariants: sanitizedHasVariants,
+      variants: sanitizedVariants,
     });
 
     // Auto-register category in Category model

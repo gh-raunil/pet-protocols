@@ -48,6 +48,8 @@ function CheckoutItemRow({ item }) {
     setImgSrc(item.image || FALLBACK_IMAGE);
   }, [item.image]);
 
+  const portionText = item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '') + (item.size ? ` • ${item.size}` : '');
+
   return (
     <div className="flex items-center gap-3 bg-[var(--bg-sub)] p-2.5 rounded-2xl border border-[var(--border-color)]">
       <Image
@@ -60,7 +62,19 @@ function CheckoutItemRow({ item }) {
       />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-bold text-[var(--text-main)] truncate">{item.name}</p>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+          {item.variantName && (
+            <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+              {item.variantName}
+            </span>
+          )}
+          {portionText && (
+            <span className="text-[10px] text-[var(--text-muted)] truncate">
+              {portionText}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
           Qty: {item.quantity} × ₹{item.price}
         </p>
       </div>

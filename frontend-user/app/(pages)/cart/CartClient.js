@@ -47,7 +47,7 @@ export default function CartClient() {
   // Helper to remove all items from a single kitchen
   const removeKitchenItems = (restName) => {
     const kitchenItems = groupedItems[restName]?.items || [];
-    kitchenItems.forEach((i) => removeItem(i._id));
+    kitchenItems.forEach((i) => removeItem(i.cartItemId || `${i._id}__${i.variantName || 'default'}`));
   };
 
   // Group items by restaurant if restaurant data exists
@@ -262,7 +262,7 @@ export default function CartClient() {
                 <div className="space-y-4 divide-y divide-[var(--border-color)]">
                   {group.items.map((item) => (
                     <CartPageItemRow
-                      key={item._id}
+                      key={item.cartItemId || `${item._id}__${item.variantName || 'default'}`}
                       item={item}
                       decreaseQty={decreaseQty}
                       increaseQty={increaseQty}
@@ -426,6 +426,7 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
   const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
   const qty = item.quantity || 1;
   const itemTotal = (item.price || 0) * qty;
+  const itemKey = item.cartItemId || `${item._id}__${item.variantName || 'default'}`;
 
   useEffect(() => {
     setImgSrc(item.image || FALLBACK_IMAGE);
@@ -448,6 +449,20 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
           <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] truncate">
             {item.name}
           </h3>
+          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+            {item.variantName && (
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+                {item.variantName}
+              </span>
+            )}
+            {(item.servingLabel || item.portionQuantity || item.size) && (
+              <span className="text-xs text-[var(--text-muted)]">
+                {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
+                {item.size ? ` • ${item.size}` : ''}
+                {qty > 1 && item.portionQuantity ? ` (${qty * Number(item.portionQuantity)} ${item.portionUnit || ''} total)` : ''}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             ₹{item.price} each
           </p>
@@ -462,7 +477,7 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
         <div className="flex items-center gap-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1">
           <button
             type="button"
-            onClick={() => decreaseQty(item._id)}
+            onClick={() => decreaseQty(itemKey)}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             aria-label={`Decrease quantity of ${item.name}`}
           >
@@ -473,7 +488,7 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
           </span>
           <button
             type="button"
-            onClick={() => increaseQty(item._id)}
+            onClick={() => increaseQty(itemKey)}
             disabled={qty >= 20}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             aria-label={`Increase quantity of ${item.name}`}
@@ -484,7 +499,7 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
 
         <button
           type="button"
-          onClick={() => removeItem(item._id)}
+          onClick={() => removeItem(itemKey)}
           className="p-2 rounded-xl text-rose-500 hover:bg-rose-500/10 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
           aria-label={`Remove ${item.name} from cart`}
         >

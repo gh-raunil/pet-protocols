@@ -148,7 +148,7 @@ export default function CartDrawer() {
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
               {items.map((item) => (
                 <CartDrawerItem
-                  key={item._id || item.productId}
+                  key={item.cartItemId || `${item._id}__${item.variantName || 'default'}`}
                   item={item}
                   decreaseQty={decreaseQty}
                   increaseQty={increaseQty}
@@ -226,6 +226,7 @@ export default function CartDrawer() {
 function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
   const [imgSrc, setImgSrc] = useState(item.image || FALLBACK_IMAGE);
   const qty = item.quantity || 1;
+  const itemKey = item.cartItemId || `${item._id}__${item.variantName || 'default'}`;
 
   useEffect(() => {
     setImgSrc(item.image || FALLBACK_IMAGE);
@@ -248,11 +249,23 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
         <h4 className="text-xs font-bold text-[var(--text-main)] truncate">
           {item.name}
         </h4>
+        {item.variantName && (
+          <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20 mt-0.5 mr-1">
+            {item.variantName}
+          </span>
+        )}
+        {(item.servingLabel || item.portionQuantity || item.size) && (
+          <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+            {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
+            {item.size ? ` • ${item.size}` : ''}
+            {qty > 1 && item.portionQuantity ? ` (${qty * Number(item.portionQuantity)} ${item.portionUnit || ''} total)` : ''}
+          </p>
+        )}
         <p className="text-xs text-[var(--text-muted)] mt-0.5">
           ₹{item.price} each
         </p>
         <p className="text-xs font-extrabold text-[var(--brand-accent)] mt-0.5">
-          ₹{item.price * qty}
+          ₹{(item.price || 0) * qty}
         </p>
       </div>
 
@@ -261,7 +274,7 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
         <Tooltip content="Reduce quantity" placement="top">
           <button
             type="button"
-            onClick={() => decreaseQty(item._id)}
+            onClick={() => decreaseQty(itemKey)}
             aria-label={`Decrease quantity of ${item.name}`}
             className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
           >
@@ -277,7 +290,7 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
         >
           <button
             type="button"
-            onClick={() => increaseQty(item._id)}
+            onClick={() => increaseQty(itemKey)}
             disabled={qty >= 20}
             aria-label={`Increase quantity of ${item.name}`}
             className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
@@ -291,7 +304,7 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
       <Tooltip content="Remove dish from your cart" placement="left">
         <button
           type="button"
-          onClick={() => removeItem(item._id)}
+          onClick={() => removeItem(itemKey)}
           aria-label={`Remove ${item.name} from cart`}
           className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
         >

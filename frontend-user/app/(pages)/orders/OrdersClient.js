@@ -44,6 +44,8 @@ function OrderHistoryDishItem({ item }) {
     setImgSrc(item.image || FALLBACK_IMAGE);
   }, [item.image]);
 
+  const portionText = item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '') + (item.size ? ` • ${item.size}` : '');
+
   return (
     <div className="flex items-center gap-3.5 bg-[var(--bg-sub)] p-3 rounded-2xl border border-[var(--border-color)]">
       <Image
@@ -58,6 +60,18 @@ function OrderHistoryDishItem({ item }) {
         <p className="text-[var(--text-main)] font-bold text-xs sm:text-sm truncate">
           {item.name}
         </p>
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+          {item.variantName && (
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+              {item.variantName}
+            </span>
+          )}
+          {portionText && (
+            <span className="text-[11px] text-[var(--text-muted)] truncate">
+              {portionText}
+            </span>
+          )}
+        </div>
         <p className="text-[var(--text-muted)] text-xs mt-0.5">
           ₹{item.price} × {item.quantity}
         </p>

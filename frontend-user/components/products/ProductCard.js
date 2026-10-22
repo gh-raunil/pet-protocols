@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Star, Heart, Clock, Sparkles, Tag, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Star, Heart, Clock, Sparkles, Tag, Zap, Layers } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import { toast } from "@/components/ui/ToastProvider";
@@ -71,6 +72,7 @@ export function ProductCardSkeleton({ isCarousel = false }) {
 }
 
 export default function ProductCard({ product, isCarousel = false, offers = [] }) {
+  const router = useRouter();
   const { addItem } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   const [imgSrc, setImgSrc] = useState(() => getSmartInitialImage(product));
@@ -80,6 +82,39 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
   useEffect(() => {
     setImgSrc(getSmartInitialImage(product));
   }, [product?.image, product?.name, product?.category]);
+
+  // Portion label preview
+  const portionLabel = useMemo(() => {
+    if (product?.portion?.servingLabel && product.portion.servingLabel.trim()) {
+      return product.portion.servingLabel.trim();
+    }
+    const qty = product?.portion?.quantity;
+    const unit = product?.portion?.unit === "custom" ? product?.portion?.customUnit : product?.portion?.unit;
+    if (qty && unit) {
+      const sizePart = product?.portion?.size ? ` · ${product.portion.size}` : "";
+      return `${qty} ${unit}${sizePart}`;
+    }
+    if (product?.portion?.size) {
+      return product.portion.size;
+    }
+    return null;
+  }, [product?.portion]);
+
+  // Variant checking
+  const hasMultipleVariants = Boolean(
+    product?.hasVariants &&
+    Array.isArray(product?.variants) &&
+    product.variants.length > 0
+  );
+
+  const availableVariants = hasMultipleVariants
+    ? product.variants.filter((v) => v.isAvailable !== false)
+    : [];
+
+  const variantPrices = (availableVariants.length > 0 ? availableVariants : product?.variants || []).map(
+    (v) => Number(v.price) || 0
+  );
+  const minVariantPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : (product?.price || 0);
 
   if (!product) return null;
 
@@ -93,15 +128,16 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
 
   // Option B: discount directly reduces the price automatically
   let autoDiscount = 0;
-  let displayPrice = product.price;
+  let displayPrice = hasMultipleVariants ? minVariantPrice : product.price;
   if (isAutoDiscount) {
     autoDiscount = calculateItemDiscount(product, matchedOffer);
-    displayPrice = Math.max(0, product.price - autoDiscount);
+    displayPrice = Math.max(0, (hasMultipleVariants ? minVariantPrice : product.price) - autoDiscount);
   }
 
   // Option A: catalog price is NOT reduced; coupon code is displayed
-  const hasStrikethrough = isAutoDiscount ? true : Boolean(product.originalPrice && product.originalPrice > product.price);
-  const struckPrice = isAutoDiscount ? product.price : product.originalPrice;
+  const baseComparePrice = hasMultipleVariants ? minVariantPrice : product.price;
+  const hasStrikethrough = isAutoDiscount ? true : Boolean(product.originalPrice && product.originalPrice > baseComparePrice);
+  const struckPrice = isAutoDiscount ? baseComparePrice : product.originalPrice;
   const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
 
   const handleCardClick = () => {
@@ -119,7 +155,20 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
       return;
     }
 
-    addItem(product);
+    if (hasMultipleVariants) {
+      router.push(`/menu/${product._id}`);
+      return;
+    }
+
+    const itemToAdd = {
+      ...product,
+      portionQuantity: product.portion?.quantity,
+      portionUnit: product.portion?.unit === "custom" ? product.portion?.customUnit : product.portion?.unit,
+      servingLabel: product.portion?.servingLabel,
+      size: product.portion?.size,
+    };
+
+    addItem(itemToAdd);
     trackAddToCart(product);
     toast.success(`${product.name} added to cart!`);
   };
@@ -271,8 +320,17 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
           <div className="min-w-0 pt-0.5">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-sm sm:text-base font-black text-[var(--text-main)]">
-                ₹{displayPrice}
+                {hasMultipleVariants ? `From ₹${displayPrice}` : `₹${displayPrice}`}
               </span>
+              {hasMultipleVariants ? (
+                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                  {product.variants.length} sizes
+                </span>
+              ) : portionLabel ? (
+                <span className="text-[11px] font-semibold text-[var(--text-muted)] truncate max-w-[130px]">
+                  · {portionLabel}
+                </span>
+              ) : null}
               {hasStrikethrough && struckPrice > displayPrice && (
                 <span className="text-[10px] sm:text-xs text-[var(--text-muted)] line-through">
                   ₹{struckPrice}
@@ -326,6 +384,16 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
               <Clock size={12} /> Closed
             </button>
           </Tooltip>
+        ) : hasMultipleVariants ? (
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            aria-label={`Select size for ${product.name}`}
+            className="w-full py-2 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--brand-accent)] hover:text-white border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+          >
+            <Layers size={13} strokeWidth={2.5} />
+            <span>Select Size</span>
+          </button>
         ) : (
           <button
             type="button"

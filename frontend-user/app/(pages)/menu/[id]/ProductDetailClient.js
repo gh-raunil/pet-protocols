@@ -24,6 +24,9 @@ import {
   ChevronRight,
   X,
   Flame,
+  Layers,
+  Scale,
+  Utensils,
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
@@ -75,17 +78,68 @@ export default function ProductDetailClient({ product }) {
   const isAutoDiscount = matchedOffer && matchedOffer.applyMode === "automatic";
   const isCouponOffer = matchedOffer && (!matchedOffer.applyMode || matchedOffer.applyMode === "coupon");
 
+  // Variant selection state
+  const hasVariants = Boolean(
+    product?.hasVariants &&
+    Array.isArray(product?.variants) &&
+    product.variants.length > 0
+  );
+
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(() => {
+    if (!hasVariants) return -1;
+    const firstAvail = product.variants.findIndex((v) => v.isAvailable !== false);
+    return firstAvail >= 0 ? firstAvail : 0;
+  });
+
+  const selectedVariant = hasVariants && selectedVariantIndex >= 0 ? product.variants[selectedVariantIndex] : null;
+
+  // Base price: variant price or product.price
+  const rawBasePrice = selectedVariant ? Number(selectedVariant.price) || 0 : (product?.price || 0);
+
+  // Active portion metadata resolved from variant or root dish
+  const activePortion = useMemo(() => {
+    if (selectedVariant) {
+      return {
+        quantity: selectedVariant.portionQuantity || product?.portion?.quantity,
+        unit: selectedVariant.portionUnit || product?.portion?.unit,
+        customUnit: product?.portion?.customUnit,
+        servingLabel: selectedVariant.servingLabel || product?.portion?.servingLabel,
+        size: selectedVariant.size || product?.portion?.size,
+      };
+    }
+    return product?.portion || null;
+  }, [selectedVariant, product?.portion]);
+
+  // Formatted serving label
+  const activePortionText = useMemo(() => {
+    if (!activePortion) return null;
+    if (activePortion.servingLabel && activePortion.servingLabel.trim()) {
+      return activePortion.servingLabel.trim();
+    }
+    const qty = activePortion.quantity;
+    const unit = activePortion.unit === "custom" ? activePortion.customUnit : activePortion.unit;
+    if (qty && unit) {
+      const sizePart = activePortion.size ? ` (${activePortion.size})` : "";
+      return `${qty} ${unit}${sizePart}`;
+    }
+    if (activePortion.size) {
+      return activePortion.size;
+    }
+    return null;
+  }, [activePortion]);
+
   // Option B: discount directly reduces the price automatically
   let autoDiscount = 0;
-  let displayPrice = product?.price || 0;
+  let displayPrice = rawBasePrice;
   if (isAutoDiscount) {
-    autoDiscount = calculateItemDiscount(product, matchedOffer);
-    displayPrice = Math.max(0, (product?.price || 0) - autoDiscount);
+    autoDiscount = calculateItemDiscount({ ...product, price: rawBasePrice }, matchedOffer);
+    displayPrice = Math.max(0, rawBasePrice - autoDiscount);
   }
 
   // Option A: catalog price is NOT reduced; coupon code is displayed
-  const hasStrikethrough = isAutoDiscount ? true : Boolean(product?.originalPrice && product.originalPrice > product.price);
-  const struckPrice = isAutoDiscount ? product?.price : product?.originalPrice;
+  const baseComparePrice = rawBasePrice;
+  const hasStrikethrough = isAutoDiscount ? true : Boolean(product?.originalPrice && product.originalPrice > baseComparePrice);
+  const struckPrice = isAutoDiscount ? baseComparePrice : product?.originalPrice;
   const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
   const deliveryFee = product?.restaurant?.chargeSettings?.flatDeliveryFee ?? 40;
   const freeThreshold = product?.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
@@ -158,26 +212,59 @@ export default function ProductDetailClient({ product }) {
 
   const handleAddToCart = () => {
     if (!product.isAvailable) return;
+    if (selectedVariant && selectedVariant.isAvailable === false) {
+      toast.error(`The "${selectedVariant.name}" size is currently out of stock.`);
+      return;
+    }
     if (!restStatus.isOpen) {
       toast.error(
         `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}. Ordering is unavailable right now.`
       );
       return;
     }
-    addItem({ ...product, _id: product._id.toString() }, quantity);
+
+    const itemToAdd = {
+      ...product,
+      _id: product._id.toString(),
+      price: rawBasePrice,
+      variantName: selectedVariant ? selectedVariant.name : undefined,
+      portionQuantity: activePortion?.quantity,
+      portionUnit: activePortion?.unit === "custom" ? activePortion?.customUnit : activePortion?.unit,
+      servingLabel: activePortion?.servingLabel,
+      size: activePortion?.size,
+    };
+
+    addItem(itemToAdd, quantity);
     trackAddToCart(product);
-    toast.success(`Added ${quantity} × ${product.name} to cart!`);
+    const variantSuffix = selectedVariant ? ` (${selectedVariant.name})` : "";
+    toast.success(`Added ${quantity} × ${product.name}${variantSuffix} to cart!`);
   };
 
   const handleBuyNow = () => {
     if (!product.isAvailable) return;
+    if (selectedVariant && selectedVariant.isAvailable === false) {
+      toast.error(`The "${selectedVariant.name}" size is currently out of stock.`);
+      return;
+    }
     if (!restStatus.isOpen) {
       toast.error(
         `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}.`
       );
       return;
     }
-    addItem({ ...product, _id: product._id.toString() }, quantity);
+
+    const itemToAdd = {
+      ...product,
+      _id: product._id.toString(),
+      price: rawBasePrice,
+      variantName: selectedVariant ? selectedVariant.name : undefined,
+      portionQuantity: activePortion?.quantity,
+      portionUnit: activePortion?.unit === "custom" ? activePortion?.customUnit : activePortion?.unit,
+      servingLabel: activePortion?.servingLabel,
+      size: activePortion?.size,
+    };
+
+    addItem(itemToAdd, quantity);
     trackAddToCart(product);
     router.push("/cart");
   };
@@ -486,7 +573,7 @@ export default function ProductDetailClient({ product }) {
           </div>
 
           {/* Pricing Section */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-3">
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
                 ₹{displayPrice}
@@ -502,15 +589,92 @@ export default function ProductDetailClient({ product }) {
                 </span>
               )}
             </div>
+
+            {/* Serving / Portion Transparent Summary */}
+            {activePortionText && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] shadow-2xs">
+                <Utensils size={13} className="text-[var(--brand-accent)] shrink-0" />
+                <span>Portion: {activePortionText}</span>
+                {activePortion?.quantity && quantity > 1 && (
+                  <span className="text-[var(--text-muted)] font-normal ml-1">
+                    ({quantity} servings = <strong className="text-[var(--text-main)] font-bold">{quantity * Number(activePortion.quantity)} {activePortion.unit === "custom" ? activePortion.customUnit : activePortion.unit}</strong> total)
+                  </span>
+                )}
+              </div>
+            )}
+
             {isAutoDiscount && (
               <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
                 ⚡ Auto Discount Applied: Save ₹{autoDiscount} instantly!
               </p>
             )}
-            <div className="text-xs text-[var(--text-muted)] mt-1.5 font-medium">
+            <div className="text-xs text-[var(--text-muted)] mt-1 font-medium">
               Inclusive of all taxes • No hidden packing charges
             </div>
           </div>
+
+          {/* Multiple Sizes / Pricing Variants Selector */}
+          {hasVariants && (
+            <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                  <Layers size={14} className="text-[var(--brand-accent)]" />
+                  Select Size / Variant
+                </h3>
+                {selectedVariant && (
+                  <span className="text-[11px] font-bold text-[var(--brand-accent)]">
+                    Selected: {selectedVariant.name} (₹{selectedVariant.price})
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {product.variants.map((v, idx) => {
+                  const isSelected = selectedVariantIndex === idx;
+                  const isOutOfStock = v.isAvailable === false;
+                  const vPortion = v.servingLabel || (v.portionQuantity && v.portionUnit ? `${v.portionQuantity} ${v.portionUnit}` : "") || v.size;
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={isOutOfStock}
+                      onClick={() => setSelectedVariantIndex(idx)}
+                      className={`p-3 rounded-xl border text-left transition relative cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                        isSelected
+                          ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 shadow-xs"
+                          : isOutOfStock
+                          ? "border-[var(--border-color)] bg-[var(--bg-sub)] opacity-50 cursor-not-allowed"
+                          : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card)]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-xs text-[var(--text-main)] truncate">
+                          {v.name}
+                        </span>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-[var(--brand-accent)] shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-xs font-black text-[var(--brand-accent)] mt-1">
+                        ₹{v.price}
+                      </div>
+                      {vPortion && (
+                        <div className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                          {vPortion}
+                        </div>
+                      )}
+                      {isOutOfStock && (
+                        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider mt-1 block">
+                          Sold Out
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Available Offers Box */}
           <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
@@ -652,7 +816,7 @@ export default function ProductDetailClient({ product }) {
               </div>
               <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
                 <span className="text-[var(--text-muted)] font-medium">Portion / Serving</span>
-                <span className="font-bold text-[var(--text-main)]">Standard 1 Person</span>
+                <span className="font-bold text-[var(--text-main)]">{activePortionText || "Standard Serving"}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
                 <span className="text-[var(--text-muted)] font-medium">Kitchen Partner</span>

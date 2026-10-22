@@ -1485,6 +1485,19 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                         </span>
                         <div>
                           <p className="font-bold text-stone-900 dark:text-white">{item.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10px] mt-0.5">
+                            {item.variantName && (
+                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
+                                {item.variantName}
+                              </span>
+                            )}
+                            {(item.servingLabel || item.portionQuantity || item.size) && (
+                              <span className="text-stone-500">
+                                {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
+                                {item.size ? ` • ${item.size}` : ''}
+                              </span>
+                            )}
+                          </div>
                           {Array.isArray(item.selectedOptions) && item.selectedOptions.length > 0 && (
                             <p className="text-[10px] text-stone-400">
                               {item.selectedOptions.map((o) => o.name || o).join(", ")}
@@ -1861,18 +1874,29 @@ export default function CashierWorkspace({ restaurantName = "" }) {
 
                     {/* Items */}
                     <div className="divide-y divide-stone-200/70 text-[11px] py-1">
-                      {receiptOrder.items?.map((item, idx) => (
-                        <div key={idx} className="py-1 flex justify-between items-start gap-1">
-                          <span className="w-8 font-bold text-black">{item.quantity}×</span>
-                          <span className="flex-1 text-left font-semibold text-black">{item.name}</span>
-                          <span className="w-14 text-right text-stone-600 font-mono">
-                            ₹{(item.price || 0).toFixed(2)}
-                          </span>
-                          <span className="w-16 text-right font-bold text-black font-mono">
-                            ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                          </span>
-                        </div>
-                      ))}
+                      {receiptOrder.items?.map((item, idx) => {
+                        const portionStr = item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '') + (item.size ? ` (${item.size})` : '');
+                        return (
+                          <div key={idx} className="py-1 flex justify-between items-start gap-1">
+                            <span className="w-8 font-bold text-black">{item.quantity}×</span>
+                            <div className="flex-1 text-left">
+                              <span className="font-semibold text-black">{item.name}</span>
+                              {(item.variantName || portionStr) && (
+                                <div className="text-[9px] text-stone-500 leading-tight">
+                                  {item.variantName && <span className="font-bold text-stone-700 mr-1">[{item.variantName}]</span>}
+                                  {portionStr}
+                                </div>
+                              )}
+                            </div>
+                            <span className="w-14 text-right text-stone-600 font-mono">
+                              ₹{(item.price || 0).toFixed(2)}
+                            </span>
+                            <span className="w-16 text-right font-bold text-black font-mono">
+                              ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="border-b border-dashed border-stone-400 my-1.5" />

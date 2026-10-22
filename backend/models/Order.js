@@ -31,6 +31,26 @@ const OrderItemSchema = new mongoose.Schema(
       type: String,
       default: "veg",
     },
+    variantName: {
+      type: String,
+      default: null,
+    },
+    portionQuantity: {
+      type: Number,
+      default: null,
+    },
+    portionUnit: {
+      type: String,
+      default: null,
+    },
+    servingLabel: {
+      type: String,
+      default: null,
+    },
+    size: {
+      type: String,
+      default: null,
+    },
   },
   { _id: false }
 );

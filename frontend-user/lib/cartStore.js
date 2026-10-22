@@ -14,43 +14,64 @@ let syncTimer = null;
 let isSyncing = false;
 let syncPending = false;
 
+export function getCartItemKey(item) {
+  if (!item) return "";
+  if (item.cartItemId) return String(item.cartItemId);
+  const baseId = (item._id || item.product)?.toString() || "";
+  if (item.variantName && typeof item.variantName === "string" && item.variantName.trim()) {
+    return `${baseId}__${item.variantName.trim()}`;
+  }
+  return baseId;
+}
+
 function cleanCartItems(items) {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => ({
-    _id: item._id?.toString(),
-    name: item.name,
-    price: Number(item.price),
-    image: item.image,
-    category: item.category,
-    type: item.type,
-    isAvailable: item.isAvailable,
-    isFeatured: item.isFeatured,
-    description: item.description,
-    quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(Number(item.quantity) || 1))),
-    restaurant: item.restaurant?._id?.toString() || item.restaurant?.toString() || item.restaurantId,
-    restaurantId: item.restaurantId || item.restaurant?._id?.toString() || item.restaurant?.toString(),
-  }));
+  return items.map((item) => {
+    const key = getCartItemKey(item);
+    return {
+      _id: (item._id || item.product)?.toString(),
+      cartItemId: key,
+      name: item.name,
+      price: Number(item.price),
+      image: item.image,
+      category: item.category,
+      type: item.type,
+      isAvailable: item.isAvailable,
+      isFeatured: item.isFeatured,
+      description: item.description,
+      quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(Number(item.quantity) || 1))),
+      restaurant: item.restaurant?._id?.toString() || item.restaurant?.toString() || item.restaurantId,
+      restaurantId: item.restaurantId || item.restaurant?._id?.toString() || item.restaurant?.toString(),
+      variantName: item.variantName ? String(item.variantName).trim() : null,
+      portionQuantity: item.portionQuantity !== undefined && item.portionQuantity !== null ? Number(item.portionQuantity) : null,
+      portionUnit: item.portionUnit ? String(item.portionUnit).trim() : null,
+      servingLabel: item.servingLabel ? String(item.servingLabel).trim() : null,
+      size: item.size ? String(item.size).trim() : null,
+    };
+  });
 }
 
 function mergeItems(baseItems = [], guestItems = []) {
   const map = new Map();
   for (const item of baseItems) {
     if (!item || !item._id) continue;
-    map.set(String(item._id), { ...item, quantity: Number(item.quantity) || 1 });
+    const key = getCartItemKey(item);
+    map.set(key, { ...item, cartItemId: key, quantity: Number(item.quantity) || 1 });
   }
   for (const guest of guestItems) {
     if (!guest || !guest._id) continue;
-    const id = String(guest._id);
-    if (map.has(id)) {
-      const existing = map.get(id);
+    const key = getCartItemKey(guest);
+    if (map.has(key)) {
+      const existing = map.get(key);
       const combined = Math.min(
         MAX_ITEM_QUANTITY,
         (Number(existing.quantity) || 1) + (Number(guest.quantity) || 1)
       );
-      map.set(id, { ...existing, quantity: combined });
+      map.set(key, { ...existing, quantity: combined });
     } else {
-      map.set(id, {
+      map.set(key, {
         ...guest,
+        cartItemId: key,
         quantity: Math.min(MAX_ITEM_QUANTITY, Number(guest.quantity) || 1),
       });
     }
@@ -145,18 +166,19 @@ const useCartStore = create((set, get) => ({
   addItem: (product, qty = 1) => {
     if (!product || !product._id) return;
     const addQty = Math.max(1, Math.floor(Number(qty) || 1));
+    const targetKey = getCartItemKey(product);
     const items = get().items;
-    const existing = items.find((item) => item._id === product._id);
+    const existing = items.find((item) => getCartItemKey(item) === targetKey);
     let newItems;
 
     if (existing) {
       const newQty = Math.min(MAX_ITEM_QUANTITY, (Number(existing.quantity) || 0) + addQty);
       newItems = items.map((item) =>
-        item._id === product._id ? { ...item, quantity: newQty } : item
+        getCartItemKey(item) === targetKey ? { ...item, quantity: newQty } : item
       );
     } else {
       const initialQty = Math.min(MAX_ITEM_QUANTITY, addQty);
-      newItems = [...items, { ...product, quantity: initialQty }];
+      newItems = [...items, { ...product, cartItemId: targetKey, quantity: initialQty }];
     }
 
     const cleaned = cleanCartItems(newItems);
@@ -172,7 +194,8 @@ const useCartStore = create((set, get) => ({
     for (const entry of entries) {
       if (!entry || !entry._id) continue;
       const addQty = Math.max(1, Math.floor(Number(entry.quantity) || 1));
-      const existingIndex = currentItems.findIndex((item) => item._id === entry._id);
+      const targetKey = getCartItemKey(entry);
+      const existingIndex = currentItems.findIndex((item) => getCartItemKey(item) === targetKey);
 
       if (existingIndex > -1) {
         const newQty = Math.min(
@@ -186,6 +209,7 @@ const useCartStore = create((set, get) => ({
       } else {
         currentItems.push({
           ...entry,
+          cartItemId: targetKey,
           quantity: Math.min(MAX_ITEM_QUANTITY, addQty),
         });
       }
@@ -196,19 +220,24 @@ const useCartStore = create((set, get) => ({
     scheduleSaveCart(get, set);
   },
 
-  removeItem: (productId) => {
-    const newItems = get().items.filter((item) => item._id !== productId);
+  removeItem: (keyOrId) => {
+    const newItems = get().items.filter(
+      (item) => getCartItemKey(item) !== keyOrId && item._id !== keyOrId && item.cartItemId !== keyOrId
+    );
     set({ items: newItems });
     scheduleSaveCart(get, set);
   },
 
-  increaseQty: (productId) => {
+  increaseQty: (keyOrId) => {
     const items = get().items;
-    const existing = items.find((item) => item._id === productId);
+    const existing = items.find(
+      (item) => getCartItemKey(item) === keyOrId || item.cartItemId === keyOrId || item._id === keyOrId
+    );
     if (!existing || (Number(existing.quantity) || 0) >= MAX_ITEM_QUANTITY) return;
 
+    const targetKey = getCartItemKey(existing);
     const newItems = items.map((item) =>
-      item._id === productId
+      getCartItemKey(item) === targetKey
         ? { ...item, quantity: Math.min(MAX_ITEM_QUANTITY, (Number(item.quantity) || 0) + 1) }
         : item
     );
@@ -216,17 +245,20 @@ const useCartStore = create((set, get) => ({
     scheduleSaveCart(get, set);
   },
 
-  decreaseQty: (productId) => {
+  decreaseQty: (keyOrId) => {
     const items = get().items;
-    const item = items.find((i) => i._id === productId);
+    const item = items.find(
+      (i) => getCartItemKey(i) === keyOrId || i.cartItemId === keyOrId || i._id === keyOrId
+    );
     if (!item) return;
+    const targetKey = getCartItemKey(item);
     let newItems;
 
     if (item.quantity <= 1) {
-      newItems = items.filter((i) => i._id !== productId);
+      newItems = items.filter((i) => getCartItemKey(i) !== targetKey);
     } else {
       newItems = items.map((i) =>
-        i._id === productId ? { ...i, quantity: item.quantity - 1 } : i
+        getCartItemKey(i) === targetKey ? { ...i, quantity: item.quantity - 1 } : i
       );
     }
 

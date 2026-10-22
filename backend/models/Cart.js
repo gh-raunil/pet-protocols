@@ -11,6 +11,12 @@ const CartItemSchema = new mongoose.Schema({
   isFeatured: { type: Boolean },
   description: { type: String },
   quantity: { type: Number },
+  variantName: { type: String, default: null },
+  portionQuantity: { type: Number, default: null },
+  portionUnit: { type: String, default: null },
+  servingLabel: { type: String, default: null },
+  size: { type: String, default: null },
+  cartItemId: { type: String, default: null },
 }, { _id: false })
 
 const CartSchema = new mongoose.Schema({

@@ -74,6 +74,31 @@ const ProductSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    portion: {
+      quantity: { type: Number, default: null, min: 0 },
+      unit: { type: String, default: null, trim: true },
+      customUnit: { type: String, default: null, trim: true, maxlength: 50 },
+      servingLabel: { type: String, default: null, trim: true, maxlength: 100 },
+      size: { type: String, default: null, trim: true, maxlength: 50 },
+    },
+    hasVariants: {
+      type: Boolean,
+      default: false,
+    },
+    variants: {
+      type: [
+        {
+          name: { type: String, required: true, trim: true, maxlength: 100 },
+          price: { type: Number, required: true, min: 0 },
+          portionQuantity: { type: Number, default: null, min: 0 },
+          portionUnit: { type: String, default: null, trim: true },
+          servingLabel: { type: String, default: null, trim: true, maxlength: 100 },
+          size: { type: String, default: null, trim: true, maxlength: 50 },
+          isAvailable: { type: Boolean, default: true },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
