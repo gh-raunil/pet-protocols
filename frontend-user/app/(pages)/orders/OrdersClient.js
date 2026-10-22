@@ -23,10 +23,12 @@ import {
   Tag,
   RefreshCw,
   Calendar,
+  Star,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
+import FeedbackModal from "@/components/feedback/FeedbackModal";
 import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { formatDateInTimeZone } from "@/lib/timeZone";
@@ -89,6 +91,7 @@ export default function OrdersClient() {
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [reorderingOrderId, setReorderingOrderId] = useState(null);
+  const [activeFeedbackOrder, setActiveFeedbackOrder] = useState(null);
 
   // Customer Cancellation Modal/State
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
@@ -636,6 +639,7 @@ export default function OrdersClient() {
               {/* Status Progression Tracker */}
               <div className="py-2">
                 <OrderStatusTracker
+                  orderId={order.orderId || order._id}
                   status={order.status}
                   paymentStatus={order.paymentStatus}
                   isPickup={isPickup}
@@ -781,6 +785,19 @@ export default function OrdersClient() {
                       </Tooltip>
                     )}
 
+                    {/* Rate Order Button for Delivered Orders */}
+                    {isDelivered && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveFeedbackOrder(order)}
+                        className="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                        aria-label="Rate and review this order"
+                      >
+                        <Star size={13} className="fill-amber-400 text-amber-400" />
+                        <span>Rate Order</span>
+                      </button>
+                    )}
+
                     {/* Reorder Button */}
                     <Tooltip
                       content="Add all available dishes from this order back to your cart for quick re-ordering"
@@ -816,6 +833,14 @@ export default function OrdersClient() {
           Explore More Menus 🍔
         </Link>
       </div>
+
+      {activeFeedbackOrder && (
+        <FeedbackModal
+          order={activeFeedbackOrder}
+          isOpen={Boolean(activeFeedbackOrder)}
+          onClose={() => setActiveFeedbackOrder(null)}
+        />
+      )}
     </main>
   );
 }

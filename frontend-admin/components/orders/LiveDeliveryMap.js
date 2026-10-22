@@ -743,9 +743,10 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 5. Turn-by-Turn Road Route Polyline from Delivery Boy (or Restaurant) to Destination Doorstep
-      const routeOriginLat = hasValidDriverCoords ? driverLat : (hasValidRestaurantCoords ? restLat : null);
-      const routeOriginLng = hasValidDriverCoords ? driverLng : (hasValidRestaurantCoords ? restLng : null);
+      // 5. Turn-by-Turn Road Route Polyline: Strictly from Delivery Staff to Customer Location
+      // In every map (user, restaurant, staff), route MUST originate from delivery staff, never restaurant.
+      const routeOriginLat = hasValidDriverCoords ? driverLat : null;
+      const routeOriginLng = hasValidDriverCoords ? driverLng : null;
 
       if (routeOriginLat && routeOriginLng && hasEffectiveDest) {
         const directDist = haversineDistance(routeOriginLat, routeOriginLng, effectiveDestLat, effectiveDestLng);
@@ -1170,7 +1171,7 @@ export default function LiveDeliveryMap({
         </div>
 
         {/* Floating Route Distance & ETA Pill */}
-        {hasEffectiveDest && (
+        {hasValidDriverCoords && hasEffectiveDest && routeStats.distanceKm && (
           <div className="absolute top-3 left-3 z-30 pointer-events-none">
             <div className="px-3.5 py-2 rounded-full bg-stone-900/95 backdrop-blur-md border border-blue-500/40 shadow-2xl flex items-center gap-2 text-xs font-bold text-white">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />

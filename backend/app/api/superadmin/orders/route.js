@@ -188,6 +188,19 @@ export async function PATCH(request) {
         );
       }
 
+      if (status === "delivered") {
+        const isPickup = typeof order.isPickupOrder === "function" ? order.isPickupOrder() : (order.orderType === "pickup");
+        if (!isPickup) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Delivery orders require valid customer handover OTP verification by the assigned delivery driver. Direct superadmin status override to 'delivered' is prohibited.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       if (typeof order.addStatusTransition === "function") {
         order.addStatusTransition(
           status,

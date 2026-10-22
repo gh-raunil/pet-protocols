@@ -11,6 +11,11 @@ import {
   AlertTriangle,
   Clock,
   Sparkles,
+  ShieldCheck,
+  KeyRound,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
@@ -162,6 +167,7 @@ function getStepHistoryEntry(stepId, history = [], createdAt = null) {
 }
 
 export default function OrderStatusTracker({
+  orderId = null,
   status = "pending",
   paymentStatus = "paid",
   isPickup = false,
@@ -176,6 +182,78 @@ export default function OrderStatusTracker({
   const activeIndex = getActiveStepIndex(status);
   const steps = getOrderSteps(isPickup);
   const currentStep = steps[activeIndex] || steps[0];
+
+  // Secure Handover OTP State
+  const [otpData, setOtpData] = React.useState(null);
+  const [otpLoading, setOtpLoading] = React.useState(false);
+  const [otpError, setOtpError] = React.useState("");
+  const [reissueCooldown, setReissueCooldown] = React.useState(0);
+  const [reissuing, setReissuing] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  const fetchHandoverOtp = React.useCallback(async () => {
+    if (!orderId || isPickup || status !== "out_for_delivery") return;
+    try {
+      setOtpLoading(true);
+      setOtpError("");
+      const res = await fetch(`/api/orders/${orderId}/handover-otp`);
+      const data = await res.json();
+      if (data.success && data.otpCode) {
+        setOtpData(data);
+      } else if (data.message && !data.notActiveYet) {
+        setOtpError(data.message);
+      }
+    } catch {
+      setOtpError("Unable to retrieve handover code. Please check your connection.");
+    } finally {
+      setOtpLoading(false);
+    }
+  }, [orderId, isPickup, status]);
+
+  React.useEffect(() => {
+    if (orderId && status === "out_for_delivery" && !isPickup) {
+      fetchHandoverOtp();
+    }
+  }, [orderId, status, isPickup, fetchHandoverOtp]);
+
+  // Cooldown countdown
+  React.useEffect(() => {
+    if (reissueCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setReissueCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [reissueCooldown]);
+
+  const handleReissueOtp = async () => {
+    if (!orderId || reissueCooldown > 0 || reissuing) return;
+    try {
+      setReissuing(true);
+      setOtpError("");
+      const res = await fetch(`/api/orders/${orderId}/handover-otp`, { method: "POST" });
+      const data = await res.json();
+      if (data.success && data.otpCode) {
+        setOtpData(data);
+        setReissueCooldown(30);
+      } else {
+        setOtpError(data.message || "Failed to reissue code.");
+        if (data.status === 429) {
+          setReissueCooldown(30);
+        }
+      }
+    } catch {
+      setOtpError("Network error. Please try again.");
+    } finally {
+      setReissuing(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (!otpData?.otpCode) return;
+    navigator.clipboard.writeText(otpData.otpCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Cancellation timestamp & details from history if available
   const cancelEntry = Array.isArray(statusHistory)
@@ -314,6 +392,95 @@ export default function OrderStatusTracker({
               >
                 Call Partner
               </a>
+            )}
+          </div>
+        )}
+
+        {/* Secure Delivery Handover OTP Card */}
+        {status === "out_for_delivery" && !isPickup && orderId && (
+          <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/30 shadow-lg relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
+                  <ShieldCheck size={26} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
+                      Proof of Handover
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)] font-medium">
+                      Doorstep Security Code
+                    </span>
+                  </div>
+                  <h4 className="text-base font-extrabold text-[var(--text-main)] mt-1">
+                    Delivery Handover Code (OTP)
+                  </h4>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                    Share this 4-digit code with your delivery driver when they hand you your food package.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4-Digit Display & Copy Button */}
+              <div className="flex flex-col sm:items-end gap-2 shrink-0">
+                {otpLoading && !otpData ? (
+                  <div className="flex items-center gap-2 py-3 px-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-pulse">
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Generating Handover Code...</span>
+                  </div>
+                ) : otpData?.otpCode ? (
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex items-center gap-1.5 bg-white dark:bg-stone-900 border-2 border-emerald-500/40 px-4 py-2 rounded-2xl shadow-md cursor-pointer hover:border-emerald-500 transition group"
+                      onClick={handleCopyCode}
+                      title="Click to copy handover code"
+                    >
+                      <span className="font-mono text-2xl sm:text-3xl font-black tracking-[0.25em] text-emerald-600 dark:text-emerald-400 pl-1">
+                        {otpData.otpCode}
+                      </span>
+                      <button
+                        type="button"
+                        className="ml-2 p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20 transition"
+                      >
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleReissueOtp}
+                      disabled={reissueCooldown > 0 || reissuing}
+                      className="p-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={reissueCooldown > 0 ? `Wait ${reissueCooldown}s before reissuing` : "Reissue fresh handover code"}
+                    >
+                      <RefreshCw size={15} className={reissuing ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={fetchHandoverOtp}
+                    className="py-2 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold transition hover:bg-emerald-700 flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={12} />
+                    <span>Generate Code</span>
+                  </button>
+                )}
+
+                {reissueCooldown > 0 && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    Reissue available in {reissueCooldown}s
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {otpError && (
+              <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>{otpError}</span>
+              </div>
             )}
           </div>
         )}

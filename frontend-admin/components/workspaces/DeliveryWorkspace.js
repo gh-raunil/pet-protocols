@@ -38,6 +38,9 @@ import {
   FileSpreadsheet,
   BadgeCheck,
   Copy,
+  ShieldCheck,
+  KeyRound,
+  X,
 } from "lucide-react";
 import {
   useDeliveryGpsTransmitter,
@@ -71,6 +74,83 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
   const [updatingId, setUpdatingId] = useState(null);
   const [deliveryNote, setDeliveryNote] = useState({});
+
+  // Handover Verification (OTP) Modal State
+  const [handoverModalOrder, setHandoverModalOrder] = useState(null);
+  const [handoverOtpCode, setHandoverOtpCode] = useState("");
+  const [handoverSubmitting, setHandoverSubmitting] = useState(false);
+  const [handoverError, setHandoverError] = useState("");
+  const [handoverRemainingAttempts, setHandoverRemainingAttempts] = useState(null);
+
+  const handleVerifyHandoverModal = async (e) => {
+    if (e) e.preventDefault();
+    if (!handoverModalOrder) return;
+    const sanitizedCode = handoverOtpCode.trim();
+    if (sanitizedCode.length !== 4 || !/^\d{4}$/.test(sanitizedCode)) {
+      setHandoverError("Please enter the complete 4-digit code provided by the customer.");
+      return;
+    }
+
+    setHandoverSubmitting(true);
+    setHandoverError("");
+
+    try {
+      const order = handoverModalOrder;
+      const isCod = isOrderCod(order);
+      const isCollected = isCashCollected(order);
+      const amount = Number(order.totalAmount || 0);
+
+      const payload = {
+        otpCode: sanitizedCode,
+        notes: "Delivered to customer following successful OTP handover verification",
+      };
+
+      if (isCod && !isCollected) {
+        payload.codPaymentHandler = {
+          id: currentStaffId,
+          name: currentStaffName,
+          phone: currentStaffPhone,
+          amount: amount,
+          collected: true,
+          collectedAt: new Date(),
+          settledWithManager: false,
+        };
+      }
+
+      const res = await fetch(`/api/restaurant/orders/${order._id}/verify-handover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrders((prev) => prev.map((o) => (o._id === order._id ? data.order : o)));
+
+        if (
+          gpsTransmitter.activeOrderId === order._id ||
+          gpsTransmitter.activeOrderId === order.orderId
+        ) {
+          gpsTransmitter.stopTracking("stopped");
+        }
+
+        toast.success("Handover verified! Order marked delivered.", { icon: "🎉" });
+        setHandoverModalOrder(null);
+        setHandoverOtpCode("");
+        setHandoverError("");
+        setHandoverRemainingAttempts(null);
+      } else {
+        setHandoverError(data.message || "Failed to verify handover code.");
+        if (data.remainingAttempts !== undefined) {
+          setHandoverRemainingAttempts(data.remainingAttempts);
+        }
+      }
+    } catch (err) {
+      setHandoverError("Network error while verifying handover. Please check connection and retry.");
+    } finally {
+      setHandoverSubmitting(false);
+    }
+  };
 
   const toggleDoorstepMap = (orderId) => {
     setExpandedMapOrderIds((prev) => {
@@ -184,6 +264,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     }
   }, [orders, gpsTransmitter.activeOrderId, gpsTransmitter.stopTracking]);
 
+
   async function updateOrderStatus(orderId, newStatus, extra = {}) {
     try {
       const currentOrder = orders.find((o) => o._id === orderId);
@@ -234,7 +315,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         }
 
         if (newStatus === "out_for_delivery") {
-          toast.success("Order dispatched! Delivery staff can now share their live GPS location from their mobile device.");
+          toast.success("Order dispatched! Live GPS tracking activated for delivery.");
+          if (!isManager && currentOrder) {
+            gpsTransmitter.startTracking(orderId, currentOrder);
+          }
         } else if (newStatus === "delivered" || newStatus === "cancelled") {
           // Teardown GPS when delivered or cancelled
           if (
@@ -408,6 +492,20 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
     },
     [isMyOrder]
   );
+
+  // Auto-start live GPS tracking if delivery staff has an active transit order
+  useEffect(() => {
+    if (isManager || typeof window === "undefined" || !navigator.geolocation) return;
+    if (gpsTransmitter.activeOrderId) return;
+
+    const myActiveTransitOrder = orders.find(
+      (o) => o.status === "out_for_delivery" && isMyOrder(o)
+    );
+
+    if (myActiveTransitOrder) {
+      gpsTransmitter.startTracking(myActiveTransitOrder.orderId || myActiveTransitOrder._id, myActiveTransitOrder);
+    }
+  }, [orders, isManager, isMyOrder, gpsTransmitter.activeOrderId, gpsTransmitter.startTracking]);
 
   // Filtered orders: scoped so staff only sees unassigned pickup tasks or their own orders
   const filteredOrders = useMemo(() => {
@@ -1134,15 +1232,20 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           )
                         )}
 
-                        {/* Delivery Handover Action (automatically handles COD collection upon delivery confirmation) */}
-                        <Tooltip content="Confirm food handed to customer at doorstep. Automatically records cash collected for COD orders." position="top">
+                        {/* Delivery Handover Action (Requires Customer OTP Verification) */}
+                        <Tooltip content="Verify customer's 4-digit handover code at doorstep and complete delivery." position="top">
                           <button
-                            onClick={() => updateOrderStatus(order._id, "delivered")}
+                            onClick={() => {
+                              setHandoverModalOrder(order);
+                              setHandoverOtpCode("");
+                              setHandoverError("");
+                              setHandoverRemainingAttempts(null);
+                            }}
                             disabled={isUpdating}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
-                            <CheckCircle2 size={14} />
-                            <span>Mark Handed Over / Delivered</span>
+                            <KeyRound size={14} />
+                            <span>Verify Handover (OTP)</span>
                           </button>
                         </Tooltip>
                       </>
@@ -1490,13 +1593,19 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            order.codPaymentHandler?.settledWithManager
+                            order.status === "cancelled"
+                              ? "bg-stone-500/10 text-stone-600 dark:text-stone-400"
+                              : order.codPaymentHandler?.settledWithManager
                               ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                               : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
                           }`}>
-                            {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "In Driver's Hand (Pending Handover)"}
+                            {order.status === "cancelled"
+                              ? "Void (Cancelled)"
+                              : order.codPaymentHandler?.settledWithManager
+                              ? "✓ Settled with Manager"
+                              : "In Driver's Hand (Pending Handover)"}
                           </span>
-                          {isManager && !order.codPaymentHandler?.settledWithManager && (
+                          {isManager && order.status !== "cancelled" && !order.codPaymentHandler?.settledWithManager && (
                             <Tooltip content="Acknowledge cash deposit into the restaurant cash register" position="top">
                               <button
                                 onClick={() => handleSettleCash(order._id)}
@@ -2068,6 +2177,146 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 })
               )}
             </div>
+          </div>
+        </div>
+      )}
+      {/* ── SECURE DELIVERY HANDOVER OTP MODAL ────────────────────────── */}
+      {handoverModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-[#151926] rounded-3xl border border-stone-200 dark:border-white/10 shadow-2xl max-w-md w-full p-6 sm:p-7 space-y-5 overflow-hidden relative">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-stone-900 dark:text-white">
+                    Verify Customer Handover
+                  </h3>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 font-mono">
+                    Order #{handoverModalOrder.orderId || handoverModalOrder._id.slice(-6).toUpperCase()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!handoverSubmitting) {
+                    setHandoverModalOrder(null);
+                    setHandoverOtpCode("");
+                    setHandoverError("");
+                    setHandoverRemainingAttempts(null);
+                  }
+                }}
+                disabled={handoverSubmitting}
+                className="p-1.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 transition cursor-pointer disabled:opacity-40"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Recipient / Address Summary */}
+            <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-white/[0.03] border border-stone-200/80 dark:border-white/5 text-xs space-y-1.5">
+              <div className="flex items-center justify-between font-bold text-stone-900 dark:text-white">
+                <span className="truncate">{handoverModalOrder.address?.fullName || "Customer"}</span>
+                {handoverModalOrder.address?.phone && (
+                  <span className="font-mono text-stone-500 text-[11px]">{handoverModalOrder.address.phone}</span>
+                )}
+              </div>
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+                {[handoverModalOrder.address?.street, handoverModalOrder.address?.city].filter(Boolean).join(", ")}
+              </p>
+            </div>
+
+            {/* COD Cash Collection Notice if applicable */}
+            {isOrderCod(handoverModalOrder) && !isCashCollected(handoverModalOrder) && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                <Banknote size={18} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <div className="min-w-0">
+                  <p className="font-extrabold">Cash Collection Required</p>
+                  <p className="text-[11px] mt-0.5 leading-relaxed">
+                    Collect <span className="font-bold underline">₹{Number(handoverModalOrder.totalAmount || 0).toFixed(2)}</span> in cash from customer upon verifying the code.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Verification Form */}
+            <form onSubmit={handleVerifyHandoverModal} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-300">
+                  4-Digit Handover Code (OTP)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  autoFocus
+                  value={handoverOtpCode}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setHandoverOtpCode(clean);
+                    if (handoverError) setHandoverError("");
+                  }}
+                  placeholder="0000"
+                  className="w-full text-center font-mono text-3xl font-black tracking-[0.5em] py-3.5 px-4 rounded-2xl border-2 border-emerald-500/40 focus:border-emerald-500 focus:outline-hidden bg-stone-50 dark:bg-black/30 text-stone-900 dark:text-white transition shadow-inner"
+                  disabled={handoverSubmitting}
+                />
+                <p className="text-[11px] text-stone-500 text-center">
+                  Ask the customer to read the 4-digit code displayed on their live tracking screen.
+                </p>
+              </div>
+
+              {/* Error / Attempt Warning Banner */}
+              {handoverError && (
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold">{handoverError}</p>
+                    {handoverRemainingAttempts !== null && (
+                      <p className="text-[11px] mt-0.5">
+                        {handoverRemainingAttempts} verification attempt{handoverRemainingAttempts === 1 ? "" : "s"} remaining before lockout.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHandoverModalOrder(null);
+                    setHandoverOtpCode("");
+                    setHandoverError("");
+                    setHandoverRemainingAttempts(null);
+                  }}
+                  disabled={handoverSubmitting}
+                  className="flex-1 py-3 px-4 rounded-xl border border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 font-bold text-xs hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={handoverSubmitting || handoverOtpCode.trim().length !== 4}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {handoverSubmitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} />
+                      <span>Verify & Deliver</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

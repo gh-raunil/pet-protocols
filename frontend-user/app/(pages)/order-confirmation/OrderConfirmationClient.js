@@ -21,10 +21,12 @@ import {
   XCircle,
   AlertTriangle,
   X,
+  Star,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
+import FeedbackModal from "@/components/feedback/FeedbackModal";
 import { toast } from "@/components/ui/ToastProvider";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
@@ -84,6 +86,7 @@ export default function OrderConfirmationClient() {
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const modalRef = useRef(null);
   const triggerRef = useRef(null);
 
@@ -441,6 +444,7 @@ export default function OrderConfirmationClient() {
       {/* Honest Order-Status Progress Tracker (No fake GPS) */}
       <section className="space-y-4">
         <OrderStatusTracker
+          orderId={order.orderId || order._id}
           status={order.status}
           paymentStatus={order.paymentStatus}
           isPickup={isPickup}
@@ -513,6 +517,33 @@ export default function OrderConfirmationClient() {
                 <span>Call Kitchen: {restPhone}</span>
               </a>
             ) : null}
+          </div>
+        )}
+
+        {/* Feedback Banner for Delivered Orders */}
+        {order.status === "delivered" && (
+          <div className="bg-amber-500/10 border border-amber-500/25 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                <Star size={20} className="fill-amber-400 text-amber-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[var(--text-main)]">
+                  How was your order from {restaurantName}?
+                </h4>
+                <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                  Your ratings and reviews help {restaurantName} maintain exceptional quality and resolve any issues.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFeedbackModal(true)}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <Star size={14} className="fill-white text-white" />
+              <span>Leave Feedback & Review</span>
+            </button>
           </div>
         )}
       </section>
@@ -798,6 +829,14 @@ export default function OrderConfirmationClient() {
             </div>
           </div>
         </div>
+      )}
+
+      {order && (
+        <FeedbackModal
+          order={order}
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+        />
       )}
     </main>
   );

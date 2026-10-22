@@ -54,7 +54,13 @@ export async function POST(request) {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
-    if (generatedSignature !== razorpay_signature) {
+    const sigBuf = Buffer.from(razorpay_signature, 'utf8');
+    const expectedBuf = Buffer.from(generatedSignature, 'utf8');
+    const isSignatureValid =
+      sigBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(sigBuf, expectedBuf);
+
+    if (!isSignatureValid) {
       console.error('Razorpay signature mismatch for order:', razorpay_order_id);
       return NextResponse.json(
         { success: false, message: 'Invalid payment signature' },

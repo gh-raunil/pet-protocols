@@ -13,7 +13,6 @@ import {
   Search,
   Edit2,
   Trash2,
-  CheckCircle2,
   AlertTriangle,
   RefreshCw,
   X,
@@ -233,11 +232,21 @@ export default function ProductsClient() {
     }
   }, [status, router]);
 
+  async function safeParseJson(res) {
+    try {
+      if (!res || !res.ok) return { success: false, message: `Server status: ${res?.status || "network"}` };
+      const text = await res.text();
+      return JSON.parse(text);
+    } catch {
+      return { success: false, message: "Server is compiling or temporarily busy." };
+    }
+  }
+
   async function loadProducts() {
     try {
       setLoading(true);
       const res = await fetch("/api/restaurant/products");
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (data.success) {
         setProducts(data.products || []);
       }
@@ -252,7 +261,7 @@ export default function ProductsClient() {
   async function loadCategories() {
     try {
       const res = await fetch("/api/categories");
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (data.success && Array.isArray(data.categories)) {
         setLaunchedCategories(data.categories);
       }
@@ -713,15 +722,6 @@ export default function ProductsClient() {
                 <Sparkles size={16} className="text-stone-950" />
                 <span>Launch Category</span>
               </button>
-            </Tooltip>
-
-            <Tooltip content="Quickly pause or unpause items in bulk during rush hours without editing them" position="bottom">
-              <Link
-                href="/products/availability"
-                className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 dark:bg-white/10 dark:hover:bg-white/15 transition text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl text-sm font-semibold border border-stone-200 dark:border-white/10 active:scale-95"
-              >
-                <CheckCircle2 size={16} className="text-emerald-500" /> Menu Availability
-              </Link>
             </Tooltip>
 
             <Tooltip content="Add a new dish with photos, pricing, prep time, and dietary tags" position="bottom">

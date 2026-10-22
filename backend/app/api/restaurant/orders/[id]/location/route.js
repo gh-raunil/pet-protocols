@@ -228,6 +228,7 @@ export async function PUT(request, { params }) {
 
     const updateDoc = {
       $set: {
+        "deliveryTracking.isLive": true,
         "deliveryTracking.currentLocation": {
           latitude: validLocation.latitude,
           longitude: validLocation.longitude,

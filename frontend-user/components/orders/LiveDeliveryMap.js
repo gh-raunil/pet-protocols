@@ -181,6 +181,7 @@ export default function LiveDeliveryMap({
       // Mock / dynamic loader stub for Mappls v3 contract validation
       const sdkUrl = `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?v=3.0&layer=vector`;
       window.mappls = window.mappls || { Map: function() {} };
+    }
   }, [mapKey]);
 
   const retryMapSdk = useCallback(() => {
@@ -422,7 +423,6 @@ export default function LiveDeliveryMap({
     !isPickup &&
     !tracking?.isPickup &&
     currentStatus === "out_for_delivery" &&
-    Boolean(tracking?.isLive) &&
     Boolean(tracking?.location);
 
   const driverLat = tracking?.location?.latitude;
@@ -734,9 +734,10 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 5. Draw Turn-by-Turn Route Polyline from Delivery Boy (or Restaurant) to Doorstep
-      const routeOriginLat = hasValidDriverCoords ? driverLat : (hasValidRestaurantCoords ? restLat : null);
-      const routeOriginLng = hasValidDriverCoords ? driverLng : (hasValidRestaurantCoords ? restLng : null);
+      // 5. Draw Turn-by-Turn Route Polyline: Strictly from Delivery Staff to Customer Location
+      // In every map (user, restaurant, staff), route MUST originate from delivery staff, never restaurant.
+      const routeOriginLat = hasValidDriverCoords ? driverLat : null;
+      const routeOriginLng = hasValidDriverCoords ? driverLng : null;
 
       if (routeOriginLat && routeOriginLng && hasEffectiveDest) {
         const directDist = haversineDistance(routeOriginLat, routeOriginLng, effectiveDestLat, effectiveDestLng);

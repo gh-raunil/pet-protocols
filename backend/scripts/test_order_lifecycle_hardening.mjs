@@ -1,5 +1,8 @@
+import { register } from "node:module";
+import { pathToFileURL } from "node:url";
+register(pathToFileURL("./scripts/loader.mjs").href, import.meta.url);
+
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import dns from "dns";
@@ -7,22 +10,31 @@ import assert from "node:assert/strict";
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const backendDir = path.join(__dirname, "..");
-dotenv.config({ path: path.join(backendDir, ".env.local") });
-dotenv.config({ path: path.join(backendDir, ".env") });
-
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error("Missing MONGODB_URI in environment");
-}
-
 console.log("========================================================================");
 console.log("PET PROTOCOLS — ORDER LIFECYCLE SECURITY HARDENING REGRESSION TEST SUITE");
+console.log("REC-06: STRICTLY ISOLATED IN-MEMORY DATABASE TEST HARNESS");
 console.log("========================================================================\n");
 
-await mongoose.connect(MONGODB_URI);
-console.log("Connected to MongoDB successfully.\n");
+// REC-06: Start isolated MongoMemoryReplSet (zero access to live database)
+console.log("Starting isolated MongoMemoryReplSet for order lifecycle hardening...");
+const { MongoMemoryReplSet } = await import("mongodb-memory-server");
+const replSet = await MongoMemoryReplSet.create({
+  replSet: { count: 1, storageEngine: "wiredTiger" },
+});
+const localUri = replSet.getUri("test_order_lifecycle_isolated");
+
+// Security Invariant: Ensure connection is strictly loopback (zero access to live database)
+assert.ok(
+  localUri.includes("127.0.0.1") || localUri.includes("localhost"),
+  "Security Invariant: Must use isolated loopback MongoDB URI"
+);
+
+process.env.MONGODB_URI = localUri;
+process.env.TEST_MONGODB_URI = localUri;
+process.env.DELIVERY_OTP_SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+await mongoose.connect(localUri);
+console.log(`Connected to isolated test database: ${localUri}\n`);
 
 // Import models
 const Order = (await import("../models/Order.js")).default;
@@ -71,6 +83,7 @@ const {
   _setTestHttpTransport,
   _resetTestHttpTransport,
 } = await import("../lib/razorpayHttpClient.js");
+const { decryptOtpCode } = await import("../lib/deliveryOtpService.js");
 
 // Cleanup previous test fixtures
 const cleanupFilter = {
@@ -413,7 +426,7 @@ try {
     reportTest(6, "Delivery staff CANNOT accept/prepare orders (rejected with 403)", res.status === 403 && body.success === false);
   }
 
-  // Test 7: Delivery staff CAN dispatch and deliver delivery orders
+  // Test 7: Delivery staff CAN dispatch and deliver delivery orders (Requires Handover OTP)
   {
     const ord = await createTestOrder({ orderType: "delivery", status: "ready" });
     setRestaurantOrdersAuth(async () => mockRestaurantAuth(deliveryUserA, restA));
@@ -425,19 +438,42 @@ try {
     const resDispatch = await restaurantOrdersPUT(reqDispatch);
     const bodyDispatch = await resDispatch.json();
 
-    const reqDeliver = new Request("http://localhost:3000/api/restaurant/orders", {
+    // Rejection check: delivery without OTP must be rejected with 400
+    const reqDeliverNoOtp = new Request("http://localhost:3000/api/restaurant/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId: ord._id.toString(), status: "delivered" }),
+    });
+    const resDeliverNoOtp = await restaurantOrdersPUT(reqDeliverNoOtp);
+
+    // Retrieve active OTP from the order
+    const refreshedOrder = await Order.findById(ord._id).select("+deliveryOtp.encryptedCode");
+    const activeOtpCode = decryptOtpCode(refreshedOrder.deliveryOtp?.encryptedCode, {
+      orderId: ord._id,
+      issuanceId: refreshedOrder.deliveryOtp?.issuanceId,
+    });
+
+    const reqDeliver = new Request("http://localhost:3000/api/restaurant/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: ord._id.toString(),
+        status: "delivered",
+        deliveryOtpCode: activeOtpCode,
+      }),
     });
     const resDeliver = await restaurantOrdersPUT(reqDeliver);
     const bodyDeliver = await resDeliver.json();
 
     reportTest(
       7,
-      "Delivery staff CAN dispatch and deliver delivery orders",
-      resDispatch.status === 200 && bodyDispatch.order?.status === "out_for_delivery" &&
-      resDeliver.status === 200 && bodyDeliver.order?.status === "delivered"
+      "Delivery staff CAN dispatch and deliver delivery orders with OTP (unverified rejected)",
+      resDispatch.status === 200 &&
+      bodyDispatch.order?.status === "out_for_delivery" &&
+      resDeliverNoOtp.status === 400 &&
+      resDeliver.status === 200 &&
+      bodyDeliver.order?.status === "delivered",
+      `resDispatch=${resDispatch.status}, bodyDispatch=${JSON.stringify(bodyDispatch)}, resDeliverNoOtp=${resDeliverNoOtp.status}, resDeliver=${resDeliver.status}, bodyDeliver=${JSON.stringify(bodyDeliver)}, activeOtpCode=${activeOtpCode}`
     );
   }
 
@@ -1387,4 +1423,8 @@ try {
   await Ingredient.deleteMany({ name: { $regex: /^Test Hardened / } });
   console.log("Cleanup complete.");
   await mongoose.disconnect();
+  if (replSet) {
+    await replSet.stop();
+    console.log("Stopped isolated MongoMemoryReplSet.");
+  }
 }

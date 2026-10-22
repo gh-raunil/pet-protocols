@@ -30,6 +30,7 @@ import {
   Check,
   Banknote,
   Zap,
+  PackageCheck,
 } from "lucide-react";
 import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
@@ -1547,13 +1548,19 @@ export default function OrdersClient() {
                                 </span>
                                 <div className="flex items-center gap-2 self-end sm:self-auto">
                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    order.codPaymentHandler?.settledWithManager
+                                    order.status === "cancelled"
+                                      ? "bg-stone-500/10 text-stone-600 dark:text-stone-400"
+                                      : order.codPaymentHandler?.settledWithManager
                                       ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                                       : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
                                   }`}>
-                                    {order.codPaymentHandler?.settledWithManager ? "✓ Settled with Manager" : "⚠️ Pending Manager Handover"}
+                                    {order.status === "cancelled"
+                                      ? "Void (Cancelled)"
+                                      : order.codPaymentHandler?.settledWithManager
+                                      ? "✓ Settled with Manager"
+                                      : "⚠️ Pending Manager Handover"}
                                   </span>
-                                  {isManagerOrAdmin && !order.codPaymentHandler?.settledWithManager && (
+                                  {isManagerOrAdmin && order.status !== "cancelled" && !order.codPaymentHandler?.settledWithManager && (
                                     <Tooltip content="Confirm that the delivery driver has handed over the collected cash to the register" position="top">
                                       <button
                                         type="button"

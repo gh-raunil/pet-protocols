@@ -1,28 +1,40 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import dns from "dns";
 import assert from "node:assert/strict";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
+import { register } from "node:module";
+import { pathToFileURL } from "node:url";
+register(pathToFileURL("./scripts/loader.mjs").href, import.meta.url);
 
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const backendDir = path.join(__dirname, "..");
-dotenv.config({ path: path.join(backendDir, ".env.local") });
-dotenv.config({ path: path.join(backendDir, ".env") });
-
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error("Missing MONGODB_URI in environment");
-}
+// Set deterministic test secrets
+process.env.DELIVERY_OTP_HMAC_SECRET = "test_hmac_secret_key_12345678901234567890";
+process.env.DELIVERY_OTP_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+process.env.DELIVERY_OTP_WINDOW_SECONDS = "600";
+process.env.DELIVERY_OTP_MAX_ATTEMPTS = "5";
 
 console.log("========================================================================");
 console.log("PET PROTOCOLS — DELIVERY ROLE AUTHORIZATION & COD RECONCILIATION SUITE");
 console.log("========================================================================\n");
 
+console.log("Starting in-memory MongoDB replica set for isolated regression testing...");
+const replSet = await MongoMemoryReplSet.create({
+  replSet: { count: 1, storageEngine: "wiredTiger" },
+});
+const MONGODB_URI = replSet.getUri();
+
+// Fail closed if URI is remote or not loopback
+const parsedUri = new URL(MONGODB_URI);
+if (parsedUri.hostname !== "127.0.0.1" && parsedUri.hostname !== "localhost") {
+  throw new Error(`CRITICAL: Test execution aborted. Non-loopback database URI detected: ${MONGODB_URI}`);
+}
+process.env.MONGODB_URI = MONGODB_URI;
+console.log(`Isolated loopback database URI established: ${MONGODB_URI}`);
+
 await mongoose.connect(MONGODB_URI);
 console.log("Connected to MongoDB successfully.\n");
+
+const { decryptOtpCode } = await import("../lib/deliveryOtpService.js");
 
 const Order = (await import("../models/Order.js")).default;
 const User = (await import("../models/User.js")).default;
@@ -197,16 +209,27 @@ try {
 
   // --- TEST 4: Delivery Staff transitions to delivered ---
   console.log("\n--- Test 4: Marking order delivered after cash collection ---");
+  // Retrieve active OTP from the order (using select('+deliveryOtp.encryptedCode') since it's select: false)
+  const refreshed = await Order.findById(testOrder1._id).select("+deliveryOtp.encryptedCode");
+  const activeOtpCode = decryptOtpCode(refreshed.deliveryOtp?.encryptedCode, {
+    orderId: testOrder1._id,
+    issuanceId: refreshed.deliveryOtp?.issuanceId,
+  });
+
   const reqDeliver = new Request("http://localhost:4000/api/restaurant/orders", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderId: testOrder1._id.toString(), status: "delivered" }),
+    body: JSON.stringify({
+      orderId: testOrder1._id.toString(),
+      status: "delivered",
+      deliveryOtpCode: activeOtpCode,
+    }),
   });
   const resDeliver = await ordersPUT(reqDeliver);
   const dataDeliver = await resDeliver.json();
   assert.strictEqual(resDeliver.status, 200);
   assert.strictEqual(dataDeliver.success, true);
-  console.log("  ✅ Order successfully marked delivered.");
+  console.log("  ✅ Order successfully marked delivered with OTP verification.");
 
   // --- TEST 5: Manager Settlement of COD Cash ---
   console.log("\n--- Test 5: Manager settles COD cash with delivery staff ---");
@@ -250,8 +273,18 @@ try {
 } finally {
   // Cleanup test orders
   if (createdOrders.length > 0) {
-    await Order.deleteMany({ _id: { $in: createdOrders } });
+    try {
+      await Order.deleteMany({ _id: { $in: createdOrders } });
+    } catch (e) {}
   }
   _setTestRequireRestaurantAdmin(null);
-  await mongoose.disconnect();
+  try {
+    await mongoose.disconnect();
+  } catch (e) {}
+  if (replSet) {
+    try {
+      await replSet.stop();
+    } catch (e) {}
+  }
+  process.exit(0);
 }

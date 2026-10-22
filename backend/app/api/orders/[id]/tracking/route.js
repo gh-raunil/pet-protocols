@@ -92,11 +92,10 @@ export async function GET(request, { params }) {
       typeof tracking.currentLocation.longitude === "number"
     );
 
-    // Rule: Never expose coordinates unless order is in out_for_delivery with an active live session and real coordinates
+    // Expose coordinates when order is actively in out_for_delivery and real coordinates are present
     const isActivelyDelivering =
       !isPickup &&
       order.status === "out_for_delivery" &&
-      Boolean(tracking.isLive) &&
       hasCoordinates;
 
     const now = Date.now();

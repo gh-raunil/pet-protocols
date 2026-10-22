@@ -31,6 +31,7 @@ import {
   CircleDot,
   Flame,
   X,
+  Star,
 } from "lucide-react";
 import Tooltip from "../ui/Tooltip";
 import { useTheme } from "../ui/ThemeProvider";
@@ -154,6 +155,7 @@ export default function Sidebar({
           title: "Front Desk & Billing",
           items: [
             { href: "/cashier", label: "Cashier & Billing", icon: Receipt, badge: "POS" },
+            { href: "/feedback", label: "Feedback & Reviews", icon: Star, badge: "Reviews" },
             { href: "/support", label: "Customer Support", icon: Headphones },
           ].filter((item) => isFeatureEnabled(item.href)),
         },
@@ -225,6 +227,7 @@ export default function Sidebar({
             title: "Front Desk & POS",
             items: [
               { href: "/cashier", label: "Cashier & Billing", icon: Receipt, badge: "POS" },
+              { href: "/feedback", label: "Feedback & Reviews", icon: Star, badge: "Reviews" },
               { href: "/support", label: "Customer Support", icon: Headphones },
             ].filter((item) => isFeatureEnabled(item.href)),
           },

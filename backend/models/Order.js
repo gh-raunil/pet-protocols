@@ -263,6 +263,14 @@ const OrderSchema = new mongoose.Schema(
         name: { type: String, default: "" },
       },
     },
+    paidAt: {
+      type: Date,
+      default: null,
+    },
+    settledAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"],
@@ -402,6 +410,10 @@ const OrderSchema = new mongoose.Schema(
       collectedAt: { type: Date },
       settledWithManager: { type: Boolean, default: false },
       settledAt: { type: Date },
+      settledBy: {
+        id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        name: { type: String, default: "" },
+      },
     },
     deliveryTracking: {
       type: DeliveryTrackingSchema,
@@ -435,6 +447,29 @@ const OrderSchema = new mongoose.Schema(
     cancellationReason: {
       type: String,
       default: "",
+    },
+    deliveryOtp: {
+      status: {
+        type: String,
+        enum: ["not_generated", "issued", "expired", "max_attempts_exceeded", "verified", "invalidated"],
+        default: "not_generated",
+      },
+      issuanceId: { type: String, default: null },
+      codeDigest: { type: String, default: null, select: false },
+      encryptedCode: { type: String, default: null, select: false },
+      expiresAt: { type: Date, default: null },
+      attemptCount: { type: Number, default: 0 },
+      maxAttempts: { type: Number, default: 5 },
+      reissueCount: { type: Number, default: 0 },
+      lastIssuedAt: { type: Date, default: null },
+      lastAttemptAt: { type: Date, default: null },
+      lockedUntil: { type: Date, default: null },
+      verifiedAt: { type: Date, default: null },
+      verifiedBy: {
+        id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        name: { type: String, default: "" },
+        phone: { type: String, default: "" },
+      },
     },
   },
   { timestamps: true }
@@ -535,6 +570,18 @@ OrderSchema.statics.isPickupOrder = function (order) {
 // Instance method delegation
 OrderSchema.methods.isPickupOrder = function () {
   return (this.constructor.isPickupOrder || OrderSchema.statics.isPickupOrder)(this);
+};
+
+// Canonical static helper to detect if order is a COD / cash on delivery order
+OrderSchema.statics.isCodOrder = function (order) {
+  if (!order) return false;
+  const method = String(order.paymentMethod || "").toLowerCase().trim();
+  return method.includes("cod") || method.includes("cash") || method === "cash on delivery";
+};
+
+// Instance method delegation
+OrderSchema.methods.isCodOrder = function () {
+  return (this.constructor.isCodOrder || OrderSchema.statics.isCodOrder)(this);
 };
 
 // Start live delivery tracking session on authorized delivery dispatch
@@ -861,6 +908,7 @@ OrderSchema.index({ user: 1, createdAt: -1 });
 OrderSchema.index({ "address.phone": 1, createdAt: -1 });
 OrderSchema.index({ orderId: 1 });
 OrderSchema.index({ "deliveryTracking.isLive": 1 }, { sparse: true });
+OrderSchema.index({ "deliveryOtp.issuanceId": 1 }, { sparse: true });
 
 // Database-enforced uniqueness for Razorpay paid orders (SEC-04)
 // Uses a partial index so mock payments and pending COD orders are unaffected

@@ -11,6 +11,7 @@ import { calculateOrderDetails } from '@/lib/checkoutCalculationService';
 import { deductStockForOrder, restoreStockForOrder } from '@/lib/inventoryService';
 import { executeOrderRefund } from '@/lib/refundService';
 import { notifyOrderEvent } from '@/lib/pushService';
+import { enqueueOrderEvents } from '@/lib/notificationOutboxService';
 import { isValidPhone, normalizePhone } from '@/lib/validation';
 
 let _getServerSession = getServerSession;
@@ -432,6 +433,10 @@ export async function POST(request) {
         notifyOrderEvent(populatedOrder, 'order_placed').catch((e) =>
           console.warn("[Order Create Push] Non-blocking push warning:", e.message)
         );
+        // Persist durable notification event to Outbox
+        enqueueOrderEvents(populatedOrder, 'order_placed').catch((e) =>
+          console.warn("[Order Create Outbox] Non-blocking outbox enqueue warning:", e.message)
+        );
       }
     }
 
@@ -475,7 +480,7 @@ export async function PATCH(request) {
 
     await connectDB();
 
-    const order = await Order.findById(orderId).populate('restaurant');
+    let order = await Order.findById(orderId).populate('restaurant');
     if (!order) {
       return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
     }
@@ -626,6 +631,8 @@ export async function PATCH(request) {
 
     // Dispatch push notifications to customer and restaurant admins
     notifyOrderEvent(order, 'order_cancelled_by_customer', { reason }).catch(() => {});
+    // Persist durable cancellation event to Outbox
+    enqueueOrderEvents(order, 'status_update', { status: 'cancelled', reason, notifyRestaurant: true }).catch(() => {});
 
     const updatedOrder = await Order.findById(order._id);
 

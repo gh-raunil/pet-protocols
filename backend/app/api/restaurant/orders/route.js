@@ -7,8 +7,10 @@ import { requireRestaurantAdmin } from "@/lib/authMiddleware";
 import { restoreStockForOrder } from "@/lib/inventoryService";
 import { executeOrderRefund, retryFailedDeduction } from "@/lib/refundService";
 import { notifyOrderEvent, sendPushToUser } from "@/lib/pushService";
+import { enqueueOrderEvents } from "@/lib/notificationOutboxService";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
 import { processStalePickupOrders, logWasteForOrder } from "@/lib/orderMaintenanceService";
+import { verifyAndCompleteDelivery, issueDeliveryOtpForOrder } from "@/lib/deliveryOtpService";
 
 let _requireRestaurantAdmin = requireRestaurantAdmin;
 export function _setTestRequireRestaurantAdmin(fn) {
@@ -72,21 +74,61 @@ export async function GET(request) {
       filter.$or = orConditions;
     }
 
-    let orders = await Order.find(filter)
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") === "asc" ? 1 : -1;
+    const paymentStatusParam = searchParams.get("paymentStatus");
+    const orderTypeParam = searchParams.get("orderType");
+
+    if (paymentStatusParam && paymentStatusParam !== "all") {
+      filter.paymentStatus = paymentStatusParam;
+    }
+    if (orderTypeParam && orderTypeParam !== "all") {
+      filter.orderType = orderTypeParam;
+    }
+
+    let sortObj = {};
+    if (sortBy === "amount" || sortBy === "totalAmount") {
+      sortObj.totalAmount = sortOrder;
+    } else {
+      sortObj.createdAt = sortOrder;
+    }
+    sortObj._id = sortOrder;
+
+    let totalOrders = await Order.countDocuments(filter);
+    const page = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+    const limit = limitParam === "all" ? 0 : (limitParam ? Math.max(1, parseInt(limitParam, 10) || 25) : 0);
+    let totalPages = limit > 0 ? Math.ceil(totalOrders / limit) : 1;
+
+    let query = Order.find(filter)
       .populate("user", "name email phone")
       .populate("restaurant", "name slug phone address deliverySettings")
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort(sortObj);
+
+    if (limit > 0) {
+      query = query.skip((page - 1) * limit).limit(limit);
+    }
+
+    let orders = await query.lean();
 
     // Fallback: If searching by orderId or customer and 0 results found in filtered date range, search across all dates
     if (orders.length === 0 && searchQuery && filter.createdAt) {
       const fallbackFilter = { ...filter };
       delete fallbackFilter.createdAt;
-      orders = await Order.find(fallbackFilter)
+      totalOrders = await Order.countDocuments(fallbackFilter);
+      totalPages = limit > 0 ? Math.ceil(totalOrders / limit) : 1;
+
+      let fallbackQuery = Order.find(fallbackFilter)
         .populate("user", "name email phone")
         .populate("restaurant", "name slug phone address deliverySettings")
-        .sort({ createdAt: -1 })
-        .lean();
+        .sort(sortObj);
+
+      if (limit > 0) {
+        fallbackQuery = fallbackQuery.skip((page - 1) * limit).limit(limit);
+      }
+
+      orders = await fallbackQuery.lean();
     }
 
     // Attach delivery distance and out-of-range indicators, ensuring restaurant coordinates
@@ -130,6 +172,10 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       orders,
+      totalOrders: totalOrders ?? orders.length,
+      totalPages: totalPages ?? 1,
+      currentPage: page ?? 1,
+      limit: limit || orders.length,
       restaurantCreatedAt: restaurant?.createdAt || null,
       restaurantName: restaurant?.name || "",
       restaurant,
@@ -194,17 +240,119 @@ export async function PUT(request) {
         );
       }
 
-      const targetOrderIds = Array.isArray(orderIds) && orderIds.length > 0
+      const rawTargetIds = Array.isArray(orderIds) && orderIds.length > 0
         ? orderIds
         : (orderId ? [orderId] : []);
 
-      if (targetOrderIds.length === 0) {
+      if (rawTargetIds.length === 0) {
         return NextResponse.json({ success: false, message: "Order ID(s) required." }, { status: 400 });
       }
 
-      const ordersToSettle = await Order.find({ _id: { $in: targetOrderIds }, restaurant: restaurantId });
-      if (!ordersToSettle || ordersToSettle.length === 0) {
-        return NextResponse.json({ success: false, message: "No matching orders found to settle." }, { status: 404 });
+      // Deduplicate IDs and validate 24-character hexadecimal ObjectId format
+      const targetOrderIds = [];
+      const skippedOrders = [];
+
+      for (const rawId of rawTargetIds) {
+        const strId = String(rawId || "").trim();
+        if (/^[0-9a-fA-F]{24}$/.test(strId)) {
+          if (!targetOrderIds.includes(strId)) {
+            targetOrderIds.push(strId);
+          }
+        } else {
+          skippedOrders.push({
+            orderId: strId,
+            reason: "invalid_id_format",
+            message: "Order ID is not a valid 24-character hexadecimal ObjectId.",
+          });
+        }
+      }
+
+      if (targetOrderIds.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "No valid order IDs provided to settle.",
+            settledCount: 0,
+            skippedCount: skippedOrders.length,
+            skippedOrders,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Pre-fetch candidate documents across requested IDs to categorize ineligibility reasons
+      const candidateOrders = await Order.find({ _id: { $in: targetOrderIds } }).lean();
+      const ordersMap = new Map(candidateOrders.map((o) => [o._id.toString(), o]));
+
+      const eligibleCandidates = [];
+
+      for (const tId of targetOrderIds) {
+        const ord = ordersMap.get(tId);
+        if (!ord) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "not_found",
+            message: "Order does not exist.",
+          });
+          continue;
+        }
+
+        if (ord.restaurant?.toString() !== restaurantId.toString()) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "cross_restaurant_forbidden",
+            message: "Order belongs to another restaurant. Access denied.",
+          });
+          continue;
+        }
+
+        const isCod = typeof Order.isCodOrder === "function" ? Order.isCodOrder(ord) : /cod|cash/i.test(ord.paymentMethod || "");
+        if (!isCod) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "not_cod_payment",
+            message: `Order payment method is '${ord.paymentMethod || "unknown"}'. Only COD/cash orders can be settled.`,
+          });
+          continue;
+        }
+
+        if (ord.status === "cancelled") {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "order_cancelled",
+            message: "Cancelled orders cannot be settled for COD cash.",
+          });
+          continue;
+        }
+
+        if (["refunded", "failed"].includes(ord.paymentStatus)) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "ineligible_payment_status",
+            message: `Order payment status is '${ord.paymentStatus}'. Ineligible for COD cash settlement.`,
+          });
+          continue;
+        }
+
+        if (ord.codPaymentHandler?.collected !== true) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "cash_not_collected",
+            message: "Cash collection has not been recorded by delivery staff for this order.",
+          });
+          continue;
+        }
+
+        if (ord.codPaymentHandler?.settledWithManager === true) {
+          skippedOrders.push({
+            orderId: tId,
+            reason: "already_settled",
+            message: "Order COD cash has already been settled with manager.",
+          });
+          continue;
+        }
+
+        eligibleCandidates.push(ord);
       }
 
       const settledAtTime = new Date();
@@ -213,25 +361,65 @@ export async function PUT(request) {
         name: auth.user?.name || "Manager",
       };
 
-      await Order.updateMany(
-        { _id: { $in: targetOrderIds }, restaurant: restaurantId },
-        {
+      const settledOrders = [];
+
+      // Concurrency-Safe Conditional Atomic Write per eligible order
+      for (const candidate of eligibleCandidates) {
+        const atomicQuery = {
+          _id: candidate._id,
+          restaurant: restaurantId,
+          paymentMethod: { $regex: /cod|cash/i },
+          status: { $ne: "cancelled" },
+          paymentStatus: { $nin: ["refunded", "failed"] },
+          "codPaymentHandler.collected": true,
+          "codPaymentHandler.settledWithManager": { $ne: true },
+        };
+
+        const updateOp = {
           $set: {
+            settledAt: settledAtTime,
             "codPaymentHandler.settledWithManager": true,
             "codPaymentHandler.settledAt": settledAtTime,
             "codPaymentHandler.settledBy": managerInfo,
           },
+          $push: {
+            statusHistory: {
+              status: candidate.status,
+              changedAt: settledAtTime,
+              changedBy: {
+                userId: auth.user?._id,
+                role: auth.user?.role || "manager",
+                name: auth.user?.name || "Manager",
+              },
+              note: `COD cash of ₹${Number(candidate.codPaymentHandler?.amount || candidate.totalAmount || 0).toFixed(2)} settled with manager ${managerInfo.name}`,
+            },
+          },
+          $inc: { __v: 1 },
+        };
+
+        const updated = await Order.findOneAndUpdate(atomicQuery, updateOp, { returnDocument: "after" });
+        if (updated) {
+          settledOrders.push(updated);
+        } else {
+          // A concurrent manager request settled this order in the race window
+          skippedOrders.push({
+            orderId: candidate._id.toString(),
+            reason: "concurrent_settlement_conflict",
+            message: "Order was concurrently settled by another manager request.",
+          });
         }
-      );
+      }
 
       // Notify delivery staff member(s) that their cash handover was received & confirmed
+      // ONLY notify for orders that were ACTUALLY settled in THIS transaction
       try {
         const staffMap = {};
-        ordersToSettle.forEach((o) => {
+        settledOrders.forEach((o) => {
           const handlerId = o.codPaymentHandler?.id;
           if (handlerId) {
-            if (!staffMap[handlerId]) staffMap[handlerId] = [];
-            staffMap[handlerId].push(o);
+            const hIdStr = handlerId.toString();
+            if (!staffMap[hIdStr]) staffMap[hIdStr] = [];
+            staffMap[hIdStr].push(o);
           }
         });
 
@@ -253,10 +441,72 @@ export async function PUT(request) {
         console.warn("[Cash Settlement Push Error]", pushErr.message);
       }
 
-      const refreshedOrder = orderId ? await Order.findById(orderId) : null;
+      // Single-order request handling
+      if (!Array.isArray(orderIds) && orderId) {
+        if (settledOrders.length === 1) {
+          return NextResponse.json({
+            success: true,
+            message: "COD Cash marked as settled with manager.",
+            settledCount: 1,
+            skippedCount: 0,
+            settledOrders: [settledOrders[0]._id.toString()],
+            skippedOrders: [],
+            order: settledOrders[0],
+          });
+        }
+
+        const skipInfo = skippedOrders[0] || { reason: "settlement_failed", message: "Failed to settle COD cash." };
+        let statusCode = 400;
+        if (["not_found", "cross_restaurant_forbidden"].includes(skipInfo.reason)) {
+          statusCode = 404;
+        } else if (["already_settled", "concurrent_settlement_conflict"].includes(skipInfo.reason)) {
+          statusCode = 409;
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            message: skipInfo.message,
+            reason: skipInfo.reason,
+            settledCount: 0,
+            skippedCount: 1,
+            skippedOrders,
+          },
+          { status: statusCode }
+        );
+      }
+
+      // Batch array request handling
+      if (settledOrders.length === 0) {
+        const allAlreadySettled = skippedOrders.every(
+          (s) => s.reason === "already_settled" || s.reason === "concurrent_settlement_conflict"
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            message: allAlreadySettled
+              ? "All requested orders have already been settled with manager."
+              : "No eligible orders were settled.",
+            settledCount: 0,
+            skippedCount: skippedOrders.length,
+            skippedOrders,
+          },
+          { status: allAlreadySettled ? 409 : 400 }
+        );
+      }
+
+      const refreshedOrder = orderId ? await Order.findById(orderId) : (settledOrders[0] || null);
+      const batchMsg = skippedOrders.length > 0
+        ? `Settled COD cash for ${settledOrders.length} order(s) with manager. (${skippedOrders.length} skipped as ineligible or already settled)`
+        : `Settled COD cash for ${settledOrders.length} order(s) with manager.`;
+
       return NextResponse.json({
         success: true,
-        message: `Settled COD cash for ${targetOrderIds.length} order(s) with manager.`,
+        message: batchMsg,
+        settledCount: settledOrders.length,
+        skippedCount: skippedOrders.length,
+        settledOrders: settledOrders.map((o) => o._id.toString()),
+        skippedOrders,
         order: refreshedOrder,
       });
     }
@@ -368,6 +618,53 @@ export async function PUT(request) {
           { success: false, message: `Cannot transition order from '${order.status}' to '${status}'.` },
           { status: 400 }
         );
+      }
+
+      // Mandatory Secure Handover Verification (OTP) for ordinary delivery completion
+      if (status === "delivered" && !isPickup) {
+        const otpCode = body.deliveryOtpCode || body.otpCode || body.code;
+        if (!otpCode) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Delivery orders require valid customer handover OTP verification by the assigned driver to be marked delivered.",
+            },
+            { status: 400 }
+          );
+        }
+
+        const verificationResult = await verifyAndCompleteDelivery({
+          orderId: order._id,
+          restaurantId,
+          staffUser: {
+            ...(auth.user?.toObject ? auth.user.toObject() : auth.user),
+            staffRoles: auth.staffRoles || auth.user?.staffRoles || [auth.user?.staffRole || "Delivery"],
+          },
+          otpCode,
+          codPaymentHandler,
+          transitionNote: notes || "Delivered to customer following successful OTP handover verification",
+        });
+
+        if (!verificationResult.success) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: verificationResult.message,
+              invalidCode: Boolean(verificationResult.invalidCode),
+              remainingAttempts: verificationResult.remainingAttempts,
+              codeExpired: Boolean(verificationResult.codeExpired),
+              attemptsExceeded: Boolean(verificationResult.attemptsExceeded),
+              conflict: Boolean(verificationResult.conflict),
+            },
+            { status: verificationResult.status || 400 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: verificationResult.message,
+          order: verificationResult.order,
+        });
       }
     }
 
@@ -490,6 +787,13 @@ export async function PUT(request) {
     }
     if (paymentStatus) {
       setFields.paymentStatus = paymentStatus;
+      if (paymentStatus === "paid") {
+        if (!order.paidAt) setFields.paidAt = new Date();
+        if (!order.settledAt) setFields.settledAt = new Date();
+      }
+    }
+    if (body.paymentMethod && typeof body.paymentMethod === "string") {
+      setFields.paymentMethod = body.paymentMethod.trim();
     }
     if (typeof notes === "string") {
       setFields.notes = notes;
@@ -525,21 +829,33 @@ export async function PUT(request) {
     }
 
     if (codPaymentHandler) {
-      const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
-      setFields.codPaymentHandler = {
-        id: codPaymentHandler.id || auth.user?._id,
-        name: codPaymentHandler.name || auth.user?.name || "Delivery Staff",
-        phone: codPaymentHandler.phone || auth.user?.phone || "",
-        amount: Number(codPaymentHandler.amount !== undefined ? codPaymentHandler.amount : (order.totalAmount || 0)),
-        collected: isCollected,
-        collectedAt: codPaymentHandler.collectedAt || (isCollected ? new Date() : null),
-        settledWithManager: codPaymentHandler.settledWithManager !== undefined
-          ? Boolean(codPaymentHandler.settledWithManager)
-          : Boolean(order.codPaymentHandler?.settledWithManager),
-        settledAt: codPaymentHandler.settledWithManager ? (order.codPaymentHandler?.settledAt || new Date()) : null,
-      };
-      if (isCollected) {
-        setFields.paymentStatus = "paid";
+      const isCodOrder = typeof order.isCodOrder === "function" ? order.isCodOrder() : Order.isCodOrder(order);
+      if (isCodOrder) {
+        const isManagerOrAdmin = auth.isAdmin || (Array.isArray(auth.staffRoles) && auth.staffRoles.includes("Manager"));
+        const isCollected = codPaymentHandler.collected !== undefined ? Boolean(codPaymentHandler.collected) : true;
+        const allowSettlement = isManagerOrAdmin && Boolean(codPaymentHandler.settledWithManager);
+        const settledState = allowSettlement
+          ? true
+          : Boolean(order.codPaymentHandler?.settledWithManager);
+
+        const expectedAmount = Number.isFinite(order.totalAmount) && order.totalAmount >= 0 ? order.totalAmount : 0;
+
+        setFields.codPaymentHandler = {
+          id: auth.user?._id,
+          name: auth.user?.name || "Delivery Staff",
+          phone: auth.user?.phone || "",
+          amount: expectedAmount,
+          collected: isCollected,
+          collectedAt: codPaymentHandler.collectedAt || (isCollected ? new Date() : null),
+          settledWithManager: settledState,
+          settledAt: settledState ? (order.codPaymentHandler?.settledAt || new Date()) : null,
+          settledBy: allowSettlement
+            ? { id: auth.user?._id, name: auth.user?.name || "Manager" }
+            : (order.codPaymentHandler?.settledBy || null),
+        };
+        if (isCollected) {
+          setFields.paymentStatus = "paid";
+        }
       }
     }
 
@@ -574,6 +890,13 @@ export async function PUT(request) {
         },
         { status: 409 }
       );
+    }
+
+    // Auto-issue active Delivery Handover OTP upon order dispatch
+    if (status === "out_for_delivery" && !isPickup) {
+      await issueDeliveryOtpForOrder(updatedOrder, { requestedBy: "system" }).catch((err) => {
+        console.warn("[DeliveryOTP System Auto-Issuance Warning]", err.message);
+      });
     }
 
     // Side effects executed strictly AFTER atomic state transition commits
@@ -628,22 +951,32 @@ export async function PUT(request) {
       }
     }
 
-    // Send Web Push notification if order status changed
+    // Send Web Push notification & persist Outbox event if order status changed
     if (status && status !== previousStatus) {
       Order.findById(updatedOrder._id)
         .populate('restaurant', 'name slug phone')
         .populate('user', 'name email phone')
         .then((populated) => {
-          notifyOrderEvent(populated || updatedOrder, 'status_update', {
+          const target = populated || updatedOrder;
+          notifyOrderEvent(target, 'status_update', {
             status,
             previousStatus,
             reason: transitionNote,
           }).catch((pushErr) => {
             console.warn('[Order Update Push] Non-blocking push warning:', pushErr.message);
           });
+          enqueueOrderEvents(target, 'status_update', {
+            status,
+            previousStatus,
+            reason: transitionNote,
+            notifyRestaurant: status === 'cancelled',
+          }).catch((outboxErr) => {
+            console.warn('[Order Update Outbox] Non-blocking outbox warning:', outboxErr.message);
+          });
         })
         .catch(() => {
           notifyOrderEvent(updatedOrder, 'status_update', { status, previousStatus, reason: transitionNote }).catch(() => {});
+          enqueueOrderEvents(updatedOrder, 'status_update', { status, previousStatus, reason: transitionNote }).catch(() => {});
         });
     }
 

@@ -115,19 +115,35 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [ingredientFilter, setIngredientFilter] = useState("all"); // all, good, low, out
 
+  // Helper to safely parse API responses without throwing JSON SyntaxError on server errors
+  async function parseResponse(res) {
+    try {
+      if (!res || !res.ok) return { success: false, message: `Server error (${res?.status || "network"})` };
+      const text = await res.text();
+      return JSON.parse(text);
+    } catch {
+      return { success: false, message: "Server temporarily busy. Please retry." };
+    }
+  }
+
   // Load all initial data
   async function loadData(isSilent = false) {
     try {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
+      const safeFetch = (url) =>
+        fetch(url)
+          .then(parseResponse)
+          .catch((err) => ({ success: false, message: err?.message || "Fetch failed" }));
+
       const [resOverview, resIng, resPur, resSup, resWaste, resRec] = await Promise.all([
-        fetch("/api/restaurant/inventory/overview").then((r) => r.json()),
-        fetch("/api/restaurant/inventory/ingredients").then((r) => r.json()),
-        fetch("/api/restaurant/inventory/purchases").then((r) => r.json()),
-        fetch("/api/restaurant/inventory/suppliers").then((r) => r.json()),
-        fetch("/api/restaurant/inventory/waste").then((r) => r.json()),
-        fetch("/api/restaurant/inventory/recipes").then((r) => r.json()),
+        safeFetch("/api/restaurant/inventory/overview"),
+        safeFetch("/api/restaurant/inventory/ingredients"),
+        safeFetch("/api/restaurant/inventory/purchases"),
+        safeFetch("/api/restaurant/inventory/suppliers"),
+        safeFetch("/api/restaurant/inventory/waste"),
+        safeFetch("/api/restaurant/inventory/recipes"),
       ]);
 
       if (resOverview.success) setOverviewData(resOverview.data);
@@ -159,7 +175,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
     setDetailIngredient(ing);
     try {
       const res = await fetch(`/api/restaurant/inventory/ingredients/${ing._id}/stock`);
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (data.success) {
         setDetailIngredient(data.ingredient);
         setIngredientHistory(data.history || []);
@@ -204,7 +220,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (data.success) {
         setStockModalOpen(false);
         loadData(true);
@@ -241,7 +257,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (data.success) {
         setIngredientModalOpen(false);
         setEditingIngredient(null);
@@ -259,7 +275,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
     if (!confirm("Are you sure you want to delete this ingredient?")) return;
     try {
       const res = await fetch(`/api/restaurant/inventory/ingredients/${id}`, { method: "DELETE" });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (data.success) {
         if (detailIngredient?._id === id) setDetailIngredient(null);
         loadData(true);
@@ -309,7 +325,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
         body: JSON.stringify(wasteForm),
       });
 
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (data.success) {
         setWasteModalOpen(false);
         setWasteForm({
@@ -1858,11 +1874,11 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
                   required
                   value={wasteForm.ingredient}
                   onChange={(e) => setWasteForm({ ...wasteForm, ingredient: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-semibold"
+                  className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-[#161c2d] border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-900 dark:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)] [&>option]:bg-white [&>option]:text-stone-900 dark:[&>option]:bg-[#161c2d] dark:[&>option]:text-white"
                 >
-                  <option value="">Select ingredient...</option>
+                  <option value="" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Select ingredient...</option>
                   {ingredients.map((ing) => (
-                    <option key={ing._id} value={ing._id}>
+                    <option key={ing._id} value={ing._id} className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">
                       {ing.name} (Current: {ing.currentStock} {ing.unit})
                     </option>
                   ))}
@@ -1882,7 +1898,7 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
                     value={wasteForm.quantity}
                     onChange={(e) => setWasteForm({ ...wasteForm, quantity: e.target.value })}
                     placeholder="e.g. 2"
-                    className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-semibold"
+                    className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-900 dark:text-white"
                   />
                 </div>
 
@@ -1893,14 +1909,14 @@ export default function InventoryWorkspace({ restaurantName = "" }) {
                   <select
                     value={wasteForm.reason}
                     onChange={(e) => setWasteForm({ ...wasteForm, reason: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs font-semibold"
+                    className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-[#161c2d] border border-stone-200 dark:border-white/10 text-xs font-semibold text-stone-900 dark:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)] [&>option]:bg-white [&>option]:text-stone-900 dark:[&>option]:bg-[#161c2d] dark:[&>option]:text-white"
                   >
-                    <option value="Spoiled">Spoiled</option>
-                    <option value="Expired">Expired</option>
-                    <option value="Damaged">Damaged</option>
-                    <option value="Over-prepared">Over-prepared</option>
-                    <option value="Spilled">Spilled</option>
-                    <option value="Other">Other</option>
+                    <option value="Spoiled" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Spoiled</option>
+                    <option value="Expired" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Expired</option>
+                    <option value="Damaged" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Damaged</option>
+                    <option value="Over-prepared" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Over-prepared</option>
+                    <option value="Spilled" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Spilled</option>
+                    <option value="Other" className="bg-white dark:bg-[#161c2d] text-stone-900 dark:text-white">Other</option>
                   </select>
                 </div>
               </div>
