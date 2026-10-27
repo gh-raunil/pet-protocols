@@ -9,7 +9,7 @@ export default function ThemeToggle({ className = "" }) {
 
   if (!mounted) {
     return (
-      <div className={`w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 ${className}`} />
+      <div className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 ${className}`} />
     );
   }
 
@@ -28,12 +28,12 @@ export default function ThemeToggle({ className = "" }) {
         onClick={toggleTheme}
         type="button"
         aria-label="Toggle theme"
-        className={`p-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm ${className}`}
+        className={`min-w-[44px] min-h-[44px] p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm cursor-pointer active:scale-95 flex items-center justify-center ${className}`}
       >
         {isDark ? (
-          <Sun className="w-4 h-4 text-amber-400 transition" />
+          <Sun className="w-5 h-5 text-amber-400 transition" />
         ) : (
-          <Moon className="w-4 h-4 text-slate-500 transition" />
+          <Moon className="w-5 h-5 text-slate-500 transition" />
         )}
       </button>
     </Tooltip>

@@ -360,7 +360,7 @@ export default function RestaurantHomeClient() {
             Restaurant Operations Hub
           </h1>
           <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-2 max-w-md mx-auto leading-relaxed">
-            Manage your kitchen orders, dispatch transit, cashier registers, and catalog stock across Pet Protocols.
+            Manage your kitchen orders, dispatch transit, cashier registers, and catalog stock across पेट Protocols.
           </p>
         </div>
 

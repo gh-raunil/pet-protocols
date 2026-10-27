@@ -11,6 +11,8 @@ import {
   XCircle,
   AlertCircle,
   Percent,
+  Ticket,
+  Zap,
 } from "lucide-react";
 
 export default function OffersSection() {
@@ -385,7 +387,10 @@ export default function OffersSection() {
                       }`}
                     >
                       <div className="font-bold text-xs flex items-center justify-between">
-                        <span>🎟️ Option A: Coupon Code</span>
+                        <span className="flex items-center gap-1.5">
+                          <Ticket size={14} className="text-orange-600 dark:text-orange-400 shrink-0" />
+                          <span>Option A: Coupon Code</span>
+                        </span>
                         {formData.applyMode === "coupon" && <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400">✓ Selected</span>}
                       </div>
                       <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
@@ -403,7 +408,10 @@ export default function OffersSection() {
                       }`}
                     >
                       <div className="font-bold text-xs flex items-center justify-between">
-                        <span>⚡ Option B: Automatic Discount</span>
+                        <span className="flex items-center gap-1.5">
+                          <Zap size={14} className="text-amber-500 shrink-0" />
+                          <span>Option B: Automatic Discount</span>
+                        </span>
                         {formData.applyMode === "automatic" && <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400">✓ Selected</span>}
                       </div>
                       <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">

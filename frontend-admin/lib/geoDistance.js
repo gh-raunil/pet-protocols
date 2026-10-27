@@ -9,6 +9,12 @@ export const DEFAULT_DELIVERY_RADIUS_KM = 10;
  * Validates whether latitude and longitude are valid non-zero geographical coordinates
  */
 export function isValidCoordinate(lat, lng) {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return false;
+  }
+  if (typeof lat === "string" && lat.trim() === "") return false;
+  if (typeof lng === "string" && lng.trim() === "") return false;
+
   const nLat = Number(lat);
   const nLng = Number(lng);
   return (
@@ -83,14 +89,8 @@ export function getOrderDistanceInfo(order, restaurant = null) {
 
   // Restaurant kitchen address
   const restObj = order.restaurant && typeof order.restaurant === "object" ? order.restaurant : restaurant;
-  let restLat = restObj?.address?.latitude;
-  let restLng = restObj?.address?.longitude;
-  if ((!restLat || !restLng || (Number(restLat) === 0 && Number(restLng) === 0)) && hasUserCoords) {
-    if (Math.abs(Number(userLat) - 12.97) < 0.2) {
-      restLat = 12.9698;
-      restLng = 79.1550;
-    }
-  }
+  const restLat = restObj?.address?.latitude;
+  const restLng = restObj?.address?.longitude;
   const hasRestCoords = isValidCoordinate(restLat, restLng);
 
   // Driver live location (if assigned and transmitting)

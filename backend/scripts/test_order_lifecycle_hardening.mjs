@@ -428,7 +428,15 @@ try {
 
   // Test 7: Delivery staff CAN dispatch and deliver delivery orders (Requires Handover OTP)
   {
-    const ord = await createTestOrder({ orderType: "delivery", status: "ready" });
+    const ord = await createTestOrder({
+      orderType: "delivery",
+      status: "ready",
+      assignedDeliveryStaff: {
+        id: deliveryUserA._id,
+        name: deliveryUserA.name,
+        phone: deliveryUserA.phone || "",
+      },
+    });
     setRestaurantOrdersAuth(async () => mockRestaurantAuth(deliveryUserA, restA));
     const reqDispatch = new Request("http://localhost:3000/api/restaurant/orders", {
       method: "PUT",
@@ -512,7 +520,15 @@ try {
   // Test 9: Multi-role staff (Cashier+Delivery) receives union of permissions; unknown role is default-denied
   {
     const ordPickup = await createTestOrder({ orderType: "pickup", address: null, status: "ready" });
-    const ordDelivery = await createTestOrder({ orderType: "delivery", status: "ready" });
+    const ordDelivery = await createTestOrder({
+      orderType: "delivery",
+      status: "ready",
+      assignedDeliveryStaff: {
+        id: multiRoleUser._id,
+        name: multiRoleUser.name,
+        phone: multiRoleUser.phone || "",
+      },
+    });
 
     // Multi-role cashier+delivery can complete pickup
     setRestaurantOrdersAuth(async () => mockRestaurantAuth(multiRoleUser, restA));
@@ -602,24 +618,39 @@ try {
   console.log("GROUP 3: DRIVER ASSIGNMENT & VALIDATION");
   console.log("------------------------------------------------------------------------");
 
-  // Test 13: Manager dispatching delivery order leaves driver unassigned, enabling field driver to claim
+  // Test 13: Rule B Guard: Manager cannot dispatch unassigned delivery order (400 required assignment)
   {
     const ord = await createTestOrder({ orderType: "delivery", status: "ready", restaurant: restA._id });
     setRestaurantOrdersAuth(async () => mockRestaurantAuth(managerUserA, restA));
-    const req = new Request("http://localhost:3000/api/restaurant/orders", {
+    const reqUnassigned = new Request("http://localhost:3000/api/restaurant/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId: ord._id.toString(), status: "out_for_delivery" }),
     });
-    const res = await restaurantOrdersPUT(req);
-    const body = await res.json();
-    const refreshed = await Order.findById(ord._id);
-    const isUnassigned = refreshed.assignedDeliveryStaff === null || refreshed.assignedDeliveryStaff?.id === undefined;
+    const resUnassigned = await restaurantOrdersPUT(reqUnassigned);
+
+    // Now assign driver and verify dispatch succeeds
+    ord.assignedDeliveryStaff = {
+      id: deliveryUserA._id,
+      name: deliveryUserA.name,
+      phone: deliveryUserA.phone || "",
+      email: deliveryUserA.email || "",
+      assignedAt: new Date(),
+    };
+    await ord.save();
+
+    const reqAssigned = new Request("http://localhost:3000/api/restaurant/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: ord._id.toString(), status: "out_for_delivery" }),
+    });
+    const resAssigned = await restaurantOrdersPUT(reqAssigned);
+    const bodyAssigned = await resAssigned.json();
+
     reportTest(
       13,
-      "Manager dispatch leaves driver unassigned (null) for field driver to claim",
-      res.status === 200 && isUnassigned,
-      `assignedDeliveryStaff: ${JSON.stringify(refreshed.assignedDeliveryStaff)}`
+      "Manager dispatch requires valid assignment (unassigned 400; assigned 200)",
+      resUnassigned.status === 400 && resAssigned.status === 200 && bodyAssigned.order?.status === "out_for_delivery"
     );
   }
 

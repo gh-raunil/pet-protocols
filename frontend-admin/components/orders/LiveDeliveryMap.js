@@ -370,17 +370,6 @@ export default function LiveDeliveryMap({
   const effectiveDestLng = hasValidDestCoords ? destLng : (hasValidCustomerCoords ? custLng : null);
   const hasEffectiveDest = isValidCoordinate(effectiveDestLat, effectiveDestLng);
 
-  // Fallback restaurant kitchen coordinates if missing or zero in DB
-  if ((!isValidCoordinate(restLat, restLng)) && hasEffectiveDest) {
-    if (Math.abs(Number(effectiveDestLat) - 12.97) < 0.2) {
-      // Vellore / Katpadi area near VIT campus
-      restLat = 12.9698;
-      restLng = 79.1550;
-    } else {
-      restLat = Number(effectiveDestLat) - 0.005;
-      restLng = Number(effectiveDestLng) - 0.005;
-    }
-  }
   const hasValidRestaurantCoords = isValidCoordinate(restLat, restLng);
 
   // Driver location resolution:

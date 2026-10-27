@@ -659,26 +659,26 @@ export default function CashierWorkspace({ restaurantName = "" }) {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 self-start md:self-auto">
+            <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
               {/* Density Toggle */}
               <div className="inline-flex rounded-xl bg-stone-100 dark:bg-white/5 p-1 border border-stone-200/60 dark:border-white/10 text-xs">
                 <button
                   type="button"
                   onClick={() => setDensity("compact")}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                  className={`min-h-[38px] px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     density === "compact"
                       ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
                       : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
                   }`}
                   title="Compact density for fast operational scanning"
                 >
-                  <Layers size={12} />
+                  <Layers size={14} />
                   <span>Compact</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setDensity("comfortable")}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                  className={`min-h-[38px] px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
                     density === "comfortable"
                       ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
                       : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
@@ -694,11 +694,11 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                 type="button"
                 onClick={() => fetchOrders(false)}
                 disabled={refreshing || loading}
-                className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70"
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70"
                 title="Refresh orders and reconciliation ledger"
               >
-                <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-                <span>{refreshing ? "Syncing..." : "Sync"}</span>
+                <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                <span>{refreshing ? "Syncing..." : "Refresh Register"}</span>
               </button>
             </div>
           </div>
@@ -1081,13 +1081,14 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                             <button
                               type="button"
                               onClick={(e) => handleCopyOrderId(e, fullOrderId)}
-                              className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition p-0.5"
+                              className="min-w-[36px] min-h-[36px] -my-1 -mx-0.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/10 transition inline-flex items-center justify-center cursor-pointer"
                               title={`Copy full ID: ${fullOrderId}`}
+                              aria-label={`Copy full ID: ${fullOrderId}`}
                             >
                               {isCopied ? (
-                                <Check size={11} className="text-emerald-500" />
+                                <Check size={14} className="text-emerald-500" />
                               ) : (
-                                <Copy size={11} />
+                                <Copy size={14} />
                               )}
                             </button>
                             {isPickup ? (
@@ -1220,17 +1221,17 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                               <button
                                 type="button"
                                 onClick={() => setOpenMenuId(isRowMenuOpen ? null : order._id)}
-                                className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 transition cursor-pointer"
+                                className="min-w-[40px] min-h-[40px] rounded-xl hover:bg-stone-100 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 transition cursor-pointer flex items-center justify-center"
                                 aria-label="Open Order Actions Menu"
                               >
-                                <MoreVertical size={13} />
+                                <MoreVertical size={16} />
                               </button>
 
                               {/* Dropdown Menu Popover */}
                               {isRowMenuOpen && (
                                 <div
                                   ref={menuRef}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-white dark:bg-[#121624] border border-stone-200 dark:border-white/10 shadow-xl py-1 z-30 text-left"
+                                  className="absolute right-0 top-full mt-1 w-48 rounded-2xl bg-white dark:bg-[#121624] border border-stone-200 dark:border-white/10 shadow-xl py-1.5 z-30 text-left"
                                 >
                                   <button
                                     type="button"
@@ -1238,9 +1239,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                                       setOpenMenuId(null);
                                       setDrawerOrder(order);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer"
+                                    className="w-full min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2.5 cursor-pointer font-medium"
                                   >
-                                    <Eye size={12} className="text-emerald-500" />
+                                    <Eye size={15} className="text-emerald-500 shrink-0" />
                                     <span>View Details</span>
                                   </button>
 
@@ -1250,9 +1251,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                                       setOpenMenuId(null);
                                       setReceiptOrder(order);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer"
+                                    className="w-full min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2.5 cursor-pointer font-medium"
                                   >
-                                    <Printer size={12} className="text-blue-500" />
+                                    <Printer size={15} className="text-blue-500 shrink-0" />
                                     <span>Print Receipt Slip</span>
                                   </button>
 
@@ -1264,9 +1265,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                                         setSettlingOrder(order);
                                         setTenderedAmount((order.totalAmount || 0).toString());
                                       }}
-                                      className="w-full px-3 py-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-bold flex items-center gap-2 cursor-pointer"
+                                      className="w-full min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 font-bold flex items-center gap-2.5 cursor-pointer"
                                     >
-                                      <CreditCard size={12} />
+                                      <CreditCard size={15} className="shrink-0" />
                                       <span>Settle Bill</span>
                                     </button>
                                   )}
@@ -1278,9 +1279,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                                         setOpenMenuId(null);
                                         handleSettleCodCash(order._id);
                                       }}
-                                      className="w-full px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-bold flex items-center gap-2 cursor-pointer"
+                                      className="w-full min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-bold flex items-center gap-2.5 cursor-pointer"
                                     >
-                                      <Banknote size={12} />
+                                      <Banknote size={15} className="shrink-0" />
                                       <span>Settle COD Cash</span>
                                     </button>
                                   )}
@@ -1291,9 +1292,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                                       setOpenMenuId(null);
                                       handleCopyOrderId(e, fullOrderId);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2 cursor-pointer border-t border-stone-100 dark:border-white/5"
+                                    className="w-full min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 flex items-center gap-2.5 cursor-pointer border-t border-stone-100 dark:border-white/5 font-medium"
                                   >
-                                    <Copy size={12} />
+                                    <Copy size={15} className="shrink-0" />
                                     <span>Copy Order ID</span>
                                   </button>
                                 </div>
@@ -1309,19 +1310,20 @@ export default function CashierWorkspace({ restaurantName = "" }) {
             </div>
 
             {/* ── PAGINATION BAR ────────────────────────────────────────── */}
-            <div className="bg-stone-50 dark:bg-white/5 border-t border-stone-200 dark:border-white/10 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="bg-stone-50 dark:bg-white/5 border-t border-stone-200 dark:border-white/10 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
               <span className="text-stone-500 font-mono">
                 Showing {processedOrders.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
                 {Math.min(page * pageSize, processedOrders.length)} of {processedOrders.length} records
               </span>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2 flex-wrap justify-center">
                 <button
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage(1)}
-                  className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer"
+                  className="min-h-[40px] min-w-[40px] px-3 py-2 rounded-xl bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer flex items-center justify-center transition"
                   title="First Page"
+                  aria-label="First Page"
                 >
                   «
                 </button>
@@ -1329,13 +1331,13 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer"
+                  className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1 transition"
                   title="Previous Page"
                 >
                   ‹ Prev
                 </button>
 
-                <span className="px-2 font-mono font-bold text-stone-800 dark:text-stone-200">
+                <span className="px-3 font-mono font-bold text-stone-800 dark:text-stone-200">
                   Page {page} of {totalPages}
                 </span>
 
@@ -1343,7 +1345,7 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer"
+                  className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1 transition"
                   title="Next Page"
                 >
                   Next ›
@@ -1352,8 +1354,9 @@ export default function CashierWorkspace({ restaurantName = "" }) {
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage(totalPages)}
-                  className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer"
+                  className="min-h-[40px] min-w-[40px] px-3 py-2 rounded-xl bg-white dark:bg-white/10 text-stone-700 dark:text-stone-300 font-bold border border-stone-200 dark:border-white/10 disabled:opacity-40 cursor-pointer flex items-center justify-center transition"
                   title="Last Page"
+                  aria-label="Last Page"
                 >
                   »
                 </button>

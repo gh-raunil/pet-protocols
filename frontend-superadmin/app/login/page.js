@@ -37,7 +37,12 @@ export default function SuperadminLoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid superadmin credentials or account suspended.");
+        const errorLower = String(result.error).toLowerCase();
+        if (errorLower.includes("too many") || errorLower.includes("wait") || errorLower.includes("rate limit")) {
+          setError(result.error);
+        } else {
+          setError("Invalid superadmin credentials or account suspended.");
+        }
         return;
       }
 
@@ -78,7 +83,7 @@ export default function SuperadminLoginPage() {
             <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
               Superadmin Email
             </label>
-            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
+            <div className="flex items-center min-h-[44px] bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-1 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
               <Mail className="text-slate-400 w-4 h-4 mr-2.5 shrink-0" />
               <input
                 type="email"
@@ -89,7 +94,7 @@ export default function SuperadminLoginPage() {
                 required
                 autoComplete="email"
                 style={{ colorScheme: "dark", backgroundColor: "transparent" }}
-                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input"
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-base sm:text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input py-2"
               />
             </div>
           </div>
@@ -98,7 +103,7 @@ export default function SuperadminLoginPage() {
             <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-2">
               Security Password
             </label>
-            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
+            <div className="flex items-center min-h-[44px] bg-slate-900/90 border border-slate-800 rounded-lg px-3.5 py-1 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition">
               <Lock className="text-slate-400 w-4 h-4 mr-2.5 shrink-0" />
               <input
                 type={showPass ? "text" : "password"}
@@ -109,14 +114,15 @@ export default function SuperadminLoginPage() {
                 required
                 autoComplete="current-password"
                 style={{ colorScheme: "dark", backgroundColor: "transparent" }}
-                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input"
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-base sm:text-sm outline-none border-none shadow-none focus:outline-none focus:ring-0 dark-input py-2"
               />
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
-                className="text-slate-400 hover:text-white transition ml-2 cursor-pointer"
+                aria-label={showPass ? "Hide password" : "Show password"}
+                className="min-w-[44px] min-h-[44px] -mr-2 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
               >
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
@@ -127,11 +133,10 @@ export default function SuperadminLoginPage() {
             </div>
           )}
 
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 transition shadow-md shadow-indigo-600/20 text-sm"
+            className="w-full min-h-[48px] bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition shadow-md shadow-indigo-600/20 text-sm active:scale-95 cursor-pointer"
           >
             {loading ? "Authenticating..." : "Access Control Panel"}
             {!loading && <ArrowRight size={16} />}

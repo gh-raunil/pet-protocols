@@ -24,6 +24,9 @@ import {
   RefreshCw,
   Calendar,
   Star,
+  FileText,
+  CreditCard,
+  ChevronDown,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
@@ -33,7 +36,7 @@ import useCartStore from "@/lib/cartStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { formatDateInTimeZone } from "@/lib/timeZone";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
-import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
+import Tooltip from "@/components/ui/Tooltip";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -44,7 +47,10 @@ function OrderHistoryDishItem({ item }) {
     setImgSrc(item.image || FALLBACK_IMAGE);
   }, [item.image]);
 
-  const portionText = item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '') + (item.size ? ` • ${item.size}` : '');
+  const portionText =
+    item.servingLabel ||
+    (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ""}` : "") +
+      (item.size ? ` • ${item.size}` : "");
 
   return (
     <div className="flex items-center gap-3.5 bg-[var(--bg-sub)] p-3 rounded-2xl border border-[var(--border-color)]">
@@ -54,7 +60,7 @@ function OrderHistoryDishItem({ item }) {
         width={52}
         height={52}
         onError={() => setImgSrc(FALLBACK_IMAGE)}
-        className="w-13 h-13 rounded-xl object-cover border border-[var(--border-color)] shrink-0"
+        className="w-13 h-13 rounded-xl object-cover border border-[var(--border-color)] shrink-0 bg-[var(--bg-card)]"
       />
       <div className="flex-1 min-w-0">
         <p className="text-[var(--text-main)] font-bold text-xs sm:text-sm truncate">
@@ -67,7 +73,7 @@ function OrderHistoryDishItem({ item }) {
             </span>
           )}
           {portionText && (
-            <span className="text-[11px] text-[var(--text-muted)] truncate">
+            <span className="text-[11px] text-[var(--text-muted)] truncate font-medium">
               {portionText}
             </span>
           )}
@@ -84,6 +90,7 @@ function OrderHistoryDishItem({ item }) {
 }
 
 const formatDate = (dateStr) => {
+  if (!dateStr) return "";
   return formatDateInTimeZone(dateStr, undefined, {
     day: "numeric",
     month: "short",
@@ -99,20 +106,25 @@ export default function OrdersClient() {
   const addBatch = useCartStore((s) => s.addBatch);
   const openCart = useCartStore((s) => s.openCart);
 
+  // Orders State & Pagination
   const [orders, setOrders] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [reorderingOrderId, setReorderingOrderId] = useState(null);
   const [activeFeedbackOrder, setActiveFeedbackOrder] = useState(null);
 
-  // Customer Cancellation Modal/State
+  // Cancellation State
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelReason, setCancelReason] = useState("");
   const [submittingCancel, setSubmittingCancel] = useState(false);
 
-  // Date filter state: "today" (default) | "date" | "all" (Requirement 7)
+  // Date filter state: "today" (default) | "date" | "all"
   const [dateFilterMode, setDateFilterMode] = useState("today");
   const [selectedDate, setSelectedDate] = useState(() => {
     return new Intl.DateTimeFormat("en-CA", {
@@ -122,6 +134,15 @@ export default function OrdersClient() {
       day: "2-digit",
     }).format(new Date());
   });
+
+  const todayDateStr = useMemo(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
 
   const getOrderDateStr = useCallback((dateStr) => {
     if (!dateStr) return "";
@@ -139,19 +160,11 @@ export default function OrdersClient() {
     }
   }, []);
 
-  const todayDateStr = useMemo(() => {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  }, []);
-
   const todayOrdersCount = useMemo(() => {
     return orders.filter((o) => getOrderDateStr(o.createdAt) === todayDateStr).length;
   }, [orders, todayDateStr, getOrderDateStr]);
 
+  // Client-side date filter fallback for currently loaded orders
   const filteredOrders = useMemo(() => {
     if (dateFilterMode === "all") {
       return orders;
@@ -165,13 +178,14 @@ export default function OrdersClient() {
     return orders;
   }, [orders, dateFilterMode, todayDateStr, selectedDate, getOrderDateStr]);
 
+  // Auth Guard
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/login?callbackUrl=/orders");
     }
   }, [status, router]);
 
-  // Live timer for cancellation window countdown
+  // Live timer for cancellation countdown
   useEffect(() => {
     setCurrentTime(Date.now());
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -179,31 +193,97 @@ export default function OrdersClient() {
   }, []);
 
   const isFetchingRef = useRef(false);
+  const fetchSeqRef = useRef(0);
 
-  const fetchOrders = useCallback(async (isManual = false) => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-    if (isManual) setIsRefreshing(true);
-    try {
-      const res = await fetch("/api/orders");
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.orders || []);
-        setError("");
+  // Unified fetchOrders with backend pagination and date filtering
+  const fetchOrders = useCallback(
+    async (
+      isManual = false,
+      targetPage = 1,
+      append = false,
+      overrideFilterMode = null,
+      overrideDate = null
+    ) => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+
+      const currentSeq = ++fetchSeqRef.current;
+
+      if (isManual) setIsRefreshing(true);
+      if (append) setLoadingMore(true);
+
+      const activeMode = overrideFilterMode || dateFilterMode;
+      const activeDate = overrideDate !== undefined ? overrideDate : selectedDate;
+
+      let queryParams = `?page=${targetPage}&limit=20`;
+      if (activeMode === "today") {
+        queryParams += "&date=today";
+      } else if (activeMode === "date" && activeDate) {
+        queryParams += `&date=${encodeURIComponent(activeDate)}`;
       } else {
-        setError(data.message || "Failed to load orders.");
+        queryParams += "&date=all";
       }
-    } catch (err) {
-      console.error("Orders fetch error:", err);
-      setError("Network error while loading your order history.");
-    } finally {
-      isFetchingRef.current = false;
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+
+      try {
+        const res = await fetch(`/api/orders${queryParams}`);
+        const data = await res.json();
+
+        // Discard stale responses if a newer request was dispatched
+        if (currentSeq !== fetchSeqRef.current) return;
+
+        if (data.success) {
+          const incoming = Array.isArray(data.orders) ? data.orders : [];
+          const pagination = data.pagination || {};
+
+          if (append) {
+            setOrders((prev) => {
+              const existingIds = new Set(prev.map((o) => (o._id || o.orderId)?.toString()));
+              const newItems = incoming.filter(
+                (o) => !existingIds.has((o._id || o.orderId)?.toString())
+              );
+              return [...prev, ...newItems];
+            });
+            setCurrentPage(targetPage);
+          } else {
+            // If background polling refresh while on higher page, merge updates in place
+            if (!isManual && targetPage === 1 && currentPage > 1) {
+              setOrders((prev) => {
+                const incomingMap = new Map(
+                  incoming.map((o) => [(o._id || o.orderId)?.toString(), o])
+                );
+                return prev.map((oldOrder) => {
+                  const idKey = (oldOrder._id || oldOrder.orderId)?.toString();
+                  return incomingMap.get(idKey) || oldOrder;
+                });
+              });
+            } else {
+              setOrders(incoming);
+              setCurrentPage(targetPage);
+            }
+          }
+
+          setHasMore(Boolean(pagination.hasMore));
+          setTotalOrdersCount(pagination.totalOrders ?? incoming.length);
+          setError("");
+        } else {
+          setError(data.message || "Failed to load orders.");
+        }
+      } catch (err) {
+        if (currentSeq !== fetchSeqRef.current) return;
+        console.error("Orders fetch error:", err);
+        setError("Network error while loading your order history.");
+      } finally {
+        isFetchingRef.current = false;
+        setLoading(false);
+        setIsRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [dateFilterMode, selectedDate, currentPage]
+  );
 
   // 1. Initial fetch when authenticated session is available or session changes
+  // Note: Must remain strictly decoupled from orders array reference per F-01 contract
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       fetchOrders(false);
@@ -212,7 +292,7 @@ export default function OrdersClient() {
     }
   }, [status, session?.user?.email, fetchOrders]);
 
-  // 2. Stable primitive fingerprint of active in-progress orders (avoids array-reference churn)
+  // 2. Stable primitive fingerprint of active in-progress orders
   const activeOrdersFingerprint = useMemo(() => {
     if (!Array.isArray(orders) || orders.length === 0) return "";
     return orders
@@ -232,12 +312,12 @@ export default function OrdersClient() {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         return;
       }
-      fetchOrders(false);
+      fetchOrders(false, 1, false);
     }, 30000);
 
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        fetchOrders(false);
+        fetchOrders(false, 1, false);
       }
     };
 
@@ -249,6 +329,31 @@ export default function OrdersClient() {
     };
   }, [session, fetchOrders, activeOrdersFingerprint]);
 
+  // Load More Handler for Pagination
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore || isFetchingRef.current) return;
+    fetchOrders(false, currentPage + 1, true);
+  };
+
+  // Filter Change Handlers (Reset pagination to page 1)
+  const handleSelectFilterMode = (mode) => {
+    if (mode === dateFilterMode && mode !== "date") return;
+    setDateFilterMode(mode);
+    setCurrentPage(1);
+    const targetDate = mode === "today" ? todayDateStr : mode === "date" ? selectedDate : null;
+    if (mode === "today") setSelectedDate(todayDateStr);
+    fetchOrders(false, 1, false, mode, targetDate);
+  };
+
+  const handleDateChange = (newDate) => {
+    if (!newDate) return;
+    setSelectedDate(newDate);
+    setDateFilterMode("date");
+    setCurrentPage(1);
+    fetchOrders(false, 1, false, "date", newDate);
+  };
+
+  // Reorder Handler
   const handleReorder = async (order) => {
     if (!order.items || order.items.length === 0) return;
 
@@ -355,6 +460,7 @@ export default function OrdersClient() {
     }
   };
 
+  // Cancellation Handler
   const handleCancelOrder = async (orderId) => {
     if (!orderId) return;
 
@@ -389,6 +495,7 @@ export default function OrdersClient() {
     }
   };
 
+  // Initial Loading Skeleton
   if (loading || status === "loading") {
     return (
       <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 max-w-4xl mx-auto text-[var(--text-main)]">
@@ -405,6 +512,7 @@ export default function OrdersClient() {
     );
   }
 
+  // Error State
   if (error && orders.length === 0) {
     return (
       <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 max-w-md mx-auto flex flex-col items-center justify-center text-center gap-4 text-[var(--text-main)]">
@@ -417,7 +525,7 @@ export default function OrdersClient() {
         </p>
         <button
           type="button"
-          onClick={() => fetchOrders(true)}
+          onClick={() => fetchOrders(true, 1, false)}
           className="mt-2 bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold px-8 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition shadow-lg shadow-[var(--brand-accent)]/20 cursor-pointer"
         >
           Try Again
@@ -426,6 +534,7 @@ export default function OrdersClient() {
     );
   }
 
+  // Empty State
   if (orders.length === 0) {
     return (
       <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 max-w-md mx-auto flex flex-col items-center justify-center text-center gap-4 text-[var(--text-main)]">
@@ -448,28 +557,32 @@ export default function OrdersClient() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] transition-colors">
-      {/* Header */}
+      {/* Editorial Header */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <span className="text-[var(--brand-accent)] text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-            <Sparkles size={14} /> Order History & Tracking
+            <Sparkles size={14} /> Order History & Live Tracking
           </span>
           <h1 className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
             My <span className="text-[var(--brand-accent)]">Orders</span>
           </h1>
           <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
-            {orders.length} {orders.length === 1 ? "order" : "orders"} placed on पेट Protocols
+            {totalOrdersCount || orders.length}{" "}
+            {(totalOrdersCount || orders.length) === 1 ? "order" : "orders"} recorded on पेट Protocols
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => fetchOrders(true)}
+          onClick={() => fetchOrders(true, 1, false)}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-xs cursor-pointer self-start sm:self-auto"
           title="Refresh order history & live statuses"
         >
-          <RefreshCw size={13} className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""} />
+          <RefreshCw
+            size={13}
+            className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""}
+          />
           <span>{isRefreshing ? "Updating..." : "Refresh"}</span>
         </button>
       </div>
@@ -477,16 +590,13 @@ export default function OrdersClient() {
       {/* Closed-Tab Delivery Alerts Permission Prompt */}
       <DeliveryPushPrompt className="mb-6" />
 
-      {/* Date Filter Toolbar (Requirement 7: show only today's orders by default, other by selecting date) */}
+      {/* Date Filter & Range Toolbar */}
       <div className="mb-6 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Today Button */}
           <button
             type="button"
-            onClick={() => {
-              setDateFilterMode("today");
-              setSelectedDate(todayDateStr);
-            }}
+            onClick={() => handleSelectFilterMode("today")}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               dateFilterMode === "today"
                 ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/20"
@@ -500,14 +610,14 @@ export default function OrdersClient() {
           {/* All Orders Button */}
           <button
             type="button"
-            onClick={() => setDateFilterMode("all")}
+            onClick={() => handleSelectFilterMode("all")}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               dateFilterMode === "all"
                 ? "bg-[var(--brand-accent)] text-white shadow-md shadow-[var(--brand-accent)]/20"
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)]"
             }`}
           >
-            <span>All Orders ({orders.length})</span>
+            <span>All Orders ({totalOrdersCount || orders.length})</span>
           </button>
         </div>
 
@@ -520,12 +630,7 @@ export default function OrdersClient() {
             type="date"
             value={selectedDate}
             max={todayDateStr}
-            onChange={(e) => {
-              if (e.target.value) {
-                setSelectedDate(e.target.value);
-                setDateFilterMode("date");
-              }
-            }}
+            onChange={(e) => handleDateChange(e.target.value)}
             className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-accent)] cursor-pointer w-auto min-w-0 max-w-[130px] sm:max-w-none"
             title="Pick a specific date to view orders"
           />
@@ -545,297 +650,338 @@ export default function OrdersClient() {
           </h3>
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
             {dateFilterMode === "today"
-              ? `You haven't placed any orders today. You have ${orders.length} total orders across other dates.`
+              ? `You haven't placed any orders today. You have other orders across past dates.`
               : `No orders match this date. Select another date or view all your orders.`}
           </p>
           <button
             type="button"
-            onClick={() => setDateFilterMode("all")}
+            onClick={() => handleSelectFilterMode("all")}
             className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--brand-accent)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 hover:opacity-90 transition cursor-pointer"
           >
-            <span>View All Orders ({orders.length})</span>
+            <span>View All Orders</span>
           </button>
         </div>
       ) : (
         <div className="space-y-6">
           {filteredOrders.map((order) => {
-          const isDelivered = order.status === "delivered";
-          const isCancelled = order.status === "cancelled";
-          const isPending = order.status === "pending";
-          const isPickup =
-            order.notes?.includes("[PICKUP]") ||
-            order.paymentMethod?.toLowerCase().includes("pickup") ||
-            order.deliveryFee === 0;
+            const isDelivered = order.status === "delivered";
+            const isCancelled = order.status === "cancelled";
+            const isPending = order.status === "pending";
+            const isPickup =
+              order.orderType === "pickup" ||
+              order.notes?.includes("[PICKUP]") ||
+              order.paymentMethod?.toLowerCase().includes("pickup") ||
+              order.deliveryFee === 0;
 
-          // Cancellation window calculations
-          const cancelSettings = order.restaurant?.cancellationSettings || {};
-          const allowCancel = cancelSettings.allowCustomerCancel !== false;
-          const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
-          const createdAtMs = new Date(order.createdAt).getTime();
-          const effectiveCurrentTime = currentTime > 0 ? currentTime : createdAtMs;
-          const remainingMs = Math.max(0, createdAtMs + windowMinutes * 60 * 1000 - effectiveCurrentTime);
-          const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-          const canCancel = isPending && allowCancel && remainingSeconds > 0;
-          const remainingMinDisplay = Math.floor(remainingSeconds / 60);
-          const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
+            const orderDetailUrl = `/orders/${order._id || order.orderId}`;
 
-          return (
-            <div
-              key={order._id}
-              className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-7 hover:border-[var(--brand-accent)]/40 transition-all duration-300 shadow-xl space-y-4"
-            >
-              {/* Top Bar */}
-              <div className="flex justify-between items-start flex-wrap gap-3 pb-4 border-b border-[var(--border-color)]">
-                <div>
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-md border border-[var(--brand-accent)]/20">
-                      #{order.orderId || order._id.slice(-8)}
-                    </span>
+            // Cancellation window calculations
+            const cancelSettings = order.restaurant?.cancellationSettings || {};
+            const allowCancel = cancelSettings.allowCustomerCancel !== false;
+            const windowMinutes = Number(cancelSettings.customerCancelWindowMinutes) || 1;
+            const createdAtMs = new Date(order.createdAt).getTime();
+            const effectiveCurrentTime = currentTime > 0 ? currentTime : createdAtMs;
+            const remainingMs = Math.max(0, createdAtMs + windowMinutes * 60 * 1000 - effectiveCurrentTime);
+            const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+            const canCancel = isPending && allowCancel && remainingSeconds > 0;
+            const remainingMinDisplay = Math.floor(remainingSeconds / 60);
+            const remainingSecDisplay = (remainingSeconds % 60).toString().padStart(2, "0");
 
-                    {/* Fulfillment badge */}
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
-                        isPickup
-                          ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
-                          : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
-                      }`}
-                    >
-                      {isPickup ? <ShoppingBag size={11} /> : <Truck size={11} />}
-                      {isPickup ? "Self Pickup" : "Doorstep Delivery"}
-                    </span>
-
-                    {order.restaurant?.name && (
-                      <span className="flex items-center gap-1 text-xs text-[var(--text-main)] font-semibold bg-[var(--bg-sub)] px-2.5 py-0.5 rounded-md border border-[var(--border-color)]">
-                        <Building size={12} className="text-[var(--brand-accent)]" />
-                        {order.restaurant.name}
-                      </span>
-                    )}
-
-                    {order.restaurant?.phone && (
-                      <a
-                        href={`tel:${order.restaurant.phone.replace(/\s+/g, "")}`}
-                        className="flex items-center gap-1 text-[11px] text-[var(--brand-accent)] font-semibold hover:underline bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded border border-[var(--brand-accent)]/20"
+            return (
+              <div
+                key={order._id || order.orderId}
+                className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-7 hover:border-[var(--brand-accent)]/40 transition-all duration-300 shadow-xl space-y-4"
+              >
+                {/* Top Bar */}
+                <div className="flex justify-between items-start flex-wrap gap-3 pb-4 border-b border-[var(--border-color)]">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <Link
+                        href={orderDetailUrl}
+                        className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-md border border-[var(--brand-accent)]/20 hover:underline cursor-pointer"
+                        title="View order details"
                       >
-                        <Phone size={10} /> Call Kitchen
-                      </a>
-                    )}
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-1 font-medium">
-                    <Clock size={12} /> {formatDate(order.createdAt)}
-                  </p>
-                </div>
+                        #{order.orderId || order._id.slice(-8)}
+                      </Link>
 
-                <div className="text-right flex flex-col items-end">
-                  <span
-                    className={`inline-block text-[11px] px-3 py-1 rounded-full font-extrabold uppercase tracking-wide border ${
-                      isDelivered
-                        ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
-                        : isCancelled
-                        ? "bg-red-500/15 text-red-500 border-red-500/30"
-                        : "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border-[var(--brand-accent)]/30"
-                    }`}
-                  >
-                    ● {order.status}
-                  </span>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                    {order.paymentMethod || "Online Payment"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Order Items */}
-              <div className="py-2 space-y-2.5">
-                {order.items?.map((item, idx) => (
-                  <OrderHistoryDishItem key={idx} item={item} />
-                ))}
-              </div>
-
-              {/* Status Progression Tracker */}
-              <div className="py-2">
-                <OrderStatusTracker
-                  orderId={order.orderId || order._id}
-                  status={order.status}
-                  paymentStatus={order.paymentStatus}
-                  isPickup={isPickup}
-                  cancellationReason={order.cancellationReason || ""}
-                  statusHistory={order.statusHistory || []}
-                  notes={order.notes || ""}
-                  createdAt={order.createdAt}
-                  assignedDeliveryStaff={order.assignedDeliveryStaff}
-                />
-                {order.status === "out_for_delivery" && !isPickup && (
-                  <div className="pt-3">
-                    <LiveDeliveryMap
-                      orderId={order.orderId || order._id}
-                      initialStatus={order.status}
-                      isPickup={isPickup}
-                      restaurant={order.restaurant}
-                      destination={order.address}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Customer Cancellation Inline Form (if active) */}
-              {cancellingOrderId === order._id && (
-                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-rose-500 flex items-center gap-1.5">
-                      <AlertTriangle size={15} /> Confirm Order Cancellation
-                    </p>
-                    <span className="text-[11px] font-mono text-rose-500 font-bold">
-                      {remainingMinDisplay}:{remainingSecDisplay} left
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      "Ordered by mistake",
-                      "Need to change address",
-                      "Selected wrong dishes",
-                      "Changed my mind",
-                    ].map((reason) => (
-                      <button
-                        key={reason}
-                        type="button"
-                        onClick={() => setCancelReason(reason)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-medium border transition cursor-pointer ${
-                          cancelReason === reason
-                            ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
-                            : "bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
+                      {/* Fulfillment badge */}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border ${
+                          isPickup
+                            ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
+                            : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
                         }`}
                       >
-                        {reason}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Or type reason for cancellation..."
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
-                  />
-                  <div className="flex justify-end items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCancellingOrderId(null)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer"
-                    >
-                      Keep Order
-                    </button>
-                    <button
-                      type="button"
-                      disabled={submittingCancel}
-                      onClick={() => handleCancelOrder(order._id)}
-                      className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {submittingCancel ? (
-                        <span>Cancelling...</span>
-                      ) : (
-                        <>
-                          <XCircle size={13} /> Confirm Cancellation
-                        </>
+                        {isPickup ? <ShoppingBag size={11} /> : <Truck size={11} />}
+                        {isPickup ? "Self Pickup" : "Doorstep Delivery"}
+                      </span>
+
+                      {order.restaurant?.name && (
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-main)] font-semibold bg-[var(--bg-sub)] px-2.5 py-0.5 rounded-md border border-[var(--border-color)]">
+                          <Building size={12} className="text-[var(--brand-accent)]" />
+                          {order.restaurant.name}
+                        </span>
                       )}
-                    </button>
-                  </div>
-                </div>
-              )}
 
-              {/* Footer Actions, Delivery Info, and Total */}
-              <div className="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="text-xs text-[var(--text-muted)] space-y-1">
-                  <p className="font-semibold text-[var(--text-main)]">
-                    {isPickup ? "Pickup Customer: " : "Delivery to: "}
-                    {order.address?.fullName}
-                  </p>
-                  {!isPickup && (
-                    <p className="flex items-center gap-1">
-                      <MapPin size={12} className="text-[var(--brand-accent)] shrink-0" />
-                      {order.address?.street}, {order.address?.city}
+                      {order.restaurant?.phone && (
+                        <a
+                          href={`tel:${order.restaurant.phone.replace(/\s+/g, "")}`}
+                          className="flex items-center gap-1 text-[11px] text-[var(--brand-accent)] font-semibold hover:underline bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded border border-[var(--brand-accent)]/20"
+                        >
+                          <Phone size={10} /> Call Kitchen
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-1 font-medium">
+                      <Clock size={12} /> {formatDate(order.createdAt)}
                     </p>
-                  )}
-                  {order.discount > 0 && (
-                    <p className="text-emerald-500 font-semibold flex items-center gap-1">
-                      <Tag size={12} /> Promo discount applied: -₹{order.discount}
-                    </p>
-                  )}
-                  <div className="pt-1 flex items-center gap-3">
-                    <Link
-                      href={`/order-confirmation?orderId=${order._id}`}
-                      className="text-xs font-bold text-[var(--brand-accent)] hover:underline inline-flex items-center gap-1"
+                  </div>
+
+                  <div className="text-right flex flex-col items-end">
+                    <span
+                      className={`inline-block text-[11px] px-3 py-1 rounded-full font-extrabold uppercase tracking-wide border ${
+                        isDelivered
+                          ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                          : isCancelled
+                          ? "bg-red-500/15 text-red-500 border-red-500/30"
+                          : "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border-[var(--brand-accent)]/30"
+                      }`}
                     >
-                      View Live Tracker & Receipt <ArrowRight size={13} />
-                    </Link>
+                      ● {order.status}
+                    </span>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                      {order.paymentMethod || "Online Payment"}
+                      {order.paymentStatus && ` (${order.paymentStatus})`}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3">
-                  <div className="text-left sm:text-right">
-                    <span className="text-[11px] text-[var(--text-muted)] block">Total Paid</span>
-                    <span className="text-[var(--brand-accent)] font-black text-xl sm:text-2xl font-mono">
-                      ₹{order.totalAmount}
-                    </span>
+                {/* Order Items */}
+                <div className="py-2 space-y-2.5">
+                  {order.items?.map((item, idx) => (
+                    <OrderHistoryDishItem key={idx} item={item} />
+                  ))}
+                </div>
+
+                {/* Status Progression Tracker */}
+                <div className="py-2">
+                  <OrderStatusTracker
+                    orderId={order.orderId || order._id}
+                    status={order.status}
+                    paymentStatus={order.paymentStatus}
+                    isPickup={isPickup}
+                    cancellationReason={order.cancellationReason || ""}
+                    statusHistory={order.statusHistory || []}
+                    notes={order.notes || ""}
+                    createdAt={order.createdAt}
+                    assignedDeliveryStaff={order.assignedDeliveryStaff}
+                  />
+                  {order.status === "out_for_delivery" && !isPickup && (
+                    <div className="pt-3">
+                      <LiveDeliveryMap
+                        orderId={order.orderId || order._id}
+                        initialStatus={order.status}
+                        isPickup={isPickup}
+                        restaurant={order.restaurant}
+                        destination={order.address}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Customer Cancellation Inline Form (if active) */}
+                {cancellingOrderId === order._id && (
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-rose-500 flex items-center gap-1.5">
+                        <AlertTriangle size={15} /> Confirm Order Cancellation
+                      </p>
+                      <span className="text-[11px] font-mono text-rose-500 font-bold">
+                        {remainingMinDisplay}:{remainingSecDisplay} left
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        "Ordered by mistake",
+                        "Need to change address",
+                        "Selected wrong dishes",
+                        "Changed my mind",
+                      ].map((reason) => (
+                        <button
+                          key={reason}
+                          type="button"
+                          onClick={() => setCancelReason(reason)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-medium border transition cursor-pointer ${
+                            cancelReason === reason
+                              ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
+                              : "bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
+                          }`}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Or type reason for cancellation..."
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
+                    />
+                    <div className="flex justify-end items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCancellingOrderId(null)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer"
+                      >
+                        Keep Order
+                      </button>
+                      <button
+                        type="button"
+                        disabled={submittingCancel}
+                        onClick={() => handleCancelOrder(order._id)}
+                        className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {submittingCancel ? (
+                          <span>Cancelling...</span>
+                        ) : (
+                          <>
+                            <XCircle size={13} /> Confirm Cancellation
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer Actions, Delivery Info, and Total */}
+                <div className="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="text-xs text-[var(--text-muted)] space-y-1">
+                    <p className="font-semibold text-[var(--text-main)]">
+                      {isPickup ? "Pickup Customer: " : "Delivery to: "}
+                      {order.address?.fullName}
+                    </p>
+                    {!isPickup && (
+                      <p className="flex items-center gap-1">
+                        <MapPin size={12} className="text-[var(--brand-accent)] shrink-0" />
+                        {order.address?.street}, {order.address?.city}
+                      </p>
+                    )}
+                    {order.discount > 0 && (
+                      <p className="text-emerald-500 font-semibold flex items-center gap-1">
+                        <Tag size={12} /> Promo discount applied: -₹{order.discount}
+                      </p>
+                    )}
+                    <div className="pt-1 flex items-center gap-3">
+                      <Link
+                        href={orderDetailUrl}
+                        className="text-xs font-bold text-[var(--brand-accent)] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        View Order Details & Itemized Receipt <ArrowRight size={13} />
+                      </Link>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Customer Cancellation Button */}
-                    {canCancel && cancellingOrderId !== order._id && (
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3">
+                    <div className="text-left sm:text-right">
+                      <span className="text-[11px] text-[var(--text-muted)] block">Total Paid</span>
+                      <span className="text-[var(--brand-accent)] font-black text-xl sm:text-2xl font-mono">
+                        ₹{order.totalAmount}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Customer Cancellation Button */}
+                      {canCancel && cancellingOrderId !== order._id && (
+                        <Tooltip
+                          content="Cancel this order before kitchen starts preparation. If paid online, full refund is automatically issued."
+                          placement="top"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCancellingOrderId(order._id);
+                              setCancelReason("");
+                            }}
+                            className="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                            aria-label="Cancel order within grace period"
+                          >
+                            <XCircle size={13} />
+                            <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
+                          </button>
+                        </Tooltip>
+                      )}
+
+                      {/* Rate Order Button for Delivered Orders */}
+                      {isDelivered && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveFeedbackOrder(order)}
+                          className="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                          aria-label="Rate and review this order"
+                        >
+                          <Star size={13} className="fill-amber-400 text-amber-400" />
+                          <span>Rate Order</span>
+                        </button>
+                      )}
+
+                      {/* Reorder Button */}
                       <Tooltip
-                        content="Cancel this order before kitchen starts preparation. If paid online, full refund is automatically issued."
+                        content="Add all available dishes from this order back to your cart for quick re-ordering"
                         placement="top"
                       >
                         <button
                           type="button"
-                          onClick={() => {
-                            setCancellingOrderId(order._id);
-                            setCancelReason("");
-                          }}
-                          className="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                          aria-label="Cancel order within grace period"
+                          disabled={reorderingOrderId === order._id}
+                          onClick={() => handleReorder(order)}
+                          className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer disabled:opacity-50"
                         >
-                          <XCircle size={13} />
-                          <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
+                          <RotateCcw
+                            size={13}
+                            className={reorderingOrderId === order._id ? "animate-spin" : ""}
+                          />
+                          {reorderingOrderId === order._id ? "Checking..." : "Reorder"}
                         </button>
                       </Tooltip>
-                    )}
-
-                    {/* Rate Order Button for Delivered Orders */}
-                    {isDelivered && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveFeedbackOrder(order)}
-                        className="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                        aria-label="Rate and review this order"
-                      >
-                        <Star size={13} className="fill-amber-400 text-amber-400" />
-                        <span>Rate Order</span>
-                      </button>
-                    )}
-
-                    {/* Reorder Button */}
-                    <Tooltip
-                      content="Add all available dishes from this order back to your cart for quick re-ordering"
-                      placement="top"
-                    >
-                      <button
-                        type="button"
-                        disabled={reorderingOrderId === order._id}
-                        onClick={() => handleReorder(order)}
-                        className="px-4 py-2 rounded-xl bg-[var(--brand-accent)] hover:opacity-90 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 transition cursor-pointer disabled:opacity-50"
-                      >
-                        <RotateCcw
-                          size={13}
-                          className={reorderingOrderId === order._id ? "animate-spin" : ""}
-                        />
-                        {reorderingOrderId === order._id ? "Checking..." : "Reorder"}
-                      </button>
-                    </Tooltip>
+                    </div>
                   </div>
                 </div>
               </div>
+            );
+          })}
+
+          {/* Pagination Controls & Loading States */}
+          {hasMore && (
+            <div className="pt-4 text-center">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)] text-xs font-bold text-[var(--text-main)] shadow-sm hover:shadow-md transition cursor-pointer disabled:opacity-50"
+              >
+                {loadingMore ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin text-[var(--brand-accent)]" />
+                    <span>Loading more orders...</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} className="text-[var(--brand-accent)]" />
+                    <span>
+                      Load More Orders (Showing {filteredOrders.length}
+                      {totalOrdersCount ? ` of ${totalOrdersCount}` : ""})
+                    </span>
+                  </>
+                )}
+              </button>
             </div>
-          );
-        })}
+          )}
+
+          {!hasMore && orders.length > 0 && (
+            <div className="pt-6 text-center text-xs text-[var(--text-muted)] font-medium">
+              <span>You have reached the beginning of your order history.</span>
+            </div>
+          )}
         </div>
       )}
 

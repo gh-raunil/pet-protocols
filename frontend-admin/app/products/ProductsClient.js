@@ -920,7 +920,7 @@ export default function ProductsClient() {
                   setNewCategoryForm({ name: "", icon: "🍽️", description: "", image: "" });
                   setIsCategoryModalOpen(true);
                 }}
-                className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
+                className="flex items-center gap-2 min-h-[44px] bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
               >
                 <Sparkles size={16} className="text-stone-950" />
                 <span>Launch Category</span>
@@ -930,7 +930,7 @@ export default function ProductsClient() {
             <Tooltip content="Add a new dish with photos, pricing, prep time, and dietary tags" position="bottom">
               <button
                 onClick={openAddModal}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
+                className="flex items-center gap-2 min-h-[44px] bg-orange-500 hover:bg-orange-600 transition text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-orange-500/20 active:scale-95 cursor-pointer"
               >
                 <PlusCircle size={18} /> Add Dish
               </button>
@@ -1409,9 +1409,10 @@ export default function ProductsClient() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer"
+                  aria-label="Close dialog"
+                  className="min-w-[44px] min-h-[44px] -mr-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer flex items-center justify-center"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -1771,10 +1772,11 @@ export default function ProductsClient() {
                                   type="button"
                                   onClick={() => handleRemoveVariantRow(idx)}
                                   disabled={(modalForm.variants || []).length <= 1}
-                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                                  className="min-w-[40px] min-h-[40px] rounded-xl text-rose-500 hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer flex items-center justify-center"
                                   title="Delete variant"
+                                  aria-label="Delete variant"
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={16} />
                                 </button>
                               </div>
                             </div>
@@ -1785,9 +1787,9 @@ export default function ProductsClient() {
                       <button
                         type="button"
                         onClick={handleAddVariantRow}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs font-bold hover:bg-orange-500/10 transition cursor-pointer"
+                        className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 rounded-xl border border-dashed border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs sm:text-sm font-bold hover:bg-orange-500/10 transition cursor-pointer"
                       >
-                        <PlusCircle size={14} />
+                        <PlusCircle size={16} />
                         <span>+ Add Another Variant</span>
                       </button>
                     </div>
@@ -1796,15 +1798,15 @@ export default function ProductsClient() {
 
                 {/* Dish Image Source */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                     <label className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
                       Dish Photo
                     </label>
-                    <div className="flex items-center gap-1 text-[11px] font-semibold bg-stone-100 dark:bg-white/5 p-0.5 rounded-lg border border-stone-200/80 dark:border-white/10">
+                    <div className="flex items-center gap-1 text-xs font-semibold bg-stone-100 dark:bg-white/5 p-1 rounded-xl border border-stone-200/80 dark:border-white/10">
                       <button
                         type="button"
                         onClick={() => setImageMode("preset")}
-                        className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
                           imageMode === "preset"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
                             : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
@@ -1815,7 +1817,7 @@ export default function ProductsClient() {
                       <button
                         type="button"
                         onClick={() => setImageMode("file")}
-                        className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
                           imageMode === "file"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
                             : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
@@ -1826,7 +1828,7 @@ export default function ProductsClient() {
                       <button
                         type="button"
                         onClick={() => setImageMode("url")}
-                        className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
                           imageMode === "url"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
                             : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
@@ -1952,18 +1954,18 @@ export default function ProductsClient() {
                   />
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2.5">
+                <div className="pt-3 flex items-center justify-end gap-3 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-200/70 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition active:scale-95 cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-stone-200/70 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition active:scale-95 cursor-pointer flex items-center justify-center"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 disabled:opacity-50 transition shadow-sm active:scale-95 cursor-pointer"
+                    className="min-h-[44px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 disabled:opacity-50 transition shadow-sm active:scale-95 cursor-pointer flex items-center justify-center"
                   >
                     {submitting ? "Saving..." : isEditing ? "Update Dish" : "Create Dish"}
                   </button>
@@ -1998,9 +2000,10 @@ export default function ProductsClient() {
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer"
+                  aria-label="Close dialog"
+                  className="min-w-[44px] min-h-[44px] -mr-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer flex items-center justify-center"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
 

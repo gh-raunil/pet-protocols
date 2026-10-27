@@ -1,0 +1,44 @@
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const repoRoot = path.resolve(path.dirname(__filename), '..', '..');
+const backendDir = path.resolve(repoRoot, 'backend');
+const backendNodeModules = path.resolve(backendDir, 'node_modules');
+
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier === 'next/server') {
+    const nextServerPath = path.resolve(backendNodeModules, 'next', 'server.js');
+    return {
+      url: pathToFileURL(nextServerPath).href,
+      shortCircuit: true,
+      format: 'commonjs',
+    };
+  }
+
+  if (specifier.startsWith('@/')) {
+    const rel = specifier.replace(/^@\//, './');
+    let resolved = path.resolve(backendDir, rel);
+    if (!fs.existsSync(resolved) && fs.existsSync(resolved + '.js')) {
+      resolved = resolved + '.js';
+    } else if (fs.existsSync(path.join(resolved, 'index.js'))) {
+      resolved = path.join(resolved, 'index.js');
+    }
+    return {
+      url: pathToFileURL(resolved).href,
+      shortCircuit: true,
+      format: 'module',
+    };
+  }
+
+  if (specifier.startsWith('.') && context.parentURL) {
+    const parentDir = path.dirname(fileURLToPath(context.parentURL));
+    let resolved = path.resolve(parentDir, specifier);
+    if (!fs.existsSync(resolved) && fs.existsSync(resolved + '.js')) {
+      return nextResolve(pathToFileURL(resolved + '.js').href, context);
+    }
+  }
+
+  return nextResolve(specifier, context);
+}

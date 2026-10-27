@@ -125,13 +125,13 @@ function LoginForm({ defaultRole = "admin" }) {
         />
       </div>
 
-      {/* Theme toggle corner button */}
-      <div className="absolute top-5 right-5 sm:top-6 sm:right-6 z-20">
+      {/* Top Header Row with Theme Toggle */}
+      <header className="w-full max-w-[420px] flex items-center justify-end mb-2.5 z-20">
         <ThemeToggle />
-      </div>
+      </header>
 
       {/* 3D Perspective Card Container */}
-      <div className="w-full max-w-[420px] [perspective:1200px] my-auto">
+      <div className="w-full max-w-[420px] [perspective:1200px]">
         <motion.div
           animate={{ rotateY: isStaff ? 180 : 0 }}
           transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
@@ -154,18 +154,18 @@ function LoginForm({ defaultRole = "admin" }) {
 
               <button
                 type="button"
-                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
+                className="relative z-10 w-1/2 min-h-[44px] py-2.5 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
               >
-                <ShieldCheck size={14} className="text-orange-500" />
+                <ShieldCheck size={16} className="text-orange-500 shrink-0" />
                 <span>Admin Login</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleFlipTo(true)}
-                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
+                className="relative z-10 w-1/2 min-h-[44px] py-2.5 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
               >
-                <ChefHat size={14} />
+                <ChefHat size={16} className="shrink-0" />
                 <span>Staff Login</span>
               </button>
             </div>
@@ -194,8 +194,8 @@ function LoginForm({ defaultRole = "admin" }) {
                 <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
                   Manager Email Address
                 </label>
-                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
-                  <Mail className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                <div className="group flex items-center min-h-[46px] bg-stone-50/90 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-2xl px-3.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25 transition shadow-xs">
+                  <Mail className="text-stone-400 group-focus-within:text-orange-500 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0 transition-colors" />
                   <input
                     type="email"
                     placeholder="e.g. manager@yourkitchen.com"
@@ -205,7 +205,7 @@ function LoginForm({ defaultRole = "admin" }) {
                       setAdminError("");
                     }}
                     required
-                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0 !outline-none border-0 py-2.5"
                   />
                 </div>
               </div>
@@ -214,8 +214,8 @@ function LoginForm({ defaultRole = "admin" }) {
                 <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
                   Password
                 </label>
-                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition">
-                  <Lock className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                <div className="group flex items-center min-h-[46px] bg-stone-50/90 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-2xl px-3.5 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25 transition shadow-xs">
+                  <Lock className="text-stone-400 group-focus-within:text-orange-500 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0 transition-colors" />
                   <input
                     type={showAdminPass ? "text" : "password"}
                     placeholder="••••••••"
@@ -225,14 +225,15 @@ function LoginForm({ defaultRole = "admin" }) {
                       setAdminError("");
                     }}
                     required
-                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0 !outline-none border-0 py-2.5"
                   />
                   <button
                     type="button"
                     onClick={() => setShowAdminPass(!showAdminPass)}
-                    className="text-stone-400 hover:text-stone-700 dark:hover:text-white transition ml-1.5 cursor-pointer"
+                    aria-label={showAdminPass ? "Hide password" : "Show password"}
+                    className="min-w-[40px] min-h-[40px] -mr-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-white transition flex items-center justify-center cursor-pointer rounded-xl focus:outline-none"
                   >
-                    {showAdminPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showAdminPass ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -244,7 +245,7 @@ function LoginForm({ defaultRole = "admin" }) {
                     <button
                       type="button"
                       onClick={() => handleFlipTo(true)}
-                      className="text-xs font-bold text-orange-600 dark:text-orange-400 underline hover:no-underline cursor-pointer block mx-auto"
+                      className="min-h-[44px] px-3 py-2 text-xs font-bold text-orange-600 dark:text-orange-400 underline hover:no-underline cursor-pointer inline-flex items-center justify-center mx-auto"
                     >
                       Click here to flip to Staff Login →
                     </button>
@@ -255,7 +256,7 @@ function LoginForm({ defaultRole = "admin" }) {
               <button
                 type="submit"
                 disabled={adminLoading}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-orange-500/25 text-xs sm:text-sm active:scale-95 cursor-pointer mt-1"
+                className="w-full min-h-[48px] bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-orange-500/25 text-sm active:scale-95 cursor-pointer mt-1"
               >
                 {adminLoading ? "Signing in..." : "Sign In to Kitchen"}
                 {!adminLoading && <ArrowRight size={16} />}
@@ -266,9 +267,9 @@ function LoginForm({ defaultRole = "admin" }) {
             <div className="mt-5 pt-4 border-t border-stone-200/80 dark:border-white/10 text-center">
               <Link
                 href="/"
-                className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center gap-1.5 transition font-medium"
+                className="min-h-[44px] px-3 py-2 text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center justify-center gap-1.5 transition font-medium rounded-lg"
               >
-                <ArrowLeft size={13} /> Back to पेट Protocols Partner Overview
+                <ArrowLeft size={14} /> Back to पेट Protocols Partner Overview
               </Link>
             </div>
           </div>
@@ -291,17 +292,17 @@ function LoginForm({ defaultRole = "admin" }) {
               <button
                 type="button"
                 onClick={() => handleFlipTo(false)}
-                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
+                className="relative z-10 w-1/2 min-h-[44px] py-2.5 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 transition-colors cursor-pointer"
               >
-                <ShieldCheck size={14} />
+                <ShieldCheck size={16} className="shrink-0" />
                 <span>Admin Login</span>
               </button>
 
               <button
                 type="button"
-                className="relative z-10 w-1/2 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
+                className="relative z-10 w-1/2 min-h-[44px] py-2.5 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-stone-900 dark:text-white cursor-default"
               >
-                <ChefHat size={14} className="text-emerald-500" />
+                <ChefHat size={16} className="text-emerald-500 shrink-0" />
                 <span>Staff Login</span>
               </button>
             </div>
@@ -330,8 +331,8 @@ function LoginForm({ defaultRole = "admin" }) {
                 <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
                   Staff Email Address
                 </label>
-                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
-                  <Mail className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                <div className="group flex items-center min-h-[46px] bg-stone-50/90 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-2xl px-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/25 transition shadow-xs">
+                  <Mail className="text-stone-400 group-focus-within:text-emerald-500 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0 transition-colors" />
                   <input
                     type="email"
                     placeholder="e.g. staff@yourkitchen.com"
@@ -341,7 +342,7 @@ function LoginForm({ defaultRole = "admin" }) {
                       setStaffError("");
                     }}
                     required
-                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0 !outline-none border-0 py-2.5"
                   />
                 </div>
               </div>
@@ -350,8 +351,8 @@ function LoginForm({ defaultRole = "admin" }) {
                 <label className="block text-[11px] font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
                   Password
                 </label>
-                <div className="flex items-center bg-stone-50/80 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-xl px-3.5 py-2.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition">
-                  <Lock className="text-stone-400 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0" />
+                <div className="group flex items-center min-h-[46px] bg-stone-50/90 dark:bg-[#141622] border border-stone-300/80 dark:border-white/10 rounded-2xl px-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/25 transition shadow-xs">
+                  <Lock className="text-stone-400 group-focus-within:text-emerald-500 dark:text-stone-500 w-4 h-4 mr-2.5 shrink-0 transition-colors" />
                   <input
                     type={showStaffPass ? "text" : "password"}
                     placeholder="••••••••"
@@ -361,14 +362,15 @@ function LoginForm({ defaultRole = "admin" }) {
                       setStaffError("");
                     }}
                     required
-                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-xs sm:text-sm outline-none"
+                    className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 dark:placeholder-stone-500 text-sm outline-none focus:outline-none focus:ring-0 !outline-none border-0 py-2.5"
                   />
                   <button
                     type="button"
                     onClick={() => setShowStaffPass(!showStaffPass)}
-                    className="text-stone-400 hover:text-stone-700 dark:hover:text-white transition ml-1.5 cursor-pointer"
+                    aria-label={showStaffPass ? "Hide password" : "Show password"}
+                    className="min-w-[40px] min-h-[40px] -mr-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-white transition flex items-center justify-center cursor-pointer rounded-xl focus:outline-none"
                   >
-                    {showStaffPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showStaffPass ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -380,7 +382,7 @@ function LoginForm({ defaultRole = "admin" }) {
                     <button
                       type="button"
                       onClick={() => handleFlipTo(false)}
-                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer block mx-auto"
+                      className="min-h-[44px] px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer inline-flex items-center justify-center mx-auto"
                     >
                       Click here to flip to Admin Login →
                     </button>
@@ -391,7 +393,7 @@ function LoginForm({ defaultRole = "admin" }) {
               <button
                 type="submit"
                 disabled={staffLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/25 text-xs sm:text-sm active:scale-95 cursor-pointer mt-1"
+                className="w-full min-h-[48px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/25 text-sm active:scale-95 cursor-pointer mt-1"
               >
                 {staffLoading ? "Signing in..." : "Sign In to Staff Station"}
                 {!staffLoading && <ArrowRight size={16} />}
@@ -402,9 +404,9 @@ function LoginForm({ defaultRole = "admin" }) {
             <div className="mt-5 pt-4 border-t border-stone-200/80 dark:border-white/10 text-center">
               <Link
                 href="/"
-                className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center gap-1.5 transition font-medium"
+                className="min-h-[44px] px-3 py-2 text-xs text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white inline-flex items-center justify-center gap-1.5 transition font-medium rounded-lg"
               >
-                <ArrowLeft size={13} /> Back to पेट Protocols Partner Overview
+                <ArrowLeft size={14} /> Back to पेट Protocols Partner Overview
               </Link>
             </div>
           </div>

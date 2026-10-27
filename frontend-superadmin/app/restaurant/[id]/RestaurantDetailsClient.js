@@ -659,7 +659,11 @@ export default function RestaurantDetailsClient() {
                 <span className="text-xs text-slate-400 font-medium block uppercase tracking-wider">Rating</span>
                 <span className="text-lg font-black text-amber-500 mt-0.5 block flex items-center justify-center gap-1">
                   <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>{restaurant.rating || 4.8}</span>
+                  <span>
+                    {typeof restaurant.rating === "number" && restaurant.numRatings > 0
+                      ? restaurant.rating.toFixed(1)
+                      : "--"}
+                  </span>
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800 text-center">

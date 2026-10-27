@@ -32,6 +32,7 @@ import {
   Flame,
   X,
   Star,
+  Bike,
 } from "lucide-react";
 import Tooltip from "../ui/Tooltip";
 import { useTheme } from "../ui/ThemeProvider";
@@ -118,6 +119,7 @@ export default function Sidebar({
     const FEATURE_MAP = {
       "/kitchen": "kitchen",
       "/delivery": "delivery",
+      "/delivery/assign": "delivery",
       "/cashier": "cashier",
       "/inventory": "inventory",
       "/standards": "standards",
@@ -149,6 +151,7 @@ export default function Sidebar({
             },
             { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
             { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
+            { href: "/delivery/assign", label: "Assign Delivery Boy", icon: Bike, badge: "Assign" },
           ].filter((item) => isFeatureEnabled(item.href)),
         },
         {
@@ -221,6 +224,7 @@ export default function Sidebar({
               },
               { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
               { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
+              { href: "/delivery/assign", label: "Assign Delivery Boy", icon: Bike, badge: "Assign" },
             ].filter((item) => isFeatureEnabled(item.href)),
           },
           {
@@ -395,7 +399,7 @@ export default function Sidebar({
               <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
                 <Image
                   src="/images/logo1.png"
-                  alt="Pet Protocols Logo"
+                  alt="पेट Protocols Logo"
                   width={32}
                   height={32}
                   className="w-full h-full object-cover"
@@ -540,21 +544,22 @@ export default function Sidebar({
 
               <button
                 onClick={onCloseMobile}
-                className="p-1.5 rounded-lg bg-stone-100 dark:bg-white/10 text-stone-500 hover:text-stone-900 dark:hover:text-white"
+                type="button"
+                className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-500 hover:text-stone-900 dark:hover:text-white transition flex items-center justify-center cursor-pointer active:scale-95"
                 aria-label="Close menu"
               >
-                <X size={16} />
+                <X size={20} />
               </button>
             </div>
 
             {/* Scrollable Groups */}
             <div className="flex-1 overflow-y-auto py-3 space-y-4 pr-1 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {navigationGroups.map((group, groupIdx) => (
-                <div key={groupIdx} className="space-y-1">
+                <div key={groupIdx} className="space-y-1.5">
                   <div className="px-2 text-[10px] font-black uppercase tracking-wider text-stone-400 dark:text-stone-500">
                     {group.title}
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {group.items.map((item) => (
                       <NavItem key={item.href} item={item} />
                     ))}
@@ -564,24 +569,25 @@ export default function Sidebar({
             </div>
 
             {/* Bottom Mobile Drawer Actions */}
-            <div className="shrink-0 pt-3 border-t border-stone-200 dark:border-white/10 flex flex-col gap-2">
+            <div className="shrink-0 pt-3 pb-safe border-t border-stone-200 dark:border-white/10 flex flex-col gap-2">
               {isRestaurantAdmin ? (
                 <>
                   <Link
                     href="/profile"
                     onClick={onCloseMobile}
-                    className="flex items-center gap-2 p-2 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 text-xs font-bold text-stone-800 dark:text-stone-200"
+                    className="min-h-[44px] flex items-center gap-2 px-3 py-2.5 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 text-xs font-bold text-stone-800 dark:text-stone-200 active:scale-95"
                   >
-                    <User size={15} className="text-orange-500 shrink-0" />
+                    <User size={16} className="text-orange-500 shrink-0" />
                     <span className="truncate flex-1">
                       {session?.user?.name || "Profile & Settings"}
                     </span>
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-100 transition cursor-pointer"
+                    type="button"
+                    className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-100 transition cursor-pointer active:scale-95"
                   >
-                    <LogOut size={14} />
+                    <LogOut size={16} />
                     <span>Sign Out</span>
                   </button>
                 </>
@@ -589,7 +595,7 @@ export default function Sidebar({
                 <Link
                   href="/login"
                   onClick={onCloseMobile}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-orange-500 text-white font-bold text-xs shadow-xs hover:bg-orange-600 transition"
+                  className="w-full min-h-[44px] flex items-center justify-center gap-2 p-2.5 rounded-xl bg-orange-500 text-white font-bold text-xs shadow-xs hover:bg-orange-600 transition active:scale-95"
                 >
                   Sign In
                 </Link>

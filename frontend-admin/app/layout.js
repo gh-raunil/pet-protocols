@@ -17,7 +17,7 @@ export const metadata = {
   authors: [{ name: "पेट Protocols" }],
   openGraph: {
     title: "पेट Protocols — Restaurant Management & Kitchen OS",
-    description: "Enterprise restaurant operations portal for Pet Protocols partnered kitchens.",
+    description: "Enterprise restaurant operations portal for पेट Protocols partnered kitchens.",
     type: "website",
     locale: "en_IN",
   },

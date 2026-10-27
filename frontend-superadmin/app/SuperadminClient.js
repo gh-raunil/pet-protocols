@@ -784,108 +784,108 @@ export default function SuperadminClient() {
       {/* ── MODULE NAVIGATION BAR ─────────────────────────────────── */}
       <div className="bg-slate-50/70 dark:bg-[#0f141f] border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-1.5 py-2.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 py-2.5 overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => handleTabChange("overview")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "overview"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Building2 size={14} />
+              <Building2 size={16} />
               <span>Tenants & Admins</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("customers")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "customers"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Users size={14} />
+              <Users size={16} />
               <span>Customers</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("orders")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "orders"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <ShoppingBag size={14} />
+              <ShoppingBag size={16} />
               <span>Orders</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("categories")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "categories"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <FolderTree size={14} />
+              <FolderTree size={16} />
               <span>Categories</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("offers")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "offers"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Tag size={14} />
+              <Tag size={16} />
               <span>Offers</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("support")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "support"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Headphones size={14} />
+              <Headphones size={16} />
               <span>Support</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("messages")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "messages"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Bell size={14} />
+              <Bell size={16} />
               <span>Bulletins</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleTabChange("settings")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition shrink-0 cursor-pointer ${
                 activeSection === "settings"
                   ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              <Sliders size={14} />
+              <Sliders size={16} />
               <span>Settings</span>
             </button>
           </div>
@@ -1108,20 +1108,20 @@ export default function SuperadminClient() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
               {/* Search Box */}
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <input
                   type="text"
                   placeholder="Search restaurant..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-52 bg-white dark:bg-slate-950/70 text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg border border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 px-3 py-1.5 pl-8 transition outline-none shadow-sm"
+                  className="w-full sm:w-56 min-h-[44px] bg-white dark:bg-slate-950/70 text-base sm:text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl border border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 px-3.5 py-2 pl-9 transition outline-none shadow-sm"
                 />
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
               </div>
 
-              <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              <span className="hidden md:inline-flex items-center min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                 {restaurants.length} {includeArchived ? "Listed (incl. Archived)" : "Operational"}
               </span>
 
@@ -1132,7 +1132,7 @@ export default function SuperadminClient() {
                   setIncludeArchived(next);
                   loadData(next);
                 }}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                className={`min-h-[44px] px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer flex items-center justify-center ${
                   includeArchived
                     ? "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
                     : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
@@ -1144,9 +1144,9 @@ export default function SuperadminClient() {
               <button
                 type="button"
                 onClick={() => setIsCreateRestaurantModalOpen(true)}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition inline-flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition inline-flex items-center justify-center gap-2 shadow-xs shrink-0 cursor-pointer"
               >
-                <PlusCircle className="w-3.5 h-3.5" />
+                <PlusCircle className="w-4 h-4" />
                 <span>Add Restaurant</span>
               </button>
             </div>

@@ -13,6 +13,14 @@ import { executeOrderRefund } from '@/lib/refundService';
 import { notifyOrderEvent } from '@/lib/pushService';
 import { enqueueOrderEvents } from '@/lib/notificationOutboxService';
 import { isValidPhone, normalizePhone } from '@/lib/validation';
+import {
+  generateGuestAccessToken,
+  deriveGuestAccessToken,
+  hashGuestAccessToken,
+  extractGuestAccessToken,
+  computeGuestTokenExpiry,
+  buildGuestOrderQuery,
+} from '@/lib/guestAccessService';
 
 let _getServerSession = getServerSession;
 export function _setTestGetServerSession(fn) {
@@ -27,38 +35,122 @@ async function resolveSession() {
   }
 }
 
-// GET — Fetch customer's orders (with optional ?orderId= filter)
+// GET — Fetch customer's orders (with pagination, deterministic sort, and optional filters)
 export async function GET(request) {
   try {
     const session = await resolveSession();
+    const guestToken = extractGuestAccessToken(request);
 
-    if (!session) {
+    if (!session && !guestToken) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
     const orderIdParam = searchParams.get('orderId') || searchParams.get('id');
 
+    // Pagination parameter validation & safe normalization (Phase 3)
+    let page = 1;
+    let limit = 20;
+
+    if (searchParams.has('page')) {
+      const rawPage = searchParams.get('page')?.trim();
+      if (!rawPage || !/^\d+$/.test(rawPage) || parseInt(rawPage, 10) < 1) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Invalid page parameter. Page must be a positive integer greater than zero.',
+          },
+          { status: 400 }
+        );
+      }
+      page = parseInt(rawPage, 10);
+    }
+
+    if (searchParams.has('limit')) {
+      const rawLimit = searchParams.get('limit')?.trim();
+      if (!rawLimit || !/^\d+$/.test(rawLimit) || parseInt(rawLimit, 10) < 1) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Invalid limit parameter. Limit must be a positive integer between 1 and 50.',
+          },
+          { status: 400 }
+        );
+      }
+      const parsedLimit = parseInt(rawLimit, 10);
+      limit = Math.min(50, parsedLimit);
+    }
+
+    await connectDB();
+
     let query = {};
 
-    if (session.user.role === 'superadmin') {
+    if (session?.user?.role === 'superadmin') {
       // Superadmin can view all orders
       query = {};
-    } else if (session.user.role === 'restaurant_admin') {
-      query = { restaurant: session.user.restaurantId };
-    } else {
-      // Customer
-      const user = await User.findOne({ email: session.user.email });
+    } else if (session?.user?.role === 'restaurant_admin' || session?.user?.role === 'staff') {
+      const restId = (session.user.restaurantId || session.user.restaurant)?.toString();
+      if (!restId) {
+        return NextResponse.json(
+          { success: false, message: 'Access denied: staff account is not assigned to an active restaurant.' },
+          { status: 403 }
+        );
+      }
+      query = { restaurant: restId };
+    } else if (session?.user) {
+      // Customer: ownership strictly enforced in query against verified account ID
+      const user = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
       if (!user) {
         return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
       }
-      query = { $or: [{ user: user._id }, { 'address.phone': user.phone }] };
+      // Security Invariant: Registered customer orders are queryable only by authenticated account ID.
+      // Phone matching against guest orders is strictly removed to prevent account hijacking.
+      if (guestToken) {
+        const tokenHash = hashGuestAccessToken(guestToken);
+        query = {
+          $or: [
+            { user: user._id },
+            buildGuestOrderQuery(tokenHash),
+          ],
+        };
+      } else {
+        query = { user: user._id };
+      }
+    } else {
+      // Guest customer: authorized strictly via validated guest access token
+      const tokenHash = hashGuestAccessToken(guestToken);
+      query = buildGuestOrderQuery(tokenHash);
     }
+
+    // Optional date filter: 'today', 'all', or 'YYYY-MM-DD'
+    const dateParam = searchParams.get('date')?.trim();
+    if (dateParam && dateParam !== 'all') {
+      let targetDateStr = null;
+      if (dateParam === 'today') {
+        targetDateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        targetDateStr = dateParam;
+      }
+
+      if (targetDateStr) {
+        const startOfDay = new Date(`${targetDateStr}T00:00:00.000+05:30`);
+        const endOfDay = new Date(`${targetDateStr}T23:59:59.999+05:30`);
+        if (!isNaN(startOfDay.getTime()) && !isNaN(endOfDay.getTime())) {
+          query.createdAt = { $gte: startOfDay, $lte: endOfDay };
+        }
+      }
+    }
+
+    let totalOrders = 0;
+    let orders = [];
 
     if (orderIdParam) {
       if (orderIdParam.length === 24 && /^[0-9a-fA-F]{24}$/.test(orderIdParam)) {
@@ -66,12 +158,32 @@ export async function GET(request) {
       } else {
         query.orderId = orderIdParam;
       }
+
+      orders = await Order.find(query)
+        .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1, _id: -1 });
+
+      totalOrders = orders.length;
+    } else {
+      const skip = (page - 1) * limit;
+
+      const [count, results] = await Promise.all([
+        Order.countDocuments(query),
+        Order.find(query)
+          .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings')
+          .populate('user', 'name email')
+          .sort({ createdAt: -1, _id: -1 })
+          .skip(skip)
+          .limit(limit),
+      ]);
+
+      totalOrders = count;
+      orders = results;
     }
 
-    const orders = await Order.find(query)
-      .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings')
-      .populate('user', 'name email')
-      .sort({ createdAt: -1 });
+    const totalPages = totalOrders > 0 ? Math.ceil(totalOrders / limit) : 1;
+    const hasMore = page < totalPages;
 
     const sanitizedOrders = orders.map((o) => {
       const orderObj = typeof o.toObject === 'function' ? o.toObject() : { ...o };
@@ -92,7 +204,7 @@ export async function GET(request) {
         }));
       }
 
-      // Customer Privacy (Requirement 5): Never expose driver coordinates unless actively out_for_delivery
+      // Customer Privacy: Never expose driver coordinates unless actively out_for_delivery
       if (orderObj.deliveryTracking) {
         if (typeof Order.sanitizeTrackingForCustomer === 'function') {
           orderObj.deliveryTracking = Order.sanitizeTrackingForCustomer(orderObj);
@@ -109,17 +221,47 @@ export async function GET(request) {
         }
       }
 
+      // Strip sensitive handover OTP internals
+      if (orderObj.deliveryOtp) {
+        delete orderObj.deliveryOtp.codeDigest;
+        delete orderObj.deliveryOtp.encryptedCode;
+        delete orderObj.deliveryOtp.code;
+      }
+
       return orderObj;
     });
 
     const order = sanitizedOrders.length > 0 ? sanitizedOrders[0] : null;
 
-    return NextResponse.json({ success: true, order, orders: sanitizedOrders });
+    return NextResponse.json(
+      {
+        success: true,
+        order,
+        orders: sanitizedOrders,
+        pagination: {
+          page,
+          limit,
+          totalOrders,
+          totalPages,
+          hasMore,
+        },
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    );
 
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
+      { success: false, error: 'Internal server error while loading order history.' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
     );
   }
 }
@@ -129,7 +271,7 @@ export async function POST(request) {
   try {
     const session = await resolveSession();
     const body = await request.json();
-    const { items, address, paymentMethod = 'Mock Test Payment', notes = '' } = body;
+    const { items, address, paymentMethod = '', notes = '' } = body;
     let idempotencyKey = request.headers.get('x-idempotency-key') || body.idempotencyKey || null;
     if (typeof idempotencyKey === 'string') {
       idempotencyKey = idempotencyKey.trim();
@@ -162,6 +304,77 @@ export async function POST(request) {
       address.recipientPhone = normalizePhone(address.recipientPhone);
     }
 
+    // Canonical payment method allowlists (exact match after whitespace/case normalization)
+    const CANONICAL_COD_METHODS = new Set([
+      'cash on delivery (cod)',
+      'cash on delivery',
+      'cod',
+    ]);
+
+    const CANONICAL_COP_METHODS = new Set([
+      'cash on pickup (cop)',
+      'cash on pickup',
+      'cop',
+    ]);
+
+    const CANONICAL_SIMULATOR_METHODS = new Set([
+      'instant simulator (test mode)',
+      'mock test payment',
+    ]);
+
+    // Exact Payment Method Validation & Production Security Gating
+    const rawPaymentMethod = typeof paymentMethod === 'string' ? paymentMethod : '';
+    const normalizedPaymentMethod = rawPaymentMethod.trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const isCod = CANONICAL_COD_METHODS.has(normalizedPaymentMethod);
+    const isCop = CANONICAL_COP_METHODS.has(normalizedPaymentMethod);
+    const isSimulator = CANONICAL_SIMULATOR_METHODS.has(normalizedPaymentMethod);
+
+    // 1. Production security boundary: reject simulator unconditionally in production
+    const isProd = process.env.NODE_ENV === 'production';
+    const isSimulatorAllowed = !isProd && process.env.ENABLE_PAYMENT_SIMULATOR !== 'false';
+
+    if (isSimulator) {
+      if (!isSimulatorAllowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Developer payment simulator is strictly disabled in production environments. Please select an authorized payment method.',
+          },
+          { status: 403 }
+        );
+      }
+    } else if (isCod) {
+      if (body.orderType === 'pickup') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Cash on Delivery is only available for doorstep delivery orders. Please select Cash on Pickup.',
+          },
+          { status: 400 }
+        );
+      }
+    } else if (isCop) {
+      if (body.orderType !== 'pickup') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Cash on Pickup is only available for pickup orders. Please select Cash on Delivery or an authorized online payment method.',
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Unknown, malformed, empty, or unsupported payment method -> Fail closed
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Unsupported or invalid payment method. Orders placed through this endpoint must use Cash on Delivery, Cash on Pickup, or an authorized payment flow.',
+        },
+        { status: 400 }
+      );
+    }
+
     await connectDB();
 
     let userId = null;
@@ -184,11 +397,17 @@ export async function POST(request) {
       items,
       orderType: body.orderType,
       couponCode: body.couponCode,
+      address,
     });
 
     if (!calcResult.success) {
       return NextResponse.json(
-        { success: false, message: calcResult.message },
+        {
+          success: false,
+          code: calcResult.code || 'CALCULATION_FAILED',
+          message: calcResult.message,
+          serviceability: calcResult.serviceability,
+        },
         { status: calcResult.status || 400 }
       );
     }
@@ -255,15 +474,43 @@ export async function POST(request) {
         }
 
         if (existingOrders.length === calcResult.orders.length) {
-          const hasCod = existingOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
+          const hasCash = existingOrders.some((o) => {
+            const pm = (o.paymentMethod || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            return CANONICAL_COD_METHODS.has(pm) || CANONICAL_COP_METHODS.has(pm) || pm.includes('cash');
+          });
+
+          // Refresh guest access token on replay for guest orders so the client receives an active token
+          let replayGuestToken = undefined;
+          if (!userId) {
+            if (idempotencyKey) {
+              replayGuestToken = deriveGuestAccessToken(idempotencyKey, "pet-protocols:guest-order-create");
+            } else {
+              replayGuestToken = generateGuestAccessToken();
+            }
+            const replayTokenHash = hashGuestAccessToken(replayGuestToken);
+            const replayExpiresAt = computeGuestTokenExpiry();
+            await Order.updateMany(
+              { _id: { $in: existingOrders.map((o) => o._id) } },
+              {
+                $set: {
+                  "guestAccess.tokenHash": replayTokenHash,
+                  "guestAccess.issuedAt": new Date(),
+                  "guestAccess.expiresAt": replayExpiresAt,
+                  "guestAccess.isRevoked": false,
+                },
+              }
+            );
+          }
+
           return NextResponse.json(
             {
               success: true,
-              message: hasCod
-                ? "Order placed successfully with Cash on Delivery!"
+              message: hasCash
+                ? "Order placed successfully with Cash payment!"
                 : "Order placed successfully with Test Payment!",
               order: existingOrders[0],
               orders: existingOrders,
+              guestAccessToken: replayGuestToken,
               idempotentReplay: true,
             },
             { status: 200 }
@@ -275,14 +522,32 @@ export async function POST(request) {
     const createdOrders = [];
     let isReplay = false;
 
+    // Cryptographically secure guest-order access credential generation (256 bits entropy)
+    let guestAccessToken = null;
+    let guestAccessRecord = null;
+    if (!userId) {
+      if (idempotencyKey) {
+        guestAccessToken = deriveGuestAccessToken(idempotencyKey, "pet-protocols:guest-order-create");
+      } else {
+        guestAccessToken = generateGuestAccessToken();
+      }
+      const tokenHash = hashGuestAccessToken(guestAccessToken);
+      const expiresAt = computeGuestTokenExpiry();
+      guestAccessRecord = {
+        tokenHash,
+        issuedAt: new Date(),
+        expiresAt,
+        isRevoked: false,
+      };
+    }
+
     for (const calcOrder of calcResult.orders) {
-      const isCod = paymentMethod?.toLowerCase().includes("cash on delivery") || paymentMethod?.toLowerCase().includes("cod");
-      const isCop = paymentMethod?.toLowerCase().includes("cash on pickup") || paymentMethod?.toLowerCase().includes("cop");
-      const paymentStatus = isCod || isCop ? "pending" : "test_paid";
+      const paymentStatus = isCod || isCop ? "pending" : (isSimulator ? "test_paid" : "failed");
 
       let finalPaymentMethod = paymentMethod;
       if (isCod) finalPaymentMethod = "Cash on Delivery (COD)";
       else if (isCop) finalPaymentMethod = "Cash on Pickup (COP)";
+      else if (isSimulator) finalPaymentMethod = "Instant Simulator (Test Mode)";
 
       const scopedKey = calcResult.orders.length > 1
         ? `${idempotencyKey}_${calcOrder.restaurantId}`
@@ -294,6 +559,7 @@ export async function POST(request) {
       try {
         newOrder = await Order.create({
           user: userId,
+          ...(guestAccessRecord ? { guestAccess: guestAccessRecord } : {}),
           restaurant: calcOrder.restaurantId,
           items: calcOrder.items,
           address,
@@ -306,6 +572,7 @@ export async function POST(request) {
           paymentMethod: finalPaymentMethod,
           status: "pending",
           orderType: body.orderType === "pickup" ? "pickup" : "delivery",
+          deliveryDistanceKm: calcOrder.deliveryDistanceKm ?? null,
           notes: body.orderType === "pickup" ? `[PICKUP] ${notes}` : notes,
           idempotencyKey: scopedKey,
           payloadHash,
@@ -441,16 +708,22 @@ export async function POST(request) {
       }
     }
 
-    const hasCod = createdOrders.some((o) => o.paymentMethod?.toLowerCase().includes("cod"));
+    let orderSuccessMsg = "Order placed successfully!";
+    if (isCod) {
+      orderSuccessMsg = "Order placed successfully with Cash on Delivery!";
+    } else if (isCop) {
+      orderSuccessMsg = "Order placed successfully with Cash on Pickup!";
+    } else if (isSimulator) {
+      orderSuccessMsg = "Order placed successfully with Test Payment!";
+    }
 
     return NextResponse.json(
       {
         success: true,
-        message: hasCod
-          ? "Order placed successfully with Cash on Delivery!"
-          : "Order placed successfully with Test Payment!",
+        message: orderSuccessMsg,
         order: createdOrders[0],
         orders: createdOrders,
+        guestAccessToken: guestAccessToken || undefined,
         idempotentReplay: isReplay,
       },
       { status: isReplay ? 200 : 201 }

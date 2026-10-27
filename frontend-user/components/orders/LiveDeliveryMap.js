@@ -131,6 +131,7 @@ export default function LiveDeliveryMap({
   restaurant = null,
   destination = null,
   onStatusUpdate = null,
+  guestToken = "",
 }) {
   const [tracking, setTracking] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +139,23 @@ export default function LiveDeliveryMap({
   const [fetchError, setFetchError] = useState("");
   const [sdkStatus, setSdkStatus] = useState("ready"); // "idle" | "loading" | "ready" | "missing_key" | "error"
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Helper to resolve guest access token from prop or session storage
+  const getEffectiveGuestToken = useCallback(() => {
+    if (guestToken) return guestToken;
+    if (typeof window !== "undefined") {
+      try {
+        return (
+          sessionStorage.getItem(`pet_protocols_guest_token_${orderId}`) ||
+          sessionStorage.getItem("pet_protocols_latest_guest_token") ||
+          ""
+        );
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  }, [guestToken, orderId]);
 
   // Layer style state
   const [activeStyle, setActiveStyle] = useState("default");
@@ -201,7 +219,9 @@ export default function LiveDeliveryMap({
       if (isManual) setIsRefreshing(true);
 
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/tracking`);
+        const effectiveToken = getEffectiveGuestToken();
+        const headers = effectiveToken ? { "x-guest-access-token": effectiveToken } : {};
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/tracking`, { headers });
         const data = await res.json().catch(() => ({}));
 
         if (res.ok && data.success) {
@@ -211,7 +231,7 @@ export default function LiveDeliveryMap({
             onStatusUpdate(data.status, data);
           }
         } else if (res.status === 401) {
-          setFetchError("Please sign in to view live delivery tracking.");
+          setFetchError("Please sign in or provide guest credentials to view live delivery tracking.");
         } else if (res.status === 404) {
           setFetchError("Order tracking not found or unauthorized.");
         } else {
@@ -228,7 +248,7 @@ export default function LiveDeliveryMap({
         if (isManual) setIsRefreshing(false);
       }
     },
-    [orderId, onStatusUpdate]
+    [orderId, onStatusUpdate, getEffectiveGuestToken]
   );
 
   /**
@@ -254,9 +274,13 @@ export default function LiveDeliveryMap({
         setCustomerCoords({ latitude: lat, longitude: lng, accuracy: acc });
         setIsSharingLocation(true);
 
+        const effectiveToken = getEffectiveGuestToken();
         await fetch(`/api/orders/${encodeURIComponent(orderId)}/customer-location`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(effectiveToken ? { "x-guest-access-token": effectiveToken } : {}),
+          },
           body: JSON.stringify({ latitude: lat, longitude: lng, accuracy: acc }),
         });
       } catch (err) {
@@ -427,6 +451,7 @@ export default function LiveDeliveryMap({
 
   const driverLat = tracking?.location?.latitude;
   const driverLng = tracking?.location?.longitude;
+  const driver = tracking?.driver;
   const hasValidDriverCoords = isActivelyDelivering && isValidCoordinate(driverLat, driverLng);
 
   const restAddress = tracking?.restaurant?.address || restaurant?.address;
@@ -905,7 +930,7 @@ export default function LiveDeliveryMap({
             Meal Handed Over Successfully
           </h4>
           <p className="text-xs text-[var(--text-muted)]">
-            Live delivery tracking has completed. Thank you for ordering with Pet Protocols!
+            Live delivery tracking has completed. Thank you for ordering with पेट Protocols!
           </p>
         </div>
       </div>
@@ -963,7 +988,6 @@ export default function LiveDeliveryMap({
 
   // ── 4. Actively Out For Delivery (Interactive Live Map View) ──────────────
   const isStale = Boolean(tracking?.isStale);
-  const driver = tracking?.driver;
   const lastRecordedAt = tracking?.location?.recordedAt || tracking?.lastUpdatedAt;
 
   return (

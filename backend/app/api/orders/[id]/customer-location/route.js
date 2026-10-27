@@ -4,6 +4,11 @@ import Order from "@/models/Order";
 import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  hashGuestAccessToken,
+  extractGuestAccessToken,
+  buildGuestOrderQuery,
+} from "@/lib/guestAccessService";
 
 let _getServerSession = getServerSession;
 export function _setTestGetServerSession(fn) {
@@ -21,8 +26,10 @@ async function resolveSession() {
 export async function PATCH(request, { params }) {
   try {
     const session = await resolveSession();
-    if (!session || !session.user) {
-      return NextResponse.json({ success: false, message: "Unauthorized. Please sign in." }, { status: 401 });
+    const guestToken = extractGuestAccessToken(request);
+
+    if (!session?.user && !guestToken) {
+      return NextResponse.json({ success: false, message: "Unauthorized. Please sign in or provide guest access token." }, { status: 401 });
     }
 
     const resolvedParams = params ? await params : {};
@@ -55,23 +62,38 @@ export async function PATCH(request, { params }) {
     };
 
     let query = {};
-    if (["superadmin", "restaurant_admin", "staff"].includes(session.user.role)) {
+    if (session?.user && ["superadmin", "restaurant_admin", "staff"].includes(session.user.role)) {
       query = orderIdentifierFilter;
-    } else {
+    } else if (session?.user) {
       const dbUser = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
       if (!dbUser) {
         return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
       }
 
+      let customerOwnership;
+      if (guestToken) {
+        customerOwnership = {
+          $or: [
+            { user: dbUser._id },
+            buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
+          ],
+        };
+      } else {
+        customerOwnership = { user: dbUser._id };
+      }
+
       query = {
         $and: [
           orderIdentifierFilter,
-          {
-            $or: [
-              { user: dbUser._id },
-              ...(dbUser.phone ? [{ "address.phone": dbUser.phone }] : []),
-            ],
-          },
+          customerOwnership,
+        ],
+      };
+    } else {
+      // Guest: authorized strictly via validated guest access token
+      query = {
+        $and: [
+          orderIdentifierFilter,
+          buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
         ],
       };
     }

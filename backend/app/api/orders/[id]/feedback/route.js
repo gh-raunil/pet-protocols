@@ -43,11 +43,10 @@ async function resolveAndAuthorizeCustomerOrder(orderParamId, sessionUser) {
     return { error: "Order not found", status: 404 };
   }
 
-  // Check ownership
+  // Check ownership: strictly enforce verified account ID, never phone match
   const isOwnerUser = order.user && order.user.toString() === dbUser._id.toString();
-  const isOwnerPhone = Boolean(dbUser.phone && order.address?.phone && order.address.phone.trim() === dbUser.phone.trim());
 
-  if (!isOwnerUser && !isOwnerPhone && sessionUser.role !== "superadmin") {
+  if (!isOwnerUser && sessionUser.role !== "superadmin") {
     // Non-leaky 404 to avoid leaking whether the order exists to another customer
     return { error: "Order not found", status: 404 };
   }
@@ -223,6 +222,23 @@ export async function POST(request, { params }) {
       } catch (notifyErr) {
         // Notification failure must never block feedback persistence
         console.warn("Feedback outbox enqueue skipped or failed:", notifyErr?.message);
+      }
+
+      // Recompute and synchronize authentic restaurant rating from Feedback collection
+      try {
+        const Restaurant = (await import("@/models/Restaurant")).default;
+        const feedbackStats = await Feedback.aggregate([
+          { $match: { restaurant: order.restaurant } },
+          { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: "$rating" } } }
+        ]);
+        const count = feedbackStats[0]?.count || 0;
+        const avg = count > 0 ? Number(feedbackStats[0].avg.toFixed(1)) : null;
+        await Restaurant.updateOne(
+          { _id: order.restaurant },
+          { $set: { rating: avg, numRatings: count } }
+        );
+      } catch (syncErr) {
+        console.warn("Failed to synchronize restaurant rating from feedback:", syncErr?.message);
       }
 
       return NextResponse.json(

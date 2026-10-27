@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   KeyRound,
   X,
+  Bike,
 } from "lucide-react";
 import {
   useDeliveryGpsTransmitter,
@@ -861,22 +862,22 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       )}
 
       {gpsTransmitter.activeOrderId && (
-        <div className="bg-gradient-to-r from-emerald-950/40 via-[#101928] to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-lg shadow-emerald-500/5 space-y-3">
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/50 dark:from-emerald-950/40 dark:via-[#101928] dark:to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xs dark:shadow-lg dark:shadow-emerald-500/5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
                 <Radio size={20} className={gpsTransmitter.trackingStatus === "sharing" ? "animate-pulse" : ""} />
                 {gpsTransmitter.trackingStatus === "sharing" && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-ping" />
                 )}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
                     Live GPS Transmission Active
                   </span>
-                  <span className="text-stone-400 text-xs">•</span>
-                  <span className="font-extrabold text-sm text-white">
+                  <span className="text-stone-400 dark:text-stone-500 text-xs">•</span>
+                  <span className="font-extrabold text-sm text-stone-900 dark:text-white">
                     Order #{gpsTransmitter.activeOrderId}
                   </span>
                 </div>
@@ -884,10 +885,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                       gpsTransmitter.trackingStatus === "sharing"
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40"
                         : gpsTransmitter.trackingStatus === "requesting_permission"
-                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse"
-                        : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                        ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40 animate-pulse"
+                        : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40"
                     }`}
                   >
                     {gpsTransmitter.trackingStatus === "sharing" && "● Sharing live location"}
@@ -900,7 +901,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                   {gpsTransmitter.wakeLockActive && (
                     <Tooltip content="Keeps phone screen on while driving to prevent background GPS transmission pauses" position="top">
-                      <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1 cursor-help">
+                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-300 dark:text-blue-300 dark:bg-blue-500/15 dark:border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1 cursor-help">
                         📱 Screen Awake
                       </span>
                     </Tooltip>
@@ -912,7 +913,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             <Tooltip content="Stop sharing your real-time GPS coordinates with the customer" position="left">
               <button
                 onClick={() => gpsTransmitter.stopTracking("stopped")}
-                className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer"
+                className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 dark:border-rose-500/40 font-bold px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95"
               >
                 <Power size={13} />
                 <span>Stop GPS Transmission</span>
@@ -922,8 +923,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
           {/* Telemetry Pills */}
           {gpsTransmitter.lastLocation && (
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap pt-2 border-t border-white/10 text-xs">
-              <span className="font-mono text-emerald-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap pt-2 border-t border-emerald-500/20 dark:border-white/10 text-xs">
+              <span className="font-mono text-emerald-900 bg-white/90 border border-emerald-500/25 dark:text-emerald-300 dark:bg-white/5 dark:border-white/10 px-2.5 py-1 rounded-lg shadow-xs font-semibold">
                 📍 {gpsTransmitter.lastLocation.latitude.toFixed(5)}, {gpsTransmitter.lastLocation.longitude.toFixed(5)}
               </span>
 
@@ -931,10 +932,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 <span
                   className={`font-semibold px-2 py-1 rounded-lg border text-[11px] ${
                     gpsTransmitter.lastLocation.accuracy <= 20
-                      ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
+                      ? "text-emerald-800 bg-emerald-100/80 border-emerald-300/80 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/20"
                       : gpsTransmitter.lastLocation.accuracy <= 50
-                      ? "text-amber-300 bg-amber-500/10 border-amber-500/20"
-                      : "text-rose-300 bg-rose-500/10 border-rose-500/20"
+                      ? "text-amber-800 bg-amber-100/80 border-amber-300/80 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/20"
+                      : "text-rose-800 bg-rose-100/80 border-rose-300/80 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/20"
                   }`}
                 >
                   🎯 ±{Math.round(gpsTransmitter.lastLocation.accuracy)}m accuracy
@@ -942,21 +943,21 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               )}
 
               {typeof gpsTransmitter.lastLocation.speed === "number" && gpsTransmitter.lastLocation.speed > 0 && (
-                <span className="text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
+                <span className="text-blue-800 bg-blue-100/80 border border-blue-300/80 dark:text-blue-300 dark:bg-blue-500/10 dark:border-blue-500/20 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
                   <Gauge size={12} />
                   <span>{Math.round(gpsTransmitter.lastLocation.speed * 3.6)} km/h</span>
                 </span>
               )}
 
               {typeof gpsTransmitter.lastLocation.heading === "number" && gpsTransmitter.lastLocation.heading >= 0 && (
-                <span className="text-stone-300 bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
+                <span className="text-stone-700 bg-white/90 border border-emerald-500/20 dark:text-stone-300 dark:bg-white/5 dark:border-white/10 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
                   <Compass size={12} />
                   <span>{Math.round(gpsTransmitter.lastLocation.heading)}°</span>
                 </span>
               )}
 
               {gpsTransmitter.lastSentTime && (
-                <span className="text-stone-400 text-[11px] ml-auto">
+                <span className="text-stone-600 dark:text-stone-400 text-[11px] ml-auto font-medium">
                   Sent: {new Date(gpsTransmitter.lastSentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                 </span>
               )}
@@ -964,15 +965,15 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           )}
 
           {gpsTransmitter.errorMessage && (
-            <div className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 flex items-center gap-2">
+            <div className="text-xs text-amber-900 bg-amber-100 border border-amber-300 dark:text-amber-300/90 dark:bg-amber-500/10 dark:border-amber-500/20 rounded-xl p-2.5 flex items-center gap-2">
               <AlertTriangle size={14} className="shrink-0" />
               <span>{gpsTransmitter.errorMessage}</span>
             </div>
           )}
 
           {/* Device and Background GPS Note */}
-          <p className="text-[11px] text-stone-400 leading-relaxed pt-1">
-            ⚠️ <strong>Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.
+          <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed pt-1">
+            ⚠️ <strong className="text-stone-800 dark:text-stone-200">Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.
           </p>
         </div>
       )}
@@ -1168,33 +1169,52 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   </div>
 
                   {/* Quick Action Button for Delivery Flow */}
-                  <div className="flex items-center gap-2 self-end md:self-auto flex-wrap justify-end">
+                  <div className="w-full sm:w-auto flex items-center gap-2 flex-wrap justify-start sm:justify-end mt-2 sm:mt-0">
                     {(order.status === "preparing" || order.status === "ready") && (
-                      <Tooltip content="Pick up packed food parcel from kitchen and start transit to customer" position="top">
-                        <button
-                          onClick={() =>
-                            updateOrderStatus(order._id, "out_for_delivery", {
-                              assignedDeliveryStaff: {
-                                id: currentStaffId,
-                                name: currentStaffName,
-                                phone: currentStaffPhone,
-                              },
-                            })
-                          }
-                          disabled={isUpdating}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <Truck size={14} />
-                          <span>Pick Up & Start Transit</span>
-                        </button>
-                      </Tooltip>
+                      isManager ? (
+                        order.assignedDeliveryStaff?.id ? (
+                          <Tooltip content="Dispatch packed food parcel for delivery transit" position="top">
+                            <button
+                              onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
+                              disabled={isUpdating}
+                              className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                            >
+                              <Truck size={15} />
+                              <span>Dispatch Order</span>
+                            </button>
+                          </Tooltip>
+                        ) : (
+                          <a
+                            href="/delivery/assign"
+                            className="min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                          >
+                            <Bike size={15} />
+                            <span>Assign Driver First</span>
+                          </a>
+                        )
+                      ) : isMyOrder(order) ? (
+                        <Tooltip content="Pick up packed food parcel from kitchen and start transit to customer" position="top">
+                          <button
+                            onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
+                            disabled={isUpdating}
+                            className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                          >
+                            <Truck size={15} />
+                            <span>Dispatch Order</span>
+                          </button>
+                        </Tooltip>
+                      ) : (
+                        <span className="min-h-[44px] inline-flex items-center text-xs font-semibold px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-500">
+                          Awaiting Manager Assignment
+                        </span>
+                      )
                     )}
 
                     {order.status === "out_for_delivery" && (
                       <>
                         {!isPickup && (
                           isManager ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">
+                            <span className="min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">
                               {order.deliveryTracking?.isLive ? (
                                 <>
                                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1211,10 +1231,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <Tooltip content="Stop sharing your live GPS coordinates for this delivery" position="top">
                               <button
                                 onClick={() => gpsTransmitter.stopTracking("stopped")}
-                                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                                className="min-h-[44px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                                 title="Stop sending GPS coordinates for this order"
                               >
-                                <Power size={13} />
+                                <Power size={14} />
                                 <span>Stop Sharing GPS</span>
                               </button>
                             </Tooltip>
@@ -1222,15 +1242,48 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <Tooltip content="Transmit your phone's real-time GPS location to the customer and restaurant manager" position="top">
                               <button
                                 onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95 flex-1 sm:flex-none"
                                 title="Start transmitting real device GPS for this active delivery"
                               >
-                                <Navigation size={13} />
-                                <span>Share Live GPS Location</span>
+                                <Navigation size={14} />
+                                <span>Share Live GPS</span>
                               </button>
                             </Tooltip>
                           )
                         )}
+
+                        {/* Dual-Party Handover OTP View */}
+                        <Tooltip content="View active 4-digit handover OTP code for customer coordination" position="top">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/restaurant/orders/${order._id}/otp`);
+                                const data = await res.json();
+                                if (data.success && data.otpCode) {
+                                  toast(
+                                    (t) => (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="font-bold text-xs">Customer Handover Code:</span>
+                                        <span className="text-2xl font-mono font-black text-emerald-600 tracking-widest">
+                                          {data.otpCode}
+                                        </span>
+                                      </div>
+                                    ),
+                                    { duration: 6000, icon: "🔑" }
+                                  );
+                                } else {
+                                  toast.error(data.message || "Failed to retrieve OTP.");
+                                }
+                              } catch {
+                                toast.error("Network error retrieving OTP.");
+                              }
+                            }}
+                            className="min-h-[44px] bg-stone-800 hover:bg-stone-900 text-white dark:bg-stone-700 dark:hover:bg-stone-600 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <KeyRound size={14} />
+                            <span>View OTP</span>
+                          </button>
+                        </Tooltip>
 
                         {/* Delivery Handover Action (Requires Customer OTP Verification) */}
                         <Tooltip content="Verify customer's 4-digit handover code at doorstep and complete delivery." position="top">
@@ -1242,9 +1295,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               setHandoverRemainingAttempts(null);
                             }}
                             disabled={isUpdating}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
                           >
-                            <KeyRound size={14} />
+                            <KeyRound size={15} />
                             <span>Verify Handover (OTP)</span>
                           </button>
                         </Tooltip>
@@ -1253,10 +1306,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                     <button
                       onClick={() => setExpandedOrderId(isExpanded ? null : order._id)}
-                      className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      className="min-h-[44px] px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <span>{isExpanded ? "Hide Details" : "View Full Details"}</span>
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
                   </div>
                 </div>
@@ -2209,9 +2262,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   }
                 }}
                 disabled={handoverSubmitting}
-                className="p-1.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 transition cursor-pointer disabled:opacity-40"
+                aria-label="Close Handover Dialog"
+                className="min-w-[44px] min-h-[44px] -mr-1 -mt-1 rounded-2xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 transition cursor-pointer disabled:opacity-40 flex items-center justify-center"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
@@ -2260,7 +2314,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     if (handoverError) setHandoverError("");
                   }}
                   placeholder="0000"
-                  className="w-full text-center font-mono text-3xl font-black tracking-[0.5em] py-3.5 px-4 rounded-2xl border-2 border-emerald-500/40 focus:border-emerald-500 focus:outline-hidden bg-stone-50 dark:bg-black/30 text-stone-900 dark:text-white transition shadow-inner"
+                  className="w-full text-center font-mono text-3xl font-black tracking-[0.5em] py-3.5 px-4 min-h-[56px] rounded-2xl border-2 border-emerald-500/40 focus:border-emerald-500 focus:outline-hidden bg-stone-50 dark:bg-black/30 text-stone-900 dark:text-white transition shadow-inner"
                   disabled={handoverSubmitting}
                 />
                 <p className="text-[11px] text-stone-500 text-center">
@@ -2284,7 +2338,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2.5 pt-2">
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2294,23 +2348,23 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     setHandoverRemainingAttempts(null);
                   }}
                   disabled={handoverSubmitting}
-                  className="flex-1 py-3 px-4 rounded-xl border border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 font-bold text-xs hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40"
+                  className="flex-1 min-h-[48px] py-3.5 px-4 rounded-xl border border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 font-bold text-xs sm:text-sm hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40 flex items-center justify-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={handoverSubmitting || handoverOtpCode.trim().length !== 4}
-                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 min-h-[48px] py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {handoverSubmitting ? (
                     <>
-                      <RefreshCw size={14} className="animate-spin" />
+                      <RefreshCw size={15} className="animate-spin" />
                       <span>Verifying...</span>
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 size={15} />
+                      <CheckCircle2 size={16} />
                       <span>Verify & Deliver</span>
                     </>
                   )}

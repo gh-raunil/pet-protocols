@@ -134,32 +134,7 @@ export async function GET(request) {
     // Attach delivery distance and out-of-range indicators, ensuring restaurant coordinates
     orders = orders.map((order) => {
       const distInfo = getOrderDistanceInfo(order, restaurant);
-      let restObj = order.restaurant || restaurant;
-      if (restObj) {
-        let rLat = restObj.address?.latitude || 0;
-        let rLng = restObj.address?.longitude || 0;
-        if (!rLat || !rLng || (rLat === 0 && rLng === 0)) {
-          const destLat = order.address?.latitude || order.customerLocation?.latitude;
-          if (destLat && Math.abs(destLat - 12.97) < 0.2) {
-            rLat = 12.9698;
-            rLng = 79.1550;
-          } else if (destLat) {
-            rLat = destLat - 0.005;
-            rLng = (order.address?.longitude || order.customerLocation?.longitude || 79.15) - 0.005;
-          } else {
-            rLat = 12.9698;
-            rLng = 79.1550;
-          }
-          restObj = {
-            ...restObj,
-            address: {
-              ...(restObj.address || {}),
-              latitude: rLat,
-              longitude: rLng,
-            },
-          };
-        }
-      }
+      const restObj = order.restaurant || restaurant;
       return {
         ...order,
         restaurant: restObj,
@@ -668,9 +643,32 @@ export async function PUT(request) {
       }
     }
 
-    // Driver assignment validation (Rule #4 & Finding B & G)
+    // Driver assignment & dispatch validation (Rules B, C, & D)
     let validatedDriverDoc = null;
-    if (assignedDeliveryStaff && assignedDeliveryStaff.id) {
+    let validatedAssignmentMode = null;
+    let validatedAssignmentStatus = null;
+
+    if (body.action === "self_delivery" || body.selfDelivery === true) {
+      const isLeadAdmin = auth.isAdmin || auth.user?.role === "restaurant_admin" || auth.user?.role === "admin";
+      const userRoles = Array.isArray(auth.staffRoles) ? auth.staffRoles : (auth.user?.staffRoles || []);
+      const isManager = isLeadAdmin || userRoles.includes("Manager");
+
+      if (!isManager) {
+        return NextResponse.json(
+          { success: false, message: "Access denied. Only restaurant managers can select self-delivery." },
+          { status: 403 }
+        );
+      }
+      validatedDriverDoc = {
+        id: auth.user._id,
+        name: `${auth.user.name || "Manager"} (Self-Delivery)`,
+        phone: auth.user.phone || "",
+        email: auth.user.email || "",
+        assignedAt: new Date(),
+      };
+      validatedAssignmentMode = "manager_self_delivery";
+      validatedAssignmentStatus = "accepted";
+    } else if (assignedDeliveryStaff && assignedDeliveryStaff.id) {
       const driverUser = await User.findOne({
         _id: assignedDeliveryStaff.id,
         restaurant: restaurantId,
@@ -691,6 +689,8 @@ export async function PUT(request) {
         email: driverUser.email || "",
         assignedAt: new Date(),
       };
+      validatedAssignmentMode = "staff";
+      validatedAssignmentStatus = "assigned";
     } else if (status === "out_for_delivery" && !order.assignedDeliveryStaff?.id) {
       // If no driver specified and order has no assigned driver:
       // Only auto-assign if the actor is an actual delivery driver self-dispatching
@@ -703,8 +703,37 @@ export async function PUT(request) {
           email: auth.user.email || "",
           assignedAt: new Date(),
         };
+        validatedAssignmentMode = "staff";
+        validatedAssignmentStatus = "accepted";
       }
-      // If manager dispatches, validatedDriverDoc remains null so the delivery driver can claim on first GPS ping
+    }
+
+    // Rule B & D Dispatch Authorization Guard:
+    if (status === "out_for_delivery" && !isPickup) {
+      const effectiveDriverId = validatedDriverDoc?.id || order.assignedDeliveryStaff?.id;
+      if (!effectiveDriverId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Cannot dispatch delivery order without an assigned delivery person. Please assign a delivery person or select 'Deliver This Order Myself' first.",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Rule D: If actor is non-manager delivery staff, they MUST be the currently assigned driver
+      const isLeadAdmin = auth.isAdmin || auth.user?.role === "restaurant_admin" || auth.user?.role === "admin";
+      const userRoles = Array.isArray(auth.staffRoles) ? auth.staffRoles : (auth.user?.staffRoles || []);
+      const isManager = isLeadAdmin || userRoles.includes("Manager");
+
+      if (!isManager) {
+        if (String(effectiveDriverId) !== String(auth.user._id)) {
+          return NextResponse.json(
+            { success: false, message: "Access denied. You are not the assigned delivery person for this order." },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     if (paymentStatus) {
@@ -818,6 +847,15 @@ export async function PUT(request) {
       setFields["deliveryTracking.startedAt"] = order.deliveryTracking?.startedAt || new Date();
       setFields["deliveryTracking.endedAt"] = null;
       setFields["deliveryTracking.endReason"] = null;
+      setFields.dispatchedAt = new Date();
+      setFields.dispatchedBy = {
+        id: auth.user?._id,
+        name: auth.user?.name || "Staff",
+        role: auth.user?.role || "restaurant_admin",
+      };
+      if (!order.assignmentStatus || order.assignmentStatus === "assigned") {
+        setFields.assignmentStatus = "accepted";
+      }
     } else if (["delivered", "cancelled"].includes(status)) {
       setFields["deliveryTracking.isLive"] = false;
       setFields["deliveryTracking.endedAt"] = new Date();
@@ -826,6 +864,17 @@ export async function PUT(request) {
 
     if (validatedDriverDoc) {
       setFields.assignedDeliveryStaff = validatedDriverDoc;
+      if (validatedAssignmentMode) {
+        setFields.deliveryAssignmentMode = validatedAssignmentMode;
+      }
+      if (validatedAssignmentStatus) {
+        setFields.assignmentStatus = validatedAssignmentStatus;
+      }
+      setFields.assignedBy = {
+        id: auth.user?._id,
+        name: auth.user?.name || "Manager",
+        role: auth.user?.role || "restaurant_admin",
+      };
     }
 
     if (codPaymentHandler) {

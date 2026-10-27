@@ -115,14 +115,15 @@ export default function TopHeader({
     <header className="sticky top-0 z-30 h-14 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-stone-200/80 dark:border-white/10 px-4 sm:px-6 transition-colors font-jakarta">
       <div className="h-full flex items-center justify-between gap-3">
         {/* Left Section: Mobile Trigger & Breadcrumbs */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Mobile hamburger button */}
           <button
             onClick={onOpenMobileMenu}
-            className="md:hidden p-1.5 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/15 transition cursor-pointer"
+            type="button"
+            className="md:hidden min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/15 transition cursor-pointer flex items-center justify-center active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none"
             aria-label="Open navigation menu"
           >
-            <Menu size={18} />
+            <Menu size={20} />
           </button>
 
           {/* Breadcrumb Trail */}
@@ -138,15 +139,15 @@ export default function TopHeader({
         </div>
 
         {/* Center / Right Section */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Superadmin Broadcast Banner Pill (if unread message exists) */}
           {activeNotice && (
             <Tooltip content={activeNotice.title} placement="bottom">
               <Link
                 href="/updates"
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold transition animate-pulse"
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold transition animate-pulse min-h-[38px]"
               >
-                <Bell size={12} className="shrink-0" />
+                <Bell size={13} className="shrink-0" />
                 <span className="truncate max-w-[130px]">{activeNotice.title}</span>
               </Link>
             </Tooltip>
@@ -164,14 +165,15 @@ export default function TopHeader({
             >
               <button
                 onClick={onToggleKitchenActive}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition cursor-pointer ${
+                type="button"
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition cursor-pointer min-h-[38px] active:scale-95 ${
                   kitchenActive
                     ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100"
                     : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30 hover:bg-rose-100"
                 }`}
               >
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${
+                  className={`w-2 h-2 rounded-full ${
                     kitchenActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
                   }`}
                 />
@@ -191,7 +193,8 @@ export default function TopHeader({
           >
             <button
               onClick={toggleSound}
-              className={`p-1.5 sm:px-2 sm:py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+              type="button"
+              className={`min-w-[44px] min-h-[44px] p-2.5 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
                 soundEnabled
                   ? "bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:text-orange-500"
                   : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
@@ -200,12 +203,12 @@ export default function TopHeader({
             >
               {soundEnabled ? (
                 <>
-                  <Volume2 size={14} className="text-orange-500" />
+                  <Volume2 size={16} className="text-orange-500 shrink-0" />
                   <span className="hidden xl:inline text-[11px] font-bold">Chimes On</span>
                 </>
               ) : (
                 <>
-                  <VolumeX size={14} />
+                  <VolumeX size={16} className="shrink-0" />
                   <span className="hidden xl:inline text-[11px] font-bold">Muted</span>
                 </>
               )}
@@ -224,9 +227,9 @@ export default function TopHeader({
               >
                 <Link
                   href="/profile"
-                  className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 transition text-xs font-semibold text-stone-800 dark:text-stone-200"
+                  className="min-h-[44px] flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 transition text-xs font-semibold text-stone-800 dark:text-stone-200 active:scale-95"
                 >
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-orange-500/15 text-orange-600 dark:text-orange-400 font-black flex items-center justify-center text-[10px] shrink-0 border border-orange-500/30">
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-orange-500/15 text-orange-600 dark:text-orange-400 font-black flex items-center justify-center text-xs shrink-0 border border-orange-500/30">
                     {session?.user?.image ? (
                       <img
                         src={session.user.image}
@@ -249,10 +252,11 @@ export default function TopHeader({
               <Tooltip content="Sign out of restaurant partner account" placement="bottom">
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-stone-500 hover:text-rose-600 border border-stone-200 dark:border-white/10 transition cursor-pointer"
+                  type="button"
+                  className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-stone-500 hover:text-rose-600 border border-stone-200 dark:border-white/10 transition cursor-pointer flex items-center justify-center active:scale-95"
                   aria-label="Logout"
                 >
-                  <LogOut size={14} />
+                  <LogOut size={16} />
                 </button>
               </Tooltip>
             </div>
@@ -260,13 +264,13 @@ export default function TopHeader({
             <div className="flex items-center gap-2">
               <Link
                 href="/login/staff"
-                className="hidden sm:inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 transition border border-stone-200 dark:border-white/10"
+                className="hidden sm:inline-flex items-center text-xs font-bold px-3 py-2 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 transition border border-stone-200 dark:border-white/10 min-h-[44px]"
               >
                 Staff Login
               </Link>
               <Link
                 href="/login"
-                className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs transition shadow-xs"
+                className="min-h-[44px] flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-xs active:scale-95 cursor-pointer"
               >
                 Sign In
               </Link>

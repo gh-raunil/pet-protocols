@@ -237,7 +237,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
               <button
                 onClick={() => loadOrders(false)}
                 disabled={refreshing || loading}
-                className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70"
+                className="min-h-[44px] inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70"
               >
                 <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
                 <span>{refreshing ? "Syncing..." : "Sync Tickets"}</span>
@@ -302,16 +302,16 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
           <button
             onClick={handleDismissAllStale}
             disabled={loading || refreshing || Boolean(updatingId)}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
+            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
           >
-            <XCircle size={14} />
+            <XCircle size={15} />
             <span>Dismiss All Stale ({staleOrders.length})</span>
           </button>
         </div>
       )}
 
       {/* ── TICKET VIEW SELECTOR ────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 shadow-xs overflow-x-auto">
+      <div className="flex items-center justify-between gap-3 bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-2 sm:p-3 shadow-xs overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-2">
           {[
             { id: "all_kds", label: `Active Kitchen Queue (${activeTickets.length})` },
@@ -322,7 +322,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
             <button
               key={tab.id}
               onClick={() => setViewTab(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer flex items-center justify-center ${
                 viewTab === tab.id
                   ? "bg-orange-500 text-white shadow-xs"
                   : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-white/10"
@@ -568,17 +568,17 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                         type="button"
                         onClick={() => handleStartCooking(order)}
                         disabled={isUpdating}
-                        className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 active:scale-[0.99] transition-all duration-200 shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 border border-orange-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl font-extrabold text-xs sm:text-sm text-white bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 active:scale-[0.99] transition-all duration-200 shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 border border-orange-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {isUpdating ? (
                           <>
-                            <RefreshCw size={14} className="animate-spin text-white" />
+                            <RefreshCw size={15} className="animate-spin text-white" />
                             <span>Accepting Ticket...</span>
                           </>
                         ) : (
                           <>
                             <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                              <Flame size={13} className="text-white" />
+                              <Flame size={14} className="text-white" />
                             </div>
                             <span className="tracking-wide">Start Cooking</span>
                           </>
@@ -598,17 +598,17 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                         type="button"
                         onClick={() => updateStatus(order._id, "out_for_delivery")}
                         disabled={isUpdating}
-                        className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] transition-all duration-200 shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/35 border border-emerald-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full min-h-[48px] py-3 px-4 rounded-xl font-extrabold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] transition-all duration-200 shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/35 border border-emerald-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {isUpdating ? (
                           <>
-                            <RefreshCw size={14} className="animate-spin text-white" />
+                            <RefreshCw size={15} className="animate-spin text-white" />
                             <span>Marking Ready...</span>
                           </>
                         ) : (
                           <>
                             <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                              <PackageCheck size={13} className="text-white" />
+                              <PackageCheck size={14} className="text-white" />
                             </div>
                             <span className="tracking-wide">Mark Ready for Pickup</span>
                             <span className="text-[10px] opacity-80 font-bold ml-0.5">✓</span>
@@ -647,9 +647,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                             type="button"
                             onClick={() => updateStatus(order._id, "delivered")}
                             disabled={isUpdating}
-                            className="w-full py-2 px-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="w-full min-h-[44px] py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
-                            <PackageCheck size={13} />
+                            <PackageCheck size={14} />
                             <span>Hand Over</span>
                           </button>
                         </Tooltip>
@@ -663,13 +663,13 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                               setDismissPromptOrder(order);
                             }}
                             disabled={isUpdating}
-                            className={`w-full font-bold text-xs py-2 rounded-xl border transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                            className={`w-full min-h-[44px] font-bold text-xs sm:text-sm py-2.5 px-3 rounded-xl border transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
                               isStale
                                 ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-600"
                                 : "bg-stone-100 hover:bg-rose-600 hover:text-white dark:bg-white/5 dark:hover:bg-rose-600 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:border-transparent"
                             }`}
                           >
-                            <XCircle size={13} />
+                            <XCircle size={14} />
                             <span>Dismiss</span>
                           </button>
                         </Tooltip>
@@ -704,7 +704,8 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
               <button
                 type="button"
                 onClick={() => setDismissPromptOrder(null)}
-                className="text-stone-400 hover:text-stone-700 dark:hover:text-white p-1 rounded-lg cursor-pointer text-sm font-bold"
+                aria-label="Close dialog"
+                className="min-w-[44px] min-h-[44px] -mr-2 text-stone-400 hover:text-stone-700 dark:hover:text-white rounded-xl flex items-center justify-center cursor-pointer text-base font-bold"
               >
                 ✕
               </button>
@@ -725,14 +726,14 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                   key={reason}
                   type="button"
                   onClick={() => setDismissReason(reason)}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex items-center justify-between ${
+                  className={`w-full min-h-[44px] text-left px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition cursor-pointer flex items-center justify-between ${
                     dismissReason === reason
                       ? "bg-rose-50 dark:bg-rose-950/30 border-rose-500 text-rose-900 dark:text-rose-200 font-bold"
                       : "bg-stone-50 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:border-stone-400"
                   }`}
                 >
                   <span>{reason}</span>
-                  {dismissReason === reason && <Check size={14} className="text-rose-500 shrink-0" />}
+                  {dismissReason === reason && <Check size={16} className="text-rose-500 shrink-0" />}
                 </button>
               ))}
 
@@ -742,7 +743,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                   placeholder="Enter specific dismissal reason..."
                   value={customReason}
                   onChange={(e) => setCustomReason(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs text-stone-900 dark:text-white outline-none focus:border-rose-500"
+                  className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-base sm:text-xs text-stone-900 dark:text-white outline-none focus:border-rose-500"
                 />
               )}
             </div>
@@ -751,7 +752,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
               <button
                 type="button"
                 onClick={() => setDismissPromptOrder(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -768,9 +769,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                   });
                   setDismissPromptOrder(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                <XCircle size={14} />
+                <XCircle size={15} />
                 <span>Confirm Dismissal</span>
               </button>
             </div>

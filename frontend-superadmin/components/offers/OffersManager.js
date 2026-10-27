@@ -23,6 +23,8 @@ import {
   ShieldCheck,
   Clock,
   ArrowRight,
+  Ticket,
+  Zap,
 } from "lucide-react";
 
 export default function OffersManager({ restaurants = [] }) {
@@ -774,30 +776,36 @@ export default function OffersManager({ restaurants = [] }) {
 
       {/* ── CREATE OFFER MODAL ────────────────────────────────────────── */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="fixed inset-0" onClick={() => setIsCreateOpen(false)} />
           <form
             onSubmit={handleCreateOffer}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-8 animate-in fade-in zoom-in-95"
+            className="relative bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl z-10 overflow-hidden animate-in fade-in zoom-in-95 my-auto"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 shrink-0 bg-white dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
                   <Tag size={18} />
                 </div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  Launch New Promotion
-                </h3>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                    Launch New Promotion
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Create a platform-wide or restaurant-specific offer
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs sm:text-sm">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs sm:text-sm flex-1">
               {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -894,7 +902,10 @@ export default function OffersManager({ restaurants = [] }) {
                     }`}
                   >
                     <div className="font-extrabold text-xs flex items-center justify-between">
-                      <span>🎟️ Option A: Coupon Code</span>
+                      <span className="flex items-center gap-1.5">
+                        <Ticket size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>Option A: Coupon Code</span>
+                      </span>
                       {createForm.applyMode === "coupon" && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">✓ Selected</span>}
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -912,7 +923,10 @@ export default function OffersManager({ restaurants = [] }) {
                     }`}
                   >
                     <div className="font-extrabold text-xs flex items-center justify-between">
-                      <span>⚡ Option B: Automatic Discount</span>
+                      <span className="flex items-center gap-1.5">
+                        <Zap size={14} className="text-amber-500 shrink-0" />
+                        <span>Option B: Automatic Discount</span>
+                      </span>
                       {createForm.applyMode === "automatic" && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">✓ Selected</span>}
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -1079,11 +1093,11 @@ export default function OffersManager({ restaurants = [] }) {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2.5">
+            <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 transition cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1111,30 +1125,36 @@ export default function OffersManager({ restaurants = [] }) {
 
       {/* ── EDIT OFFER MODAL ──────────────────────────────────────────── */}
       {editingOffer && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="fixed inset-0" onClick={() => setEditingOffer(null)} />
           <form
             onSubmit={handleSaveEdit}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-8 animate-in fade-in zoom-in-95"
+            className="relative bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl z-10 overflow-hidden animate-in fade-in zoom-in-95 my-auto"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 shrink-0 bg-white dark:bg-slate-900">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
                   <Pencil size={18} />
                 </div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  Edit Offer Details
-                </h3>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                    Edit Offer Details
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Update offer parameters and discount rules
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingOffer(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs sm:text-sm">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs sm:text-sm flex-1">
               {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -1230,7 +1250,10 @@ export default function OffersManager({ restaurants = [] }) {
                     }`}
                   >
                     <div className="font-extrabold text-xs flex items-center justify-between">
-                      <span>🎟️ Option A: Coupon Code</span>
+                      <span className="flex items-center gap-1.5">
+                        <Ticket size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>Option A: Coupon Code</span>
+                      </span>
                       {editForm.applyMode === "coupon" && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">✓ Selected</span>}
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -1248,7 +1271,10 @@ export default function OffersManager({ restaurants = [] }) {
                     }`}
                   >
                     <div className="font-extrabold text-xs flex items-center justify-between">
-                      <span>⚡ Option B: Automatic Discount</span>
+                      <span className="flex items-center gap-1.5">
+                        <Zap size={14} className="text-amber-500 shrink-0" />
+                        <span>Option B: Automatic Discount</span>
+                      </span>
                       {editForm.applyMode === "automatic" && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">✓ Selected</span>}
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -1412,11 +1438,11 @@ export default function OffersManager({ restaurants = [] }) {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2.5">
+            <div className="p-4 sm:px-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setEditingOffer(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 transition cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
               >
                 Cancel
               </button>

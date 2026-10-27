@@ -176,12 +176,33 @@ export default function OrderStatusTracker({
   notes = "",
   createdAt = null,
   assignedDeliveryStaff = null,
+  guestToken = "",
 }) {
-  const isCancelled = status?.toLowerCase() === "cancelled";
+  const normalizedStatus = status?.toLowerCase()?.trim() || "pending";
+  const isCancelled = normalizedStatus === "cancelled";
   const isFailed = paymentStatus?.toLowerCase() === "failed";
+  const isOutForDelivery = normalizedStatus === "out_for_delivery";
+  const isDelivered = normalizedStatus === "delivered";
   const activeIndex = getActiveStepIndex(status);
   const steps = getOrderSteps(isPickup);
   const currentStep = steps[activeIndex] || steps[0];
+
+  // Helper to resolve guest token from prop or protected session storage
+  const getEffectiveGuestToken = React.useCallback(() => {
+    if (guestToken) return guestToken;
+    if (typeof window !== "undefined") {
+      try {
+        return (
+          sessionStorage.getItem(`pet_protocols_guest_token_${orderId}`) ||
+          sessionStorage.getItem("pet_protocols_latest_guest_token") ||
+          ""
+        );
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  }, [guestToken, orderId]);
 
   // Secure Handover OTP State
   const [otpData, setOtpData] = React.useState(null);
@@ -192,15 +213,19 @@ export default function OrderStatusTracker({
   const [copied, setCopied] = React.useState(false);
 
   const fetchHandoverOtp = React.useCallback(async () => {
-    if (!orderId || isPickup || status !== "out_for_delivery") return;
+    if (!orderId || isPickup || isCancelled || isFailed || isDelivered) return;
     try {
       setOtpLoading(true);
       setOtpError("");
-      const res = await fetch(`/api/orders/${orderId}/handover-otp`);
+      const effectiveToken = getEffectiveGuestToken();
+      const headers = effectiveToken ? { "x-guest-access-token": effectiveToken } : {};
+      const res = await fetch(`/api/orders/${orderId}/handover-otp`, { headers });
       const data = await res.json();
       if (data.success && data.otpCode) {
         setOtpData(data);
-      } else if (data.message && !data.notActiveYet) {
+      } else if (data.notActiveYet) {
+        setOtpData(data);
+      } else if (data.message) {
         setOtpError(data.message);
       }
     } catch {
@@ -208,13 +233,13 @@ export default function OrderStatusTracker({
     } finally {
       setOtpLoading(false);
     }
-  }, [orderId, isPickup, status]);
+  }, [orderId, isPickup, isCancelled, isFailed, isDelivered, getEffectiveGuestToken]);
 
   React.useEffect(() => {
-    if (orderId && status === "out_for_delivery" && !isPickup) {
+    if (orderId && isOutForDelivery && !isPickup) {
       fetchHandoverOtp();
     }
-  }, [orderId, status, isPickup, fetchHandoverOtp]);
+  }, [orderId, isOutForDelivery, isPickup, fetchHandoverOtp]);
 
   // Cooldown countdown
   React.useEffect(() => {
@@ -230,7 +255,9 @@ export default function OrderStatusTracker({
     try {
       setReissuing(true);
       setOtpError("");
-      const res = await fetch(`/api/orders/${orderId}/handover-otp`, { method: "POST" });
+      const effectiveToken = getEffectiveGuestToken();
+      const headers = effectiveToken ? { "x-guest-access-token": effectiveToken } : {};
+      const res = await fetch(`/api/orders/${orderId}/handover-otp`, { method: "POST", headers });
       const data = await res.json();
       if (data.success && data.otpCode) {
         setOtpData(data);
@@ -332,9 +359,9 @@ export default function OrderStatusTracker({
   // 2. Normal Active Order Progress Tracker
   return (
     <div className="w-full space-y-4">
-      <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden transition-all">
+      <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl relative overflow-hidden transition-all">
         {/* Tracker Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-[var(--border-color)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 sm:pb-6 border-b border-[var(--border-color)]">
           <div>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -381,7 +408,7 @@ export default function OrderStatusTracker({
                   Delivery Partner: {assignedDeliveryStaff.name}
                 </p>
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  {status === "out_for_delivery" ? "On the way with your food parcel" : "Assigned staff taking order for delivery"}
+                  {isOutForDelivery ? "On the way with your food parcel" : "Assigned staff taking order for delivery"}
                 </p>
               </div>
             </div>
@@ -397,87 +424,171 @@ export default function OrderStatusTracker({
         )}
 
         {/* Secure Delivery Handover OTP Card */}
-        {status === "out_for_delivery" && !isPickup && orderId && (
-          <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/30 shadow-lg relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
-                  <ShieldCheck size={26} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
-                      Proof of Handover
-                    </span>
-                    <span className="text-[11px] text-[var(--text-muted)] font-medium">
-                      Doorstep Security Code
-                    </span>
+        {!isPickup && orderId && !isCancelled && !isFailed && (
+          <div
+            className={`mt-4 sm:mt-5 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl transition-all relative overflow-hidden border-2 ${
+              isOutForDelivery
+                ? "bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-500/30 shadow-lg"
+                : isDelivered
+                ? "bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20 shadow-xs"
+                : "bg-gradient-to-br from-amber-500/10 via-[var(--bg-sub)] to-transparent border-amber-500/30 shadow-xs"
+            }`}
+          >
+            {isOutForDelivery ? (
+              /* Active 4-Digit Doorstep Handover State */
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <ShieldCheck size={22} className="sm:hidden" />
+                    <ShieldCheck size={26} className="hidden sm:block" />
                   </div>
-                  <h4 className="text-base font-extrabold text-[var(--text-main)] mt-1">
-                    Delivery Handover Code (OTP)
-                  </h4>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
-                    Share this 4-digit code with your delivery driver when they hand you your food package.
-                  </p>
-                </div>
-              </div>
-
-              {/* 4-Digit Display & Copy Button */}
-              <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                {otpLoading && !otpData ? (
-                  <div className="flex items-center gap-2 py-3 px-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-pulse">
-                    <RefreshCw size={14} className="animate-spin" />
-                    <span>Generating Handover Code...</span>
-                  </div>
-                ) : otpData?.otpCode ? (
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="flex items-center gap-1.5 bg-white dark:bg-stone-900 border-2 border-emerald-500/40 px-4 py-2 rounded-2xl shadow-md cursor-pointer hover:border-emerald-500 transition group"
-                      onClick={handleCopyCode}
-                      title="Click to copy handover code"
-                    >
-                      <span className="font-mono text-2xl sm:text-3xl font-black tracking-[0.25em] text-emerald-600 dark:text-emerald-400 pl-1">
-                        {otpData.otpCode}
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
+                        Proof of Handover
                       </span>
+                      <span className="text-[10px] sm:text-[11px] text-[var(--text-muted)] font-medium">
+                        Doorstep Security Code
+                      </span>
+                    </div>
+                    <h4 className="text-sm sm:text-base font-extrabold text-[var(--text-main)] mt-0.5 sm:mt-1">
+                      Delivery Handover Code (OTP)
+                    </h4>
+                    <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Share this 4-digit code with your delivery driver when they hand you your food package.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4-Digit Display & Copy Button */}
+                <div className="flex flex-col sm:items-end gap-1.5 shrink-0 pt-1 sm:pt-0">
+                  {otpLoading && !otpData?.otpCode ? (
+                    <div className="flex items-center gap-2 py-2 px-4 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-pulse">
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Generating Code...</span>
+                    </div>
+                  ) : otpData?.otpCode ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div
+                        className="flex items-center gap-1.5 bg-white dark:bg-stone-900 border-2 border-emerald-500/40 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-sm cursor-pointer hover:border-emerald-500 transition group active:scale-95"
+                        onClick={handleCopyCode}
+                        title="Click to copy handover code"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleCopyCode();
+                          }
+                        }}
+                      >
+                        <span className="font-mono text-xl sm:text-2xl md:text-3xl font-black tracking-[0.25em] text-emerald-600 dark:text-emerald-400 pl-1">
+                          {otpData.otpCode}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Copy code to clipboard"
+                          className="ml-1 sm:ml-2 p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20 transition min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        >
+                          {copied ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
+                      </div>
+
                       <button
                         type="button"
-                        className="ml-2 p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20 transition"
+                        onClick={handleReissueOtp}
+                        disabled={reissueCooldown > 0 || reissuing}
+                        className="min-w-[40px] min-h-[40px] p-2 rounded-xl sm:rounded-2xl border border-[var(--border-color)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center active:scale-95 shrink-0"
+                        title={reissueCooldown > 0 ? `Wait ${reissueCooldown}s before reissuing` : "Reissue fresh handover code"}
+                        aria-label="Reissue handover code"
                       >
-                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        <RefreshCw size={15} className={reissuing ? "animate-spin" : ""} />
                       </button>
                     </div>
-
+                  ) : (
                     <button
                       type="button"
-                      onClick={handleReissueOtp}
-                      disabled={reissueCooldown > 0 || reissuing}
-                      className="p-2.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={reissueCooldown > 0 ? `Wait ${reissueCooldown}s before reissuing` : "Reissue fresh handover code"}
+                      onClick={fetchHandoverOtp}
+                      className="py-2 px-3.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer min-h-[40px]"
                     >
-                      <RefreshCw size={15} className={reissuing ? "animate-spin" : ""} />
+                      <RefreshCw size={12} />
+                      <span>Generate Code</span>
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={fetchHandoverOtp}
-                    className="py-2 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold transition hover:bg-emerald-700 flex items-center gap-1.5"
-                  >
-                    <RefreshCw size={12} />
-                    <span>Generate Code</span>
-                  </button>
-                )}
+                  )}
 
-                {reissueCooldown > 0 && (
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
-                    Reissue available in {reissueCooldown}s
-                  </span>
-                )}
+                  {reissueCooldown > 0 && (
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                      Reissue available in {reissueCooldown}s
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : isDelivered ? (
+              /* Completed Handover State */
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                        Verified Handover
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-[var(--text-main)] mt-0.5">
+                      Handover OTP Verified & Package Delivered
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                  Completed
+                </span>
+              </div>
+            ) : (
+              /* Informative Pre-Dispatch Security State (Compact & Clean on Mobile) */
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <KeyRound size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/25">
+                        Doorstep Security
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                        Active Upon Dispatch
+                      </span>
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-extrabold text-[var(--text-main)] mt-0.5">
+                      Delivery Handover Code (OTP)
+                    </h4>
+                    <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Your secure 4-digit code will appear here once your food order is picked up and out for delivery.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pre-Dispatch Masked Code Preview - Compact on mobile */}
+                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-0.5 sm:pt-0">
+                  <div className="flex items-center gap-1.5 bg-[var(--bg-sub)] border border-dashed border-amber-500/30 px-2.5 py-1 rounded-xl">
+                    <span className="font-mono text-base sm:text-lg font-black tracking-[0.25em] text-amber-600/70 dark:text-amber-400/70 select-none pl-1">
+                      ••••
+                    </span>
+                    <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
+                      Standby
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] hidden sm:inline">
+                    Share only at doorstep handover
+                  </span>
+                </div>
+              </div>
+            )}
 
             {otpError && (
-              <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+              <div className="mt-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
                 <AlertTriangle size={14} className="shrink-0" />
                 <span>{otpError}</span>
               </div>
@@ -606,7 +717,7 @@ export default function OrderStatusTracker({
                 </div>
 
                 <div className="flex-1 min-w-0 pt-0.5">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p
                       className={`text-xs font-bold ${
                         isCurrent

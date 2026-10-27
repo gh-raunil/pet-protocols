@@ -4,6 +4,11 @@ import Order from "@/models/Order";
 import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  hashGuestAccessToken,
+  extractGuestAccessToken,
+  buildGuestOrderQuery,
+} from "@/lib/guestAccessService";
 
 let _getServerSession = getServerSession;
 export function _setTestGetServerSession(fn) {
@@ -21,7 +26,9 @@ async function resolveSession() {
 export async function GET(request, { params }) {
   try {
     const session = await resolveSession();
-    if (!session || !session.user) {
+    const guestToken = extractGuestAccessToken(request);
+
+    if (!session?.user && !guestToken) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
@@ -43,32 +50,54 @@ export async function GET(request, { params }) {
     };
 
     let query = {};
-    if (session.user.role === "superadmin") {
+    if (session?.user?.role === "superadmin") {
       query = orderIdentifierFilter;
-    } else if (session.user.role === "restaurant_admin" || session.user.role === "staff") {
+    } else if (session?.user?.role === "restaurant_admin" || session?.user?.role === "staff") {
       const restId = (session.user.restaurantId || session.user.restaurant)?.toString();
+      if (!restId) {
+        return NextResponse.json(
+          { success: false, message: "Access denied: staff account is not assigned to an active restaurant." },
+          { status: 403 }
+        );
+      }
       query = {
         $and: [
           orderIdentifierFilter,
           { restaurant: restId },
         ],
       };
-    } else {
-      // Customer: strictly enforce ownership via customer user ID or verified phone number
+    } else if (session?.user) {
+      // Customer: strictly enforce ownership via verified customer user ID.
+      // Phone matching against guest orders is strictly removed to prevent account spoofing.
       const dbUser = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
       if (!dbUser) {
         return NextResponse.json({ success: false, message: "User not found" }, { status: 404 });
       }
 
+      let customerOwnership;
+      if (guestToken) {
+        customerOwnership = {
+          $or: [
+            { user: dbUser._id },
+            buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
+          ],
+        };
+      } else {
+        customerOwnership = { user: dbUser._id };
+      }
+
       query = {
         $and: [
           orderIdentifierFilter,
-          {
-            $or: [
-              { user: dbUser._id },
-              ...(dbUser.phone ? [{ "address.phone": dbUser.phone }] : []),
-            ],
-          },
+          customerOwnership,
+        ],
+      };
+    } else {
+      // Guest: authorized strictly via validated guest access token
+      query = {
+        $and: [
+          orderIdentifierFilter,
+          buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
         ],
       };
     }
@@ -165,33 +194,20 @@ export async function GET(request, { params }) {
       destination: destinationCoords,
       customerLocation: customerLocationData,
       restaurant: order.restaurant
-        ? (() => {
-            let rLat = order.restaurant.address?.latitude || 0;
-            let rLng = order.restaurant.address?.longitude || 0;
-            if ((!rLat || !rLng || (rLat === 0 && rLng === 0)) && destinationCoords.latitude && destinationCoords.longitude) {
-              if (Math.abs(destinationCoords.latitude - 12.97) < 0.2) {
-                rLat = 12.9698;
-                rLng = 79.1550;
-              } else {
-                rLat = destinationCoords.latitude - 0.005;
-                rLng = destinationCoords.longitude - 0.005;
-              }
-            }
-            return {
-              name: order.restaurant.name || "",
-              phone: order.restaurant.phone || "",
-              address: order.restaurant.address
-                ? {
-                    street: order.restaurant.address.street || "",
-                    city: order.restaurant.address.city || "",
-                    state: order.restaurant.address.state || "",
-                    pincode: order.restaurant.address.pincode || "",
-                    latitude: rLat,
-                    longitude: rLng,
-                  }
-                : null,
-            };
-          })()
+        ? {
+            name: order.restaurant.name || "",
+            phone: order.restaurant.phone || "",
+            address: order.restaurant.address
+              ? {
+                  street: order.restaurant.address.street || "",
+                  city: order.restaurant.address.city || "",
+                  state: order.restaurant.address.state || "",
+                  pincode: order.restaurant.address.pincode || "",
+                  latitude: order.restaurant.address.latitude ?? null,
+                  longitude: order.restaurant.address.longitude ?? null,
+                }
+              : null,
+          }
         : null,
     });
   } catch (error) {

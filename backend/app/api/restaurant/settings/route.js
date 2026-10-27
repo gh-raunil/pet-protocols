@@ -238,6 +238,10 @@ export async function PUT(request) {
       restaurant,
     });
   } catch (error) {
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors || {}).map((e) => e.message).join(" ");
+      return NextResponse.json({ success: false, message: messages || error.message }, { status: 400 });
+    }
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

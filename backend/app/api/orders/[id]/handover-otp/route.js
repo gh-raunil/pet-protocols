@@ -5,6 +5,11 @@ import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueDeliveryOtpForOrder, getDeliveryOtpSecret } from "@/lib/deliveryOtpService";
+import {
+  hashGuestAccessToken,
+  extractGuestAccessToken,
+  buildGuestOrderQuery,
+} from "@/lib/guestAccessService";
 
 let _getServerSession = getServerSession;
 export function _setTestGetServerSession(fn) {
@@ -26,8 +31,10 @@ async function resolveSession() {
 export async function GET(request, { params }) {
   try {
     const session = await resolveSession();
-    if (!session || !session.user) {
-      return NextResponse.json({ success: false, message: "Unauthorized. Please log in." }, { status: 401 });
+    const guestToken = extractGuestAccessToken(request);
+
+    if (!session?.user && !guestToken) {
+      return NextResponse.json({ success: false, message: "Unauthorized. Please log in or provide guest access token." }, { status: 401 });
     }
 
     const resolvedParams = params ? await params : {};
@@ -44,31 +51,85 @@ export async function GET(request, { params }) {
     };
 
     let query = {};
-    const userRole = session.user.role;
+    const userRole = session?.user?.role;
 
     if (userRole === "superadmin") {
       query = orderIdentifierFilter;
     } else if (userRole === "restaurant_admin" || userRole === "staff") {
-      return NextResponse.json(
-        { success: false, message: "Access denied. Restaurant and delivery staff are prohibited from viewing customer handover OTPs." },
-        { status: 403 }
-      );
-    } else {
-      // Customer: strictly enforce ownership via user ID or address phone
       const dbUser = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
       if (!dbUser) {
         return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
       }
 
+      const targetOrder = await Order.findOne(orderIdentifierFilter).select("+deliveryOtp.codeDigest +deliveryOtp.encryptedCode");
+      if (!targetOrder) {
+        return NextResponse.json({ success: false, message: "Order not found." }, { status: 404 });
+      }
+
+      // Check tenant match
+      const orderRestId = targetOrder.restaurant?.toString();
+      const userRestId = dbUser.restaurant?.toString();
+      if (!userRestId || orderRestId !== userRestId) {
+        return NextResponse.json(
+          { success: false, message: "Access denied. Order belongs to another restaurant." },
+          { status: 403 }
+        );
+      }
+
+      const isManager = userRole === "restaurant_admin" || (Array.isArray(dbUser.staffRoles) && dbUser.staffRoles.includes("Manager")) || dbUser.staffRole === "Manager";
+      const assignedDriverId = targetOrder.assignedDeliveryStaff?.id?.toString();
+      const isAssignedDriver = assignedDriverId && assignedDriverId === dbUser._id.toString();
+
+      // Dual-party authorization:
+      if (targetOrder.deliveryAssignmentMode === "manager_self_delivery") {
+        if (!isManager) {
+          return NextResponse.json(
+            { success: false, message: "Access denied. This is a manager self-delivery order." },
+            { status: 403 }
+          );
+        }
+      } else {
+        if (!isAssignedDriver && !isManager) {
+          return NextResponse.json(
+            { success: false, message: "Access denied. Only the assigned delivery person or restaurant manager can access the handover OTP." },
+            { status: 403 }
+          );
+        }
+      }
+
+      query = { _id: targetOrder._id };
+    } else if (session?.user) {
+      // Customer: strictly enforce ownership via customer user ID.
+      // Phone matching against guest orders is strictly removed to prevent account spoofing.
+      const dbUser = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
+      if (!dbUser) {
+        return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
+      }
+
+      let customerOwnership;
+      if (guestToken) {
+        customerOwnership = {
+          $or: [
+            { user: dbUser._id },
+            buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
+          ],
+        };
+      } else {
+        customerOwnership = { user: dbUser._id };
+      }
+
       query = {
         $and: [
           orderIdentifierFilter,
-          {
-            $or: [
-              { user: dbUser._id },
-              ...(dbUser.phone ? [{ "address.phone": dbUser.phone }] : []),
-            ],
-          },
+          customerOwnership,
+        ],
+      };
+    } else {
+      // Guest: authorized strictly via validated guest access token
+      query = {
+        $and: [
+          orderIdentifierFilter,
+          buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
         ],
       };
     }
@@ -143,8 +204,10 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const session = await resolveSession();
-    if (!session || !session.user) {
-      return NextResponse.json({ success: false, message: "Unauthorized. Please log in." }, { status: 401 });
+    const guestToken = extractGuestAccessToken(request);
+
+    if (!session?.user && !guestToken) {
+      return NextResponse.json({ success: false, message: "Unauthorized. Please log in or provide guest access token." }, { status: 401 });
     }
 
     const resolvedParams = params ? await params : {};
@@ -161,7 +224,7 @@ export async function POST(request, { params }) {
     };
 
     let query = {};
-    const userRole = session.user.role;
+    const userRole = session?.user?.role;
 
     if (userRole === "superadmin") {
       query = orderIdentifierFilter;
@@ -170,21 +233,36 @@ export async function POST(request, { params }) {
         { success: false, message: "Access denied. Restaurant and delivery staff cannot reissue customer handover OTPs." },
         { status: 403 }
       );
-    } else {
+    } else if (session?.user) {
       const dbUser = await User.findOne({ email: session.user.email?.toLowerCase().trim() });
       if (!dbUser) {
         return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
       }
 
+      let customerOwnership;
+      if (guestToken) {
+        customerOwnership = {
+          $or: [
+            { user: dbUser._id },
+            buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
+          ],
+        };
+      } else {
+        customerOwnership = { user: dbUser._id };
+      }
+
       query = {
         $and: [
           orderIdentifierFilter,
-          {
-            $or: [
-              { user: dbUser._id },
-              ...(dbUser.phone ? [{ "address.phone": dbUser.phone }] : []),
-            ],
-          },
+          customerOwnership,
+        ],
+      };
+    } else {
+      // Guest: authorized strictly via validated guest access token
+      query = {
+        $and: [
+          orderIdentifierFilter,
+          buildGuestOrderQuery(hashGuestAccessToken(guestToken)),
         ],
       };
     }

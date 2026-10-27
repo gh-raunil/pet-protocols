@@ -78,10 +78,71 @@ input, textarea, select {
   color-scheme: dark light;
 }
 
+/* Accessible focus rings with visible contrast */
+:where(a:any-link, button, textarea, select):focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+:where(input:not([class*="outline-none"]):not([class*="border-0"])):focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Form inputs with explicit outline-none or inside focus-within wrappers should never display redundant inner focus outlines */
+input.outline-none,
+input[class*="outline-none"],
 input:focus,
-textarea:focus,
-select:focus {
+input:focus-visible,
+[class*="focus-within"] input,
+[class*="focus-within"] textarea {
   outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ── Mobile Usability & Touch Target Standards (WCAG 2.5.8 / 44px) ── */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-target-compact {
+  min-height: 40px;
+  min-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Prevent unwanted automatic zoom shifts on iOS Safari / WebKit when focusing inputs */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Coarse pointer enhancements for touch screens */
+@media (pointer: coarse) {
+  button, 
+  a[role="button"], 
+  input[type="button"], 
+  input[type="submit"] {
+    touch-action: manipulation;
+  }
+}
+
+/* Safe area insets for notches, island, and gesture home indicator */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
 }
 
 /* Default dark-safe autofill: prevents jarring browser white background */
