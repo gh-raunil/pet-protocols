@@ -52,8 +52,52 @@ const RestaurantSchema = new mongoose.Schema(
       state: { type: String, default: '' },
       pincode: { type: String, default: '' },
       country: { type: String, default: 'India' },
-      latitude: { type: Number, default: 0 },
-      longitude: { type: Number, default: 0 },
+      latitude: {
+        type: Number,
+        default: null,
+        validate: {
+          validator: function (v) {
+            const doc = typeof this.ownerDocument === 'function' ? this.ownerDocument() : this;
+            const isDeliveryActive =
+              doc?.status === 'active' &&
+              doc?.deliverySettings?.deliveryEnabled !== false &&
+              doc?.orderTypes?.delivery !== false;
+
+            if (isDeliveryActive) {
+              if (v === null || v === undefined) return false;
+              if (v === 0 && (doc?.address?.longitude === 0 || doc?.address?.longitude === null)) return false;
+              return typeof v === 'number' && Number.isFinite(v) && v >= -90 && v <= 90;
+            }
+
+            if (v === null || v === undefined) return true;
+            return typeof v === 'number' && Number.isFinite(v) && v >= -90 && v <= 90;
+          },
+          message: 'Active delivery restaurants require a valid non-zero latitude between -90 and 90.',
+        },
+      },
+      longitude: {
+        type: Number,
+        default: null,
+        validate: {
+          validator: function (v) {
+            const doc = typeof this.ownerDocument === 'function' ? this.ownerDocument() : this;
+            const isDeliveryActive =
+              doc?.status === 'active' &&
+              doc?.deliverySettings?.deliveryEnabled !== false &&
+              doc?.orderTypes?.delivery !== false;
+
+            if (isDeliveryActive) {
+              if (v === null || v === undefined) return false;
+              if (v === 0 && (doc?.address?.latitude === 0 || doc?.address?.latitude === null)) return false;
+              return typeof v === 'number' && Number.isFinite(v) && v >= -180 && v <= 180;
+            }
+
+            if (v === null || v === undefined) return true;
+            return typeof v === 'number' && Number.isFinite(v) && v >= -180 && v <= 180;
+          },
+          message: 'Active delivery restaurants require a valid non-zero longitude between -180 and 180.',
+        },
+      },
     },
     phone: {
       type: String,
@@ -116,13 +160,14 @@ const RestaurantSchema = new mongoose.Schema(
     },
     rating: {
       type: Number,
-      default: 4.8,
-      min: 1,
+      default: null,
+      min: 0,
       max: 5,
     },
     numRatings: {
       type: Number,
-      default: 28,
+      default: 0,
+      min: 0,
     },
     openingHours: {
       type: String,
@@ -282,6 +327,49 @@ const RestaurantSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Validate geographical coordinates when a restaurant is active and offering delivery
+RestaurantSchema.pre('validate', function () {
+  const isDeliveryActive =
+    this.status === 'active' &&
+    this.deliverySettings?.deliveryEnabled !== false &&
+    this.orderTypes?.delivery !== false;
+
+  if (isDeliveryActive) {
+    const lat = this.address?.latitude;
+    const lng = this.address?.longitude;
+
+    if (lat === null || lat === undefined || lng === null || lng === undefined) {
+      this.invalidate(
+        'address.latitude',
+        'Active restaurants offering delivery require valid geographical coordinates (latitude and longitude).'
+      );
+      this.invalidate(
+        'address.longitude',
+        'Active restaurants offering delivery require valid geographical coordinates (latitude and longitude).'
+      );
+    } else if (
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180 ||
+      (lat === 0 && lng === 0)
+    ) {
+      this.invalidate(
+        'address.latitude',
+        'Active delivery restaurant coordinates must be valid non-zero geographical numbers (-90 to 90 lat, -180 to 180 lng).'
+      );
+      this.invalidate(
+        'address.longitude',
+        'Active delivery restaurant coordinates must be valid non-zero geographical numbers (-90 to 90 lat, -180 to 180 lng).'
+      );
+    }
+  }
+});
 
 if (mongoose.models.Restaurant) {
   delete mongoose.models.Restaurant;

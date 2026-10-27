@@ -70,6 +70,8 @@ const PaymentIntentSchema = new mongoose.Schema(
       amountPaise: { type: Number, default: 0 },
       currency: { type: String, default: "INR" },
       requestFingerprint: { type: String, default: null },
+      leaseToken: { type: String, default: null },
+      leaseGeneration: { type: Number, default: 0 },
       dispatchState: {
         type: String,
         enum: ["none", "prepared", "dispatching", "confirmed", "failed", "quarantined"],
@@ -81,6 +83,7 @@ const PaymentIntentSchema = new mongoose.Schema(
       amount: { type: Number, default: 0 },
       reason: { type: String, default: "" },
       error: { type: String, default: null },
+      initiatedBy: { type: String, default: null },
       retryCount: { type: Number, default: 0 },
       processedAt: { type: Date, default: null },
       lastAttemptAt: { type: Date, default: null },

@@ -20,6 +20,9 @@ let _testHttpTransport = null;
  * @param {Function|null} transportFn - async ({ url, method, headers, body }) => ({ status, data, headers })
  */
 export function _setTestHttpTransport(transportFn) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] HTTP transport test hook is forbidden in production environment.');
+  }
   _testHttpTransport = transportFn;
 }
 
@@ -27,6 +30,9 @@ export function _setTestHttpTransport(transportFn) {
  * Reset test transport hook to default.
  */
 export function _resetTestHttpTransport() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] HTTP transport reset test hook is forbidden in production environment.');
+  }
   _testHttpTransport = null;
 }
 

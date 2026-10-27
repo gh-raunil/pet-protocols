@@ -8,15 +8,26 @@ import PaymentIntent from '@/models/PaymentIntent';
 import { deductStockForOrder } from '@/lib/inventoryService';
 import { notifyOrderEvent } from '@/lib/pushService';
 import { _setTestRazorpayClient as _setRefundTestClient } from '@/lib/refundService';
+import { validateDeliveryServiceability } from '@/lib/geoDistance';
 import {
   razorpayHttpClient,
   computePayloadFingerprint,
   generateRefundIdempotencyKey,
 } from '@/lib/razorpayHttpClient';
+import {
+  generateGuestAccessToken,
+  deriveGuestAccessToken,
+  hashGuestAccessToken,
+  computeGuestTokenExpiry,
+} from '@/lib/guestAccessService';
+import { checkPaymentVerifyRateLimit } from '@/lib/rateLimit';
 
 // Optional override for automated testing
 let testRazorpayClient = null;
 export function _setTestRazorpayClient(client) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Razorpay test client hook is forbidden in production environment.');
+  }
   testRazorpayClient = client;
   _setRefundTestClient(client);
 }
@@ -35,6 +46,24 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, message: 'Missing Razorpay verification parameters' },
         { status: 400 }
+      );
+    }
+
+    // SEC-RL: Rate Limiting Protection (Order: 15/5m, IP: 30/5m)
+    const rateLimit = await checkPaymentVerifyRateLimit(razorpay_order_id, request);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RATE_LIMITED',
+          message: `Too many payment verification attempts. Please wait ${rateLimit.resetInSeconds} seconds before trying again.`,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetInSeconds),
+          },
+        }
       );
     }
 
@@ -88,6 +117,13 @@ export async function POST(request) {
       const expectedCount = paymentIntent.calcResult?.orders?.length || 1;
       if (existingOrders.length >= expectedCount) {
         const hasInventoryFailures = existingOrders.some((o) => o.stockDeducted === false);
+        let replayGuestToken = undefined;
+        if (!paymentIntent.user) {
+          replayGuestToken = deriveGuestAccessToken(
+            `${razorpay_order_id}:${razorpay_payment_id}`,
+            "pet-protocols:guest-payment-verify"
+          );
+        }
         return NextResponse.json(
           {
             success: true,
@@ -96,6 +132,7 @@ export async function POST(request) {
               : "Payment already verified and order confirmed.",
             order: existingOrders[0],
             orders: existingOrders,
+            guestAccessToken: replayGuestToken,
             inventoryDeducted: !hasInventoryFailures,
             reconciliationRequired: hasInventoryFailures,
           },
@@ -131,9 +168,34 @@ export async function POST(request) {
 
     // Step 3: Server-side validation against Razorpay API (SEC-01)
     const key_id = process.env.RAZORPAY_KEY_ID;
-    const razorpay =
-      testRazorpayClient ||
-      (key_id && secret ? new Razorpay({ key_id, key_secret: secret }) : null);
+    let razorpay = testRazorpayClient;
+    if (!razorpay) {
+      if (key_id?.startsWith("rzp_test_mock")) {
+        razorpay = {
+          orders: {
+            fetch: async (id) => ({
+              id,
+              amount: paymentIntent.amountPaise,
+              currency: "INR",
+              status: "paid",
+            }),
+          },
+          payments: {
+            fetch: async (id) => ({
+              id,
+              order_id: razorpay_order_id,
+              amount: paymentIntent.amountPaise,
+              currency: "INR",
+              status: "captured",
+              refund: async () => ({ id: `rfnd_mock_${Date.now()}`, status: "processed" }),
+            }),
+            refund: async () => ({ id: `rfnd_mock_${Date.now()}`, status: "processed" }),
+          },
+        };
+      } else if (key_id && secret) {
+        razorpay = new Razorpay({ key_id, key_secret: secret });
+      }
+    }
 
     if (!razorpay) {
       return NextResponse.json(
@@ -237,12 +299,20 @@ export async function POST(request) {
         .populate("user", "name email");
 
       if (existingOrders.length > 0) {
+        let replayGuestToken = undefined;
+        if (!lockedIntent.user) {
+          replayGuestToken = deriveGuestAccessToken(
+            `${razorpay_order_id}:${razorpay_payment_id}`,
+            "pet-protocols:guest-payment-verify"
+          );
+        }
         return NextResponse.json(
           {
             success: true,
             message: "Payment already verified and order confirmed.",
             order: existingOrders[0],
             orders: existingOrders,
+            guestAccessToken: replayGuestToken,
           },
           { status: 200 }
         );
@@ -254,21 +324,39 @@ export async function POST(request) {
       );
     }
 
-    // Step 5: Check Restaurant Status from Live Database (SEC-02 Safe Refund Workflow)
+    // Step 5: Check Restaurant Status & Delivery Serviceability from Live Database (SEC-02 Safe Refund Workflow)
     const subOrders = lockedIntent.calcResult?.orders || [];
-    let suspendedOrInactiveRest = null;
+    let unserviceableOrInactiveRest = null;
+    let unserviceableReason = null;
+    let unserviceableUserMessage = null;
 
     for (const calcOrder of subOrders) {
       const restDoc = await Restaurant.findById(calcOrder.restaurantId).lean();
       if (!restDoc || restDoc.status === 'suspended' || restDoc.status === 'inactive') {
-        suspendedOrInactiveRest = restDoc || { name: 'Kitchen branch', status: 'suspended' };
+        unserviceableOrInactiveRest = restDoc || { name: 'Kitchen branch', status: 'suspended' };
+        unserviceableReason = restDoc?.status === 'suspended' ? 'restaurant_suspended' : 'restaurant_inactive';
+        unserviceableUserMessage = `${unserviceableOrInactiveRest.name || 'This kitchen'} is currently ${restDoc?.status === 'suspended' ? 'suspended' : 'inactive'}`;
+        break;
+      }
+
+      // Live serviceability re-validation at final order-creation boundary
+      const serviceability = validateDeliveryServiceability({
+        restaurant: restDoc,
+        orderType: lockedIntent.orderType,
+        address: lockedIntent.address,
+      });
+
+      if (!serviceability.isServiceable) {
+        unserviceableOrInactiveRest = restDoc;
+        unserviceableReason = serviceability.code || 'out_of_delivery_range';
+        unserviceableUserMessage = serviceability.message;
         break;
       }
     }
 
-    if (suspendedOrInactiveRest) {
-      const isSuspended = suspendedOrInactiveRest.status === 'suspended';
-      const restName = suspendedOrInactiveRest.name || 'This kitchen';
+    if (unserviceableOrInactiveRest) {
+      const isSuspended = unserviceableOrInactiveRest.status === 'suspended';
+      const restName = unserviceableOrInactiveRest.name || 'This kitchen';
 
       const opKey = lockedIntent.refundDetails?.opKey || `refop_pi_${lockedIntent._id.toString()}`;
       const idempotencyKey = lockedIntent.refundDetails?.idempotencyKey || generateRefundIdempotencyKey('pi', lockedIntent._id);
@@ -277,7 +365,7 @@ export async function POST(request) {
         opKey,
         paymentIntentId: lockedIntent._id.toString(),
         razorpay_order_id,
-        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        reason: unserviceableReason,
         restaurant: restName,
       };
 
@@ -289,6 +377,9 @@ export async function POST(request) {
         receipt: razorpay_order_id || '',
       };
       const requestFingerprint = computePayloadFingerprint(refundPayload);
+
+      const effectiveReason = unserviceableReason || (isSuspended ? 'restaurant_suspended' : 'restaurant_inactive');
+      const effectiveUserDetail = unserviceableUserMessage || `${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}`;
 
       // Record durable dispatching state before calling refund API (SEC-02 / SEC-05)
       lockedIntent.status = 'refund_pending';
@@ -303,7 +394,7 @@ export async function POST(request) {
         status: 'refund_pending',
         gatewayStatus: null,
         amount: lockedIntent.amount,
-        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        reason: effectiveReason,
         error: null,
         retryCount: (lockedIntent.refundDetails?.retryCount || 0) + 1,
         lastAttemptAt: new Date(),
@@ -343,7 +434,7 @@ export async function POST(request) {
           gatewayStatus: 'processed',
           refundId: existingRefundId,
           amount: lockedIntent.amount,
-          reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+          reason: effectiveReason,
           processedAt: new Date(),
           reconciled: true,
           requiresManualReconciliation: false,
@@ -356,7 +447,7 @@ export async function POST(request) {
             suspended: isSuspended,
             refundStatus: 'processed',
             refundId: existingRefundId,
-            message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Your refund of ₹${lockedIntent.amount} was already processed via Razorpay (Refund ID: ${existingRefundId}).`,
+            message: `Payment received (${razorpay_payment_id}), but ${effectiveUserDetail}. Your refund of ₹${lockedIntent.amount} was already processed via Razorpay (Refund ID: ${existingRefundId}).`,
           },
           { status: 400 }
         );
@@ -404,7 +495,7 @@ export async function POST(request) {
           status: refundResponse.status || 'processed',
           gatewayStatus: refundResponse.status || 'processed',
           amount: lockedIntent.amount,
-          reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+          reason: effectiveReason,
           processedAt: new Date(),
           reconciled: true,
           error: null,
@@ -418,7 +509,7 @@ export async function POST(request) {
             suspended: isSuspended,
             refundStatus: 'processed',
             refundId: refundResponse.refundId,
-            message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Your refund of ₹${lockedIntent.amount} has been processed via Razorpay (Refund ID: ${refundResponse.refundId}).`,
+            message: `Payment received (${razorpay_payment_id}), but ${effectiveUserDetail}. Your refund of ₹${lockedIntent.amount} has been processed via Razorpay (Refund ID: ${refundResponse.refundId}).`,
           },
           { status: 400 }
         );
@@ -434,7 +525,7 @@ export async function POST(request) {
         status: 'reconciliation_required',
         gatewayStatus: 'failed',
         amount: lockedIntent.amount,
-        reason: isSuspended ? 'restaurant_suspended' : 'restaurant_inactive',
+        reason: effectiveReason,
         error: refundResponse?.error || 'Refund dispatch failed or uncertain',
         requiresManualReconciliation: true,
         lastAttemptAt: new Date(),
@@ -447,7 +538,7 @@ export async function POST(request) {
           suspended: isSuspended,
           refundStatus: 'reconciliation_required',
           requiresManualReconciliation: true,
-          message: `Payment received (${razorpay_payment_id}), but ${restName} is currently ${isSuspended ? 'suspended' : 'inactive'}. Refund outcome is uncertain and has been queued for manual reconciliation (Reference: ${razorpay_order_id}). Customer support has been notified.`,
+          message: `Payment received (${razorpay_payment_id}), but ${effectiveUserDetail}. Refund outcome is uncertain and has been queued for manual reconciliation (Reference: ${razorpay_order_id}). Customer support has been notified.`,
         },
         { status: 400 }
       );
@@ -458,6 +549,24 @@ export async function POST(request) {
     const createdOrders = [];
     const isPickup = lockedIntent.orderType === 'pickup';
     const notes = lockedIntent.notes || '';
+
+    // Generate cryptographically secure guest-order access credential if guest checkout
+    let guestAccessToken = null;
+    let guestAccessRecord = null;
+    if (!lockedIntent.user) {
+      guestAccessToken = deriveGuestAccessToken(
+        `${razorpay_order_id}:${razorpay_payment_id}`,
+        "pet-protocols:guest-payment-verify"
+      );
+      const tokenHash = hashGuestAccessToken(guestAccessToken);
+      const expiresAt = computeGuestTokenExpiry();
+      guestAccessRecord = {
+        tokenHash,
+        issuedAt: new Date(),
+        expiresAt,
+        isRevoked: false,
+      };
+    }
 
     try {
       for (const calcOrder of subOrders) {
@@ -470,6 +579,7 @@ export async function POST(request) {
           try {
             orderDoc = await Order.create({
               user: lockedIntent.user, // SEC-05: Server-verified user identity only
+              ...(guestAccessRecord ? { guestAccess: guestAccessRecord } : {}),
               restaurant: calcOrder.restaurantId,
               items: calcOrder.items,
               address: lockedIntent.address,
@@ -483,6 +593,8 @@ export async function POST(request) {
               paymentStatus: 'paid',
               paymentMethod: 'Razorpay (Online Payment)',
               status: 'pending',
+              orderType: lockedIntent.orderType === 'pickup' ? 'pickup' : 'delivery',
+              deliveryDistanceKm: calcOrder.deliveryDistanceKm ?? null,
               notes: isPickup ? `[PICKUP] ${notes}` : notes,
             });
           } catch (createErr) {
@@ -538,6 +650,7 @@ export async function POST(request) {
             : "Payment verified and order placed successfully!",
           order: createdOrders[0],
           orders: createdOrders,
+          guestAccessToken: guestAccessToken || undefined,
           inventoryDeducted: !hasInventoryFailures,
           reconciliationRequired: hasInventoryFailures,
         },
@@ -552,6 +665,13 @@ export async function POST(request) {
           .populate("user", "name email");
 
         const hasInventoryFailures = existingOrders.some((o) => o.stockDeducted === false);
+        let replayGuestToken = undefined;
+        if (!lockedIntent.user) {
+          replayGuestToken = deriveGuestAccessToken(
+            `${razorpay_order_id}:${razorpay_payment_id}`,
+            "pet-protocols:guest-payment-verify"
+          );
+        }
         return NextResponse.json(
           {
             success: true,
@@ -560,6 +680,7 @@ export async function POST(request) {
               : "Payment already verified and order confirmed.",
             order: existingOrders[0],
             orders: existingOrders,
+            guestAccessToken: replayGuestToken,
             inventoryDeducted: !hasInventoryFailures,
             reconciliationRequired: hasInventoryFailures,
           },

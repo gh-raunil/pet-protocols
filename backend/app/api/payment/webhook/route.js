@@ -9,6 +9,9 @@ let _testWebhookSecret = null;
 let _testWebhookPreUpdateHook = null;
 
 export function _setTestWebhookSecret(secret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Webhook secret test hook is forbidden in production environment.');
+  }
   _testWebhookSecret = secret;
 }
 

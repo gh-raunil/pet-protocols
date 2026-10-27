@@ -2,6 +2,7 @@ import connectDB from './db.js';
 import Product from '../models/Product.js';
 import Restaurant from '../models/Restaurant.js';
 import Offer from '../models/Offer.js';
+import { validateDeliveryServiceability } from './geoDistance.js';
 
 /**
  * Authoritative Server-Side Checkout Calculation & Validation Service
@@ -9,17 +10,19 @@ import Offer from '../models/Offer.js';
  * Enforces:
  * 1. Product existence, pricing, availability, and owning restaurant.
  * 2. Restaurant status (must be active, not suspended/inactive, and accepting orders).
- * 3. Minimum order limit configured by the restaurant.
- * 4. Delivery fee vs free delivery threshold vs pickup.
- * 5. Coupon code existence, active status, validity window, min order, and restaurant applicability.
- * 6. Calculates authoritative subtotal, deliveryFee, discount, and totalAmount.
+ * 3. Delivery serviceability (valid coordinates, within deliveryRadiusKm, pickup exemption).
+ * 4. Minimum order limit configured by the restaurant.
+ * 5. Delivery fee vs free delivery threshold vs pickup.
+ * 6. Coupon code existence, active status, validity window, min order, and restaurant applicability.
+ * 7. Calculates authoritative subtotal, deliveryFee, discount, and totalAmount.
  * 
- * Never trusts client-submitted discount or total amount.
+ * Never trusts client-submitted discount, distance, eligibility, or total amount.
  */
 export async function calculateOrderDetails({
   items,
   orderType = 'delivery',
   couponCode = '',
+  address = undefined,
 }) {
   await connectDB();
 
@@ -224,12 +227,33 @@ export async function calculateOrderDetails({
     // Subtotal from authoritative DB prices + add-ons
     const restSubtotal = restItems.reduce((sum, it) => sum + (it.price + (it.optionsTotal || 0)) * it.quantity, 0);
 
+    // Phase 2.2: Authoritative Server-Side Delivery Serviceability Validation
+    let serviceabilityResult = null;
+    if (address !== undefined) {
+      serviceabilityResult = validateDeliveryServiceability({
+        restaurant: restDoc,
+        orderType,
+        address,
+      });
+
+      if (!serviceabilityResult.isServiceable) {
+        return {
+          success: false,
+          status: 400,
+          code: serviceabilityResult.code || 'OUT_OF_DELIVERY_RANGE',
+          message: serviceabilityResult.message,
+          serviceability: serviceabilityResult,
+        };
+      }
+    }
+
     // Minimum order check
     const minOrder = restDoc?.orderLimits?.minOrderAmount ?? 0;
     if (minOrder > 0 && restSubtotal < minOrder) {
       return {
         success: false,
         status: 400,
+        code: 'MINIMUM_ORDER_NOT_MET',
         message: `Minimum order amount for ${restDoc.name || 'this kitchen'} is ₹${minOrder}. Please add more items.`,
       };
     }
@@ -250,6 +274,8 @@ export async function calculateOrderDetails({
       couponCode: '',
       totalAmount: restSubtotal + restDeliveryFee,
       qualifyingSubtotal: restSubtotal, // baseline qualifying items
+      serviceability: serviceabilityResult,
+      deliveryDistanceKm: serviceabilityResult?.distanceKm ?? null,
     });
   }
 

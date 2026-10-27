@@ -17,22 +17,37 @@ let _testRefundPauseHook = null;
 let _testRefundPostCheckPauseHook = null;
 
 export function _setTestRazorpayClient(client) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Razorpay test client hook is forbidden in production environment.');
+  }
   _testRazorpayClient = client;
 }
 
 export function _setTestHttpTransport(fn) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] HTTP transport test hook is forbidden in production environment.');
+  }
   _setClientTestHttpTransport(fn);
 }
 
 export function _resetTestHttpTransport() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] HTTP transport reset test hook is forbidden in production environment.');
+  }
   _resetClientTestHttpTransport();
 }
 
 export function _setTestRefundPauseHook(fn) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Refund pause test hook is forbidden in production environment.');
+  }
   _testRefundPauseHook = fn;
 }
 
 export function _setTestRefundPostCheckPauseHook(fn) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Refund post-check pause test hook is forbidden in production environment.');
+  }
   _testRefundPostCheckPauseHook = fn;
 }
 
@@ -94,15 +109,40 @@ async function getGatewayRefundsAndPayment(razorpay, paymentId) {
 /**
  * Reconcile PaymentIntent document status based on order refund state.
  */
-async function reconcilePaymentIntent(lockedOrder, refundId, refundStatus, reason, error = null) {
+export async function reconcilePaymentIntent(lockedOrder, refundId, refundStatus, reason, error = null) {
   try {
-    const intent = await PaymentIntent.findOne({
-      $or: [
-        { razorpayOrderId: lockedOrder.orderId },
-        { razorpayPaymentId: lockedOrder.paymentId },
-        { createdOrders: lockedOrder._id },
-      ],
-    });
+    let intent = null;
+
+    // 1. Authoritative relationship: check if lockedOrder._id is recorded in createdOrders
+    if (lockedOrder._id) {
+      intent = await PaymentIntent.findOne({ createdOrders: lockedOrder._id });
+    }
+
+    // 2. Gateway identifier fallbacks: only if not found by direct relation
+    if (!intent) {
+      const candidates = [];
+      // Only query razorpayPaymentId if lockedOrder.paymentId is a real gateway payment ID
+      if (
+        lockedOrder.paymentId &&
+        typeof lockedOrder.paymentId === "string" &&
+        lockedOrder.paymentId.startsWith("pay_")
+      ) {
+        candidates.push({ razorpayPaymentId: lockedOrder.paymentId });
+      }
+
+      // Only query razorpayOrderId if lockedOrder.orderId is a real gateway order ID (not internal ORD_...)
+      if (
+        lockedOrder.orderId &&
+        typeof lockedOrder.orderId === "string" &&
+        lockedOrder.orderId.startsWith("order_")
+      ) {
+        candidates.push({ razorpayOrderId: lockedOrder.orderId });
+      }
+
+      if (candidates.length > 0) {
+        intent = await PaymentIntent.findOne({ $or: candidates });
+      }
+    }
 
     if (intent) {
       if (intent.status === "refunded" && refundStatus !== "processed") {
@@ -127,7 +167,7 @@ async function reconcilePaymentIntent(lockedOrder, refundId, refundStatus, reaso
         refundId: refundId || intent.refundDetails?.refundId || null,
         status: refundStatus,
         dispatchState: refundStatus === "processed" ? "confirmed" : refundStatus === "reconciliation_required" ? "quarantined" : "dispatching",
-        amount: lockedOrder.totalAmount,
+        amount: intent.amount || lockedOrder.totalAmount,
         reason,
         error: error || null,
         processedAt: refundStatus === "processed" ? new Date() : null,
@@ -724,6 +764,594 @@ export async function releaseRefundLease(orderId, leaseToken) {
 }
 
 /**
+ * Safe, crash-resilient, idempotent refund execution for a PaymentIntent without orders.
+ * (e.g., checkout failure during verification where payment was captured but restaurant inactive/unserviceable).
+ *
+ * Hardened Architecture:
+ * 1. Idempotency Check: Returns alreadyRefunded if status === 'refunded' or refundDetails.status === 'processed'.
+ * 2. Quarantine Guard: Rejects redispatch if in 'reconciliation_required' or 'quarantined' state.
+ * 3. Eligibility Check: Verifies status is 'refund_pending' and createdOrders is empty.
+ * 4. Payment & Amount Validation: Checks razorpayPaymentId and amountPaise.
+ * 5. Deterministic OpKey & Request Fingerprint: Quarantines on payload mutation for existing idempotency key.
+ * 6. Atomic Lease Acquisition: 30s TTL lock with unique leaseToken and leaseGeneration increment.
+ * 7. Gateway Reconciliation Prior to Retry:
+ *    - Reconciles without calling refund API if gateway already completed refund.
+ *    - Takeover Defense: Aborts and quarantines if taking over an in-flight 'dispatching' lease and gateway shows 0 refund.
+ * 8. Fenced Execution: Validates leaseToken before and after gateway invocation.
+ * 9. Post-Error Reconciliation: Checks gateway state immediately if dispatch throws an uncertain error.
+ */
+export async function executePaymentIntentRefund({
+  paymentIntentId,
+  reason = "PaymentIntent refund",
+  initiatedBy = "system",
+}) {
+  await connectDB();
+
+  const intent = await PaymentIntent.findById(paymentIntentId);
+  if (!intent) {
+    return { success: false, message: "PaymentIntent not found" };
+  }
+
+  // 1. Idempotency Check
+  if (intent.status === "refunded" || intent.refundDetails?.status === "processed") {
+    return {
+      success: true,
+      alreadyRefunded: true,
+      refundId: intent.refundDetails?.refundId,
+      message: "PaymentIntent refund already processed.",
+    };
+  }
+
+  // 2. Quarantine Guard: Redispatch is prohibited for ambiguous / quarantined records
+  if (
+    intent.status === "reconciliation_required" ||
+    intent.refundDetails?.status === "reconciliation_required" ||
+    intent.refundDetails?.dispatchState === "quarantined" ||
+    intent.refundDetails?.requiresManualReconciliation
+  ) {
+    return {
+      success: false,
+      status: "reconciliation_required",
+      requiresManualReconciliation: true,
+      message: "PaymentIntent is in reconciliation_required state. Redispatch is prohibited. Manual reconciliation required.",
+    };
+  }
+
+  // 3. Eligibility Check
+  if (intent.status !== "refund_pending") {
+    return {
+      success: false,
+      notApplicable: true,
+      message: `PaymentIntent status '${intent.status}' does not require gateway refund.`,
+    };
+  }
+
+  if (Array.isArray(intent.createdOrders) && intent.createdOrders.length > 0) {
+    return {
+      success: false,
+      notApplicable: true,
+      message: "PaymentIntent has associated Order documents. Refund must be processed via Order refund recovery.",
+    };
+  }
+
+  // 4. Validate paymentId and amountPaise
+  const paymentId = intent.razorpayPaymentId || intent.refundDetails?.paymentId;
+  if (!paymentId) {
+    await PaymentIntent.updateOne(
+      { _id: intent._id },
+      {
+        $set: {
+          status: "reconciliation_required",
+          "refundDetails.status": "failed",
+          "refundDetails.dispatchState": "quarantined",
+          "refundDetails.error": "PaymentIntent has no razorpayPaymentId recorded for online refund.",
+          "refundDetails.requiresManualReconciliation": true,
+          "refundDetails.lastAttemptAt": new Date(),
+        },
+      }
+    );
+    return {
+      success: false,
+      status: "reconciliation_required",
+      requiresManualReconciliation: true,
+      message: "PaymentIntent has no razorpayPaymentId recorded for online refund.",
+    };
+  }
+
+  const amountPaise = intent.amountPaise || Math.round((intent.amount || 0) * 100);
+  if (!amountPaise || amountPaise <= 0) {
+    return { success: false, message: "PaymentIntent has invalid refund amount." };
+  }
+
+  // 5. Stable Idempotency Key & Request Fingerprint
+  const idempotencyKey = intent.refundDetails?.idempotencyKey || generateRefundIdempotencyKey("pi", intent._id);
+  const opKey = intent.refundDetails?.opKey || `refop_pi_${intent._id.toString()}`;
+  const refundNotes = {
+    opKey,
+    paymentIntentId: intent._id.toString(),
+    razorpayOrderId: intent.razorpayOrderId || "",
+    reason: intent.refundDetails?.reason || reason,
+    initiatedBy: intent.refundDetails?.initiatedBy || initiatedBy,
+  };
+  const refundPayload = {
+    amount: amountPaise,
+    currency: intent.currency || "INR",
+    speed: "normal",
+    notes: refundNotes,
+    receipt: intent.razorpayOrderId || intent._id.toString(),
+  };
+  const requestFingerprint = computePayloadFingerprint(refundPayload);
+
+  if (intent.refundDetails?.requestFingerprint && intent.refundDetails.requestFingerprint !== requestFingerprint) {
+    await PaymentIntent.updateOne(
+      { _id: intent._id },
+      {
+        $set: {
+          status: "reconciliation_required",
+          "refundDetails.status": "reconciliation_required",
+          "refundDetails.dispatchState": "quarantined",
+          "refundDetails.error": "Payload mismatch: Attempted refund with modified parameters for existing idempotency key.",
+          "refundDetails.requiresManualReconciliation": true,
+          "refundDetails.lastAttemptAt": new Date(),
+        },
+      }
+    );
+    return {
+      success: false,
+      status: "reconciliation_required",
+      requiresManualReconciliation: true,
+      message: "Refund payload altered for existing idempotency key. Operation quarantined to prevent duplicate or corrupted refund.",
+    };
+  }
+
+  // 6. Atomic Lease Acquisition & Fencing
+  const lockExpiry = new Date(Date.now() - 30000); // 30-second TTL
+  const leaseToken = crypto.randomUUID();
+
+  const lockedIntent = await PaymentIntent.findOneAndUpdate(
+    {
+      _id: intent._id,
+      status: "refund_pending",
+      "refundDetails.requiresManualReconciliation": { $ne: true },
+      "refundDetails.dispatchState": { $ne: "quarantined" },
+      $or: [
+        { "refundDetails.status": { $in: ["none", "pending", "failed", null] } },
+        { "refundDetails.status": { $exists: false } },
+        {
+          "refundDetails.status": { $in: ["processing", "refund_pending"] },
+          $or: [
+            { "refundDetails.lastAttemptAt": { $lt: lockExpiry } },
+            { "refundDetails.lastAttemptAt": null },
+            { "refundDetails.lastAttemptAt": { $exists: false } },
+          ],
+        },
+      ],
+    },
+    {
+      $set: {
+        status: "refund_pending",
+        "refundDetails.status": "processing",
+        "refundDetails.dispatchState": "dispatching",
+        "refundDetails.leaseToken": leaseToken,
+        "refundDetails.opKey": opKey,
+        "refundDetails.idempotencyKey": idempotencyKey,
+        "refundDetails.paymentId": paymentId,
+        "refundDetails.amountPaise": amountPaise,
+        "refundDetails.currency": intent.currency || "INR",
+        "refundDetails.requestFingerprint": requestFingerprint,
+        "refundDetails.initiatedBy": intent.refundDetails?.initiatedBy || initiatedBy,
+        "refundDetails.reason": intent.refundDetails?.reason || reason,
+        "refundDetails.lastAttemptAt": new Date(),
+      },
+      $inc: {
+        "refundDetails.leaseGeneration": 1,
+        "refundDetails.retryCount": 1,
+      },
+    },
+    { returnDocument: "after" }
+  );
+
+  if (!lockedIntent) {
+    const fresh = await PaymentIntent.findById(intent._id);
+    if (fresh?.status === "refunded" || fresh?.refundDetails?.status === "processed") {
+      return {
+        success: true,
+        alreadyRefunded: true,
+        refundId: fresh.refundDetails?.refundId,
+        message: "PaymentIntent refund already processed.",
+      };
+    }
+    if (
+      fresh?.status === "reconciliation_required" ||
+      fresh?.refundDetails?.status === "reconciliation_required" ||
+      fresh?.refundDetails?.requiresManualReconciliation
+    ) {
+      return {
+        success: false,
+        status: "reconciliation_required",
+        requiresManualReconciliation: true,
+        message: "PaymentIntent is in reconciliation_required state. Redispatch is prohibited. Manual reconciliation required.",
+      };
+    }
+    return {
+      success: false,
+      inProgress: true,
+      message: "PaymentIntent refund is currently processing by another worker.",
+    };
+  }
+
+  // 7. Gateway Client Check
+  const razorpay = getRazorpayClient();
+  if (!razorpay) {
+    await PaymentIntent.updateOne(
+      { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+      {
+        $set: {
+          status: "refund_pending",
+          "refundDetails.status": "pending",
+          "refundDetails.dispatchState": "failed",
+          "refundDetails.error": "Payment gateway client not configured",
+          "refundDetails.leaseToken": null,
+        },
+      }
+    );
+    return {
+      success: false,
+      status: "refund_pending",
+      message: "Razorpay client not configured on server. Marked refund_pending.",
+    };
+  }
+
+  // 8. Gateway Reconciliation Prior to Retry & Takeover Defense
+  const isRecoveredAttempt =
+    intent.refundDetails?.status === "processing" ||
+    intent.refundDetails?.dispatchState === "dispatching" ||
+    (intent.refundDetails?.retryCount || 0) > 0 ||
+    intent.status === "refund_pending";
+
+  const isPreviousDispatching =
+    intent.refundDetails?.dispatchState === "dispatching" ||
+    intent.refundDetails?.status === "processing";
+
+  if (isRecoveredAttempt) {
+    try {
+      const { paymentEntity, refundsList } = await getGatewayRefundsAndPayment(razorpay, paymentId);
+
+      const specificRefund = refundsList.find((r) =>
+        r?.id === lockedIntent.refundDetails?.refundId ||
+        r?.notes?.opKey === opKey ||
+        r?.notes?.paymentIntentId === lockedIntent._id.toString() ||
+        r?.notes?.razorpay_order_id === lockedIntent.razorpayOrderId
+      );
+
+      let isFullyRefunded = false;
+      let reconciledRefundId = null;
+
+      if (specificRefund) {
+        isFullyRefunded = true;
+        reconciledRefundId = specificRefund.id;
+      } else if (refundsList.length > 1) {
+        // Multiple refunds on gateway without notes: ambiguous!
+        throw new Error(
+          `Multiple refunds found on gateway for payment ${paymentId} without matching notes. Quarantine required.`
+        );
+      } else if (
+        refundsList.length === 1 &&
+        refundsList[0].amount === amountPaise &&
+        ((paymentEntity.amount_refunded && paymentEntity.amount_refunded >= amountPaise) ||
+          paymentEntity.refund_status === "full" ||
+          paymentEntity.status === "refunded")
+      ) {
+        isFullyRefunded = true;
+        reconciledRefundId = refundsList[0].id;
+      } else if (
+        refundsList.length === 0 &&
+        paymentEntity &&
+        paymentEntity.amount_refunded === amountPaise &&
+        (paymentEntity.refund_status === "full" || paymentEntity.status === "refunded")
+      ) {
+        isFullyRefunded = true;
+        reconciledRefundId = paymentEntity.refundId || `rfnd_reconciled_${Date.now()}`;
+      }
+
+      // Conservative Takeover Defense:
+      // If taking over an expired lease where previous state was in-flight dispatching, and gateway shows NO matching refund:
+      if (isPreviousDispatching && !isFullyRefunded) {
+        throw new Error(
+          "Takeover aborted: previous PaymentIntent refund attempt was in-flight at lease expiry. Queued for safe reconciliation."
+        );
+      }
+
+      if (isFullyRefunded) {
+        // Gateway already executed the refund! Reconcile directly without duplicate call
+        const updateRes = await PaymentIntent.updateOne(
+          { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+          {
+            $set: {
+              status: "refunded",
+              "refundDetails.status": "processed",
+              "refundDetails.dispatchState": "confirmed",
+              "refundDetails.refundId": reconciledRefundId,
+              "refundDetails.amount": lockedIntent.amount,
+              "refundDetails.processedAt": new Date(),
+              "refundDetails.reconciled": true,
+              "refundDetails.error": null,
+              "refundDetails.requiresManualReconciliation": false,
+              "refundDetails.leaseToken": null,
+            },
+          }
+        );
+
+        if (updateRes.matchedCount === 0) {
+          return {
+            success: false,
+            aborted: true,
+            message: "Worker lease superseded during PaymentIntent refund reconciliation.",
+          };
+        }
+
+        return {
+          success: true,
+          reconciled: true,
+          alreadyRefunded: true,
+          refundId: reconciledRefundId,
+          status: "processed",
+          message: `PaymentIntent refund of ₹${lockedIntent.amount} verified via gateway reconciliation (Refund ID: ${reconciledRefundId}).`,
+        };
+      }
+    } catch (fetchErr) {
+      const errMsg = fetchErr?.message || fetchErr?.error?.description || String(fetchErr);
+      await PaymentIntent.updateOne(
+        { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+        {
+          $set: {
+            status: "reconciliation_required",
+            "refundDetails.status": "reconciliation_required",
+            "refundDetails.dispatchState": "quarantined",
+            "refundDetails.error": errMsg,
+            "refundDetails.requiresManualReconciliation": true,
+            "refundDetails.lastAttemptAt": new Date(),
+            "refundDetails.leaseToken": null,
+          },
+        }
+      );
+
+      return {
+        success: false,
+        status: "reconciliation_required",
+        requiresManualReconciliation: true,
+        error: errMsg,
+        message: errMsg.includes("Takeover aborted")
+          ? errMsg
+          : `Unable to verify existing gateway refund state: ${errMsg}. Queued for manual reconciliation.`,
+      };
+    }
+  }
+
+  // 9. Fencing Pre-Check before calling Gateway
+  if (typeof _testRefundPauseHook === "function") {
+    await _testRefundPauseHook({ paymentIntentId: lockedIntent._id, leaseToken });
+  }
+
+  const preCheck = await PaymentIntent.findOne({ _id: intent._id, "refundDetails.leaseToken": leaseToken });
+  if (!preCheck) {
+    return {
+      success: false,
+      aborted: true,
+      message: "Worker lease expired or superseded during pause before gateway refund call.",
+    };
+  }
+
+  if (typeof _testRefundPostCheckPauseHook === "function") {
+    await _testRefundPostCheckPauseHook({ paymentIntentId: lockedIntent._id, leaseToken });
+  }
+
+  // 10. Execute Gateway Refund
+  let refundRes;
+  let refundId;
+  let refundStatus;
+
+  if (_testRazorpayClient && typeof _testRazorpayClient.payments?.refund === "function") {
+    try {
+      const rawRes = await _testRazorpayClient.payments.refund(
+        paymentId,
+        {
+          amount: amountPaise,
+          speed: "normal",
+          receipt: lockedIntent.razorpayOrderId || lockedIntent._id.toString(),
+          notes: refundNotes,
+        },
+        {
+          headers: {
+            "X-Refund-Idempotency": idempotencyKey,
+          },
+        }
+      );
+      refundId = rawRes?.id || `rfnd_${Date.now()}`;
+      refundStatus = rawRes?.status || "processed";
+      refundRes = { success: true, refundId, status: refundStatus, refund: rawRes };
+    } catch (mockErr) {
+      refundRes = {
+        success: false,
+        uncertain: true,
+        error: mockErr.message,
+      };
+    }
+  } else {
+    refundRes = await razorpayHttpClient.executeRefund({
+      paymentId,
+      amountPaise,
+      idempotencyKey,
+      notes: refundNotes,
+      speed: "normal",
+      receipt: lockedIntent.razorpayOrderId || lockedIntent._id.toString(),
+    });
+    refundId = refundRes.refundId;
+    refundStatus = refundRes.status;
+  }
+
+  // 11. Handle Response
+  if (refundRes.success) {
+    const finalRefundId = refundId || `rfnd_${Date.now()}`;
+    const finalRefundStatus = refundStatus || "processed";
+
+    const saveRes = await PaymentIntent.updateOne(
+      { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+      {
+        $set: {
+          status: "refunded",
+          "refundDetails.status": "processed",
+          "refundDetails.dispatchState": "confirmed",
+          "refundDetails.refundId": finalRefundId,
+          "refundDetails.gatewayStatus": finalRefundStatus,
+          "refundDetails.amount": lockedIntent.amount,
+          "refundDetails.processedAt": new Date(),
+          "refundDetails.error": null,
+          "refundDetails.requiresManualReconciliation": false,
+          "refundDetails.leaseToken": null,
+        },
+      }
+    );
+
+    if (saveRes.matchedCount === 0) {
+      return {
+        success: false,
+        aborted: true,
+        message: "Worker lease superseded during gateway response processing.",
+      };
+    }
+
+    return {
+      success: true,
+      refundId: finalRefundId,
+      status: "processed",
+      message: `PaymentIntent refund of ₹${lockedIntent.amount} processed successfully (Refund ID: ${finalRefundId}).`,
+    };
+  }
+
+  // 12. Post-Error Reconciliation
+  let reconciledSuccess = false;
+  let reconciledRefundId = null;
+
+  try {
+    const { paymentEntity: postEntity, refundsList: postRefunds } = await getGatewayRefundsAndPayment(razorpay, paymentId);
+    const specificRefund = postRefunds.find((r) =>
+      r?.id === lockedIntent.refundDetails?.refundId ||
+      r?.notes?.opKey === opKey ||
+      r?.notes?.paymentIntentId === lockedIntent._id.toString() ||
+      r?.notes?.razorpay_order_id === lockedIntent.razorpayOrderId
+    );
+
+    if (specificRefund) {
+      reconciledSuccess = true;
+      reconciledRefundId = specificRefund.id;
+    } else if (
+      postEntity &&
+      ((postEntity.amount_refunded && postEntity.amount_refunded >= amountPaise) ||
+        postEntity.refund_status === "full" ||
+        postEntity.status === "refunded")
+    ) {
+      reconciledSuccess = true;
+      reconciledRefundId = postRefunds?.[0]?.id || postEntity?.refunds?.[0]?.id || `rfnd_reconciled_${Date.now()}`;
+    }
+  } catch (postReconErr) {
+    console.warn(`[RefundService] Warning during post-error reconciliation check for PaymentIntent ${intent._id}:`, postReconErr.message);
+  }
+
+  if (reconciledSuccess) {
+    await PaymentIntent.updateOne(
+      { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+      {
+        $set: {
+          status: "refunded",
+          "refundDetails.status": "processed",
+          "refundDetails.dispatchState": "confirmed",
+          "refundDetails.refundId": reconciledRefundId,
+          "refundDetails.gatewayStatus": "processed",
+          "refundDetails.amount": lockedIntent.amount,
+          "refundDetails.processedAt": new Date(),
+          "refundDetails.reconciled": true,
+          "refundDetails.error": null,
+          "refundDetails.requiresManualReconciliation": false,
+          "refundDetails.leaseToken": null,
+        },
+      }
+    );
+    return {
+      success: true,
+      reconciled: true,
+      refundId: reconciledRefundId,
+      status: "processed",
+      message: `Refund completed on gateway despite client communication error (Reconciled Refund ID: ${reconciledRefundId}).`,
+    };
+  }
+
+  const isUncertain = refundRes.uncertain || refundRes.code === "GATEWAY_TIMEOUT" || refundRes.statusCode >= 500;
+  const errorMsg = refundRes.error || "Refund execution failed";
+
+  if (isUncertain) {
+    await PaymentIntent.updateOne(
+      { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+      {
+        $set: {
+          status: "reconciliation_required",
+          "refundDetails.status": "reconciliation_required",
+          "refundDetails.dispatchState": "quarantined",
+          "refundDetails.gatewayStatus": "uncertain",
+          "refundDetails.error": errorMsg,
+          "refundDetails.requiresManualReconciliation": true,
+          "refundDetails.lastAttemptAt": new Date(),
+          "refundDetails.leaseToken": null,
+        },
+      }
+    );
+    return {
+      success: false,
+      status: "reconciliation_required",
+      requiresManualReconciliation: true,
+      message: `Gateway refund returned uncertain outcome: ${errorMsg}. Queued for manual reconciliation.`,
+    };
+  }
+
+  await PaymentIntent.updateOne(
+    { _id: intent._id, "refundDetails.leaseToken": leaseToken },
+    {
+      $set: {
+        status: "refund_pending",
+        "refundDetails.status": "failed",
+        "refundDetails.dispatchState": "failed",
+        "refundDetails.gatewayStatus": "failed",
+        "refundDetails.error": errorMsg,
+        "refundDetails.lastAttemptAt": new Date(),
+        "refundDetails.leaseToken": null,
+      },
+    }
+  );
+  return {
+    success: false,
+    status: "failed",
+    message: `Refund execution failed: ${errorMsg}`,
+  };
+}
+
+/**
+ * Release an active PaymentIntent refund lease safely with lease token verification.
+ */
+export async function releasePaymentIntentRefundLease(paymentIntentId, leaseToken) {
+  await connectDB();
+  return await PaymentIntent.updateOne(
+    { _id: paymentIntentId, "refundDetails.leaseToken": leaseToken },
+    {
+      $set: {
+        "refundDetails.status": "pending",
+        "refundDetails.dispatchState": "failed",
+        "refundDetails.leaseToken": null,
+      },
+    }
+  );
+}
+
+/**
  * Retry failed inventory deduction for an order whose payment was captured.
  */
 export async function retryFailedDeduction({ orderId, initiatedBy = "staff" }) {
@@ -845,18 +1473,41 @@ export async function recoverUnresolvedRefunds({ batchSize = 10, maxRetries = 3 
     }
   }
 
-  // PaymentIntent recovery (P2):
-  // Strictly read-only gateway reconciliation. Never issues speculative refund POST calls.
-  // Quarantines unresolved in-flight intents and recovers verified gateway refunds.
+  // PaymentIntent recovery (Phase 2.4.2 & 2.4.3):
+  // 1. Candidate selection: Inspects genuinely eligible PaymentIntents without orders where refund is pending.
+  //    Excludes 'reconciliation_required' and 'requiresManualReconciliation: true' to eliminate batch starvation.
+  // 2. Operational visibility: Counts quarantined records and includes in report so operators have full visibility.
+  // 3. Eligible refund_pending records:
+  //    Enforces retry bounds and expired leases, checks gateway before calling refund, protects against duplicate dispatch.
   const intentQuery = {
-    status: "refund_pending",
+    status: { $nin: ["refunded", "reconciliation_required"] },
     "refundDetails.status": { $nin: ["processed", "reconciliation_required"] },
     "refundDetails.dispatchState": { $nin: ["confirmed", "quarantined"] },
     "refundDetails.requiresManualReconciliation": { $ne: true },
-    $or: [
-      { "refundDetails.lastAttemptAt": { $lt: lockExpiry } },
-      { "refundDetails.lastAttemptAt": null },
-      { "refundDetails.lastAttemptAt": { $exists: false } },
+    $and: [
+      {
+        $or: [
+          { createdOrders: { $size: 0 } },
+          { createdOrders: { $exists: false } },
+          { createdOrders: null },
+        ],
+      },
+      {
+        $or: [
+          {
+            "refundDetails.status": "processing",
+            $or: [
+              { "refundDetails.lastAttemptAt": { $lt: lockExpiry } },
+              { "refundDetails.lastAttemptAt": null },
+            ],
+          },
+          {
+            status: "refund_pending",
+            "refundDetails.status": { $ne: "processing" },
+            "refundDetails.retryCount": { $lt: maxRetries },
+          },
+        ],
+      },
     ],
   };
 
@@ -865,48 +1516,26 @@ export async function recoverUnresolvedRefunds({ batchSize = 10, maxRetries = 3 
   for (const intent of candidateIntents) {
     const maskedPiId = `${intent._id.toString().substring(0, 6)}...`;
     try {
-      const reconRes = await reconcilePaymentIntentRefund({
+      const res = await executePaymentIntentRefund({
         paymentIntentId: intent._id,
+        reason: "Automated recovery of unresolved PaymentIntent refund",
         initiatedBy: "recovery_worker",
       });
 
-      if (reconRes.success && reconRes.reconciled) {
-        reconciled++;
-        results.push({
-          type: "payment_intent",
-          paymentIntentId: intent._id.toString(),
-          success: true,
-          reconciled: true,
-          status: "refunded",
-          message: reconRes.message,
-        });
-      } else {
-        // Gateway does not confirm refund:
-        // Transition to reconciliation_required / quarantined to prevent re-verification races
-        await PaymentIntent.updateOne(
-          { _id: intent._id, status: "refund_pending" },
-          {
-            $set: {
-              status: "reconciliation_required",
-              "refundDetails.status": "reconciliation_required",
-              "refundDetails.dispatchState": "quarantined",
-              "refundDetails.requiresManualReconciliation": true,
-              "refundDetails.error": "Automated recovery: No matching gateway refund found for pending PaymentIntent. Quarantined for manual review.",
-              "refundDetails.lastAttemptAt": new Date(),
-            },
-          }
-        );
-        aborted++;
-        results.push({
-          type: "payment_intent",
-          paymentIntentId: intent._id.toString(),
-          success: false,
-          reconciled: false,
-          status: "reconciliation_required",
-          requiresManualReconciliation: true,
-          message: reconRes.message || "PaymentIntent unverified at gateway; safely quarantined.",
-        });
-      }
+      if (res.success && res.reconciled) reconciled++;
+      else if (res.success) recovered++;
+      else if (res.aborted || res.requiresManualReconciliation || res.status === "reconciliation_required") aborted++;
+      else failed++;
+
+      results.push({
+        type: "payment_intent",
+        paymentIntentId: intent._id.toString(),
+        paymentStatus: intent.status,
+        resultStatus: res.status || (res.success ? "processed" : "failed"),
+        success: res.success || false,
+        reconciled: res.reconciled || false,
+        message: res.message,
+      });
     } catch (err) {
       failed++;
       console.error(`[RecoveryWorker] Error recovering PaymentIntent ${maskedPiId}:`, err.message);
@@ -918,10 +1547,39 @@ export async function recoverUnresolvedRefunds({ batchSize = 10, maxRetries = 3 
     }
   }
 
+  let quarantinedOrdersCount = 0;
+  let quarantinedIntentsCount = 0;
+  try {
+    if (typeof Order.countDocuments === "function") {
+      quarantinedOrdersCount = await Order.countDocuments({
+        $or: [
+          { paymentStatus: "reconciliation_required" },
+          { "refundDetails.status": "reconciliation_required" },
+          { "refundDetails.dispatchState": "quarantined" },
+          { "refundDetails.requiresManualReconciliation": true },
+        ],
+      });
+    }
+    if (typeof PaymentIntent.countDocuments === "function") {
+      quarantinedIntentsCount = await PaymentIntent.countDocuments({
+        $or: [
+          { status: "reconciliation_required" },
+          { "refundDetails.status": "reconciliation_required" },
+          { "refundDetails.dispatchState": "quarantined" },
+          { "refundDetails.requiresManualReconciliation": true },
+        ],
+      });
+    }
+  } catch (_countErr) {
+    // Non-fatal if countDocuments fails in limited test mock environments
+  }
+
   return {
     scanned: orders.length + candidateIntents.length,
     ordersScanned: orders.length,
     intentsScanned: candidateIntents.length,
+    quarantinedOrdersPendingReview: quarantinedOrdersCount,
+    quarantinedIntentsPendingReview: quarantinedIntentsCount,
     recovered,
     reconciled,
     aborted,
@@ -1140,6 +1798,44 @@ export async function reconcilePaymentIntentRefund({ paymentIntentId, refundId =
     };
   }
 
+  // Phase 2.4.3 (AUD-242-03 & AUD-242-04): Safety & Attribution guards
+  // 1. If PaymentIntent has createdOrders, reconciliation must proceed through Order reconciliation
+  if (intent.createdOrders && intent.createdOrders.length > 0) {
+    return {
+      success: false,
+      message: "PaymentIntent has associated orders; reconciliation must proceed via order reconciliation.",
+    };
+  }
+
+  // 2. Sibling Order check: If any Order in database shares this paymentId, reject orphan intent reconciliation
+  let siblingOrderCount = 0;
+  if (typeof Order.countDocuments === "function") {
+    siblingOrderCount = await Order.countDocuments({
+      paymentId: intent.razorpayPaymentId,
+    });
+  }
+  if (siblingOrderCount > 0) {
+    return {
+      success: false,
+      message: `Gateway payment '${intent.razorpayPaymentId}' has ${siblingOrderCount} associated Order record(s); reconciliation must proceed via order reconciliation.`,
+    };
+  }
+
+  // 3. Sibling PaymentIntent check: If another PaymentIntent shares this razorpayPaymentId, require manual review
+  let siblingIntentCount = 0;
+  if (typeof PaymentIntent.countDocuments === "function") {
+    siblingIntentCount = await PaymentIntent.countDocuments({
+      razorpayPaymentId: intent.razorpayPaymentId,
+      _id: { $ne: intent._id },
+    });
+  }
+  if (siblingIntentCount > 0) {
+    return {
+      success: false,
+      message: `Gateway payment '${intent.razorpayPaymentId}' is associated with multiple PaymentIntents; manual reconciliation required.`,
+    };
+  }
+
   const razorpay = getRazorpayClient();
   if (!razorpay) {
     return {
@@ -1178,6 +1874,7 @@ export async function reconcilePaymentIntentRefund({ paymentIntentId, refundId =
       };
     }
   } else {
+    // Exact operation-key or metadata match
     const matchingRefunds = refundsList.filter((r) =>
       r?.notes?.opKey === opKey ||
       r?.notes?.paymentIntentId === intent._id.toString() ||
@@ -1187,18 +1884,47 @@ export async function reconcilePaymentIntentRefund({ paymentIntentId, refundId =
     if (matchingRefunds.length > 1) {
       return {
         success: false,
-        message: `Gateway verification failed: Multiple ambiguous refunds found for PaymentIntent ${intent._id}.`,
+        message: `Gateway verification failed: Multiple ambiguous refunds match PaymentIntent metadata for ${intent._id}.`,
       };
     } else if (matchingRefunds.length === 1) {
       matchedRefund = matchingRefunds[0];
+    } else if (refundsList.length > 1) {
+      // Multiple refunds exist on gateway without matching notes: never pick refundsList[0]!
+      return {
+        success: false,
+        message: `Gateway verification failed: Multiple partial/unattributed refunds (${refundsList.length}) found for payment '${intent.razorpayPaymentId}'. Manual reconciliation required.`,
+      };
+    } else if (refundsList.length === 1) {
+      // Exactly ONE refund on gateway for this payment: verify amount and attribution safety
+      const singleRefund = refundsList[0];
+      const hasForeignNotes =
+        (singleRefund.notes?.opKey && singleRefund.notes.opKey !== opKey) ||
+        Boolean(singleRefund.notes?.orderId) ||
+        (singleRefund.notes?.paymentIntentId && singleRefund.notes.paymentIntentId !== intent._id.toString());
+
+      if (hasForeignNotes) {
+        return {
+          success: false,
+          message: `Gateway verification failed: Single refund '${singleRefund.id}' has notes attributing it to a different operation.`,
+        };
+      }
+
+      if (typeof singleRefund.amount === "number" && singleRefund.amount === amountPaise) {
+        matchedRefund = singleRefund;
+      } else {
+        return {
+          success: false,
+          message: `Gateway verification failed: Single refund '${singleRefund.id}' amount (${singleRefund.amount} paise) does not match PaymentIntent amount (${amountPaise} paise).`,
+        };
+      }
     } else if (
-      (paymentEntity.amount_refunded && paymentEntity.amount_refunded >= amountPaise) ||
-      paymentEntity.refund_status === "full" ||
-      paymentEntity.status === "refunded"
+      paymentEntity &&
+      paymentEntity.amount_refunded === amountPaise &&
+      (paymentEntity.refund_status === "full" || paymentEntity.status === "refunded")
     ) {
-      matchedRefund = refundsList[0] || {
+      matchedRefund = {
         id: paymentEntity.refundId || `rfnd_reconciled_${Date.now()}`,
-        amount: paymentEntity.amount_refunded || amountPaise,
+        amount: paymentEntity.amount_refunded,
         currency: paymentEntity.currency || "INR",
         payment_id: paymentEntity.id || intent.razorpayPaymentId,
       };
@@ -1248,6 +1974,7 @@ export async function reconcilePaymentIntentRefund({ paymentIntentId, refundId =
         "refundDetails.reconciled": true,
         "refundDetails.error": null,
         "refundDetails.requiresManualReconciliation": false,
+        "refundDetails.leaseToken": null,
       },
     }
   );

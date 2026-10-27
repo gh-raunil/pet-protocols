@@ -60,4 +60,9 @@ android-twa/.gradle/
 !frontend-user/public/downloads/*.apk
 
 # Database backups & exports
-backend/backups/
+backend/backups/
+
+# Local logs and scratch testing artifacts
+*.log
+scratch/
+

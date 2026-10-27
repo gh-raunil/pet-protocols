@@ -219,15 +219,39 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    guestAccess: {
+      tokenHash: {
+        type: String,
+        default: null,
+        select: false,
+      },
+      issuedAt: {
+        type: Date,
+        default: null,
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      isRevoked: {
+        type: Boolean,
+        default: false,
+      },
+    },
     orderType: {
       type: String,
       enum: ["delivery", "pickup"],
       default: undefined,
     },
+    deliveryDistanceKm: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "test_paid", "failed", "refund_pending", "refunded", "reconciliation_required"],
-      default: "test_paid",
+      default: "pending",
     },
     inventoryStatus: {
       type: String,
@@ -267,7 +291,7 @@ const OrderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      default: "Mock Test Payment",
+      default: null,
     },
     codPaymentHandler: {
       id: { type: String, default: null },
@@ -420,6 +444,30 @@ const OrderSchema = new mongoose.Schema(
       phone: { type: String, default: "" },
       email: { type: String, default: "" },
       assignedAt: { type: Date },
+    },
+    deliveryAssignmentMode: {
+      type: String,
+      enum: ["staff", "manager_self_delivery", null],
+      default: null,
+    },
+    assignmentStatus: {
+      type: String,
+      enum: ["assigned", "accepted", "rejected", null],
+      default: null,
+    },
+    assignedBy: {
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      name: { type: String, default: "" },
+      role: { type: String, default: "" },
+    },
+    dispatchedAt: {
+      type: Date,
+      default: null,
+    },
+    dispatchedBy: {
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      name: { type: String, default: "" },
+      role: { type: String, default: "" },
     },
     codPaymentHandler: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -929,6 +977,7 @@ OrderSchema.index({ "address.phone": 1, createdAt: -1 });
 OrderSchema.index({ orderId: 1 });
 OrderSchema.index({ "deliveryTracking.isLive": 1 }, { sparse: true });
 OrderSchema.index({ "deliveryOtp.issuanceId": 1 }, { sparse: true });
+OrderSchema.index({ "guestAccess.tokenHash": 1 }, { sparse: true });
 
 // Database-enforced uniqueness for Razorpay paid orders (SEC-04)
 // Uses a partial index so mock payments and pending COD orders are unaffected

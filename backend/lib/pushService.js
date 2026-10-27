@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import PushSubscription from '../models/PushSubscription.js';
 import connectDB from './db.js';
+import { validatePushEndpoint, createSecurePushAgent, sanitizePushLog } from './pushEndpointValidator.js';
 
 let isVapidConfigured = false;
 
@@ -33,7 +34,18 @@ export function getVapidPublicKey() {
 /**
  * Send push notification to a single PushSubscription document or object
  */
-export async function sendPushNotification(subscription, payload) {
+export async function sendPushNotification(subscription, payload, options = {}) {
+  // Defense-in-depth: Validate push subscription endpoint against SSRF first
+  if (!subscription || !subscription.endpoint) {
+    return { success: false, reason: 'Push subscription endpoint missing' };
+  }
+
+  const validation = await validatePushEndpoint(subscription.endpoint, options);
+  if (!validation.valid) {
+    console.warn('[PushService] Blocked unsafe push endpoint:', validation.error);
+    return { success: false, reason: `Unsafe push endpoint: ${validation.error}` };
+  }
+
   if (!ensureVapidConfig()) {
     return { success: false, reason: 'VAPID not configured' };
   }
@@ -41,27 +53,32 @@ export async function sendPushNotification(subscription, payload) {
   const pushSubscription = {
     endpoint: subscription.endpoint,
     keys: {
-      p256dh: subscription.keys.p256dh,
-      auth: subscription.keys.auth,
+      p256dh: subscription.keys?.p256dh,
+      auth: subscription.keys?.auth,
     },
   };
 
   const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const agent = options.agent || createSecurePushAgent();
+  const timeout = options.timeout || 8000;
 
   try {
     const response = await webpush.sendNotification(pushSubscription, payloadString, {
       TTL: 60 * 60 * 24, // 24 hours
+      agent,
+      timeout,
+      ...options,
     });
     return { success: true, statusCode: response.statusCode };
   } catch (error) {
-    console.warn(`[PushService] Failed to send push to ${subscription.endpoint?.slice(0, 30)}...:`, error.statusCode || error.message);
+    console.warn(`[PushService] Failed to send push to ${sanitizePushLog(subscription)}:`, error.statusCode || error.message);
 
     // If subscription is expired or gone (410 or 404), clean it up from MongoDB
     if (error.statusCode === 404 || error.statusCode === 410) {
       try {
         await connectDB();
         await PushSubscription.deleteOne({ endpoint: subscription.endpoint });
-        console.log(`[PushService] Cleaned up expired/unsubscribed push subscription: ${subscription.endpoint?.slice(0, 30)}`);
+        console.log(`[PushService] Cleaned up expired/unsubscribed push subscription: ${sanitizePushLog(subscription)}`);
       } catch (dbErr) {
         console.error('[PushService] Error removing expired subscription:', dbErr.message);
       }
@@ -74,7 +91,7 @@ export async function sendPushNotification(subscription, payload) {
 /**
  * Send push notification to all active devices registered to a specific user
  */
-export async function sendPushToUser(userId, payload) {
+export async function sendPushToUser(userId, payload, options = {}) {
   if (!userId) return { success: false, reason: 'No user ID provided' };
 
   try {
@@ -89,7 +106,7 @@ export async function sendPushToUser(userId, payload) {
     }
 
     const results = await Promise.allSettled(
-      subscriptions.map((sub) => sendPushNotification(sub, payload))
+      subscriptions.map((sub) => sendPushNotification(sub, payload, options))
     );
 
     return {

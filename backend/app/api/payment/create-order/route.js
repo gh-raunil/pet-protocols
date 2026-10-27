@@ -6,6 +6,7 @@ import User from '@/models/User';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { calculateOrderDetails } from '@/lib/checkoutCalculationService';
+import { checkPaymentCreateOrderRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request) {
   try {
@@ -29,16 +30,40 @@ export async function POST(request) {
       if (dbUser) verifiedUserId = dbUser._id;
     }
 
+    // SEC-RL: Rate Limiting Protection (User: 15/5m, IP: 25/5m)
+    const rateLimit = await checkPaymentCreateOrderRateLimit(verifiedUserId ? verifiedUserId.toString() : null, request);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RATE_LIMITED',
+          message: `Too many payment order attempts. Please wait ${rateLimit.resetInSeconds} seconds before trying again.`,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetInSeconds),
+          },
+        }
+      );
+    }
+
     // Authoritative Server-Side Checkout Calculation & Security Checks
     const calcResult = await calculateOrderDetails({
       items,
       orderType,
       couponCode,
+      address,
     });
 
     if (!calcResult.success) {
       return NextResponse.json(
-        { success: false, message: calcResult.message },
+        {
+          success: false,
+          code: calcResult.code || 'CALCULATION_FAILED',
+          message: calcResult.message,
+          serviceability: calcResult.serviceability,
+        },
         { status: calcResult.status || 400 }
       );
     }

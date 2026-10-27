@@ -3,6 +3,8 @@ import connectDB from '@/lib/db';
 import PushSubscription from '@/models/PushSubscription';
 import User from '@/models/User';
 import { getAuthSession } from '@/lib/authMiddleware';
+import { validatePushEndpoint } from '@/lib/pushEndpointValidator';
+import { checkPushSubscribeRateLimit } from '@/lib/rateLimit';
 
 export async function POST(req) {
   try {
@@ -12,6 +14,15 @@ export async function POST(req) {
     if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
       return NextResponse.json(
         { success: false, message: 'Invalid push subscription payload. Endpoint and keys are required.' },
+        { status: 400 }
+      );
+    }
+
+    // SSRF Prevention: Enforce strict URL and provider policy on subscription endpoints
+    const validation = await validatePushEndpoint(subscription.endpoint);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, message: `Invalid push subscription endpoint: ${validation.error}` },
         { status: 400 }
       );
     }
@@ -30,6 +41,24 @@ export async function POST(req) {
       }
     } catch (e) {
       // Unauthenticated / guest subscription is permitted
+    }
+
+    // Rate Limiting Protection (User: 10/5m, IP: 15/5m)
+    const rateLimit = await checkPushSubscribeRateLimit(userId ? userId.toString() : null, req);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'RATE_LIMITED',
+          message: `Too many push subscription attempts. Please wait ${rateLimit.resetInSeconds} seconds before trying again.`,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetInSeconds),
+          },
+        }
+      );
     }
 
     const updateFields = {

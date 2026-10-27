@@ -40,13 +40,8 @@ export async function requireSuperAdmin() {
     .map((e) => e.trim())
     .filter(Boolean);
   const isAllowedSuperadmin =
-    configuredSuperadminEmails.length === 0 ||
-    userEmails.some(
-      (e) =>
-        configuredSuperadminEmails.includes(e) ||
-        e === "superadmin.petprotocols@gmail.com" ||
-        e === "superadmin@petprotocols.com"
-    );
+    configuredSuperadminEmails.length > 0 &&
+    userEmails.some((e) => configuredSuperadminEmails.includes(e));
 
   if (!isAllowedSuperadmin) {
     return { error: "Access denied. Only the dedicated Superadmin email is authorized.", status: 403 };
@@ -86,8 +81,16 @@ export async function requireRestaurantAdmin({ allowStaff = false, requiredPermi
   }
 
   if (dbUser.role === "superadmin") {
-    const configuredSuperadminEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
-    if (configuredSuperadminEmail && dbUser.email?.toLowerCase().trim() !== configuredSuperadminEmail) {
+    const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    const userEmails = (dbUser.email || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+    const isAllowedSuperadmin =
+      configuredSuperadminEmails.length > 0 &&
+      userEmails.some((e) => configuredSuperadminEmails.includes(e));
+    if (!isAllowedSuperadmin) {
       return { error: "Access denied. Superadmin email mismatch.", status: 403 };
     }
   }
