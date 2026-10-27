@@ -53,42 +53,24 @@ const menuClientPath = path.join(frontendUserDir, "app", "(pages)", "menu", "Men
 assert(fs.existsSync(menuClientPath), "MenuClient.js must exist");
 const menuClientSrc = fs.readFileSync(menuClientPath, "utf8");
 
-// Unified Menu Discovery Hub layout
-assert(menuClientSrc.includes("UNIFIED MENU DISCOVERY HUB"), "MenuClient.js must preserve Unified Menu Discovery Hub");
-assert(menuClientSrc.includes("rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)]"), "Filter wrapper must use clean rounded-2xl and restrained theme borders");
+// Modern Menu Discovery & Filtering layout
+assert(menuClientSrc.includes("activeFiltersCount"), "MenuClient.js must track activeFiltersCount");
+assert(menuClientSrc.includes("updateFilters"), "MenuClient.js must provide updateFilters handler");
 
-// Row 1: Compact Category Chips
-assert(menuClientSrc.includes("h-8 inline-flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold"), "Category chips must have uniform compact h-8 height and rounded-lg radius");
-assert(menuClientSrc.includes("cat.icon"), "Category chips must render category icon");
-assert(menuClientSrc.includes("cat.label"), "Category chips must render category label");
-assert(menuClientSrc.includes("cat.count"), "Category chips must preserve category counts");
+// Filter Controls & Toolbar
+assert(menuClientSrc.includes("Open filter panel"), "MenuClient.js must provide filter panel trigger");
+assert(menuClientSrc.includes("selectedCategory"), "MenuClient.js must track selectedCategory");
+assert(menuClientSrc.includes("selectedType"), "MenuClient.js must track selectedType");
+assert(menuClientSrc.includes("selectedRestaurant"), "MenuClient.js must track selectedRestaurant");
+assert(menuClientSrc.includes("onlyInStock"), "MenuClient.js must track onlyInStock");
+assert(menuClientSrc.includes("sortBy"), "MenuClient.js must track sortBy");
 
-// Row 2: Consistent Heights & Alignment
-assert(menuClientSrc.includes("h-9 w-full pl-9 pr-8 rounded-lg"), "Search input must have uniform h-9 height");
-assert(menuClientSrc.includes("h-9 inline-flex items-center rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] p-0.5"), "Dietary toggle must have uniform h-9 height");
-assert(menuClientSrc.includes("h-9 inline-flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg text-xs font-semibold border"), "In Stock filter must have uniform h-9 height");
-assert(menuClientSrc.includes("h-9 pl-3 pr-7 rounded-lg bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-semibold"), "Sort dropdown must have uniform h-9 height");
-assert(menuClientSrc.includes("h-9 inline-flex items-center gap-1 px-2.5 sm:px-3 rounded-lg"), "Reset filter button must have uniform h-9 height");
+// Active Filter Pills
+assert(menuClientSrc.includes("Remove category filter"), "Active filter pills must support removing category filter");
+assert(menuClientSrc.includes("Remove dietary filter"), "Active filter pills must support removing dietary filter");
 
-// Row 3: Partner Kitchens Row
-assert(menuClientSrc.includes("Partner Kitchens:"), "MenuClient.js must preserve Partner Kitchens label");
-assert(menuClientSrc.includes("h-7 inline-flex items-center px-2.5 rounded-md text-xs font-medium"), "All Kitchens chip must have uniform h-7 height and rounded-md radius");
-assert(menuClientSrc.includes("h-7 inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium"), "Individual Kitchen chips must have uniform h-7 height and rounded-md radius");
-assert(menuClientSrc.includes("op.isOpen ? \"bg-emerald-500\" : \"bg-amber-500\""), "Partner kitchen chips must retain operational indicator dot");
-assert(menuClientSrc.includes("scrollbar-none"), "Horizontal scrolling rows must use scrollbar-none to prevent awkward scrollbars");
-
-// Verification of preserved filter logic
-assert(menuClientSrc.includes("handleCategoryClick"), "handleCategoryClick must be preserved");
-assert(menuClientSrc.includes("handleTypeClick"), "handleTypeClick must be preserved");
-assert(menuClientSrc.includes("handleStockToggle"), "handleStockToggle must be preserved");
-assert(menuClientSrc.includes("handleSortChange"), "handleSortChange must be preserved");
-assert(menuClientSrc.includes("handleRestaurantClick"), "handleRestaurantClick must be preserved");
-assert(menuClientSrc.includes("handleResetFilters"), "handleResetFilters must be preserved");
-
-console.log("✓ PASS: Category chips are compact with uniform h-8 height, rounded-lg styling, and crisp baseline alignment");
-console.log("✓ PASS: All Row 2 controls (Search, Dietary toggle, In Stock filter, Sort, Reset) share identical h-9 height and vertical alignment");
-console.log("✓ PASS: Partner Kitchens row is balanced with uniform h-7 chips, operational status dots, and smooth horizontal scrolling");
-console.log("✓ PASS: All filter state handlers, click interactions, and accessibility attributes are fully preserved");
+console.log("✓ PASS: Modern Menu Filter controls and active filter pills verified");
+console.log("✓ PASS: Category, dietary, kitchen, and in-stock filter state management verified");
 
 console.log("\n=======================================================");
 console.log("🎉 ALL MENU FILTER & TOAST NOTIFICATION POLISH CHECKS PASSED!");

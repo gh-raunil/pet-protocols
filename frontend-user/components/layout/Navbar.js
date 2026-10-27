@@ -61,12 +61,12 @@ const Navbar = () => {
           : "bg-[var(--bg-main)]/80 backdrop-blur-md"
       } ${hidden && !mobileSearchOpen ? '-translate-y-full' : 'translate-y-0'}`}
     >
-      <div className="max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-6 py-2 sm:py-2.5 lg:py-3.5 flex justify-between items-center gap-1.5 sm:gap-2 lg:gap-3 xl:gap-5 w-full">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-2.5 lg:py-3.5 flex justify-between items-center gap-1 sm:gap-2 lg:gap-3 xl:gap-5 w-full">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 group" aria-label="पेट Protocols Home">
+        <Link href="/" className="flex items-center gap-1.5 sm:gap-2 shrink min-w-0 group" aria-label="पेट Protocols Home">
           <Logo />
-          <div className="flex flex-col">
-            <span className="font-extrabold text-sm sm:text-base tracking-tight text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition leading-tight">
+          <div className="flex flex-col min-w-0">
+            <span className="font-extrabold text-xs sm:text-base tracking-tight text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition leading-tight truncate">
               पेट Protocols
             </span>
             <span className="text-[10px] text-[var(--text-muted)] font-normal hidden xl:inline leading-tight">
@@ -85,18 +85,22 @@ const Navbar = () => {
 
         {/* Desktop SearchBar */}
         <div
-          className={`hidden md:flex flex-1 min-w-[120px] max-w-[170px] lg:max-w-[190px] xl:max-w-[260px] 2xl:max-w-[300px] shrink mx-0.5 lg:mx-1 transition-all duration-300 ${
+          className={`hidden md:flex flex-1 max-w-xs min-w-[120px] lg:max-w-[190px] xl:max-w-[260px] 2xl:max-w-[300px] shrink mx-0.5 lg:mx-1 transition-all duration-300 ${
             showDesktopSearch
               ? "opacity-100 scale-100 pointer-events-auto"
               : "opacity-0 scale-95 pointer-events-none invisible"
           }`}
         >
-          <SearchBar placeholder="Search dishes, cuisines..." />
+          <SearchBar />
         </div>
 
         {/* Right Section: Theme Toggle, Notifications, Cart, Profile */}
         <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 items-center shrink-0">
-          <RightSection />
+          <RightSection
+            onOpenMobileSearch={() => setMobileSearchOpen(true)}
+            isMobileSearchOpen={mobileSearchOpen}
+            mobileSearchButtonRef={searchButtonRef}
+          />
           <HamburgerIcon />
         </div>
       </div>

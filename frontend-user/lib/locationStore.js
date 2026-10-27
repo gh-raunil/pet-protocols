@@ -134,19 +134,16 @@ export const useLocationStore = create((set, get) => ({
         get().evaluateServiceability(savedLoc.latitude, savedLoc.longitude);
       }
     } else {
-      // First-time visitor check: auto-open prompt if never seen
-      const hasPrompted = localStorage.getItem(FIRST_TIME_SHOWN_KEY);
+      // First-time visitor check: keep modal closed so users can browse seamlessly
       set({
         location: DEFAULT_LOCATION.name,
         locationDetails: DEFAULT_LOCATION,
         hasInitialized: true,
-        isModalOpen: !hasPrompted,
+        isModalOpen: false,
       });
-      if (!hasPrompted) {
-        try {
-          localStorage.setItem(FIRST_TIME_SHOWN_KEY, "true");
-        } catch {}
-      }
+      try {
+        localStorage.setItem(FIRST_TIME_SHOWN_KEY, "true");
+      } catch {}
     }
   },
 

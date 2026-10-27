@@ -74,15 +74,29 @@ const RightSection = ({
   const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl;
 
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 shrink-0">
-      {/* Light / Dark Mode Quick Toggle (Desktop only; on mobile handled in Settings) */}
-      <div className="hidden md:flex items-center">
+    <div className="flex items-center gap-1 sm:gap-2 md:gap-2.5 shrink-0">
+      {/* Light / Dark Mode Quick Toggle */}
+      <div className="flex items-center shrink-0">
         <ThemeToggle />
       </div>
 
-      {/* Customer Notifications */}
+      {/* Mobile Search Button (visible below md breakpoint, positioned immediately before Cart button) */}
       {!isRestaurantAdmin && !isSuperadmin && (
-        <div className="flex items-center shrink-0">
+        <button
+          ref={mobileSearchButtonRef}
+          type="button"
+          onClick={onOpenMobileSearch || (() => window.dispatchEvent(new CustomEvent("open_mobile_search")))}
+          aria-label="Search dishes and menu"
+          aria-expanded={Boolean(isMobileSearchOpen)}
+          className="md:hidden relative hover:text-[var(--brand-accent)] transition duration-200 active:scale-95 p-2 rounded-xl text-[var(--text-main)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 flex items-center justify-center min-w-[36px] min-h-[36px] w-10 h-10 sm:min-w-[40px] sm:min-h-[40px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none cursor-pointer shrink-0"
+        >
+          <Search size={21} />
+        </button>
+      )}
+
+      {/* Customer Notifications (visible on sm+ screens to preserve mobile header space) */}
+      {!isRestaurantAdmin && !isSuperadmin && (
+        <div className="hidden sm:flex items-center shrink-0">
           <NotificationBell />
         </div>
       )}
