@@ -5,7 +5,7 @@ import User from "@/models/User";
 import Restaurant from "@/models/Restaurant";
 import bcrypt from "bcryptjs";
 import { normalizeEmail } from "@/lib/validation";
-import { isLoginRateLimited, recordFailedLoginAttempt, resetLoginAttempts } from "@/lib/rateLimit";
+import { isLoginRateLimited, recordFailedLoginAttempt, resetLoginAttempts, getClientIp } from "@/lib/rateLimit";
 
 // Handle both ESM and CommonJS default exports safely
 const Google = GoogleProvider?.default || GoogleProvider;
@@ -20,6 +20,131 @@ function sanitizeTokenImage(img) {
   return img;
 }
 
+export function getConfiguredSuperadminEmails() {
+  return (process.env.SUPERADMIN_EMAIL || "")
+    .toLowerCase()
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
+export function getAllowedRedirectOrigins(baseUrl) {
+  const isProduction = process.env.NODE_ENV === "production";
+  const origins = new Set();
+
+  if (baseUrl) {
+    try {
+      origins.add(new URL(baseUrl).origin);
+    } catch (_) {}
+  }
+
+  const envOrigins = [
+    process.env.NEXTAUTH_URL,
+    process.env.FRONTEND_URL,
+    process.env.ADMIN_URL,
+    process.env.SUPERADMIN_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ];
+
+  for (const raw of envOrigins) {
+    if (raw && typeof raw === "string") {
+      try {
+        origins.add(new URL(raw.trim()).origin);
+      } catch (_) {}
+    }
+  }
+
+  // Allow localhost and 127.0.0.1 loopbacks ONLY in non-production environments
+  if (!isProduction) {
+    origins.add("http://localhost:3000");
+    origins.add("http://localhost:3001");
+    origins.add("http://localhost:3002");
+    origins.add("http://127.0.0.1:3000");
+    origins.add("http://127.0.0.1:3001");
+    origins.add("http://127.0.0.1:3002");
+  }
+
+  return origins;
+}
+
+function isAuthLoopPath(pathname) {
+  if (!pathname || typeof pathname !== "string") return false;
+  const clean = pathname.replace(/\/+$/, "").toLowerCase();
+  return (
+    clean === "/auth/login" ||
+    clean === "/auth/signup" ||
+    clean === "/login" ||
+    clean === "/signup"
+  );
+}
+
+export function safeRedirectUrl({ url, baseUrl }) {
+  if (!url || typeof url !== "string") {
+    return baseUrl;
+  }
+
+  const trimmed = url.trim();
+
+  // Reject protocol-relative or backslash-tricked URLs (e.g. "//evil.com", "/\\evil.com", "\\evil.com")
+  if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.startsWith("\\")) {
+    return baseUrl;
+  }
+
+  // Safe relative paths (e.g. "/menu", "/checkout")
+  if (trimmed.startsWith("/")) {
+    try {
+      const parsed = new URL(trimmed, "https://petprotocols.internal");
+      if (parsed.origin !== "https://petprotocols.internal") {
+        return baseUrl;
+      }
+      if (!parsed.pathname.startsWith("/") || parsed.pathname.startsWith("//")) {
+        return baseUrl;
+      }
+      if (/[\u0000-\u001F\u007F]/.test(trimmed)) {
+        return baseUrl;
+      }
+      // Prevent self-redirect loops back to login/signup
+      if (isAuthLoopPath(parsed.pathname)) {
+        return baseUrl;
+      }
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch (_) {
+      return baseUrl;
+    }
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+
+    // Only allow http: and https: protocols
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return baseUrl;
+    }
+
+    // Prevent self-redirect loops back to login/signup
+    if (isAuthLoopPath(parsed.pathname)) {
+      return baseUrl;
+    }
+
+    const isProduction = process.env.NODE_ENV === "production";
+
+    // Outside production, permit any localhost or 127.0.0.1 hostname
+    if (!isProduction && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")) {
+      return trimmed;
+    }
+
+    // In production, strictly match configured allowed application origins
+    const allowedOrigins = getAllowedRedirectOrigins(baseUrl);
+    if (allowedOrigins.has(parsed.origin)) {
+      return trimmed;
+    }
+  } catch (_) {
+    return baseUrl;
+  }
+
+  return baseUrl;
+}
+
 const providers = [
   Credentials({
     name: "credentials",
@@ -28,19 +153,21 @@ const providers = [
       password: { label: "Password", type: "password" },
       loginType: { label: "Login Type", type: "text" },
     },
-    async authorize(credentials) {
+    async authorize(credentials, req) {
         try {
           await connectDB();
           const email = normalizeEmail(credentials?.email || "");
+          const ip = getClientIp(req);
 
-          if (!email) {
-            throw new Error("Invalid email or password");
-          }
-
-          // Protect against brute force attacks with in-memory sliding window
-          const rateCheck = isLoginRateLimited(email);
+          // Protect against brute force & credential spraying attacks with sliding window
+          const rateCheck = await isLoginRateLimited({ email, ip });
           if (rateCheck.limited) {
             throw new Error(`Too many failed login attempts. Please wait ${rateCheck.resetInSeconds} seconds before trying again.`);
+          }
+
+          if (!email) {
+            await recordFailedLoginAttempt({ email: null, ip });
+            throw new Error("Invalid email or password");
           }
 
           let user = await User.findOne({ email }).populate({
@@ -59,23 +186,23 @@ const providers = [
             });
           }
 
-          // Auto-bootstrap superadmin if account doesn't exist yet in the database
+          // Auto-bootstrap superadmin only if explicitly configured in environment
           if (!user && email) {
-            const configuredEmails = (process.env.SUPERADMIN_EMAIL || "")
-              .toLowerCase()
-              .split(",")
-              .map((e) => e.trim())
-              .filter(Boolean);
+            const configuredEmails = getConfiguredSuperadminEmails();
+            const configuredPassword = process.env.SUPERADMIN_PASSWORD;
 
             const isAllowedSuperadmin =
-              configuredEmails.includes(email) ||
-              email === "superadmin.petprotocols@gmail.com" ||
-              email === "superadmin@petprotocols.com";
+              configuredEmails.length > 0 &&
+              configuredEmails.includes(email);
 
-            if (isAllowedSuperadmin) {
-              const expectedPassword = process.env.SUPERADMIN_PASSWORD || "rounak";
-              if (credentials.password === expectedPassword) {
-                const hashedPassword = await bcrypt.hash(expectedPassword, 12);
+            if (
+              isAllowedSuperadmin &&
+              configuredPassword &&
+              typeof configuredPassword === "string" &&
+              configuredPassword.trim().length > 0
+            ) {
+              if (credentials.password === configuredPassword) {
+                const hashedPassword = await bcrypt.hash(configuredPassword, 12);
                 user = await User.findOneAndUpdate(
                   { email },
                   {
@@ -95,7 +222,7 @@ const providers = [
           }
 
           if (!user) {
-            recordFailedLoginAttempt(email);
+            await recordFailedLoginAttempt({ email, ip });
             throw new Error("Invalid email or password");
           }
 
@@ -116,28 +243,28 @@ const providers = [
 
           // If account has superadmin role, strictly verify email matches configured SUPERADMIN_EMAIL
           if (user.role === "superadmin") {
-            const configuredEmails = (process.env.SUPERADMIN_EMAIL || "")
-              .toLowerCase()
-              .split(",")
-              .map((e) => e.trim())
-              .filter(Boolean);
+            const configuredEmails = getConfiguredSuperadminEmails();
 
             const isAllowed =
-              configuredEmails.length === 0 ||
-              configuredEmails.includes(email) ||
-              email === "superadmin.petprotocols@gmail.com" ||
-              email === "superadmin@petprotocols.com";
+              configuredEmails.length > 0 &&
+              configuredEmails.includes(email);
 
             if (!isAllowed) {
-              recordFailedLoginAttempt(email);
+              await recordFailedLoginAttempt({ email, ip });
               throw new Error("Invalid email or password");
             }
           }
 
           if (!user.password) {
-            const expectedPassword = process.env.SUPERADMIN_PASSWORD || "rounak";
-            if (user.role === "superadmin" && credentials.password === expectedPassword) {
-              user.password = await bcrypt.hash(expectedPassword, 12);
+            const configuredPassword = process.env.SUPERADMIN_PASSWORD;
+            if (
+              user.role === "superadmin" &&
+              configuredPassword &&
+              typeof configuredPassword === "string" &&
+              configuredPassword.trim().length > 0 &&
+              credentials.password === configuredPassword
+            ) {
+              user.password = await bcrypt.hash(configuredPassword, 12);
               try {
                 await user.save();
               } catch (_) {}
@@ -151,22 +278,27 @@ const providers = [
             user.password
           );
 
-          // Self-heal superadmin password if out of sync with configured SUPERADMIN_PASSWORD or default 'rounak'
+          // Self-heal superadmin password if out of sync with explicitly configured SUPERADMIN_PASSWORD
           if (!isPasswordCorrect && user.role === "superadmin") {
-            const expectedPassword = process.env.SUPERADMIN_PASSWORD || "rounak";
-            if (credentials.password === expectedPassword) {
-              user.password = await bcrypt.hash(expectedPassword, 12);
+            const configuredPassword = process.env.SUPERADMIN_PASSWORD;
+            if (
+              configuredPassword &&
+              typeof configuredPassword === "string" &&
+              configuredPassword.trim().length > 0 &&
+              credentials.password === configuredPassword
+            ) {
+              user.password = await bcrypt.hash(configuredPassword, 12);
               isPasswordCorrect = true;
             }
           }
 
           if (!isPasswordCorrect) {
-            recordFailedLoginAttempt(email);
+            await recordFailedLoginAttempt({ email, ip });
             throw new Error("Invalid email or password");
           }
 
           // Reset failed attempts counter upon successful credentials match
-          resetLoginAttempts(email);
+          await resetLoginAttempts({ email, ip });
 
           // Clean legacy comma-separated email string in DB if present
           if (user.role === "superadmin" && user.email.includes(",")) {
@@ -231,56 +363,52 @@ export const authOptions = {
 
       // Refresh DB data on subsequent session calls (skip on initial sign-in since user is already freshly populated)
       if (!user && token.email) {
-        await connectDB();
-        const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
-          .toLowerCase()
-          .split(",")
-          .map((e) => e.trim())
-          .filter(Boolean);
-        let dbUser = await User.findOne({ email: token.email.toLowerCase().trim() }).populate({
-          path: "restaurant",
-          select: "_id name slug status enabledFeatures appearance",
-        });
-        if (!dbUser) {
-          dbUser = await User.findOne({
-            role: "superadmin",
-            email: { $regex: new RegExp(`(^|,)\\s*${(token.email || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*(,|$)`, "i") },
-          }).populate({
+        try {
+          await connectDB();
+          const configuredSuperadminEmails = getConfiguredSuperadminEmails();
+          let dbUser = await User.findOne({ email: token.email.toLowerCase().trim() }).populate({
             path: "restaurant",
             select: "_id name slug status enabledFeatures appearance",
           });
-        }
-        if (dbUser) {
-          const userEmails = (dbUser.email || "")
-            .toLowerCase()
-            .split(",")
-            .map((e) => e.trim())
-            .filter(Boolean);
-          const isAllowedSuperadmin =
-            configuredSuperadminEmails.length === 0 ||
-            userEmails.some(
-              (e) =>
-                configuredSuperadminEmails.includes(e) ||
-                e === "superadmin.petprotocols@gmail.com" ||
-                e === "superadmin@petprotocols.com"
-            );
-
-          if (dbUser.role === "superadmin" && !isAllowedSuperadmin) {
-            token.role = "customer"; // Demote unauthorized email attempting superadmin
-          } else {
-            token.role = dbUser.role;
+          if (!dbUser) {
+            dbUser = await User.findOne({
+              role: "superadmin",
+              email: { $regex: new RegExp(`(^|,)\\s*${(token.email || "").replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*(,|$)`, "i") },
+            }).populate({
+              path: "restaurant",
+              select: "_id name slug status enabledFeatures appearance",
+            });
           }
-          token.id = dbUser._id.toString();
-          token.status = dbUser.status;
-          token.restaurantId = dbUser.restaurant
-            ? (dbUser.restaurant._id ? dbUser.restaurant._id.toString() : dbUser.restaurant.toString())
-            : null;
-          token.restaurantName = dbUser.restaurant ? dbUser.restaurant.name : null;
-          token.enabledFeatures = dbUser.restaurant ? (dbUser.restaurant.enabledFeatures || []) : [];
-          token.image = sanitizeTokenImage(dbUser.image) || sanitizeTokenImage(token.image);
-          token.staffRole = dbUser.staffRole || "Staff";
-          token.staffRoles = dbUser.staffRoles?.length ? dbUser.staffRoles : [dbUser.staffRole || "Staff"];
-          token.permissions = dbUser.permissions || [];
+          if (dbUser) {
+            const userEmails = (dbUser.email || "")
+              .toLowerCase()
+              .split(",")
+              .map((e) => e.trim())
+              .filter(Boolean);
+            const isAllowedSuperadmin =
+              configuredSuperadminEmails.length > 0 &&
+              userEmails.some((e) => configuredSuperadminEmails.includes(e));
+
+            if (dbUser.role === "superadmin" && !isAllowedSuperadmin) {
+              token.role = "customer"; // Demote unauthorized email attempting superadmin
+            } else {
+              token.role = dbUser.role;
+            }
+            token.id = dbUser._id.toString();
+            token.status = dbUser.status;
+            token.restaurantId = dbUser.restaurant
+              ? (dbUser.restaurant._id ? dbUser.restaurant._id.toString() : dbUser.restaurant.toString())
+              : null;
+            token.restaurantName = dbUser.restaurant ? dbUser.restaurant.name : null;
+            token.enabledFeatures = dbUser.restaurant ? (dbUser.restaurant.enabledFeatures || []) : [];
+            token.image = sanitizeTokenImage(dbUser.image) || sanitizeTokenImage(token.image);
+            token.staffRole = dbUser.staffRole || "Staff";
+            token.staffRoles = dbUser.staffRoles?.length ? dbUser.staffRoles : [dbUser.staffRole || "Staff"];
+            token.permissions = dbUser.permissions || [];
+          }
+        } catch (dbErr) {
+          console.warn("[Auth JWT] Session DB refresh skipped due to database connection state:", dbErr?.message || dbErr);
+          // Retain existing token claims so session remains active without throwing HTTP 500
         }
       }
 
@@ -313,15 +441,10 @@ export const authOptions = {
 
         await connectDB();
         const email = normalizeEmail(user.email);
-        const configuredSuperadminEmails = (process.env.SUPERADMIN_EMAIL || "")
-          .toLowerCase()
-          .split(",")
-          .map((e) => e.trim())
-          .filter(Boolean);
+        const configuredSuperadminEmails = getConfiguredSuperadminEmails();
         const isConfiguredSuperadmin = Boolean(
-          configuredSuperadminEmails.includes(email) ||
-          email === "superadmin.petprotocols@gmail.com" ||
-          email === "superadmin@petprotocols.com"
+          configuredSuperadminEmails.length > 0 &&
+          configuredSuperadminEmails.includes(email)
         );
 
         const existingUser = await User.findOne({ email });
@@ -361,14 +484,7 @@ export const authOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return url;
-      try {
-        const parsed = new URL(url);
-        if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.origin === baseUrl) {
-          return url;
-        }
-      } catch (e) {}
-      return baseUrl;
+      return safeRedirectUrl({ url, baseUrl });
     },
   },
 
