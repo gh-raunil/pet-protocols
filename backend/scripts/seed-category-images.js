@@ -3,7 +3,7 @@ const dns = require('node:dns');
 
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
-const MONGODB_URI = 'mongodb+srv://admin:rounak1221@pet-protocols.t3jdmic.mongodb.net/pet-protocols?retryWrites=true&w=majority&appName=pet-protocols';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pet-protocols';
 
 const defaultCategories = [
   {
