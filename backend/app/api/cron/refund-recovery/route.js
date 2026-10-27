@@ -6,10 +6,16 @@ let _testCronSecret = null;
 let _isRecoveryRunning = false;
 
 export function _setTestCronSecret(secret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Cron secret test hook is forbidden in production environment.');
+  }
   _testCronSecret = secret;
 }
 
 export function _resetRecoveryLock() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Security] Recovery lock test reset is forbidden in production environment.');
+  }
   _isRecoveryRunning = false;
 }
 
@@ -105,7 +111,9 @@ async function handleRecoveryTrigger(request) {
 
     // Minimal summary with counts and redacted identifiers; never expose customer details or secrets
     const sanitizedResults = (report.results || []).map((r) => ({
+      type: r.type || 'order',
       orderId: r.orderId ? `${r.orderId.substring(0, 6)}...` : undefined,
+      paymentIntentId: r.paymentIntentId ? `${r.paymentIntentId.substring(0, 6)}...` : undefined,
       resultStatus: r.resultStatus || (r.success ? 'processed' : 'failed'),
       success: Boolean(r.success),
       reconciled: Boolean(r.reconciled),

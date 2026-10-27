@@ -45,6 +45,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
     clearOrdersBadge,
   } = useNavBadges();
   const drawerRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -58,20 +59,46 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
     }
   }, [pathname]);
 
-  // Lock body scroll while open & handle Escape key
+  // Lock body scroll while open, auto-focus close button, & handle accessible focus trapping
   useEffect(() => {
     if (isOpen) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
 
+      // Focus close button on open
+      const focusTimer = setTimeout(() => {
+        closeButtonRef.current?.focus();
+      }, 50);
+
       const handleKeyDown = (e) => {
         if (e.key === "Escape") {
           onClose();
+        } else if (e.key === "Tab") {
+          if (!drawerRef.current) return;
+          const focusable = drawerRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              last.focus();
+              e.preventDefault();
+            }
+          } else {
+            if (document.activeElement === last) {
+              first.focus();
+              e.preventDefault();
+            }
+          }
         }
       };
 
       window.addEventListener("keydown", handleKeyDown);
       return () => {
+        clearTimeout(focusTimer);
         document.body.style.overflow = originalOverflow;
         window.removeEventListener("keydown", handleKeyDown);
       };
@@ -93,6 +120,11 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
       icon: UtensilsCrossed,
       badge: menuBadge > 0 ? menuBadge : null,
       onClear: clearMenuBadge,
+    },
+    {
+      href: "/restaurants",
+      label: "Restaurants",
+      icon: Sparkles,
     },
     {
       href: "/cart",
@@ -123,8 +155,6 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
     },
     { href: "/profile", label: "Profile & Addresses", icon: User, authOnly: true },
     { href: "/settings", label: "Settings", icon: Settings },
-    { href: "/about", label: "About पेट Protocols", icon: Info },
-    { href: "/contact", label: "Contact & Kitchens", icon: PhoneCall },
   ];
 
   if (!mounted || typeof document === "undefined") {
@@ -163,11 +193,13 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
             </span>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
+            type="button"
             aria-label="Close menu"
-            className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition"
+            className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:outline-none"
           >
-            <X size={20} />
+            <X size={22} />
           </button>
         </div>
 
@@ -176,7 +208,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
           {/* Account Profile Card Header */}
           <div className="p-4 mx-4 my-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)]">
             {session?.user ? (
-              <Link href="/profile" onClick={onClose} className="flex items-center gap-3 group">
+              <Link href="/profile" onClick={onClose} className="flex items-center gap-3 group min-h-[44px]">
                 <div className="w-11 h-11 rounded-full bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] font-black flex items-center justify-center text-base shrink-0 overflow-hidden">
                   {session.user.image ? (
                     <Image
@@ -198,7 +230,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
                     {session.user.email}
                   </p>
                 </div>
-                <ChevronRight size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition" />
+                <ChevronRight size={18} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition" />
               </Link>
             ) : (
               <div className="flex flex-col gap-2.5">
@@ -212,14 +244,14 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
                   <Link
                     href="/auth/login"
                     onClick={onClose}
-                    className="flex-1 py-2 rounded-xl bg-[var(--brand-accent)] text-white text-center text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 hover:opacity-90 transition flex items-center justify-center gap-1.5"
+                    className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-[var(--brand-accent)] text-white text-center text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 hover:opacity-90 transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                   >
-                    <LogIn size={14} /> Sign In
+                    <LogIn size={15} /> Sign In
                   </Link>
                   <Link
                     href="/auth/signup"
                     onClick={onClose}
-                    className="flex-1 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-center text-xs font-semibold hover:border-[var(--brand-accent)]/40 transition"
+                    className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-center text-xs font-semibold hover:border-[var(--brand-accent)]/40 transition flex items-center justify-center active:scale-95 cursor-pointer"
                   >
                     Register
                   </Link>
@@ -229,7 +261,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
           </div>
 
           {/* Navigation Links List */}
-          <nav className="px-3 py-2 space-y-1">
+          <nav className="px-3 py-2 space-y-1.5">
             {navLinks.map((item) => {
               if (item.authOnly && !session?.user) return null;
               const Icon = item.icon;
@@ -243,14 +275,14 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
                     item.onClear?.();
                     onClose();
                   }}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition ${
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition min-h-[44px] active:scale-[0.99] ${
                     isActive
                       ? "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/25"
                       : "text-[var(--text-main)] hover:bg-[var(--bg-card)] hover:text-[var(--brand-accent)]"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon size={18} className={isActive ? "text-[var(--brand-accent)]" : "text-[var(--text-muted)]"} />
+                    <Icon size={19} className={isActive ? "text-[var(--brand-accent)]" : "text-[var(--text-muted)]"} />
                     <span>{item.label}</span>
                   </div>
                   {item.badge ? (
@@ -258,7 +290,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
                       {item.badge}
                     </span>
                   ) : (
-                    <ChevronRight size={14} className="text-[var(--text-muted)] opacity-60" />
+                    <ChevronRight size={16} className="text-[var(--text-muted)] opacity-60" />
                   )}
                 </Link>
               );
@@ -271,14 +303,15 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Bottom Section */}
-        <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-card)] shrink-0">
+        {/* Bottom Section with Safe-Area Padding */}
+        <div className="p-4 pb-safe border-t border-[var(--border-color)] bg-[var(--bg-card)] shrink-0">
           {session?.user && (
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-500/25 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition"
+              type="button"
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/25 bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-bold transition active:scale-95 cursor-pointer"
             >
-              <LogOut size={15} /> Sign Out
+              <LogOut size={16} /> Sign Out
             </button>
           )}
           <p className="text-[11px] text-center text-[var(--text-muted)] mt-2">

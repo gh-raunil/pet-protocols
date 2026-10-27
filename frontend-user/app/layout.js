@@ -1,6 +1,6 @@
 import Providers from "./providers";
 import { ThemeProvider } from "../components/ui/ThemeProvider";
-import { ThemeScript } from "../components/ui/ThemeScript";
+import { themeScriptContent } from "../components/ui/ThemeScript";
 import { ToastProvider } from "../components/ui/ToastProvider";
 import AppShell from "../components/layout/AppShell";
 import "./globals.css";
@@ -43,7 +43,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="light" suppressHydrationWarning>
       <head>
-        <ThemeScript />
+        <script
+          id="theme-initializer"
+          dangerouslySetInnerHTML={{ __html: themeScriptContent }}
+        />
         <script
           id="pwa-service-worker-init"
           dangerouslySetInnerHTML={{

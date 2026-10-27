@@ -14,6 +14,7 @@ import {
   Clock,
   Tag,
   Check,
+  Star,
 } from "lucide-react";
 import ProductCard, { ProductCardSkeleton } from "@/components/products/ProductCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
@@ -44,6 +45,7 @@ export default function MenuClient() {
   const hasOffersFromUrl = searchParams.get("hasOffers") === "true";
   const minPriceFromUrl = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined;
   const maxPriceFromUrl = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined;
+  const ratingFromUrl = searchParams.get("rating") ? Number(searchParams.get("rating")) : undefined;
 
   // Data states
   const [products, setProducts] = useState([]);
@@ -66,10 +68,10 @@ export default function MenuClient() {
   const [onlyOffers, setOnlyOffers] = useState(hasOffersFromUrl);
   const [minPrice, setMinPrice] = useState(minPriceFromUrl);
   const [maxPrice, setMaxPrice] = useState(maxPriceFromUrl);
+  const [minRating, setMinRating] = useState(ratingFromUrl);
   const [searchInput, setSearchInput] = useState(searchFromUrl);
 
-  // Preference & Curated States
-  const [userHasHistory, setUserHasHistory] = useState(false);
+  // Curated States
   const [recommendedList, setRecommendedList] = useState([]);
   const [newArrivalsList, setNewArrivalsList] = useState([]);
 
@@ -113,6 +115,10 @@ export default function MenuClient() {
   }, [maxPriceFromUrl]);
 
   useEffect(() => {
+    setMinRating(ratingFromUrl);
+  }, [ratingFromUrl]);
+
+  useEffect(() => {
     setSearchInput(searchFromUrl);
   }, [searchFromUrl]);
 
@@ -145,6 +151,9 @@ export default function MenuClient() {
     const timer = setTimeout(() => {
       if (searchInput.trim() !== searchFromUrl.trim()) {
         updateFilters({ search: searchInput.trim() });
+        if (searchInput.trim().length > 1) {
+          trackProductSearch(searchInput.trim());
+        }
       }
     }, 350);
     return () => clearTimeout(timer);
@@ -205,31 +214,26 @@ export default function MenuClient() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Track search terms into personalization engine
-  useEffect(() => {
-    if (!searchFromUrl || searchFromUrl.trim().length < 2) return;
-    const timer = setTimeout(() => {
-      trackProductSearch(searchFromUrl.trim());
-      setUserHasHistory(hasUserPreferences());
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [searchFromUrl]);
-
-  // Update curated recommendations
+  // Curate Recommended and Newly Arrived items
   useEffect(() => {
     if (products.length > 0) {
-      const hasHistory = hasUserPreferences();
-      setUserHasHistory(hasHistory);
-      if (hasHistory) {
-        setRecommendedList(getRecommendedProducts(products, 8));
+      const rec = getRecommendedProducts(products, 8);
+      if (rec.length > 0) {
+        setRecommendedList(rec);
       } else {
-        setRecommendedList([]);
+        // Fallback to top-rated / popular items for immediate display
+        const fallback = [...products]
+          .sort((a, b) => (Number(b.numRatings || 0) * Number(b.rating || 0)) - (Number(a.numRatings || 0) * Number(a.rating || 0)))
+          .slice(0, 8);
+        setRecommendedList(fallback);
       }
+
+      const newArrivals = products.filter((p) => getProductNewArrivalStatus(p, restaurants));
       setNewArrivalsList(
-        products
-          .filter((p) => getProductNewArrivalStatus(p, restaurants))
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-          .slice(0, 8)
+        (newArrivals.length > 0
+          ? newArrivals
+          : [...products].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        ).slice(0, 8)
       );
     }
   }, [products, restaurants]);
@@ -251,21 +255,24 @@ export default function MenuClient() {
   }, [products]);
 
   // Helper to compute effective discount for discount sorting and filtering
-  const getProductDiscountInfo = useCallback((product) => {
-    if (!product) return { percent: 0, amount: 0 };
-    const offer = getProductActiveOffer(product, offers);
-    if (offer && offer.applyMode === "automatic") {
-      const disc = calculateItemDiscount(product, offer);
-      const pct = product.price > 0 ? Math.round((disc / product.price) * 100) : 0;
-      return { percent: pct, amount: disc };
-    }
-    if (product.originalPrice && product.originalPrice > product.price) {
-      const diff = product.originalPrice - product.price;
-      const pct = Math.round((diff / product.originalPrice) * 100);
-      return { percent: pct, amount: diff };
-    }
-    return { percent: 0, amount: 0 };
-  }, [offers]);
+  const getProductDiscountInfo = useCallback(
+    (product) => {
+      if (!product) return { percent: 0, amount: 0 };
+      const offer = getProductActiveOffer(product, offers);
+      if (offer && offer.applyMode === "automatic") {
+        const disc = calculateItemDiscount(product, offer);
+        const pct = product.price > 0 ? Math.round((disc / product.price) * 100) : 0;
+        return { percent: pct, amount: disc };
+      }
+      if (product.originalPrice && product.originalPrice > product.price) {
+        const diff = product.originalPrice - product.price;
+        const pct = Math.round((diff / product.originalPrice) * 100);
+        return { percent: pct, amount: diff };
+      }
+      return { percent: 0, amount: 0 };
+    },
+    [offers]
+  );
 
   // Client-side filtering & real sorting
   const displayedProducts = useMemo(() => {
@@ -293,6 +300,11 @@ export default function MenuClient() {
       result = result.filter((p) => (Number(p.price) || 0) <= maxPrice);
     }
 
+    // Rating filter
+    if (minRating !== undefined && !isNaN(minRating) && minRating > 0) {
+      result = result.filter((p) => (Number(p.rating) || 0) >= minRating);
+    }
+
     // Tie-breaker helper
     const tieBreak = (a, b) => {
       const nameComp = String(a?.name || "").localeCompare(String(b?.name || ""));
@@ -303,7 +315,6 @@ export default function MenuClient() {
     // Real Sorting against actual schema values
     switch (sortBy) {
       case "popularity":
-        // Real popularity based on verified ratings count
         result.sort((a, b) => {
           const popB = Number(b.numRatings || 0);
           const popA = Number(a.numRatings || 0);
@@ -316,7 +327,6 @@ export default function MenuClient() {
         break;
 
       case "rating":
-        // Real ratings sort with numRatings tie-break
         result.sort((a, b) => {
           const rateB = Number(b.rating || 0);
           const rateA = Number(a.rating || 0);
@@ -345,7 +355,6 @@ export default function MenuClient() {
         break;
 
       case "newest":
-        // Real creation date sorting
         result.sort((a, b) => {
           const timeB = new Date(b.createdAt || 0).getTime();
           const timeA = new Date(a.createdAt || 0).getTime();
@@ -355,7 +364,6 @@ export default function MenuClient() {
         break;
 
       case "discount":
-        // Real discount percentage sorting
         result.sort((a, b) => {
           const discB = getProductDiscountInfo(b);
           const discA = getProductDiscountInfo(a);
@@ -368,12 +376,11 @@ export default function MenuClient() {
       case "default":
       case "recommended":
       default:
-        // Preserves default ordering (featured first, then createdAt)
         break;
     }
 
     return result;
-  }, [products, onlyInStock, onlyOffers, minPrice, maxPrice, sortBy, getProductDiscountInfo, offers]);
+  }, [products, onlyInStock, onlyOffers, minPrice, maxPrice, minRating, sortBy, getProductDiscountInfo, offers]);
 
   // Categories list with global counts (from /api/categories or dynamic scan)
   const categories = useMemo(() => {
@@ -394,7 +401,7 @@ export default function MenuClient() {
   const categorySections = useMemo(() => {
     const groups = {};
     displayedProducts.forEach((item) => {
-      const cat = item.category || "Chef Specialties";
+      const cat = (typeof item.category === "string" ? item.category : item.category?.name || "Chef Specialties").trim();
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
     });
@@ -411,8 +418,9 @@ export default function MenuClient() {
     if (onlyOffers) count++;
     if (minPrice !== undefined && minPrice !== "") count++;
     if (maxPrice !== undefined && maxPrice !== "") count++;
+    if (minRating !== undefined && minRating !== null && minRating > 0) count++;
     return count;
-  }, [selectedCategory, selectedRestaurant, selectedType, onlyInStock, onlyOffers, minPrice, maxPrice]);
+  }, [selectedCategory, selectedRestaurant, selectedType, onlyInStock, onlyOffers, minPrice, maxPrice, minRating]);
 
   const handleResetFilters = () => {
     setSearchInput("");
@@ -428,6 +436,7 @@ export default function MenuClient() {
       hasOffers: filters.hasOffers,
       minPrice: filters.minPrice,
       maxPrice: filters.maxPrice,
+      rating: filters.rating,
     });
   };
 
@@ -436,23 +445,13 @@ export default function MenuClient() {
     updateFilters({ sort: newSort });
   };
 
-  const selectedRestaurantObj = restaurants.find((r) => r._id === selectedRestaurant);
+  const selectedRestaurantObj = useMemo(() => {
+    if (!selectedRestaurant || selectedRestaurant === "all") return null;
+    return restaurants.find((r) => r._id === selectedRestaurant) || null;
+  }, [restaurants, selectedRestaurant]);
 
   return (
-    <main className="min-h-screen pt-24 sm:pt-28 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
-      {/* ── HEADER ─────────────────────────────────────────────────── */}
-      <div className="text-center w-full max-w-2xl mx-auto mb-4 sm:mb-6 px-2 min-w-0">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] text-[11px] font-bold uppercase tracking-wider mb-2">
-          <Sparkles size={12} className="shrink-0" /> Verified Kitchen Menu
-        </div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-[var(--text-main)] break-words">
-          Explore Our Menu
-        </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1 max-w-lg mx-auto break-words">
-          Freshly prepared food crafted upon order by certified kitchens and culinary partners.
-        </p>
-      </div>
-
+    <main className="min-h-screen pt-20 sm:pt-24 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── COMPACT TOOLBAR (SEARCH + SORT + FILTER) ────────────────── */}
       <div className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-4 sm:mb-5 shadow-xs w-full max-w-full overflow-hidden min-w-0 space-y-2.5">
         {/* Responsive Toolbar Row */}
@@ -483,7 +482,7 @@ export default function MenuClient() {
             )}
           </div>
 
-          {/* Controls: Compact Sort & Filter Button (Mobile: side-by-side flex; Desktop: compact shrink-0) */}
+          {/* Controls: Compact Sort & Filter Button */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Real Sorting Dropdown */}
             <div className="relative flex-1 sm:flex-initial">
@@ -528,19 +527,15 @@ export default function MenuClient() {
 
         {/* ── APPLIED ACTIVE FILTER PILLS ROW ────────────────────────── */}
         {(activeFiltersCount > 0 || searchFromUrl.trim()) && (
-          <div className="pt-2 border-t border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs flex-wrap">
-            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mr-1">
-              Active:
-            </span>
-
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {/* Category Chip */}
             {selectedCategory !== "All" && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
-                <span>Category: {selectedCategory}</span>
+                <span>{selectedCategory}</span>
                 <button
                   type="button"
                   onClick={() => updateFilters({ category: "All" })}
-                  aria-label={`Remove category filter: ${selectedCategory}`}
+                  aria-label="Remove category filter"
                   className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
                 >
                   <X size={12} />
@@ -549,14 +544,14 @@ export default function MenuClient() {
             )}
 
             {/* Restaurant Chip */}
-            {selectedRestaurant !== "all" && selectedRestaurantObj && (
+            {selectedRestaurant !== "all" && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
                 <Building2 size={11} />
-                <span>{selectedRestaurantObj.name}</span>
+                <span>{selectedRestaurantObj?.name || "Selected Kitchen"}</span>
                 <button
                   type="button"
                   onClick={() => updateFilters({ restaurant: "all" })}
-                  aria-label="Remove kitchen filter"
+                  aria-label="Remove restaurant filter"
                   className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
                 >
                   <X size={12} />
@@ -564,15 +559,19 @@ export default function MenuClient() {
               </span>
             )}
 
-            {/* Dietary Chip */}
+            {/* Type Chip */}
             {selectedType !== "all" && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
-                <span className={`w-1.5 h-1.5 rounded-full ${selectedType === "veg" ? "bg-emerald-500" : "bg-rose-500"}`} />
-                <span>{selectedType === "veg" ? "Vegetarian" : "Non-Vegetarian"}</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    selectedType === "veg" ? "bg-emerald-500" : "bg-rose-500"
+                  }`}
+                />
+                <span className="capitalize">{selectedType}</span>
                 <button
                   type="button"
                   onClick={() => updateFilters({ type: "all" })}
-                  aria-label="Remove diet filter"
+                  aria-label="Remove dietary filter"
                   className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
                 >
                   <X size={12} />
@@ -622,6 +621,22 @@ export default function MenuClient() {
                   type="button"
                   onClick={() => updateFilters({ minPrice: undefined, maxPrice: undefined })}
                   aria-label="Remove price filter"
+                  className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {/* Rating Chip */}
+            {minRating !== undefined && minRating > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold">
+                <Star size={11} className="fill-[var(--brand-accent)]" />
+                <span>{minRating}+ Stars</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ rating: undefined })}
+                  aria-label="Remove rating filter"
                   className="hover:opacity-75 cursor-pointer ml-0.5 p-0.5"
                 >
                   <X size={12} />
@@ -805,7 +820,7 @@ export default function MenuClient() {
           {!searchFromUrl.trim() && selectedCategory === "All" && activeFiltersCount === 0 && (
             <>
               {/* Recommended based on personal preferences */}
-              {userHasHistory && recommendedList.length > 0 && (
+              {recommendedList.length > 0 && (
                 <ProductCarousel
                   title="Recommended For You"
                   subtitle="Curated from your recent taste preferences and search history"
@@ -882,6 +897,29 @@ export default function MenuClient() {
           )}
         </div>
       )}
+
+      {/* Filters & Refinements Drawer Modal */}
+      <FilterDrawer
+        isOpen={isFilterDrawerOpen}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        categories={categories}
+        restaurants={restaurants}
+        appliedFilters={{
+          category: selectedCategory,
+          restaurant: selectedRestaurant,
+          type: selectedType,
+          inStock: onlyInStock,
+          hasOffers: onlyOffers,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          rating: minRating,
+        }}
+        products={products}
+        offers={offers}
+        priceBounds={priceBounds}
+        onApply={handleApplyDrawerFilters}
+        onReset={handleResetFilters}
+      />
     </main>
   );
 }

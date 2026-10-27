@@ -52,7 +52,8 @@ const useNotificationStore = create((set, get) => ({
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to load messages (Status ${res.status})`);
+        set({ error: `Failed to load messages (Status ${res.status})`, loading: false });
+        return;
       }
 
       const data = await res.json();
@@ -74,8 +75,8 @@ const useNotificationStore = create((set, get) => ({
         set({ error: data.message || "Failed to load notifications", loading: false });
       }
     } catch (err) {
-      console.error("Error fetching notifications:", err);
-      set({ error: err.message || "Error loading notifications", loading: false });
+      console.warn("[NotificationStore] Warning loading notifications:", err?.message || err);
+      set({ error: err?.message || "Error loading notifications", loading: false });
     }
   },
 

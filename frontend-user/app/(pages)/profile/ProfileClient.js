@@ -62,6 +62,8 @@ export default function CustomerProfileClient() {
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
+  const [addressToDelete, setAddressToDelete] = useState(null);
+  const [deletingAddress, setDeletingAddress] = useState(false);
   const [addressForm, setAddressForm] = useState({
     label: "Home",
     fullName: "",
@@ -222,17 +224,33 @@ export default function CustomerProfileClient() {
     }
   };
 
-  const handleDeleteAddress = async (addressId) => {
-    if (!confirm("Are you sure you want to delete this delivery address?")) return;
+  const maskPhoneNumber = (phone) => {
+    if (!phone) return "";
+    const clean = String(phone).replace(/\D/g, "");
+    if (clean.length >= 10) {
+      return `•••••• ${clean.slice(-4)}`;
+    }
+    return phone;
+  };
+
+  const handleConfirmDeleteAddress = async () => {
+    if (!addressToDelete) return;
     try {
-      const res = await fetch(`/api/user/addresses?id=${addressId}`, { method: "DELETE" });
+      setDeletingAddress(true);
+      const res = await fetch(`/api/user/addresses?id=${addressToDelete._id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         setAddresses(data.addresses || []);
         toast.success("Delivery address removed");
+        setAddressToDelete(null);
+      } else {
+        toast.error(data.message || "Failed to remove address");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Error removing address");
+    } finally {
+      setDeletingAddress(false);
     }
   };
 
@@ -520,43 +538,48 @@ export default function CustomerProfileClient() {
               {addresses.map((addr) => (
                 <div
                   key={addr._id}
-                  className={`bg-[var(--bg-sub)] border rounded-2xl p-4 relative flex flex-col justify-between transition ${
+                  className={`bg-[var(--bg-sub)] border rounded-2xl p-4 sm:p-5 relative flex flex-col justify-between transition ${
                     addr.isDefault
-                      ? "border-[var(--brand-accent)]/50 ring-1 ring-[var(--brand-accent)]/30"
+                      ? "border-[var(--brand-accent)]/50 ring-1 ring-[var(--brand-accent)]/30 shadow-xs"
                       : "border-[var(--border-color)]"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-[var(--text-main)] text-sm flex items-center gap-1.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-extrabold text-[var(--text-main)] text-sm flex items-center gap-1.5 truncate">
                           {addr.label === "Home" ? (
-                            <Home size={14} className="text-[var(--brand-accent)]" />
+                            <Home size={15} className="text-[var(--brand-accent)] shrink-0" />
                           ) : addr.label === "Work" ? (
-                            <Briefcase size={14} className="text-blue-500" />
+                            <Briefcase size={15} className="text-blue-500 shrink-0" />
                           ) : (
-                            <MapPin size={14} className="text-emerald-500" />
+                            <MapPin size={15} className="text-emerald-500 shrink-0" />
                           )}
-                          {addr.label || "Address"}
+                          <span className="truncate">{addr.label || "Address"}</span>
                         </span>
                         {addr.isDefault && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30">
+                          <span className="text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 shrink-0">
                             DEFAULT
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      {/* Aligned Edit and Delete Controls with proper touch targets */}
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
+                          type="button"
                           onClick={() => openEditAddressModal(addr)}
-                          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition"
+                          aria-label={`Edit ${addr.label || 'saved'} address`}
+                          className="min-w-[36px] min-h-[36px] p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)]/60 hover:border-[var(--brand-accent)]/40 transition flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:outline-none"
                           title="Edit Address"
                         >
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDeleteAddress(addr._id)}
-                          className="p-1 rounded text-[var(--text-muted)] hover:text-red-500 transition"
+                          type="button"
+                          onClick={() => setAddressToDelete(addr)}
+                          aria-label={`Delete ${addr.label || 'saved'} address`}
+                          className="min-w-[36px] min-h-[36px] p-2 rounded-xl text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 border border-[var(--border-color)]/60 hover:border-rose-500/40 transition flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
                           title="Delete Address"
                         >
                           <Trash2 size={14} />
@@ -564,11 +587,21 @@ export default function CustomerProfileClient() {
                       </div>
                     </div>
 
-                    <p className="text-xs font-semibold text-[var(--text-main)]">
-                      {addr.fullName} • <span className="font-mono text-[var(--text-muted)]">{addr.phone}</span>
-                    </p>
+                    {/* Contact line with masked phone for privacy */}
+                    <div className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate">{addr.fullName}</span>
+                      {addr.phone && (
+                        <>
+                          <span className="text-[var(--text-muted)]">•</span>
+                          <span className="font-mono text-[var(--text-muted)] text-[11px]">
+                            {maskPhoneNumber(addr.phone)}
+                          </span>
+                        </>
+                      )}
+                    </div>
 
-                    <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                    {/* Address details with word-break and clean spacing */}
+                    <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed break-words">
                       {addr.street}, {addr.city}, {addr.state} - {addr.pincode}
                     </p>
                   </div>
@@ -576,14 +609,15 @@ export default function CustomerProfileClient() {
                   <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
                     {!addr.isDefault ? (
                       <button
+                        type="button"
                         onClick={() => handleSetDefaultAddress(addr._id)}
-                        className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition"
+                        className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition cursor-pointer min-h-[36px] flex items-center"
                       >
                         Set as Default
                       </button>
                     ) : (
                       <span className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-                        <Check size={12} /> Primary Delivery Address
+                        <Check size={12} strokeWidth={2.5} /> Primary Delivery Address
                       </span>
                     )}
                   </div>
@@ -898,6 +932,64 @@ export default function CustomerProfileClient() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADDRESS DELETION CONFIRMATION DIALOG ──────────────────── */}
+      {addressToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm Address Deletion"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !deletingAddress && setAddressToDelete(null)}
+        >
+          <div
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 size={24} />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-bold text-[var(--text-main)]">
+                Delete Delivery Address?
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Are you sure you want to remove <span className="font-bold text-[var(--text-main)]">"{addressToDelete.label}"</span>?
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] font-mono truncate max-w-xs mx-auto bg-[var(--bg-sub)] px-2.5 py-1 rounded-lg border border-[var(--border-color)]">
+                {addressToDelete.street}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setAddressToDelete(null)}
+                disabled={deletingAddress}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--bg-card-hover)] transition cursor-pointer disabled:opacity-50 min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAddress}
+                disabled={deletingAddress}
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 min-h-[44px] active:scale-95"
+              >
+                {deletingAddress ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Delete Address</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

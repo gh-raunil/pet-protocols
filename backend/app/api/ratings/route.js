@@ -36,33 +36,6 @@ export async function GET(request) {
 
       if (allReviews.length > 0) {
         allReviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      } else {
-        allReviews = [
-          {
-            _id: "default-rev-1",
-            rating: 5,
-            comment: "The burgers and fries were delivered piping hot. Incredible taste and presentation!",
-            review: "The burgers and fries were delivered piping hot. Incredible taste and presentation!",
-            userName: "Aarav Sharma",
-            createdAt: new Date(),
-          },
-          {
-            _id: "default-rev-2",
-            rating: 5,
-            comment: "Super fresh ingredients and the momos were the best I have had in a long time. Highly recommended!",
-            review: "Super fresh ingredients and the momos were the best I have had in a long time. Highly recommended!",
-            userName: "Priya Patel",
-            createdAt: new Date(),
-          },
-          {
-            _id: "default-rev-3",
-            rating: 5,
-            comment: "Super fast delivery and packaging was clean and eco-friendly. Will definitely order again!",
-            review: "Super fast delivery and packaging was clean and eco-friendly. Will definitely order again!",
-            userName: "Rohan Verma",
-            createdAt: new Date(),
-          },
-        ];
       }
 
       return NextResponse.json({
@@ -83,11 +56,18 @@ export async function GET(request) {
       if (!product) {
         return NextResponse.json({ success: false, message: "Product not found." }, { status: 404 });
       }
+      const reviews = product.reviews || [];
+      const hasReviews = reviews.length > 0;
+      const computedRating = hasReviews
+        ? Number((reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0) / reviews.length).toFixed(1))
+        : (typeof product.rating === "number" ? product.rating : null);
+      const computedNumRatings = hasReviews ? reviews.length : (product.numRatings || 0);
+
       return NextResponse.json({
         success: true,
-        rating: product.rating || 4.8,
-        numRatings: product.numRatings || 12,
-        reviews: product.reviews || [],
+        rating: computedRating,
+        numRatings: computedNumRatings,
+        reviews: reviews,
       });
     }
 
@@ -96,10 +76,11 @@ export async function GET(request) {
       if (!restaurant) {
         return NextResponse.json({ success: false, message: "Restaurant not found." }, { status: 404 });
       }
+      const hasRatings = typeof restaurant.rating === "number" && (restaurant.numRatings || 0) > 0;
       return NextResponse.json({
         success: true,
-        rating: restaurant.rating || 4.8,
-        numRatings: restaurant.numRatings || 28,
+        rating: hasRatings ? restaurant.rating : null,
+        numRatings: restaurant.numRatings || 0,
         reviews: [],
       });
     }
@@ -132,10 +113,12 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: "Restaurant not found." }, { status: 404 });
       }
 
-      const currentNum = restaurant.numRatings || 1;
-      const currentAvg = restaurant.rating || 4.8;
+      const currentNum = restaurant.numRatings || 0;
+      const currentAvg = typeof restaurant.rating === "number" && currentNum > 0 ? restaurant.rating : null;
       const newNum = currentNum + 1;
-      const newAvg = Number((((currentAvg * currentNum) + numericRating) / newNum).toFixed(1));
+      const newAvg = currentAvg === null
+        ? numericRating
+        : Number((((currentAvg * currentNum) + numericRating) / newNum).toFixed(1));
 
       restaurant.rating = newAvg;
       restaurant.numRatings = newNum;
@@ -155,14 +138,6 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: "Dish/Product not found." }, { status: 404 });
       }
 
-      const currentNum = product.numRatings || 1;
-      const currentAvg = product.rating || 4.8;
-      const newNum = currentNum + 1;
-      const newAvg = Number((((currentAvg * currentNum) + numericRating) / newNum).toFixed(1));
-
-      product.rating = newAvg;
-      product.numRatings = newNum;
-
       if (!product.reviews) {
         product.reviews = [];
       }
@@ -174,6 +149,13 @@ export async function POST(request) {
         createdAt: new Date(),
       };
       product.reviews.unshift(newReview);
+
+      const totalStars = product.reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+      const count = product.reviews.length;
+      const newAvg = Number((totalStars / count).toFixed(1));
+
+      product.rating = newAvg;
+      product.numRatings = count;
 
       await product.save();
 

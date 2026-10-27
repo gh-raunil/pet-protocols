@@ -23,13 +23,13 @@
 }
 
 :root {
-  --brand-accent: #ea580c;
-  --brand-accent-hover: #c2410c;
-  --bg-main: #FAF7F2;
+  --brand-accent: #f97316;
+  --brand-accent-hover: #ea580c;
+  --bg-main: #FAF7F1;
   --bg-sub: #F3EFE8;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F7F3EC;
-  --border-color: rgba(44, 34, 25, 0.12);
+  --border-color: rgba(44, 34, 25, 0.08);
   --text-main: #1C1917;
   --text-muted: #6B645C;
   --color-success: #10B981;
@@ -40,11 +40,11 @@
 .dark {
   --brand-accent: #f97316;
   --brand-accent-hover: #ea580c;
-  --bg-main: #141518;
-  --bg-sub: #1B1D22;
-  --bg-card: #20232A;
-  --bg-card-hover: #282C35;
-  --border-color: rgba(255, 255, 255, 0.1);
+  --bg-main: #0B1117;
+  --bg-sub: #111A22;
+  --bg-card: #111A22;
+  --bg-card-hover: #16202A;
+  --border-color: rgba(255, 255, 255, 0.08);
   --text-main: #F8FAFC;
   --text-muted: #94A3B8;
   --color-success: #10B981;
@@ -110,10 +110,27 @@ input, textarea, select {
   color-scheme: dark light;
 }
 
+/* Accessible focus rings with visible contrast */
+:where(a:any-link, button, textarea, select):focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
+:where(input:not([class*="outline-none"]):not([class*="border-0"])):focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
+/* Form inputs with explicit outline-none or inside focus-within wrappers should never display redundant inner focus outlines */
+input.outline-none,
+input[class*="outline-none"],
 input:focus,
-textarea:focus,
-select:focus {
+input:focus-visible,
+[class*="focus-within"] input,
+[class*="focus-within"] textarea {
   outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
 }
 
 /* Eliminate WebKit/Chrome autofill white background block and preserve theme text */
@@ -131,6 +148,50 @@ select:-webkit-autofill:focus {
   box-shadow: 0 0 0px 1000px var(--bg-sub) inset !important;
   transition: background-color 5000s ease-in-out 0s;
   border-color: var(--brand-accent) !important;
+}
+
+/* ── Mobile Usability & Touch Target Standards (WCAG 2.5.8 / 44px) ── */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-target-compact {
+  min-height: 40px;
+  min-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Prevent unwanted automatic zoom shifts on iOS Safari / WebKit when focusing inputs */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Coarse pointer enhancements for touch screens */
+@media (pointer: coarse) {
+  button, 
+  a[role="button"], 
+  input[type="button"], 
+  input[type="submit"] {
+    touch-action: manipulation;
+  }
+}
+
+/* Safe area insets for notches, island, and gesture home indicator */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
 }
 
 @keyframes toastSlideIn {

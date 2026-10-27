@@ -265,12 +265,12 @@ export default function DeliveryLocationMapPicker({
             if (accuracyCircleRef.current) {
               map.removeLayer(accuracyCircleRef.current);
             }
-            if (accuracy && accuracy < 200) {
+            if (accuracy && accuracy < 600) {
               accuracyCircleRef.current = L.circle([latitude, longitude], {
                 radius: accuracy,
                 color: "#10B981",
                 fillColor: "#10B981",
-                fillOpacity: 0.15,
+                fillOpacity: 0.12,
                 weight: 1.5,
               }).addTo(map);
             }
@@ -285,7 +285,7 @@ export default function DeliveryLocationMapPicker({
           setGeoError("Unable to acquire device GPS position. Move map manually to drop pin.");
         }
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   }, []);
 
@@ -300,7 +300,7 @@ export default function DeliveryLocationMapPicker({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl bg-[var(--bg-card,#141518)] border border-[var(--border-color,rgba(255,255,255,0.1))] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[var(--border-color,rgba(255,255,255,0.1))] bg-[var(--bg-main,#0D0E10)]">
@@ -467,12 +467,19 @@ export default function DeliveryLocationMapPicker({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 bg-[var(--bg-main,#0D0E10)] border-t border-[var(--border-color,rgba(255,255,255,0.1))] flex-wrap gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {selectedCoords ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                {Number(selectedCoords.latitude).toFixed(5)}, {Number(selectedCoords.longitude).toFixed(5)}
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  {Number(selectedCoords.latitude).toFixed(5)}, {Number(selectedCoords.longitude).toFixed(5)}
+                </span>
+                {selectedCoords.accuracy && (
+                  <span className="text-[11px] text-stone-400 font-medium">
+                    (Accuracy: ~{Math.round(selectedCoords.accuracy)}m)
+                  </span>
+                )}
+              </>
             ) : (
               <span className="text-xs text-stone-500 italic">No coordinates selected</span>
             )}

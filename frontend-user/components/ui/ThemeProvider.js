@@ -2,6 +2,17 @@
 
 import React, { createContext, useContext, useEffect, useState, useTransition } from "react";
 
+// Suppress the React 19 / Next.js development warning for initial inline theme script
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  const originalError = console.error;
+  console.error = (...args) => {
+    if (typeof args[0] === "string" && args[0].includes("Encountered a script tag")) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
+
 export const THEME_KEY = "pet_protocols_customer_theme";
 export const PALETTE_KEY = "pet_protocols_customer_palette";
 const SHARED_KEY = "pet_protocols_theme";
@@ -10,34 +21,34 @@ export const PALETTES = [
   {
     id: "fresh-orange",
     name: "Fresh Orange",
-    description: "Warm cream, burnt orange, and deep charcoal",
-    swatches: ["#141518", "#20232A", "#EA580C", "#F97316", "#FAF7F2"],
+    description: "Warm cream, vibrant orange, and deep charcoal",
+    swatches: ["#0B1117", "#111A22", "#EA580C", "#F97316", "#FAF7F1"],
     light: {
-      accent: "#ea580c",
-      accentHover: "#c2410c",
-      bgMain: "#FAF7F2",
+      accent: "#f97316",
+      accentHover: "#ea580c",
+      bgMain: "#FAF7F1",
       bgSub: "#F3EFE8",
       bgCard: "#FFFFFF",
       bgCardHover: "#F7F3EC",
-      borderColor: "rgba(44, 34, 25, 0.12)",
+      borderColor: "rgba(44, 34, 25, 0.08)",
       textMain: "#1C1917",
       textMuted: "#6B645C",
     },
     dark: {
       accent: "#f97316",
       accentHover: "#ea580c",
-      bgMain: "#141518",
-      bgSub: "#1B1D22",
-      bgCard: "#20232A",
-      bgCardHover: "#282C35",
-      borderColor: "rgba(255, 255, 255, 0.1)",
+      bgMain: "#0B1117",
+      bgSub: "#111A22",
+      bgCard: "#111A22",
+      bgCardHover: "#16202A",
+      borderColor: "rgba(255, 255, 255, 0.08)",
       textMain: "#F8FAFC",
       textMuted: "#94A3B8",
     },
     preview: {
-      primary: "#ea580c",
-      bg: "#FAF7F2",
-      card: "#20232A",
+      primary: "#f97316",
+      bg: "#FAF7F1",
+      card: "#111A22",
       accent: "#f97316",
     },
   },

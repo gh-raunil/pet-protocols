@@ -74,31 +74,17 @@ const RightSection = ({
   const superadminUrl = process.env.NEXT_PUBLIC_SUPERADMIN_URL || defaultSuperadminUrl;
 
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
-      {/* Light / Dark Mode Quick Toggle */}
-      <ThemeToggle />
+    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 shrink-0">
+      {/* Light / Dark Mode Quick Toggle (Desktop only; on mobile handled in Settings) */}
+      <div className="hidden md:flex items-center">
+        <ThemeToggle />
+      </div>
 
-      {/* Customer Notifications (Desktop) */}
+      {/* Customer Notifications */}
       {!isRestaurantAdmin && !isSuperadmin && (
-        <div className="hidden sm:block">
+        <div className="flex items-center shrink-0">
           <NotificationBell />
         </div>
-      )}
-
-      {/* Mobile Search Button (visible below md breakpoint, positioned immediately before Cart button) */}
-      {!isRestaurantAdmin && !isSuperadmin && onOpenMobileSearch && (
-        <Tooltip content="Search dishes and kitchens" placement="bottom">
-          <button
-            ref={mobileSearchButtonRef}
-            type="button"
-            onClick={onOpenMobileSearch}
-            aria-label="Search dishes and menu"
-            aria-expanded={Boolean(isMobileSearchOpen)}
-            className="md:hidden relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none"
-          >
-            <Search size={21} />
-          </button>
-        </Tooltip>
       )}
 
       {/* Cart Icon Button */}
@@ -112,13 +98,14 @@ const RightSection = ({
           placement="bottom"
         >
           <button
-            className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[38px] min-h-[38px] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            type="button"
+            className="relative hover:text-[var(--brand-accent)] transition duration-200 active:scale-95 p-2 rounded-xl text-[var(--text-main)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             onClick={() => openCart()}
             aria-label="Open Cart"
           >
-            <ShoppingCart size={19} />
+            <ShoppingCart size={20} />
             {isMounted && totalItems > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-[var(--brand-accent)] text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-[var(--brand-accent)]/30">
+              <span className="absolute -top-1 -right-1 bg-[var(--brand-accent)] text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-md shadow-[var(--brand-accent)]/30">
                 {totalItems}
               </span>
             )}
@@ -129,43 +116,29 @@ const RightSection = ({
       {/* Auth Dropdown or Login Button (Visible on sm+ screens; on mobile, managed in Hamburger Drawer) */}
       {session ? (
         <div className="hidden sm:block relative" ref={dropdownRef}>
-          <Tooltip content="Manage account, orders & saved addresses" placement="bottom">
+          <Tooltip content={`Account: ${session.user.name || "User"}`} placement="bottom">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
               aria-expanded={dropdownOpen}
               aria-label="Account Menu"
-              className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full pl-1 pr-3 py-1 hover:border-[var(--brand-accent)] transition shadow-sm"
+              className="flex items-center p-0.5 rounded-full bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] border border-[var(--border-color)] hover:border-[var(--brand-accent)] transition shadow-2xs active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]"
             >
-            <div className="w-7 h-7 rounded-full bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] font-bold flex items-center justify-center text-xs overflow-hidden">
-              {session.user.image ? (
-                <Image
-                  src={session.user.image}
-                  alt={session.user.name || "User"}
-                  width={28}
-                  height={28}
-                  unoptimized={session.user.image.startsWith("data:")}
-                  className="rounded-full object-cover w-7 h-7"
-                />
-              ) : (
-                <span>{session.user.name?.charAt(0)?.toUpperCase() || "U"}</span>
-              )}
-            </div>
-            <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs text-[var(--text-main)] font-semibold leading-tight truncate max-w-[85px]">
-                {session.user.name?.split(" ")[0]}
-              </span>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--brand-accent)]">
-                {isSuperadmin ? "Superadmin" : isRestaurantAdmin ? "Kitchen Admin" : "Foodie"}
-              </span>
-            </div>
-            <ChevronDown
-              size={13}
-              className={`text-[var(--text-muted)] transition-transform duration-200 ${
-                dropdownOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-        </Tooltip>
+              <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] text-white font-bold flex items-center justify-center text-xs overflow-hidden shadow-2xs">
+                {session.user.image ? (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name || "User"}
+                    width={32}
+                    height={32}
+                    unoptimized={session.user.image.startsWith("data:")}
+                    className="rounded-full object-cover w-8 h-8"
+                  />
+                ) : (
+                  <span>{session.user.name?.charAt(0)?.toUpperCase() || "R"}</span>
+                )}
+              </div>
+            </button>
+          </Tooltip>
 
           {dropdownOpen && (
             <div className="absolute right-0 top-11 w-64 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl z-50 py-1">
@@ -289,10 +262,10 @@ const RightSection = ({
           )}
         </div>
       ) : (
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
           <Link
             href="/auth/login"
-            className="bg-[var(--brand-accent)] hover:opacity-90 text-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition shadow-md shadow-[var(--brand-accent)]/20"
+            className="bg-[var(--brand-accent)] hover:opacity-90 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition shadow-md shadow-[var(--brand-accent)]/20 shrink-0 whitespace-nowrap"
           >
             Sign In
           </Link>

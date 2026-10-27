@@ -54,7 +54,7 @@ export default function NotificationBell() {
       <button
         onClick={toggleNotifications}
         aria-label="Open notifications"
-        className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] cursor-pointer"
+        className="relative hover:text-[var(--brand-accent)] transition duration-200 hover:scale-105 p-2 rounded-xl text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center min-w-[36px] min-h-[36px] cursor-pointer shrink-0"
       >
         <Bell size={20} />
         {unreadCount > 0 && (

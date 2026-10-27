@@ -8,7 +8,7 @@ import { checkSignupRateLimit } from "@/lib/rateLimit";
 export async function POST(request) {
   try {
     // 1. Rate Limiting Protection (Sliding-window: max 5 signups / 15m per IP)
-    const rateLimit = checkSignupRateLimit(request);
+    const rateLimit = await checkSignupRateLimit(request);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {

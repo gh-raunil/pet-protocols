@@ -34,6 +34,7 @@ export function usePWAInstall() {
 
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -49,6 +50,9 @@ export function usePWAInstall() {
     const isIOSDevice =
       /iphone|ipad|ipod/.test(ua) && !window.MSStream && !standaloneCheck;
     setIsIOS(Boolean(isIOSDevice));
+
+    const isAndroidDevice = /android/.test(ua) && !standaloneCheck;
+    setIsAndroid(Boolean(isAndroidDevice));
   }, []);
 
   const triggerInstall = async () => {
@@ -73,6 +77,7 @@ export function usePWAInstall() {
     isInstallable: Boolean(deferredPrompt),
     isInstalled: isStandalone,
     isIOS,
+    isAndroid,
     triggerInstall,
   };
 }

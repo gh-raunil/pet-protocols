@@ -3,12 +3,14 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Minus, Plus, Trash2, X, ShoppingBag, ArrowRight } from "lucide-react";
+import { Minus, Plus, Trash2, X, ShoppingBag, ArrowRight, Sparkles, AlertCircle, MapPin } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
+import { areAllRestaurantsPickupEnabled } from "@/lib/pickupHelper";
 import Tooltip, { HelpTooltip } from "../ui/Tooltip";
+import useLocationStore from "@/lib/locationStore";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -27,6 +29,7 @@ export default function CartDrawer() {
   const { data: session } = useSession();
   const router = useRouter();
   const [offers, setOffers] = useState([]);
+  const { locationDetails, getRestaurantServiceability, openLocationModal } = useLocationStore();
 
   useEffect(() => {
     fetch("/api/offers")
@@ -53,8 +56,52 @@ export default function CartDrawer() {
     }
   }, [isOpen, closeCart]);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const currentItems = mounted ? items : [];
+
+  const unserviceableKitchens = useMemo(() => {
+    if (!mounted || currentItems.length === 0) return [];
+    if (!locationDetails?.hasExactCoordinates || !locationDetails?.latitude || !locationDetails?.longitude) {
+      return [];
+    }
+    const unserviceable = [];
+    const seen = new Set();
+    currentItems.forEach((item) => {
+      const rest = item.restaurant;
+      const restId = rest?._id || rest?.id || rest?.name;
+      if (!restId || seen.has(restId)) return;
+      seen.add(restId);
+      const serv = getRestaurantServiceability(rest);
+      if (serv && serv.isServiceable === false) {
+        unserviceable.push({
+          name: rest.name || rest.title || "Kitchen",
+          restaurant: rest,
+          reason: serv.reason || "Outside delivery range",
+          distanceKm: serv.distanceKm,
+          maxRadiusKm: serv.maxRadiusKm,
+        });
+      }
+    });
+    return unserviceable;
+  }, [mounted, currentItems, locationDetails, getRestaurantServiceability]);
+
+  const canSwitchToPickup = useMemo(() => {
+    if (unserviceableKitchens.length === 0) return false;
+    const rests = unserviceableKitchens.map((k) => k.restaurant).filter(Boolean);
+    if (rests.length === 0) return false;
+    const cap = areAllRestaurantsPickupEnabled(rests);
+    return cap.isSupported;
+  }, [unserviceableKitchens]);
+
   const handleCheckout = () => {
     closeCart();
+    if (unserviceableKitchens.length > 0) {
+      router.push("/cart");
+      return;
+    }
     if (!session) {
       router.push("/auth/login?callbackUrl=/checkout");
       return;
@@ -62,17 +109,19 @@ export default function CartDrawer() {
     router.push("/checkout");
   };
 
-  const subtotal = getTotalPrice();
+  const subtotal = mounted ? getTotalPrice() : 0;
   const { autoDiscountAmount } = useMemo(
-    () => calculateCartDiscounts(items, offers),
-    [items, offers]
+    () => calculateCartDiscounts(currentItems, offers),
+    [currentItems, offers]
   );
-  const primaryRest = items[0]?.restaurant;
+  const primaryRest = currentItems[0]?.restaurant;
   const flatFee = primaryRest?.chargeSettings?.flatDeliveryFee ?? 40;
   const freeThreshold = primaryRest?.chargeSettings?.freeDeliveryThreshold ?? 500;
   const isFreeDelivery = subtotal >= freeThreshold;
-  const deliveryFee = items.length > 0 ? (isFreeDelivery ? 0 : flatFee) : 0;
+  const deliveryFee = currentItems.length > 0 ? (isFreeDelivery ? 0 : flatFee) : 0;
   const total = Math.max(0, subtotal + deliveryFee - autoDiscountAmount);
+  const itemCount = currentItems.reduce((acc, i) => acc + (i.quantity || 1), 0);
+  const freeDeliveryPercent = Math.min(100, Math.round((subtotal / freeThreshold) * 100));
 
   return (
     <>
@@ -80,7 +129,7 @@ export default function CartDrawer() {
       <div
         onClick={closeCart}
         aria-hidden="true"
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-xs z-[80] transition-opacity duration-300 ${
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       />
@@ -90,22 +139,31 @@ export default function CartDrawer() {
         role="dialog"
         aria-modal="true"
         aria-label="Shopping Cart Drawer"
-        className={`fixed top-0 right-0 h-[100dvh] w-full sm:w-[420px] bg-[var(--bg-main)] border-l border-[var(--border-color)] z-[90] flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 h-[100dvh] w-full sm:w-[440px] bg-[var(--bg-main)] border-l border-[var(--border-color)] z-[90] flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={20} className="text-[var(--brand-accent)]" />
-            <h2 className="text-base font-extrabold text-[var(--text-main)]">
-              Your Feast Cart
-            </h2>
-            <span className="text-xs font-bold text-[var(--text-muted)]">
-              ({items.reduce((acc, i) => acc + (i.quantity || 1), 0)})
-            </span>
+        {/* Editorial Header */}
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] flex items-center justify-center">
+              <ShoppingBag size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-serif font-black tracking-tight text-[var(--text-main)]">
+                  Your Cart
+                </h2>
+                <span suppressHydrationWarning className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+                  {itemCount} {itemCount === 1 ? "item" : "items"}
+                </span>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] tracking-wide">
+                Fresh food. Zero compromises.
+              </p>
+            </div>
             {isSyncing && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse ml-1">
                 Syncing...
               </span>
             )}
@@ -114,39 +172,114 @@ export default function CartDrawer() {
           <Tooltip content="Close cart drawer" placement="left">
             <button
               onClick={closeCart}
+              type="button"
               aria-label="Close cart drawer"
-              className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+              className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition cursor-pointer flex items-center justify-center active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
-              <X size={20} />
+              <X size={22} />
             </button>
           </Tooltip>
         </div>
 
-        {/* Empty state */}
-        {items.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] flex items-center justify-center mb-4">
-              <ShoppingBag size={30} />
+        {/* Free Delivery Threshold Bar */}
+        {currentItems.length > 0 && (
+          <div className="px-6 py-3 bg-[var(--bg-sub)] border-b border-[var(--border-color)]">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="font-semibold text-[var(--text-main)] flex items-center gap-1.5 text-[11px]">
+                <Sparkles size={13} className="text-[var(--brand-accent)]" />
+                {isFreeDelivery
+                  ? "Free Delivery Unlocked!"
+                  : `Add ₹${Math.max(0, freeThreshold - subtotal)} more for Free Delivery`}
+              </span>
+              <span className="text-[11px] font-mono text-[var(--text-muted)] font-bold">
+                {freeDeliveryPercent}%
+              </span>
             </div>
-            <h3 className="text-lg font-bold text-[var(--text-main)]">
+            <div
+              className="w-full h-1.5 rounded-full bg-[var(--border-color)] overflow-hidden"
+              role="progressbar"
+              aria-valuenow={freeDeliveryPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Free delivery progress"
+            >
+              <div
+                className="h-full rounded-full bg-[var(--brand-accent)] transition-all duration-500 ease-out"
+                style={{ width: `${freeDeliveryPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {currentItems.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <div className="w-20 h-20 rounded-3xl bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] flex items-center justify-center mb-5 shadow-xs">
+              <ShoppingBag size={34} />
+            </div>
+            <h3 className="text-xl font-serif font-black tracking-tight text-[var(--text-main)]">
               Your cart is empty
             </h3>
-            <p className="text-xs text-[var(--text-muted)] max-w-xs mt-1 mb-6">
-              Explore dishes and add something you love.
+            <p className="text-xs text-[var(--text-muted)] max-w-xs mt-1.5 mb-6 leading-relaxed">
+              Explore freshly prepared gourmet meals from our artisan kitchens and add your favorites.
             </p>
             <Link
               href="/menu"
               onClick={closeCart}
-              className="px-6 py-3 rounded-2xl bg-[var(--brand-accent)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/25 hover:opacity-90 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+              className="px-6 py-3 min-h-[44px] inline-flex items-center justify-center rounded-2xl bg-[var(--brand-accent)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 hover:opacity-95 transition cursor-pointer active:scale-98 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
               Explore Menu
             </Link>
           </div>
         ) : (
           <>
+            {/* Out-of-Range Serviceability Warning (Keeps items, never silently discards) */}
+            {unserviceableKitchens.length > 0 && (
+              <div className="mx-4 sm:mx-5 mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="font-bold text-[12px]">
+                      {unserviceableKitchens.length === 1
+                        ? `${unserviceableKitchens[0].name} is outside delivery range.`
+                        : "Some kitchens are outside delivery range."}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      {unserviceableKitchens.map((k) =>
+                        k.distanceKm != null
+                          ? `${k.name} is ${k.distanceKm} km away (delivery radius ${k.maxRadiusKm} km)`
+                          : k.reason
+                      ).join(" • ")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-amber-500/20">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeCart();
+                      openLocationModal();
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-[var(--brand-accent)] text-white font-bold text-[11px] hover:opacity-95 transition flex items-center gap-1 active:scale-95 cursor-pointer"
+                  >
+                    <MapPin size={12} /> Change Location
+                  </button>
+                  {canSwitchToPickup && (
+                    <Link
+                      href="/cart?type=pickup"
+                      onClick={closeCart}
+                      className="px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] font-semibold text-[11px] hover:border-[var(--brand-accent)]/30 transition active:scale-95 flex items-center gap-1"
+                    >
+                      Switch to Pickup
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Scrollable Items List */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-              {items.map((item) => (
+              {currentItems.map((item) => (
                 <CartDrawerItem
                   key={item.cartItemId || `${item._id}__${item.variantName || 'default'}`}
                   item={item}
@@ -157,12 +290,12 @@ export default function CartDrawer() {
               ))}
             </div>
 
-            {/* Footer Summary & Checkout Button */}
-            <div className="p-5 border-t border-[var(--border-color)] bg-[var(--bg-card)] space-y-3">
-              <div className="space-y-1.5 text-xs text-[var(--text-muted)]">
+            {/* Footer Summary & Checkout Button with Safe Area Padding */}
+            <div className="p-5 pb-safe border-t border-[var(--border-color)] bg-[var(--bg-card)] space-y-3 shadow-lg">
+              <div className="space-y-2 text-xs text-[var(--text-muted)]">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-[var(--text-main)]">₹{subtotal}</span>
+                  <span className="font-mono font-semibold text-[var(--text-main)]">₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="flex items-center gap-1">
@@ -177,40 +310,53 @@ export default function CartDrawer() {
                       side="top"
                     />
                   </span>
-                  <span className="font-semibold text-[var(--text-main)]">
+                  <span className="font-mono font-semibold text-[var(--text-main)]">
                     {deliveryFee === 0 ? (
-                      <span className="text-emerald-500 font-bold uppercase tracking-wider text-[11px]">FREE</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider text-[11px]">FREE</span>
                     ) : (
                       `₹${deliveryFee}`
                     )}
                   </span>
                 </div>
                 {autoDiscountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>⚡ Auto Discount</span>
-                    <span>-₹{autoDiscountAmount}</span>
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="flex items-center gap-1">
+                      <Sparkles size={12} /> Auto Discount
+                    </span>
+                    <span className="font-mono">-₹{autoDiscountAmount}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-[var(--border-color)] flex justify-between items-baseline text-sm">
-                  <span className="font-bold text-[var(--text-main)]">Total</span>
-                  <span className="text-xl font-black text-[var(--brand-accent)]">₹{total}</span>
+                <div className="pt-2.5 border-t border-[var(--border-color)] flex justify-between items-baseline text-sm">
+                  <div>
+                    <span className="font-serif font-bold text-base text-[var(--text-main)]">Estimated Total</span>
+                    <p className="text-[10px] text-[var(--text-muted)]">Final totals revalidated at checkout</p>
+                  </div>
+                  <span className="text-2xl font-mono font-black text-[var(--brand-accent)]">₹{total}</span>
                 </div>
               </div>
 
-              <div className="pt-1 space-y-2">
+              <div className="pt-1.5 space-y-2.5">
                 <button
                   type="button"
                   onClick={handleCheckout}
                   disabled={items.length === 0}
-                  className="w-full py-3.5 rounded-2xl bg-[var(--brand-accent)] text-white text-xs font-extrabold shadow-lg shadow-[var(--brand-accent)]/20 hover:opacity-95 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  className={`w-full min-h-[48px] py-3.5 rounded-2xl text-white text-sm font-extrabold shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                    unserviceableKitchens.length > 0
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                      : "bg-[var(--brand-accent)] hover:opacity-95 shadow-[var(--brand-accent)]/20"
+                  }`}
                 >
-                  <span>Proceed to Checkout</span>
-                  <ArrowRight size={15} />
+                  <span>
+                    {unserviceableKitchens.length > 0
+                      ? "Review Location in Cart"
+                      : "Proceed to Checkout"}
+                  </span>
+                  <ArrowRight size={16} />
                 </button>
                 <Link
                   href="/cart"
                   onClick={closeCart}
-                  className="w-full py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-center text-xs font-semibold hover:border-[var(--brand-accent)]/30 transition block cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  className="w-full min-h-[44px] py-3 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-center text-xs font-semibold hover:border-[var(--brand-accent)]/30 transition flex items-center justify-center cursor-pointer active:scale-98 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                 >
                   View Full Cart Page
                 </Link>
@@ -232,8 +378,10 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
     setImgSrc(item.image || FALLBACK_IMAGE);
   }, [item.image]);
 
+  const portionText = item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '') + (item.size ? ` • ${item.size}` : '');
+
   return (
-    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-3 shadow-xs">
+    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-3.5 shadow-xs hover:border-[var(--brand-accent)]/30 transition-colors">
       <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-[var(--bg-sub)] shrink-0 border border-[var(--border-color)]">
         <Image
           src={imgSrc}
@@ -249,39 +397,39 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
         <h4 className="text-xs font-bold text-[var(--text-main)] truncate">
           {item.name}
         </h4>
-        {item.variantName && (
-          <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20 mt-0.5 mr-1">
-            {item.variantName}
-          </span>
-        )}
-        {(item.servingLabel || item.portionQuantity || item.size) && (
-          <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-            {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
-            {item.size ? ` • ${item.size}` : ''}
-            {qty > 1 && item.portionQuantity ? ` (${qty * Number(item.portionQuantity)} ${item.portionUnit || ''} total)` : ''}
-          </p>
-        )}
-        <p className="text-xs text-[var(--text-muted)] mt-0.5">
-          ₹{item.price} each
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+          {item.variantName && (
+            <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20">
+              {item.variantName}
+            </span>
+          )}
+          {portionText && (
+            <span className="inline-block text-[10px] text-[var(--text-muted)] truncate">
+              {portionText}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] font-mono text-[var(--text-muted)] mt-0.5">
+          ₹{item.price} × {qty}
         </p>
-        <p className="text-xs font-extrabold text-[var(--brand-accent)] mt-0.5">
+        <p className="text-xs font-mono font-extrabold text-[var(--brand-accent)] mt-0.5">
           ₹{(item.price || 0) * qty}
         </p>
       </div>
 
       {/* Quantity controls */}
-      <div className="flex items-center gap-1.5 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1 shrink-0">
+      <div className="flex items-center gap-1 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl p-1 shrink-0">
         <Tooltip content="Reduce quantity" placement="top">
           <button
             type="button"
             onClick={() => decreaseQty(itemKey)}
             aria-label={`Decrease quantity of ${item.name}`}
-            className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer active:scale-90 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
           >
-            <Minus size={12} />
+            <Minus size={14} />
           </button>
         </Tooltip>
-        <span className="w-5 text-center text-xs font-bold text-[var(--text-main)]">
+        <span className="w-6 text-center text-xs font-mono font-bold text-[var(--text-main)]">
           {qty}
         </span>
         <Tooltip
@@ -293,9 +441,9 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
             onClick={() => increaseQty(itemKey)}
             disabled={qty >= 20}
             aria-label={`Increase quantity of ${item.name}`}
-            className="w-6 h-6 rounded flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] transition cursor-pointer active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
           >
-            <Plus size={12} />
+            <Plus size={14} />
           </button>
         </Tooltip>
       </div>
@@ -306,9 +454,9 @@ function CartDrawerItem({ item, decreaseQty, increaseQty, removeItem }) {
           type="button"
           onClick={() => removeItem(itemKey)}
           aria-label={`Remove ${item.name} from cart`}
-          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
+          className="p-2 min-w-[36px] min-h-[36px] rounded-xl text-rose-500 hover:bg-rose-500/10 transition shrink-0 cursor-pointer active:scale-90 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
         >
-          <Trash2 size={15} />
+          <Trash2 size={16} />
         </button>
       </Tooltip>
     </div>

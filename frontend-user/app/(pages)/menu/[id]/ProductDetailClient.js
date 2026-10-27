@@ -25,8 +25,8 @@ import {
   X,
   Flame,
   Layers,
-  Scale,
   Utensils,
+  Award,
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
@@ -35,17 +35,26 @@ import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
 import ProductCarousel from "@/components/products/ProductCarousel";
-import { getProductActiveOffer, calculateItemDiscount, isProductNewArrival } from "@/lib/offersHelper";
+import {
+  getProductActiveOffer,
+  calculateItemDiscount,
+  isProductNewArrival,
+} from "@/lib/offersHelper";
 
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800";
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800";
 
 export default function ProductDetailClient({ product }) {
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [reviewsList, setReviewsList] = useState(product?.reviews || []);
-  const [currentRating, setCurrentRating] = useState(product?.rating || 4.5);
-  const [numRatings, setNumRatings] = useState(product?.numRatings || 18);
+  const [currentRating, setCurrentRating] = useState(
+    typeof product?.rating === "number" && product?.numRatings > 0 ? product.rating : null
+  );
+  const [numRatings, setNumRatings] = useState(
+    typeof product?.numRatings === "number" ? product.numRatings : 0
+  );
   const [offers, setOffers] = useState([]);
   const [imgSrc, setImgSrc] = useState(product?.image || FALLBACK_IMAGE);
 
@@ -76,13 +85,15 @@ export default function ProductDetailClient({ product }) {
   // Match targeted active offer (Option A vs Option B)
   const matchedOffer = getProductActiveOffer(product, offers);
   const isAutoDiscount = matchedOffer && matchedOffer.applyMode === "automatic";
-  const isCouponOffer = matchedOffer && (!matchedOffer.applyMode || matchedOffer.applyMode === "coupon");
+  const isCouponOffer =
+    matchedOffer &&
+    (!matchedOffer.applyMode || matchedOffer.applyMode === "coupon");
 
   // Variant selection state
   const hasVariants = Boolean(
     product?.hasVariants &&
-    Array.isArray(product?.variants) &&
-    product.variants.length > 0
+      Array.isArray(product?.variants) &&
+      product.variants.length > 0
   );
 
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(() => {
@@ -91,10 +102,15 @@ export default function ProductDetailClient({ product }) {
     return firstAvail >= 0 ? firstAvail : 0;
   });
 
-  const selectedVariant = hasVariants && selectedVariantIndex >= 0 ? product.variants[selectedVariantIndex] : null;
+  const selectedVariant =
+    hasVariants && selectedVariantIndex >= 0
+      ? product.variants[selectedVariantIndex]
+      : null;
 
   // Base price: variant price or product.price
-  const rawBasePrice = selectedVariant ? Number(selectedVariant.price) || 0 : (product?.price || 0);
+  const rawBasePrice = selectedVariant
+    ? Number(selectedVariant.price) || 0
+    : product?.price || 0;
 
   // Active portion metadata resolved from variant or root dish
   const activePortion = useMemo(() => {
@@ -117,7 +133,10 @@ export default function ProductDetailClient({ product }) {
       return activePortion.servingLabel.trim();
     }
     const qty = activePortion.quantity;
-    const unit = activePortion.unit === "custom" ? activePortion.customUnit : activePortion.unit;
+    const unit =
+      activePortion.unit === "custom"
+        ? activePortion.customUnit
+        : activePortion.unit;
     if (qty && unit) {
       const sizePart = activePortion.size ? ` (${activePortion.size})` : "";
       return `${qty} ${unit}${sizePart}`;
@@ -132,18 +151,30 @@ export default function ProductDetailClient({ product }) {
   let autoDiscount = 0;
   let displayPrice = rawBasePrice;
   if (isAutoDiscount) {
-    autoDiscount = calculateItemDiscount({ ...product, price: rawBasePrice }, matchedOffer);
+    autoDiscount = calculateItemDiscount(
+      { ...product, price: rawBasePrice },
+      matchedOffer
+    );
     displayPrice = Math.max(0, rawBasePrice - autoDiscount);
   }
 
   // Option A: catalog price is NOT reduced; coupon code is displayed
   const baseComparePrice = rawBasePrice;
-  const hasStrikethrough = isAutoDiscount ? true : Boolean(product?.originalPrice && product.originalPrice > baseComparePrice);
+  const hasStrikethrough = isAutoDiscount
+    ? true
+    : Boolean(product?.originalPrice && product.originalPrice > baseComparePrice);
   const struckPrice = isAutoDiscount ? baseComparePrice : product?.originalPrice;
-  const discountPercent = struckPrice > displayPrice ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100) : 0;
+  const discountPercent =
+    struckPrice > displayPrice
+      ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100)
+      : 0;
+
   const deliveryFee = product?.restaurant?.chargeSettings?.flatDeliveryFee ?? 40;
-  const freeThreshold = product?.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
-  const prepTime = product?.preparationTime ? `${product.preparationTime} mins` : "15–20 mins";
+  const freeThreshold =
+    product?.restaurant?.chargeSettings?.freeDeliveryThreshold ?? 500;
+  const prepTime = product?.preparationTime
+    ? `${product.preparationTime} mins`
+    : "15–20 mins";
 
   // Dynamic review distribution calculated honestly from reviewsList
   const starDistribution = useMemo(() => {
@@ -154,8 +185,16 @@ export default function ProductDetailClient({ product }) {
     });
     const total = reviewsList.length || 1;
     return [
-      { star: "5 ★", pct: Math.round((counts[5] / total) * 100), color: "bg-emerald-600 dark:bg-emerald-500" },
-      { star: "4 ★", pct: Math.round((counts[4] / total) * 100), color: "bg-emerald-600 dark:bg-emerald-500" },
+      {
+        star: "5 ★",
+        pct: Math.round((counts[5] / total) * 100),
+        color: "bg-emerald-600 dark:bg-emerald-500",
+      },
+      {
+        star: "4 ★",
+        pct: Math.round((counts[4] / total) * 100),
+        color: "bg-emerald-600 dark:bg-emerald-500",
+      },
       { star: "3 ★", pct: Math.round((counts[3] / total) * 100), color: "bg-amber-500" },
       { star: "2 ★", pct: Math.round((counts[2] / total) * 100), color: "bg-orange-500" },
       { star: "1 ★", pct: Math.round((counts[1] / total) * 100), color: "bg-rose-500" },
@@ -176,7 +215,9 @@ export default function ProductDetailClient({ product }) {
       if (!product?._id) return;
       try {
         // Fetch reviews
-        const rateRes = await fetch(`/api/ratings?targetType=product&targetId=${product._id}`).then((r) => r.json());
+        const rateRes = await fetch(
+          `/api/ratings?targetType=product&targetId=${product._id}`
+        ).then((r) => r.json());
         if (rateRes.success) {
           if (rateRes.reviews && Array.isArray(rateRes.reviews)) {
             setReviewsList(rateRes.reviews);
@@ -191,7 +232,9 @@ export default function ProductDetailClient({ product }) {
           const others = prodRes.products.filter((p) => p._id !== product._id);
           // Prefer dishes from same category or same kitchen
           const related = others.filter(
-            (p) => p.category === product.category || p.restaurant?._id === product.restaurant?._id
+            (p) =>
+              p.category === product.category ||
+              p.restaurant?._id === product.restaurant?._id
           );
           setSimilarProducts(related.length >= 3 ? related : others.slice(0, 10));
         }
@@ -218,7 +261,9 @@ export default function ProductDetailClient({ product }) {
     }
     if (!restStatus.isOpen) {
       toast.error(
-        `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}. Ordering is unavailable right now.`
+        `${product.restaurant?.name || "Kitchen"} is ${
+          restStatus.reason || "currently closed"
+        }. Ordering is unavailable right now.`
       );
       return;
     }
@@ -229,7 +274,10 @@ export default function ProductDetailClient({ product }) {
       price: rawBasePrice,
       variantName: selectedVariant ? selectedVariant.name : undefined,
       portionQuantity: activePortion?.quantity,
-      portionUnit: activePortion?.unit === "custom" ? activePortion?.customUnit : activePortion?.unit,
+      portionUnit:
+        activePortion?.unit === "custom"
+          ? activePortion?.customUnit
+          : activePortion?.unit,
       servingLabel: activePortion?.servingLabel,
       size: activePortion?.size,
     };
@@ -248,7 +296,9 @@ export default function ProductDetailClient({ product }) {
     }
     if (!restStatus.isOpen) {
       toast.error(
-        `${product.restaurant?.name || "Kitchen"} is ${restStatus.reason || "currently closed"}.`
+        `${product.restaurant?.name || "Kitchen"} is ${
+          restStatus.reason || "currently closed"
+        }.`
       );
       return;
     }
@@ -259,7 +309,10 @@ export default function ProductDetailClient({ product }) {
       price: rawBasePrice,
       variantName: selectedVariant ? selectedVariant.name : undefined,
       portionQuantity: activePortion?.quantity,
-      portionUnit: activePortion?.unit === "custom" ? activePortion?.customUnit : activePortion?.unit,
+      portionUnit:
+        activePortion?.unit === "custom"
+          ? activePortion?.customUnit
+          : activePortion?.unit,
       servingLabel: activePortion?.servingLabel,
       size: activePortion?.size,
     };
@@ -349,7 +402,9 @@ export default function ProductDetailClient({ product }) {
 
         const focusableSelector =
           'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-        const focusables = Array.from(modal.querySelectorAll(focusableSelector)).filter(
+        const focusables = Array.from(
+          modal.querySelectorAll(focusableSelector)
+        ).filter(
           (el) => el.offsetParent !== null || el === document.activeElement
         );
 
@@ -359,12 +414,18 @@ export default function ProductDetailClient({ product }) {
         const lastEl = focusables[focusables.length - 1];
 
         if (e.shiftKey) {
-          if (document.activeElement === firstEl || !modal.contains(document.activeElement)) {
+          if (
+            document.activeElement === firstEl ||
+            !modal.contains(document.activeElement)
+          ) {
             e.preventDefault();
             lastEl.focus();
           }
         } else {
-          if (document.activeElement === lastEl || !modal.contains(document.activeElement)) {
+          if (
+            document.activeElement === lastEl ||
+            !modal.contains(document.activeElement)
+          ) {
             e.preventDefault();
             firstEl.focus();
           }
@@ -384,14 +445,23 @@ export default function ProductDetailClient({ product }) {
   const starLabels = ["Terrible", "Poor", "Average", "Good", "Excellent"];
 
   return (
-    <main className="min-h-screen pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors">
+    <main className="min-h-screen pt-24 sm:pt-28 pb-28 md:pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
       {/* ── BREADCRUMBS ─────────────────────────────────────────── */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-6 overflow-x-auto pb-1 scrollbar-none">
-        <Link href="/" className="hover:text-[var(--brand-accent)] transition font-medium">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-6 overflow-x-auto pb-1 scrollbar-none"
+      >
+        <Link
+          href="/"
+          className="hover:text-[var(--brand-accent)] transition font-medium shrink-0"
+        >
           Home
         </Link>
         <ChevronRight size={12} className="shrink-0 opacity-60" />
-        <Link href="/menu" className="hover:text-[var(--brand-accent)] transition font-medium">
+        <Link
+          href="/menu"
+          className="hover:text-[var(--brand-accent)] transition font-medium shrink-0"
+        >
           Menu
         </Link>
         {product.category && (
@@ -399,7 +469,7 @@ export default function ProductDetailClient({ product }) {
             <ChevronRight size={12} className="shrink-0 opacity-60" />
             <Link
               href={`/menu?category=${encodeURIComponent(product.category)}`}
-              className="hover:text-[var(--brand-accent)] transition font-medium"
+              className="hover:text-[var(--brand-accent)] transition font-medium shrink-0"
             >
               {product.category}
             </Link>
@@ -412,23 +482,25 @@ export default function ProductDetailClient({ product }) {
       </nav>
 
       {/* ── MAIN PRODUCT SECTION (2 COLUMNS) ───────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-        {/* LEFT COLUMN: Large Image & Action Buttons (5 Columns) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        {/* LEFT COLUMN: Large Hero Image & Trust Badges (5 Columns) */}
         <div className="lg:col-span-5 lg:sticky lg:top-28 space-y-4">
-          <div className="relative aspect-square w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-color)] shadow-md">
+          <div className="group relative aspect-square w-full rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm">
             <Image
               src={imgSrc}
               alt={product.name}
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 40vw"
-              className={`object-cover ${!product.isAvailable ? "grayscale-[40%]" : ""}`}
+              className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
+                !product.isAvailable ? "grayscale-[40%]" : ""
+              }`}
               onError={() => setImgSrc(FALLBACK_IMAGE)}
             />
 
             {/* Out of Stock Overlay */}
             {!product.isAvailable && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 text-center">
+              <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 text-center">
                 <span className="px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-black uppercase tracking-wider shadow-lg">
                   Out of Stock
                 </span>
@@ -443,8 +515,8 @@ export default function ProductDetailClient({ product }) {
               <span
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs bg-[var(--bg-card)]/95 border ${
                   product.type === "veg"
-                    ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
-                    : "border-rose-600 text-rose-700 dark:text-rose-400"
+                    ? "border-emerald-600/50 text-emerald-700 dark:text-emerald-400"
+                    : "border-rose-600/50 text-rose-700 dark:text-rose-400"
                 }`}
               >
                 <span
@@ -462,10 +534,10 @@ export default function ProductDetailClient({ product }) {
               )}
             </div>
 
-            {/* Bestseller Badge */}
+            {/* Featured Badge */}
             {product.isFeatured && (
               <div className="absolute top-3.5 right-14 z-20 bg-amber-500 text-zinc-950 text-[11px] font-black px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1">
-                <Flame size={12} className="fill-zinc-950" /> Bestseller
+                <Flame size={12} className="fill-zinc-950" /> Featured
               </div>
             )}
 
@@ -479,92 +551,91 @@ export default function ProductDetailClient({ product }) {
               className={`absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full border border-[var(--border-color)] flex items-center justify-center transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                 isFav
                   ? "bg-rose-500 text-white border-rose-500"
-                  : "bg-[var(--bg-card)]/90 text-[var(--text-muted)] hover:text-rose-500"
+                  : "bg-[var(--bg-card)]/90 text-[var(--text-muted)] hover:text-rose-500 backdrop-blur-xs"
               }`}
             >
               <Heart size={16} className={isFav ? "fill-white" : ""} />
             </button>
           </div>
 
-          {/* Action Buttons: ADD TO CART & ORDER NOW (Desktop view: visible on lg+) */}
-          <div className="hidden lg:grid grid-cols-2 gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={!product.isAvailable || !restStatus.isOpen}
-              className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
-            >
-              <ShoppingBag size={17} />
-              <span>Add To Cart</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              disabled={!product.isAvailable || !restStatus.isOpen}
-              className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
-            >
-              <Zap size={17} />
-              <span>Order Now</span>
-            </button>
-          </div>
-
-          {/* Safe & Hygiene Trust Badges (Desktop view: visible on lg+) */}
-          <div className="hidden lg:block p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs text-[var(--text-muted)]">
-            <div className="flex items-center gap-2">
+          {/* Safe & Hygiene Trust Badges Card */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 text-xs text-[var(--text-muted)] shadow-2xs">
+            <div className="flex items-center gap-2.5">
               <ShieldCheck className="text-emerald-500 w-4 h-4 shrink-0" />
-              <span><strong className="text-[var(--text-main)]">100% Certified Kitchen</strong> with audited hygiene standards</span>
+              <span>
+                <strong className="text-[var(--text-main)]">100% Certified Kitchen</strong> with audited hygiene standards
+              </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <Clock className="text-[var(--brand-accent)] w-4 h-4 shrink-0" />
-              <span>Prepared fresh upon order in <strong className="text-[var(--text-main)]">{prepTime}</strong></span>
+              <span>
+                Prepared fresh upon order in <strong className="text-[var(--text-main)]">{prepTime}</strong>
+              </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <Truck className="text-blue-500 w-4 h-4 shrink-0" />
               <span>Contactless tamper-proof sealed packaging</span>
+            </div>
+            <div className="pt-2 border-t border-[var(--border-color)] flex items-center justify-between text-[11px]">
+              <span className="font-bold text-[var(--brand-accent)] flex items-center gap-1">
+                <Award size={13} /> पेट Protocols Guarantee
+              </span>
+              <span className="text-[var(--text-muted)] font-medium">
+                Fresh food. Zero compromises.
+              </span>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Product Information (7 Columns) */}
-        <div className="lg:col-span-7 space-y-5 sm:space-y-6">
-          {/* Header & Kitchen */}
+        {/* RIGHT COLUMN: Product Information, Variants & Purchase Unit (7 Columns) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Header & Kitchen Info */}
           <div>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 mb-1.5">
               {product.restaurant?.name ? (
                 <Link
                   href={`/menu?restaurant=${product.restaurant._id || product.restaurant}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] hover:underline mb-1"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] hover:underline"
                 >
                   <Building size={13} />
-                  <span>{product.restaurant.name}</span>
+                  <span>Fresh from {product.restaurant.name}</span>
                 </Link>
-              ) : <div />}
+              ) : (
+                <div />
+              )}
 
               <button
                 type="button"
                 onClick={handleShare}
                 aria-label="Share dish link"
-                className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition cursor-pointer p-1"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition cursor-pointer p-1 rounded-lg hover:bg-[var(--bg-sub)]"
               >
                 <Share2 size={13} />
                 <span>Share</span>
               </button>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--text-main)] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--text-main)] tracking-tight font-serif">
               {product.name}
             </h1>
 
             {/* Rating Badge & Reviews Count */}
-            <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <div className="inline-flex items-center gap-1 bg-emerald-600 dark:bg-emerald-500 text-white px-2 py-0.5 rounded-[4px] text-xs font-black shadow-2xs">
-                <span>{currentRating.toFixed(1)}</span>
-                <Star size={11} className="fill-white" />
-              </div>
-              <span className="text-xs text-[var(--text-muted)] font-semibold">
-                {numRatings} Ratings & {reviewsList.length} Reviews
-              </span>
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              {numRatings > 0 && typeof currentRating === "number" && currentRating > 0 ? (
+                <>
+                  <div className="inline-flex items-center gap-1 bg-emerald-600 dark:bg-emerald-500 text-white px-2 py-0.5 rounded-[5px] text-xs font-black shadow-2xs">
+                    <span>{currentRating.toFixed(1)}</span>
+                    <Star size={11} className="fill-white" />
+                  </div>
+                  <span className="text-xs text-[var(--text-muted)] font-semibold">
+                    {numRatings} {numRatings === 1 ? "Rating" : "Ratings"}{reviewsList.length > 0 ? ` & ${reviewsList.length} ${reviewsList.length === 1 ? "Review" : "Reviews"}` : ""}
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs text-[var(--text-muted)] font-semibold italic">
+                  No ratings yet
+                </span>
+              )}
               <span className="text-[var(--border-color)]">•</span>
               <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                 <CheckCircle2 size={12} /> Certified Recipe
@@ -572,50 +643,57 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Pricing Section */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-3">
+          {/* Pricing & Serving Summary Card */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
             <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
+              <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)] font-serif">
                 ₹{displayPrice}
               </span>
               {hasStrikethrough && struckPrice > displayPrice && (
-                <span className="text-base text-[var(--text-muted)] line-through">
+                <span className="text-base sm:text-lg text-[var(--text-muted)] line-through">
                   ₹{struckPrice}
                 </span>
               )}
               {discountPercent > 0 && (
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   {discountPercent}% off
                 </span>
               )}
             </div>
 
-            {/* Serving / Portion Transparent Summary */}
+            {/* Serving / Portion Summary */}
             {activePortionText && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] shadow-2xs">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)]">
                 <Utensils size={13} className="text-[var(--brand-accent)] shrink-0" />
                 <span>Portion: {activePortionText}</span>
                 {activePortion?.quantity && quantity > 1 && (
                   <span className="text-[var(--text-muted)] font-normal ml-1">
-                    ({quantity} servings = <strong className="text-[var(--text-main)] font-bold">{quantity * Number(activePortion.quantity)} {activePortion.unit === "custom" ? activePortion.customUnit : activePortion.unit}</strong> total)
+                    ({quantity} servings ={" "}
+                    <strong className="text-[var(--text-main)] font-bold">
+                      {quantity * Number(activePortion.quantity)}{" "}
+                      {activePortion.unit === "custom"
+                        ? activePortion.customUnit
+                        : activePortion.unit}
+                    </strong>{" "}
+                    total)
                   </span>
                 )}
               </div>
             )}
 
             {isAutoDiscount && (
-              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                ⚡ Auto Discount Applied: Save ₹{autoDiscount} instantly!
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <span>⚡</span> Auto Discount Applied: Save ₹{autoDiscount} instantly!
               </p>
             )}
-            <div className="text-xs text-[var(--text-muted)] mt-1 font-medium">
+            <div className="text-[11px] text-[var(--text-muted)] font-medium">
               Inclusive of all taxes • No hidden packing charges
             </div>
           </div>
 
           {/* Multiple Sizes / Pricing Variants Selector */}
           {hasVariants && (
-            <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
+            <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
                   <Layers size={14} className="text-[var(--brand-accent)]" />
@@ -632,7 +710,12 @@ export default function ProductDetailClient({ product }) {
                 {product.variants.map((v, idx) => {
                   const isSelected = selectedVariantIndex === idx;
                   const isOutOfStock = v.isAvailable === false;
-                  const vPortion = v.servingLabel || (v.portionQuantity && v.portionUnit ? `${v.portionQuantity} ${v.portionUnit}` : "") || v.size;
+                  const vPortion =
+                    v.servingLabel ||
+                    (v.portionQuantity && v.portionUnit
+                      ? `${v.portionQuantity} ${v.portionUnit}`
+                      : "") ||
+                    v.size;
 
                   return (
                     <button
@@ -640,9 +723,9 @@ export default function ProductDetailClient({ product }) {
                       type="button"
                       disabled={isOutOfStock}
                       onClick={() => setSelectedVariantIndex(idx)}
-                      className={`p-3 rounded-xl border text-left transition relative cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
+                      className={`p-3 rounded-2xl border text-left transition relative cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
                         isSelected
-                          ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 shadow-xs"
+                          ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-2 ring-[var(--brand-accent)]/20 shadow-xs"
                           : isOutOfStock
                           ? "border-[var(--border-color)] bg-[var(--bg-sub)] opacity-50 cursor-not-allowed"
                           : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card)]"
@@ -677,7 +760,7 @@ export default function ProductDetailClient({ product }) {
           )}
 
           {/* Available Offers Box */}
-          <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2.5 shadow-2xs">
             <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
               <Tag size={14} className="text-emerald-600 dark:text-emerald-400" /> Available Deals & Offers
             </h3>
@@ -685,10 +768,15 @@ export default function ProductDetailClient({ product }) {
               {/* Option B Highlight */}
               {isAutoDiscount && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">⚡</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                    ⚡
+                  </span>
                   <div>
                     <p className="font-extrabold text-emerald-700 dark:text-emerald-400">
-                      Automatic Kitchen Discount: {matchedOffer.discountType === "percentage" ? `${matchedOffer.discountValue}% OFF` : `₹${matchedOffer.discountValue} OFF`}
+                      Automatic Kitchen Discount:{" "}
+                      {matchedOffer.discountType === "percentage"
+                        ? `${matchedOffer.discountValue}% OFF`
+                        : `₹${matchedOffer.discountValue} OFF`}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                       No coupon code needed. Discount is automatically calculated on this dish.
@@ -703,17 +791,29 @@ export default function ProductDetailClient({ product }) {
                   <span className="text-[var(--brand-accent)] font-black text-sm">🎟️</span>
                   <div>
                     <p className="font-extrabold text-[var(--brand-accent)]">
-                      Coupon Deal: Use code <span className="font-mono bg-[var(--brand-accent)] text-white px-1.5 py-0.5 rounded text-[11px] uppercase tracking-wider">{matchedOffer.code}</span>
+                      Coupon Deal: Use code{" "}
+                      <span className="font-mono bg-[var(--brand-accent)] text-white px-1.5 py-0.5 rounded text-[11px] uppercase tracking-wider">
+                        {matchedOffer.code}
+                      </span>
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                      Apply code at checkout to get {matchedOffer.discountType === "percentage" ? `${matchedOffer.discountValue}% OFF` : `₹${matchedOffer.discountValue} OFF`}{matchedOffer.minOrder ? ` on orders above ₹${matchedOffer.minOrder}` : ""}.
+                      Apply code at checkout to get{" "}
+                      {matchedOffer.discountType === "percentage"
+                        ? `${matchedOffer.discountValue}% OFF`
+                        : `₹${matchedOffer.discountValue} OFF`}
+                      {matchedOffer.minOrder
+                        ? ` on orders above ₹${matchedOffer.minOrder}`
+                        : ""}
+                      .
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="flex items-start gap-2">
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0">🛵 Delivery Deal:</span>
+              <div className="flex items-start gap-2 pt-0.5">
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+                  🛵 Delivery Deal:
+                </span>
                 <span className="text-[var(--text-muted)]">
                   Free delivery for orders above ₹{freeThreshold} (Standard fee ₹{deliveryFee})
                 </span>
@@ -721,60 +821,65 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Kitchen Operational Banner */}
+          {/* Kitchen Operational Alert Banner (if closed) */}
           {!restStatus.isOpen && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-start gap-3">
               <Clock size={18} className="shrink-0 mt-0.5" />
               <div className="text-xs">
                 <p className="font-bold text-sm text-[var(--text-main)]">
-                  {product.restaurant?.name || "Kitchen"} is {restStatus.reason || "currently closed"}
+                  {product.restaurant?.name || "Kitchen"} is{" "}
+                  {restStatus.reason || "currently closed"}
                 </p>
                 <p className="text-[var(--text-muted)] mt-0.5">
                   Ordering is temporarily closed. Regular kitchen operating hours:{" "}
-                  <strong className="text-[var(--text-main)]">{restStatus.hoursText || "10:00 AM - 11:00 PM"}</strong>
+                  <strong className="text-[var(--text-main)]">
+                    {restStatus.hoursText || "10:00 AM - 11:00 PM"}
+                  </strong>
                 </p>
               </div>
             </div>
           )}
 
-          {/* Quantity Selector & Mobile Action Buttons */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+          {/* ── UNIFIED PURCHASE MODULE (COHESIVE QUANTITY & ACTIONS) ── */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
-                Select Quantity:
+                Quantity:
               </span>
-              <div className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-1 shadow-2xs">
+
+              {/* Quantity Stepper (1..20 clamp) */}
+              <div className="flex items-center gap-3 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-2xl p-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                   aria-label="Decrease quantity"
                 >
-                  <Minus size={14} />
+                  <Minus size={15} />
                 </button>
-                <span className="w-6 text-center text-xs font-black text-[var(--text-main)]">
+                <span className="w-8 text-center text-xs font-black text-[var(--text-main)]">
                   {quantity}
                 </span>
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.min(20, q + 1))}
                   disabled={quantity >= 20}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-sub)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-card)] disabled:opacity-30 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                   aria-label="Increase quantity"
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                 </button>
               </div>
             </div>
 
-            {/* Mobile Action Buttons: Visible only on mobile (< lg) right after quantity */}
-            <div className="grid lg:hidden grid-cols-2 gap-3 pt-1">
+            {/* Primary Action Buttons: Add To Cart & Order Now */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleAddToCart}
                 disabled={!product.isAvailable || !restStatus.isOpen}
-                className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
+                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
               >
                 <ShoppingBag size={17} />
                 <span>Add To Cart</span>
@@ -784,7 +889,7 @@ export default function ProductDetailClient({ product }) {
                 type="button"
                 onClick={handleBuyNow}
                 disabled={!product.isAvailable || !restStatus.isOpen}
-                className="w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
+                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
               >
                 <Zap size={17} />
                 <span>Order Now</span>
@@ -792,44 +897,11 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Specifications Table */}
-          <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">
-              Dish Specifications & Highlights
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Diet Type</span>
-                <span className="font-bold capitalize text-[var(--text-main)]">{product.type || "Veg"}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Category</span>
-                <span className="font-bold text-[var(--text-main)]">{product.category || "General"}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Preparation Time</span>
-                <span className="font-bold text-[var(--text-main)]">{prepTime}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Delivery Radius</span>
-                <span className="font-bold text-[var(--text-main)]">Up to {product.restaurant?.deliverySettings?.deliveryRadiusKm ?? 10} km</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Portion / Serving</span>
-                <span className="font-bold text-[var(--text-main)]">{activePortionText || "Standard Serving"}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                <span className="text-[var(--text-muted)] font-medium">Kitchen Partner</span>
-                <span className="font-bold text-[var(--text-main)]">{product.restaurant?.name || "Local Kitchen"}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
+          {/* Dish Description Box */}
           {product.description && (
-            <div className="p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
-              <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] mb-1.5">
-                Description
+            <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] mb-2">
+                About This Dish
               </h3>
               <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed">
                 {product.description}
@@ -837,124 +909,162 @@ export default function ProductDetailClient({ product }) {
             </div>
           )}
 
-          {/* Safe & Hygiene Trust Badges (Mobile view: visible below lg) */}
-          <div className="lg:hidden p-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs text-[var(--text-muted)]">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="text-emerald-500 w-4 h-4 shrink-0" />
-              <span><strong className="text-[var(--text-main)]">100% Certified Kitchen</strong> with audited hygiene standards</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="text-[var(--brand-accent)] w-4 h-4 shrink-0" />
-              <span>Prepared fresh upon order in <strong className="text-[var(--text-main)]">{prepTime}</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Truck className="text-blue-500 w-4 h-4 shrink-0" />
-              <span>Contactless tamper-proof sealed packaging</span>
-            </div>
-          </div>
-
-          {/* ── RATINGS & REVIEWS SECTION ───────────────────────────── */}
-          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-5">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-[var(--text-main)]">
-                  Ratings & Reviews
-                </h3>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Customer ratings and dining feedback
-                </p>
+          {/* Dish Specifications Grid */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
+            <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">
+              Dish Specifications & Highlights
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Diet Type</span>
+                <span className="font-bold capitalize text-[var(--text-main)]">
+                  {product.type || "Veg"}
+                </span>
               </div>
-
-              {/* Rate Product Trigger Button */}
-              <button
-                ref={triggerRef}
-                type="button"
-                onClick={() => setIsRateModalOpen(true)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-              >
-                <Star size={13} className="fill-white" />
-                Rate Product
-              </button>
-            </div>
-
-            {/* Score Breakdown Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center bg-[var(--bg-sub)] p-4 rounded-xl border border-[var(--border-color)]">
-              <div className="sm:col-span-4 text-center sm:text-left sm:border-r sm:border-[var(--border-color)] sm:pr-4">
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <span className="text-3xl sm:text-4xl font-black text-[var(--text-main)]">
-                    {currentRating.toFixed(1)}
-                  </span>
-                  <Star size={24} className="fill-emerald-600 dark:fill-emerald-500 text-emerald-600 dark:text-emerald-500" />
-                </div>
-                <div className="text-xs text-[var(--text-muted)] font-medium mt-1">
-                  {numRatings} Ratings & {reviewsList.length} Reviews
-                </div>
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Category</span>
+                <span className="font-bold text-[var(--text-main)]">
+                  {product.category || "General"}
+                </span>
               </div>
-
-              <div className="sm:col-span-8 space-y-1.5 text-xs">
-                {starDistribution.map((row) => (
-                  <div key={row.star} className="flex items-center gap-2">
-                    <span className="w-7 text-right font-bold text-[var(--text-muted)]">
-                      {row.star}
-                    </span>
-                    <div className="flex-1 h-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${row.color}`}
-                        style={{ width: `${row.pct}%` }}
-                      />
-                    </div>
-                    <span className="w-8 text-right text-[var(--text-muted)] font-medium">
-                      {row.pct}%
-                    </span>
-                  </div>
-                ))}
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Preparation Time</span>
+                <span className="font-bold text-[var(--text-main)]">{prepTime}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Delivery Radius</span>
+                <span className="font-bold text-[var(--text-main)]">
+                  Up to {product.restaurant?.deliverySettings?.deliveryRadiusKm ?? 10} km
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Portion / Serving</span>
+                <span className="font-bold text-[var(--text-main)]">
+                  {activePortionText || "Standard Serving"}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-[var(--border-color)]">
+                <span className="text-[var(--text-muted)] font-medium">Kitchen Partner</span>
+                <span className="font-bold text-[var(--text-main)]">
+                  {product.restaurant?.name || "Local Kitchen"}
+                </span>
               </div>
             </div>
-
-            {/* Reviews Feed */}
-            {reviewsList.length === 0 ? (
-              <div className="text-center py-6 text-xs text-[var(--text-muted)]">
-                <MessageSquare size={24} className="mx-auto mb-1.5 opacity-50" />
-                No written customer reviews yet. Be the first to share your thoughts!
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border-color)] space-y-4 pt-2">
-                {reviewsList.slice(0, 5).map((rev, idx) => (
-                  <div key={rev._id || idx} className="pt-4 first:pt-0 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-0.5 bg-emerald-600 dark:bg-emerald-500 text-white px-1.5 py-0.5 rounded-[3px] text-[10px] font-black">
-                        {rev.rating || 5} <Star size={9} className="fill-white" />
-                      </span>
-                      <span className="text-xs font-bold text-[var(--text-main)]">
-                        {rev.userName || "Customer"}
-                      </span>
-                      {rev.isVerifiedPurchase === true ? (
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 ml-auto">
-                          <CheckCircle2 size={11} /> Verified Buyer
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-0.5 ml-auto">
-                          Customer Review
-                        </span>
-                      )}
-                    </div>
-                    {rev.comment && (
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                        {rev.comment}
-                      </p>
-                    )}
-                    <div className="text-[10px] text-[var(--text-muted)] opacity-80 flex items-center gap-3">
-                      <span>{rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : "Recent Order"}</span>
-                      <span className="flex items-center gap-1 hover:text-[var(--text-main)] cursor-pointer">
-                        <ThumbsUp size={11} /> Helpful
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
+      </div>
+
+      {/* ── RATINGS & REVIEWS SECTION ───────────────────────────── */}
+      <div className="mt-12 sm:mt-16 p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-6 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-black uppercase tracking-wider text-[var(--text-main)] font-serif">
+              Ratings & Customer Reviews
+            </h3>
+            <p className="text-xs text-[var(--text-muted)]">
+              Audited customer ratings and dining feedback
+            </p>
+          </div>
+
+          {/* Rate Product Trigger Button */}
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => setIsRateModalOpen(true)}
+            className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+          >
+            <Star size={13} className="fill-white" />
+            Rate Product
+          </button>
+        </div>
+
+        {/* Score Breakdown Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center bg-[var(--bg-sub)] p-5 rounded-2xl border border-[var(--border-color)]">
+          <div className="sm:col-span-4 text-center sm:text-left sm:border-r sm:border-[var(--border-color)] sm:pr-6">
+            <div className="flex items-center justify-center sm:justify-start gap-2.5">
+              <span className="text-4xl sm:text-5xl font-black text-[var(--text-main)] font-serif">
+                {numRatings > 0 && typeof currentRating === "number" && currentRating > 0
+                  ? currentRating.toFixed(1)
+                  : "--"}
+              </span>
+              <Star
+                size={28}
+                className="fill-emerald-600 dark:fill-emerald-500 text-emerald-600 dark:text-emerald-500"
+              />
+            </div>
+            <div className="text-xs text-[var(--text-muted)] font-medium mt-1">
+              {numRatings > 0
+                ? `Based on ${numRatings} Ratings & ${reviewsList.length} Customer Reviews`
+                : "No customer ratings or reviews yet"}
+            </div>
+          </div>
+
+          <div className="sm:col-span-8 space-y-2 text-xs">
+            {starDistribution.map((row) => (
+              <div key={row.star} className="flex items-center gap-2.5">
+                <span className="w-8 text-right font-bold text-[var(--text-muted)]">
+                  {row.star}
+                </span>
+                <div className="flex-1 h-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${row.color}`}
+                    style={{ width: `${row.pct}%` }}
+                  />
+                </div>
+                <span className="w-9 text-right text-[var(--text-muted)] font-medium">
+                  {row.pct}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Reviews Feed */}
+        {reviewsList.length === 0 ? (
+          <div className="text-center py-8 text-xs text-[var(--text-muted)]">
+            <MessageSquare size={26} className="mx-auto mb-2 opacity-40" />
+            No written customer reviews yet. Be the first to share your dining experience!
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--border-color)] space-y-4 pt-2">
+            {reviewsList.slice(0, 5).map((rev, idx) => (
+              <div key={rev._id || idx} className="pt-4 first:pt-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-0.5 bg-emerald-600 dark:bg-emerald-500 text-white px-1.5 py-0.5 rounded-[4px] text-[10px] font-black">
+                    {rev.rating || 5} <Star size={9} className="fill-white" />
+                  </span>
+                  <span className="text-xs font-bold text-[var(--text-main)]">
+                    {rev.userName || "Customer"}
+                  </span>
+                  {rev.isVerifiedPurchase === true ? (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 ml-auto">
+                      <CheckCircle2 size={11} /> Verified Buyer
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-0.5 ml-auto">
+                      Customer Review
+                    </span>
+                  )}
+                </div>
+                {rev.comment && (
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    {rev.comment}
+                  </p>
+                )}
+                <div className="text-[10px] text-[var(--text-muted)] opacity-80 flex items-center gap-3">
+                  <span>
+                    {rev.createdAt
+                      ? new Date(rev.createdAt).toLocaleDateString()
+                      : "Recent Order"}
+                  </span>
+                  <span className="flex items-center gap-1 hover:text-[var(--text-main)] cursor-pointer">
+                    <ThumbsUp size={11} /> Helpful
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── SIMILAR DISHES CAROUSEL ───────────────────────────────── */}
@@ -970,13 +1080,53 @@ export default function ProductDetailClient({ product }) {
         </div>
       )}
 
+      {/* ── MOBILE STICKY BOTTOM ACTION BAR (< 768px) ─────────────── */}
+      {!isRateModalOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--bg-card)]/95 backdrop-blur-md border-t border-[var(--border-color)] p-3 px-4 shadow-xl flex items-center justify-between gap-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="min-w-0">
+            <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold truncate">
+              {selectedVariant ? selectedVariant.name : activePortionText || "Price"}
+            </div>
+            <div className="text-base font-black text-[var(--text-main)] font-serif">
+              ₹{displayPrice * quantity}
+              {quantity > 1 && (
+                <span className="text-[10px] font-normal text-[var(--text-muted)] ml-1">
+                  ({quantity} × ₹{displayPrice})
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={!product.isAvailable || !restStatus.isOpen}
+              className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <ShoppingBag size={14} />
+              <span>Add</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              disabled={!product.isAvailable || !restStatus.isOpen}
+              className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-[var(--text-main)] text-[var(--bg-main)] shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <Zap size={14} />
+              <span>Order</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── INTERACTIVE RATE PRODUCT MODAL ───────────────────────── */}
       {isRateModalOpen && (
         <div
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsRateModalOpen(false);
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs"
         >
           <div
             ref={modalRef}
@@ -984,17 +1134,20 @@ export default function ProductDetailClient({ product }) {
             aria-modal="true"
             aria-labelledby="rate-review-title"
             tabIndex={-1}
-            className="relative w-full max-w-md bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-2xl animate-[fadeIn_0.2s_ease]"
+            className="relative w-full max-w-md bg-[var(--bg-card)] rounded-3xl p-6 sm:p-7 border border-[var(--border-color)] shadow-2xl animate-[fadeIn_0.2s_ease]"
           >
             <button
               onClick={() => setIsRateModalOpen(false)}
               aria-label="Close review dialog"
-              className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+              className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-main)] p-1.5 rounded-full hover:bg-[var(--bg-sub)] cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
               <X size={18} />
             </button>
 
-            <h3 id="rate-review-title" className="text-lg font-black text-[var(--text-main)] mb-1">
+            <h3
+              id="rate-review-title"
+              className="text-lg font-black text-[var(--text-main)] mb-1 font-serif"
+            >
               Rate & Review {product.name}
             </h3>
             <p className="text-xs text-[var(--text-muted)] mb-4">
@@ -1003,7 +1156,7 @@ export default function ProductDetailClient({ product }) {
 
             <form onSubmit={handleSubmitRating} className="space-y-4">
               {/* Star Rating Picker */}
-              <div className="text-center p-3 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+              <div className="text-center p-3.5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
                 <div className="flex justify-center gap-2 mb-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -1061,7 +1214,7 @@ export default function ProductDetailClient({ product }) {
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsRateModalOpen(false)}

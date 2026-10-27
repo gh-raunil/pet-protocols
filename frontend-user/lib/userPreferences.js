@@ -196,8 +196,10 @@ export function getRecommendedProducts(allProducts = [], limit = 10) {
       if (isNonVegDominant && prod.type === "non-veg") score += 5;
     }
 
-    // 5. Product quality & rating weight
-    score += ((prod.rating || 4.5) - 3) * 2;
+    // 5. Product quality & rating weight (only authentic ratings contribute)
+    if (typeof prod.rating === "number" && (prod.numRatings || 0) > 0) {
+      score += (prod.rating - 3) * 2;
+    }
 
     // 6. Featured bonus
     if (prod.isFeatured) score += 2;
@@ -221,8 +223,8 @@ export function getBestSellingProducts(allProducts = [], limit = 10) {
   if (!Array.isArray(allProducts)) return [];
   const list = [...allProducts];
   list.sort((a, b) => {
-    const scoreA = (a.isFeatured ? 40 : 0) + (a.numRatings || 10) * (a.rating || 4.5);
-    const scoreB = (b.isFeatured ? 40 : 0) + (b.numRatings || 10) * (b.rating || 4.5);
+    const scoreA = (a.isFeatured ? 40 : 0) + (a.numRatings || 0) * (a.rating || 0);
+    const scoreB = (b.isFeatured ? 40 : 0) + (b.numRatings || 0) * (b.rating || 0);
     return scoreB - scoreA;
   });
   return list.slice(0, limit);
@@ -230,14 +232,17 @@ export function getBestSellingProducts(allProducts = [], limit = 10) {
 
 /**
  * Return Top Rated products (sorted by rating descending, then numRatings).
+ * Only products with authentic ratings are prioritized; unrated products sort to the bottom.
  */
 export function getTopRatedProducts(allProducts = [], limit = 10) {
   if (!Array.isArray(allProducts)) return [];
   const list = [...allProducts];
   list.sort((a, b) => {
-    const diff = (b.rating || 4.5) - (a.rating || 4.5);
+    const rA = typeof a.rating === "number" && a.numRatings > 0 ? a.rating : 0;
+    const rB = typeof b.rating === "number" && b.numRatings > 0 ? b.rating : 0;
+    const diff = rB - rA;
     if (Math.abs(diff) > 0.05) return diff;
-    return (b.numRatings || 10) - (a.numRatings || 10);
+    return (b.numRatings || 0) - (a.numRatings || 0);
   });
   return list.slice(0, limit);
 }

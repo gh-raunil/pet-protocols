@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 export const metadata = {
   title: "Order Confirmed — पेट Protocols",
   description: "Track your food order progress live from our partner kitchen.",
+  referrer: "no-referrer",
 };
 
 export default function OrderConfirmationPage() {

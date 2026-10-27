@@ -25,12 +25,12 @@ const NavLinks = () => {
     },
     {
       href: "/menu",
-      label: "Explore Menu",
+      label: "Menu",
       badge: menuBadge,
       onClear: clearMenuBadge,
     },
     {
-      href: "/#restaurants",
+      href: "/restaurants",
       label: "Restaurants",
       badge: 0,
     },
@@ -40,21 +40,10 @@ const NavLinks = () => {
       badge: offersBadge,
       onClear: clearOffersBadge,
     },
-    ...(session
-      ? [
-          {
-            href: "/orders",
-            label: "Orders",
-            badge: ordersBadge,
-            onClear: clearOrdersBadge,
-          },
-        ]
-      : []),
-    { href: "/about", label: "About", badge: 0 },
   ];
 
   return (
-    <div className="flex items-center gap-3.5 lg:gap-5 xl:gap-7">
+    <div className="flex items-center gap-2 lg:gap-2.5 xl:gap-5 2xl:gap-6">
       {links.map((link) => {
         const isActive = pathname === link.href;
         return (
@@ -62,7 +51,7 @@ const NavLinks = () => {
             key={link.href}
             href={link.href}
             onClick={link.onClear}
-            className={`text-sm font-semibold transition-colors duration-150 py-1 border-b-2 flex items-center gap-1.5 shrink-0 ${
+            className={`text-xs xl:text-sm font-semibold transition-colors duration-150 py-1 border-b-2 flex items-center gap-1 shrink-0 ${
               isActive
                 ? "text-[var(--brand-accent)] border-[var(--brand-accent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)] border-transparent"

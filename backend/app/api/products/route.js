@@ -40,9 +40,19 @@ export async function GET(request) {
       if (restaurantId.length === 24 && /^[0-9a-fA-F]{24}$/.test(restaurantId)) {
         filter.restaurant = restaurantId;
       } else {
-        const foundRest = await Restaurant.findOne({ slug: restaurantId });
+        const escaped = restaurantId.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const foundRest = await Restaurant.findOne({
+          status: 'active',
+          $or: [
+            { slug: restaurantId.trim().toLowerCase() },
+            { name: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+          ]
+        });
         if (foundRest) {
           filter.restaurant = foundRest._id;
+        } else {
+          // If specified restaurant is not found, return empty set rather than exposing all restaurants
+          filter.restaurant = null;
         }
       }
     }

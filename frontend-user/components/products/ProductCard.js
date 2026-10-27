@@ -71,7 +71,12 @@ export function ProductCardSkeleton({ isCarousel = false }) {
   );
 }
 
-export default function ProductCard({ product, isCarousel = false, offers = [] }) {
+export default function ProductCard({
+  product,
+  isCarousel = false,
+  offers = [],
+  variant = "default",
+}) {
   const router = useRouter();
   const { addItem } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
@@ -168,7 +173,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
       size: product.portion?.size,
     };
 
-    addItem(itemToAdd);
+    addItem(itemToAdd); // addItem(product) compatibility
     trackAddToCart(product);
     toast.success(`${product.name} added to cart!`);
   };
@@ -183,6 +188,175 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
       toast.info("Removed from favorites");
     }
   };
+
+  if (variant === "catalog") {
+    const isBestseller = product.isFeatured || (Number(product.rating) >= 4.5);
+    const cuisineText = product.cuisine || (typeof product.category === "string" ? product.category : product.category?.name) || "Gourmet";
+    const deliveryText = product.restaurant?.chargeSettings?.flatDeliveryFee === 0 ? "Free delivery" : "Free delivery";
+
+    return (
+      <div
+        onClick={handleCardClick}
+        className={`group relative flex flex-col justify-between bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 hover:border-orange-500/50 hover:shadow-md transition-all duration-200 overflow-hidden w-full ${
+          !product.isAvailable ? "opacity-75" : ""
+        }`}
+      >
+        <Link href={`/menu/${product._id}`} className="block flex-1 flex flex-col">
+          {/* Top Product Image Container */}
+          <div className="relative aspect-[4/3] w-full bg-stone-100 dark:bg-stone-800 overflow-hidden shrink-0">
+            <Image
+              src={imgSrc}
+              alt={product.name}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+              className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
+                product.isAvailable ? "" : "grayscale-[40%]"
+              }`}
+              onError={() => setImgSrc(FALLBACK_IMAGE)}
+            />
+
+            {/* Top Left Ribbon: Bestseller or New */}
+            {isBestseller ? (
+              <div className="absolute top-0 left-0 z-10">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black italic rounded-br-xl shadow-xs tracking-wide">
+                  <Sparkles size={9} className="fill-white" />
+                  <span>Bestseller</span>
+                </span>
+              </div>
+            ) : isNew ? (
+              <div className="absolute top-0 left-0 z-10">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black uppercase rounded-br-xl shadow-xs tracking-wider">
+                  New
+                </span>
+              </div>
+            ) : null}
+
+            {/* Top Right Wishlist Button */}
+            <button
+              type="button"
+              onClick={handleToggleFav}
+              aria-label={isFav ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full bg-stone-900/60 backdrop-blur-xs text-white hover:text-rose-400 active:scale-95 transition shadow-xs flex items-center justify-center cursor-pointer"
+            >
+              <Heart size={14} className={isFav ? "fill-rose-500 text-rose-500" : "text-white"} />
+            </button>
+
+            {/* Bottom Left Veg / Non-Veg Indicator */}
+            <div className="absolute bottom-2.5 left-2.5 z-10">
+              <span
+                className={`w-4 h-4 rounded-[4px] border-2 bg-white dark:bg-stone-900 flex items-center justify-center shadow-xs ${
+                  product.type === "veg" ? "border-emerald-600" : "border-rose-600"
+                }`}
+                aria-label={product.type === "veg" ? "Pure Vegetarian" : "Non-Vegetarian"}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    product.type === "veg" ? "bg-emerald-600" : "bg-rose-600"
+                  }`}
+                />
+              </span>
+            </div>
+
+            {/* Closed / Sold Out Overlay */}
+            {!product.isAvailable ? (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 text-center z-10">
+                <span className="px-2.5 py-1 rounded-md bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+                  Sold Out
+                </span>
+              </div>
+            ) : !restStatus.isOpen ? (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-2 text-center z-10">
+                <span className="px-2.5 py-1 rounded-md bg-amber-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-xs">
+                  <Clock size={10} /> Closed
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Card Body */}
+          <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-1.5 min-w-0">
+            <div className="min-w-0 space-y-1">
+              <h3 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">
+                {product.name}
+              </h3>
+
+              {product.numRatings > 0 && typeof product.rating === "number" && product.rating > 0 ? (
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-amber-500 font-bold flex items-center gap-0.5">
+                    ★ {product.rating.toFixed(1)}
+                  </span>
+                  <span className="text-stone-400 text-[11px]">
+                    ({product.numRatings > 999 ? (product.numRatings / 1000).toFixed(1) + "k" : product.numRatings})
+                  </span>
+                </div>
+              ) : (
+                <div className="text-stone-400 text-[11px] italic">
+                  No ratings yet
+                </div>
+              )}
+
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-xs sm:text-sm font-black text-stone-900 dark:text-white">
+                  ₹{displayPrice}
+                </span>
+                {hasStrikethrough && struckPrice > displayPrice && (
+                  <span className="text-[11px] text-stone-400 line-through">
+                    ₹{struckPrice}
+                  </span>
+                )}
+                {discountPercent > 0 && (
+                  <span className="text-[10px] sm:text-[11px] font-bold text-orange-500">
+                    {discountPercent}% OFF
+                  </span>
+                )}
+              </div>
+
+              <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+                {cuisineText} • 20 min • {deliveryText}
+              </div>
+            </div>
+          </div>
+        </Link>
+
+        {/* Action Button Row */}
+        <div className="px-3 pb-3 sm:px-3.5 sm:pb-3.5 pt-0">
+          {!product.isAvailable ? (
+            <button
+              disabled
+              className="w-full py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-400 text-xs font-semibold cursor-not-allowed"
+            >
+              Unavailable
+            </button>
+          ) : !restStatus.isOpen ? (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5"
+            >
+              <Clock size={12} /> Closed
+            </button>
+          ) : hasMultipleVariants ? (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs transition flex items-center justify-center cursor-pointer active:scale-98"
+            >
+              Select Size
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1 cursor-pointer active:scale-98"
+            >
+              <span>Add to Cart</span>
+              <Plus size={13} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -244,9 +418,9 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
               type="button"
               onClick={handleToggleFav}
               aria-label={isFav ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+              className="absolute top-2.5 right-2.5 z-10 w-9 h-9 min-w-[36px] min-h-[36px] rounded-full bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 active:scale-95 transition shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
             >
-              <Heart size={13} className={isFav ? "fill-rose-500 text-rose-500" : ""} />
+              <Heart size={16} className={isFav ? "fill-rose-500 text-rose-500" : ""} />
             </button>
           </Tooltip>
 
@@ -365,7 +539,7 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             <button
               disabled
               aria-disabled="true"
-              className="w-full py-2 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[38px] sm:min-h-[40px]"
+              className="w-full py-2.5 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[44px]"
             >
               Unavailable
             </button>
@@ -379,9 +553,9 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
               type="button"
               onClick={handleAddToCart}
               aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
-              className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-500/20 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+              className="w-full py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/20 active:scale-98 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[44px]"
             >
-              <Clock size={12} /> Closed
+              <Clock size={14} /> Closed
             </button>
           </Tooltip>
         ) : hasMultipleVariants ? (
@@ -389,9 +563,9 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             type="button"
             onClick={handleAddToCart}
             aria-label={`Select size for ${product.name}`}
-            className="w-full py-2 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--brand-accent)] hover:text-white border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+            className="w-full py-2.5 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--brand-accent)] hover:text-white border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[44px]"
           >
-            <Layers size={13} strokeWidth={2.5} />
+            <Layers size={14} strokeWidth={2.5} />
             <span>Select Size</span>
           </button>
         ) : (
@@ -399,9 +573,9 @@ export default function ProductCard({ product, isCarousel = false, offers = [] }
             type="button"
             onClick={handleAddToCart}
             aria-label={`Add ${product.name} to cart`}
-            className="w-full py-2 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[38px] sm:min-h-[40px]"
+            className="w-full py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-97 transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-1 focus:outline-hidden min-h-[44px]"
           >
-            <Plus size={14} strokeWidth={2.5} />
+            <Plus size={15} strokeWidth={2.5} />
             <span>Add to Cart</span>
           </button>
         )}

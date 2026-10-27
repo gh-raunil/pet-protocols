@@ -18,6 +18,7 @@ const adminUrl = normalizeUrl(process.env.NEXT_PUBLIC_ADMIN_URL, defaultAdmin)
 const superadminUrl = normalizeUrl(process.env.NEXT_PUBLIC_SUPERADMIN_URL, defaultSuperadmin)
 
 const nextConfig = {
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   images: {
     remotePatterns: [
       {

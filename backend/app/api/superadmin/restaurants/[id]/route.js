@@ -3,6 +3,7 @@ import connectDB from "@/lib/db";
 import Restaurant from "@/models/Restaurant";
 import User from "@/models/User";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
+import { isValidCoordinate } from "@/lib/geoDistance";
 
 export async function GET(request, { params }) {
   try {
@@ -61,6 +62,23 @@ export async function PUT(request, { params }) {
 
     // Update fields
     if (body.status !== undefined && ["active", "inactive", "suspended", "archived"].includes(body.status)) {
+      if (body.status === "active") {
+        const targetLat = body.address?.latitude !== undefined ? body.address.latitude : restaurant.address?.latitude;
+        const targetLng = body.address?.longitude !== undefined ? body.address.longitude : restaurant.address?.longitude;
+        const deliveryActive =
+          (restaurant.deliverySettings?.deliveryEnabled !== false) &&
+          (restaurant.orderTypes?.delivery !== false);
+
+        if (deliveryActive && !isValidCoordinate(targetLat, targetLng)) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Cannot activate restaurant for delivery: valid geographical coordinates (latitude and longitude) are required. Please set coordinates before activating.",
+            },
+            { status: 400 }
+          );
+        }
+      }
       restaurant.status = body.status;
     }
     if (body.name !== undefined) restaurant.name = String(body.name).trim();
@@ -73,9 +91,12 @@ export async function PUT(request, { params }) {
       restaurant.cuisineType = Array.isArray(body.cuisineType)
         ? body.cuisineType
         : String(body.cuisineType).split(",").map((s) => s.trim()).filter(Boolean);
+    if (body.rating !== undefined) {
+      restaurant.rating = body.rating === null || body.rating === "" ? null : Number(body.rating);
     }
-    if (body.rating !== undefined) restaurant.rating = Number(body.rating) || 4.8;
-    if (body.image !== undefined) restaurant.image = body.image;
+    if (body.numRatings !== undefined) {
+      restaurant.numRatings = Math.max(0, Number(body.numRatings) || 0);
+    }
     if (body.bannerImage !== undefined) restaurant.bannerImage = body.bannerImage;
     if (body.enabledFeatures !== undefined && Array.isArray(body.enabledFeatures)) {
       restaurant.enabledFeatures = body.enabledFeatures;

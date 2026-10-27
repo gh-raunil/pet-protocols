@@ -13,14 +13,14 @@ export async function generateMetadata({ params }) {
       cache: "no-store",
       signal: AbortSignal.timeout(6000),
     });
-    if (!res.ok) return { title: "Dish Details | पेट Protocols" };
+    if (!res.ok) return { title: "Dish Details" };
     const data = await res.json();
     return {
-      title: `${data.product?.name || "Dish"} | पेट Protocols`,
+      title: data.product?.name || "Dish Details",
       description: data.product?.description || "Order fresh food on पेट Protocols.",
     };
   } catch {
-    return { title: "Dish Details | पेट Protocols" };
+    return { title: "Dish Details" };
   }
 }
 

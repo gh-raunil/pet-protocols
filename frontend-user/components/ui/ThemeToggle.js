@@ -9,7 +9,7 @@ export default function ThemeToggle({ className = "" }) {
 
   if (!mounted) {
     return (
-      <div className={`w-9 h-9 rounded-full bg-white/5 border border-white/10 ${className}`} />
+      <div className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl bg-white/5 border border-white/10 ${className}`} />
     );
   }
 
@@ -22,17 +22,14 @@ export default function ThemeToggle({ className = "" }) {
     >
       <button
         onClick={toggleTheme}
+        type="button"
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className={`p-2 rounded-xl transition-all duration-300 flex items-center justify-center ${
-          isDark
-            ? "bg-[#141414] hover:bg-[#202022] text-yellow-400 border border-white/10 shadow-inner"
-            : "bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 shadow-sm"
-        } ${className}`}
+        className={`min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] p-2 sm:p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center cursor-pointer active:scale-95 border border-[var(--border-color)] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] hover:border-[var(--brand-accent)]/50 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:outline-none shrink-0 ${className}`}
       >
         {isDark ? (
-          <Sun size={17} className="transition-transform duration-300 hover:rotate-45" />
+          <Sun size={19} className="text-amber-400 transition-transform duration-300 hover:rotate-45" />
         ) : (
-          <Moon size={17} className="transition-transform duration-300 hover:-rotate-12" />
+          <Moon size={19} className="text-[var(--text-main)] transition-transform duration-300 hover:-rotate-12" />
         )}
       </button>
     </Tooltip>

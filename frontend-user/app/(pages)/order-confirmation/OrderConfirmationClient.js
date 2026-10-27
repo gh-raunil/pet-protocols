@@ -88,7 +88,23 @@ export default function OrderConfirmationClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderIdParam = searchParams.get("orderId") || searchParams.get("id");
+  const guestTokenParam = searchParams.get("guestToken") || searchParams.get("guestAccessToken");
 
+  const [guestToken, setGuestToken] = useState(() => {
+    if (guestTokenParam && typeof guestTokenParam === "string" && guestTokenParam.trim()) {
+      return guestTokenParam.trim();
+    }
+    if (typeof window !== "undefined") {
+      try {
+        return (
+          sessionStorage.getItem(`pet_protocols_guest_token_${orderIdParam}`) ||
+          sessionStorage.getItem("pet_protocols_latest_guest_token") ||
+          ""
+        );
+      } catch (e) {}
+    }
+    return "";
+  });
   const [order, setOrder] = useState(null);
   const [restaurantDetails, setRestaurantDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,6 +119,66 @@ export default function OrderConfirmationClient() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const modalRef = useRef(null);
   const triggerRef = useRef(null);
+
+  // GUEST-URL-01: Capture token, persist to sessionStorage, verify storage, and strip from URL
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (guestTokenParam && typeof guestTokenParam === "string" && guestTokenParam.trim()) {
+      const cleanToken = guestTokenParam.trim();
+
+      // Persist to sessionStorage and confirm storage succeeded
+      try {
+        if (orderIdParam) {
+          sessionStorage.setItem(`pet_protocols_guest_token_${orderIdParam}`, cleanToken);
+        }
+        sessionStorage.setItem("pet_protocols_latest_guest_token", cleanToken);
+
+        const verifyKey = orderIdParam
+          ? `pet_protocols_guest_token_${orderIdParam}`
+          : "pet_protocols_latest_guest_token";
+        const storedVal = sessionStorage.getItem(verifyKey);
+        if (storedVal !== cleanToken) {
+          console.warn("[GuestAccess] Verification mismatch when persisting guest token");
+        }
+      } catch (e) {
+        console.warn("[GuestAccess] sessionStorage unavailable or restricted");
+      }
+
+      setGuestToken(cleanToken);
+
+      // Cleanse URL: remove guestToken and guestAccessToken while preserving orderId & legitimate query params
+      if (window.history && window.location) {
+        try {
+          const currentUrl = new URL(window.location.href);
+          let paramsModified = false;
+
+          if (currentUrl.searchParams.has("guestToken")) {
+            currentUrl.searchParams.delete("guestToken");
+            paramsModified = true;
+          }
+          if (currentUrl.searchParams.has("guestAccessToken")) {
+            currentUrl.searchParams.delete("guestAccessToken");
+            paramsModified = true;
+          }
+
+          if (paramsModified) {
+            const sanitizedPath = currentUrl.pathname + (currentUrl.search ? currentUrl.search : "") + currentUrl.hash;
+            window.history.replaceState(window.history.state, document.title, sanitizedPath);
+          }
+        } catch (urlErr) {
+          // Graceful fallback: do not break execution if URL parsing fails
+        }
+      }
+    } else if (!guestToken) {
+      try {
+        const stored =
+          sessionStorage.getItem(`pet_protocols_guest_token_${orderIdParam}`) ||
+          sessionStorage.getItem("pet_protocols_latest_guest_token");
+        if (stored) setGuestToken(stored);
+      } catch (e) {}
+    }
+  }, [orderIdParam, guestTokenParam, guestToken]);
 
   useEffect(() => {
     setCurrentTime(Date.now());
@@ -195,11 +271,23 @@ export default function OrderConfirmationClient() {
       if (isManual) setIsRefreshing(true);
 
       try {
+        const effectiveToken =
+          guestToken ||
+          (typeof window !== "undefined"
+            ? sessionStorage.getItem(`pet_protocols_guest_token_${orderIdParam}`) ||
+              sessionStorage.getItem("pet_protocols_latest_guest_token")
+            : null);
+
         const url = orderIdParam
           ? `/api/orders?orderId=${encodeURIComponent(orderIdParam)}`
           : "/api/orders";
 
-        const res = await fetch(url);
+        const headers = {};
+        if (effectiveToken) {
+          headers["x-guest-access-token"] = effectiveToken;
+        }
+
+        const res = await fetch(url, { headers });
         const data = await res.json();
 
         if (res.status === 401 || data.message === "Unauthorized") {
@@ -229,7 +317,7 @@ export default function OrderConfirmationClient() {
         setIsRefreshing(false);
       }
     },
-    [orderIdParam]
+    [orderIdParam, guestToken]
   );
 
   useEffect(() => {
@@ -408,15 +496,18 @@ export default function OrderConfirmationClient() {
     <main className="min-h-screen pt-28 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] space-y-8 transition-colors">
       {/* Celebration Header */}
       <div className="text-center space-y-3 pt-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-[var(--brand-accent)]/15 border border-[var(--brand-accent)]/30 text-3xl shadow-xl shadow-[var(--brand-accent)]/10 mb-1">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-3xl shadow-xl shadow-[var(--brand-accent)]/10 mb-1">
           🎉
         </div>
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-[var(--text-main)]">
+        <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--brand-accent)]">
+          <Sparkles size={14} /> Kitchen Order Received
+        </div>
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black tracking-tight text-[var(--text-main)]">
           Order <span className="text-[var(--brand-accent)]">Confirmed!</span>
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
           Your order has been received by <span className="font-bold text-[var(--text-main)]">{restaurantName}</span>.
-          Follow preparation progress below.
+          Fresh food. Zero compromises. Follow kitchen preparation progress below.
         </p>
 
         {/* Quick status bar */}
@@ -467,6 +558,7 @@ export default function OrderConfirmationClient() {
           notes={order.notes || ""}
           createdAt={order.createdAt}
           assignedDeliveryStaff={order.assignedDeliveryStaff}
+          guestToken={guestToken}
         />
         <LiveDeliveryMap
           orderId={order.orderId || order._id}
@@ -474,6 +566,7 @@ export default function OrderConfirmationClient() {
           isPickup={isPickup}
           restaurant={order.restaurant || restaurantDetails}
           destination={order.address}
+          guestToken={guestToken}
           onStatusUpdate={(newStatus) => {
             if (newStatus && newStatus !== order.status) {
               setOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
@@ -568,11 +661,11 @@ export default function OrderConfirmationClient() {
         <div className="md:col-span-2 space-y-6">
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 sm:p-6 shadow-xl">
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)] mb-4">
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
-                <Receipt size={16} className="text-[var(--brand-accent)]" />
-                Order Summary
+              <h2 className="text-base font-serif font-black text-[var(--text-main)] flex items-center gap-2">
+                <Receipt size={18} className="text-[var(--brand-accent)]" />
+                Order Summary & Receipt
               </h2>
-              <span className="text-xs text-[var(--text-muted)]">
+              <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-full border border-[var(--brand-accent)]/20">
                 {order.items?.length || 0} {order.items?.length === 1 ? "dish" : "dishes"}
               </span>
             </div>
@@ -595,18 +688,25 @@ export default function OrderConfirmationClient() {
               <div className="flex justify-between text-[var(--text-muted)]">
                 <span>Delivery Fee</span>
                 <span className="font-mono text-[var(--text-main)] font-semibold">
-                  {order.deliveryFee === 0 ? "FREE" : `₹${order.deliveryFee || 0}`}
+                  {order.deliveryFee === 0 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[11px]">FREE</span>
+                  ) : (
+                    `₹${order.deliveryFee || 0}`
+                  )}
                 </span>
               </div>
               {order.discount > 0 && (
-                <div className="flex justify-between text-emerald-500 font-semibold">
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
                   <span>Discount Applied</span>
                   <span className="font-mono">-₹{order.discount}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-3 border-t border-[var(--border-color)] font-bold text-sm sm:text-base">
-                <span className="text-[var(--text-main)]">Total Amount</span>
-                <span className="font-mono font-black text-[var(--brand-accent)] text-lg sm:text-xl">
+              <div className="flex justify-between items-baseline pt-3.5 border-t border-[var(--border-color)]">
+                <div>
+                  <span className="font-serif font-bold text-base text-[var(--text-main)]">Total Amount</span>
+                  <p className="text-[10px] text-[var(--text-muted)]">Verified final invoice</p>
+                </div>
+                <span className="font-mono font-black text-[var(--brand-accent)] text-xl sm:text-2xl">
                   ₹{order.totalAmount}
                 </span>
               </div>
@@ -623,9 +723,15 @@ export default function OrderConfirmationClient() {
                 <Building size={14} className="text-[var(--brand-accent)]" />
                 Kitchen Partner
               </h3>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                ★ {activeRest?.rating || "4.8"} Verified
-              </span>
+              {typeof activeRest?.rating === "number" && activeRest?.numRatings > 0 ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                  ★ {activeRest.rating} Verified
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-500/10 text-stone-500 border border-stone-500/20">
+                  Kitchen Partner
+                </span>
+              )}
             </div>
 
             <div>

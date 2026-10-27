@@ -201,8 +201,11 @@ export async function GET(request) {
       unreadCount,
     });
   } catch (error) {
-    console.error("Messages recipient GET error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.warn("[Messages GET] Recipient messages query warning:", error?.message || error);
+    return NextResponse.json(
+      { success: false, messages: [], unreadCount: 0, error: error?.message || "Notifications temporarily unavailable" },
+      { status: 503 }
+    );
   }
 }
 

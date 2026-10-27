@@ -408,4 +408,8 @@ const useCartStore = create((set, get) => ({
   closeCart: () => set({ isOpen: false }),
 }));
 
+if (typeof window !== "undefined") {
+  window.useCartStore = useCartStore;
+}
+
 export default useCartStore;

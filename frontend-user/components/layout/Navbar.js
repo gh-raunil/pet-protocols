@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
 import NavLinks from "./NavLinks";
+import NavbarLocationSelector from "./NavbarLocationSelector";
 import RightSection from "./RightSection";
 import HamburgerIcon from "./HamburgerIcon";
 import SearchBar from "../ui/SearchBar";
@@ -49,8 +50,8 @@ const Navbar = () => {
 
   const isHome = pathname === "/";
   const isMenu = pathname === "/menu";
-  // On homepage, suppress navbar search while hero search is in view. On /menu, suppress because in-page filter search is present.
-  const showDesktopSearch = (!isHome || scrolledPastHero) && !isMenu;
+  const isRestaurants = pathname === "/restaurants";
+  const showDesktopSearch = !isMenu && !isRestaurants;
 
   return (
     <header
@@ -60,38 +61,42 @@ const Navbar = () => {
           : "bg-[var(--bg-main)]/80 backdrop-blur-md"
       } ${hidden && !mobileSearchOpen ? '-translate-y-full' : 'translate-y-0'}`}
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3.5 flex justify-between items-center gap-2 sm:gap-6 w-full">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-6 py-2 sm:py-2.5 lg:py-3.5 flex justify-between items-center gap-1.5 sm:gap-2 lg:gap-3 xl:gap-5 w-full">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0 group" aria-label="पेट Protocols Home">
+        <Link href="/" className="flex items-center gap-2 shrink-0 group" aria-label="पेट Protocols Home">
           <Logo />
-          <span className="font-extrabold text-base tracking-tight hidden sm:inline text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition">
-            पेट Protocols
-          </span>
+          <div className="flex flex-col">
+            <span className="font-extrabold text-sm sm:text-base tracking-tight text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition leading-tight">
+              पेट Protocols
+            </span>
+            <span className="text-[10px] text-[var(--text-muted)] font-normal hidden xl:inline leading-tight">
+              Fresh food. Zero compromises.
+            </span>
+          </div>
         </Link>
 
         {/* Desktop Nav Links */}
-        <div className="hidden lg:flex items-center">
+        <div className="hidden lg:flex items-center shrink-0">
           <NavLinks />
         </div>
 
+        {/* Desktop Location Selector */}
+        <NavbarLocationSelector />
+
         {/* Desktop SearchBar */}
         <div
-          className={`hidden md:flex flex-1 max-w-xs min-w-0 mx-2 lg:mx-3 xl:mx-4 transition-all duration-300 ${
+          className={`hidden md:flex flex-1 min-w-[120px] max-w-[170px] lg:max-w-[190px] xl:max-w-[260px] 2xl:max-w-[300px] shrink mx-0.5 lg:mx-1 transition-all duration-300 ${
             showDesktopSearch
               ? "opacity-100 scale-100 pointer-events-auto"
               : "opacity-0 scale-95 pointer-events-none invisible"
           }`}
         >
-          <SearchBar />
+          <SearchBar placeholder="Search dishes, cuisines..." />
         </div>
 
-        {/* Right Section: Theme Toggle, Notifications, Mobile Search, Cart, Profile */}
-        <div className="flex gap-1.5 sm:gap-2.5 items-center shrink-0">
-          <RightSection
-            onOpenMobileSearch={() => setMobileSearchOpen(true)}
-            isMobileSearchOpen={mobileSearchOpen}
-            mobileSearchButtonRef={searchButtonRef}
-          />
+        {/* Right Section: Theme Toggle, Notifications, Cart, Profile */}
+        <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 items-center shrink-0">
+          <RightSection />
           <HamburgerIcon />
         </div>
       </div>

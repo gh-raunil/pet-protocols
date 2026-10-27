@@ -32,12 +32,16 @@ import {
   Ticket,
   Percent,
   X,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
 import DeliveryPushPrompt from "@/components/notifications/DeliveryPushPrompt";
 import { calculateCartDiscounts } from "@/lib/offersHelper";
 import DeliveryLocationMapPicker from "@/components/checkout/DeliveryLocationMapPicker";
 import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
+import useLocationStore from "@/lib/locationStore";
+import { areAllRestaurantsPickupEnabled } from "@/lib/pickupHelper";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500";
 
@@ -85,20 +89,56 @@ function CheckoutItemRow({ item }) {
   );
 }
 
-// Dynamically load Razorpay standard checkout script
+// Dynamically load Razorpay standard checkout script safely with duplicate prevention
+const RAZORPAY_SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+const RAZORPAY_SCRIPT_ID = "razorpay-checkout-sdk";
+let razorpayLoadingPromise = null;
+
 const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    if (typeof window !== "undefined" && window.Razorpay) {
-      resolve(true);
-      return;
+  if (typeof window === "undefined") {
+    return Promise.resolve(false);
+  }
+
+  // 1. If SDK is already present on window, immediately succeed
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  // 2. If a load attempt is already in flight, reuse the active promise to avoid duplicate injection
+  if (razorpayLoadingPromise) {
+    return razorpayLoadingPromise;
+  }
+
+  razorpayLoadingPromise = new Promise((resolve) => {
+    // 3. Remove any prior failed or orphaned script element before a subsequent retry
+    const existingScript =
+      document.getElementById(RAZORPAY_SCRIPT_ID) ||
+      document.querySelector(`script[src="${RAZORPAY_SCRIPT_SRC}"]`);
+    if (existingScript) {
+      existingScript.remove();
     }
+
     const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.id = RAZORPAY_SCRIPT_ID;
+    script.src = RAZORPAY_SCRIPT_SRC;
     script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
+
+    script.onload = () => {
+      razorpayLoadingPromise = null;
+      resolve(true);
+    };
+
+    script.onerror = () => {
+      // Remove failed script element to allow clean retry and avoid DOM accumulation
+      script.remove();
+      razorpayLoadingPromise = null;
+      resolve(false);
+    };
+
     document.body.appendChild(script);
   });
+
+  return razorpayLoadingPromise;
 };
 
 export default function CheckoutClient() {
@@ -108,10 +148,15 @@ export default function CheckoutClient() {
 
   const { items, getTotalPrice, clearCart } = useCartStore();
 
+  const isSimulatorAvailable =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ENABLE_PAYMENT_SIMULATOR !== "false";
+
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState("");
+  const [checkoutServiceabilityAlert, setCheckoutServiceabilityAlert] = useState(null);
 
   // Fulfillment: Delivery vs Pickup
   const initialType = searchParams?.get("type") === "pickup" ? "pickup" : "delivery";
@@ -120,6 +165,8 @@ export default function CheckoutClient() {
   // Payment Mode
   const [paymentMode, setPaymentMode] = useState(initialType === "pickup" ? "cop" : "cod");
   const [showTestCards, setShowTestCards] = useState(false);
+  const [razorpayLoadError, setRazorpayLoadError] = useState(false);
+  const [retryingSdk, setRetryingSdk] = useState(false);
 
   // Offers & Promo Codes
   const [availableOffers, setAvailableOffers] = useState([]);
@@ -181,11 +228,42 @@ export default function CheckoutClient() {
     setIsMounted(true);
     loadRazorpayScript();
 
+    const locDetails = useLocationStore.getState()?.locationDetails;
+    const hasExact = locDetails?.hasExactCoordinates && locDetails?.latitude != null && locDetails?.longitude != null;
+
     if (session?.user?.name) {
       setAddress((prev) => ({
         ...prev,
         fullName: prev.fullName || session.user.name,
         phone: prev.phone || session.user.phone || "",
+        latitude: prev.latitude ?? (hasExact ? locDetails.latitude : null),
+        longitude: prev.longitude ?? (hasExact ? locDetails.longitude : null),
+        street: prev.street || (hasExact && locDetails.name ? locDetails.name : ""),
+        city: prev.city || (hasExact && locDetails.area ? locDetails.area : "New Delhi"),
+      }));
+      setDraftNewAddress((prev) => ({
+        ...prev,
+        fullName: prev.fullName || session.user.name,
+        phone: prev.phone || session.user.phone || "",
+        latitude: prev.latitude ?? (hasExact ? locDetails.latitude : null),
+        longitude: prev.longitude ?? (hasExact ? locDetails.longitude : null),
+        street: prev.street || (hasExact && locDetails.name ? locDetails.name : ""),
+        city: prev.city || (hasExact && locDetails.area ? locDetails.area : "New Delhi"),
+      }));
+    } else if (hasExact) {
+      setAddress((prev) => ({
+        ...prev,
+        latitude: prev.latitude ?? locDetails.latitude,
+        longitude: prev.longitude ?? locDetails.longitude,
+        street: prev.street || (locDetails.name ? locDetails.name : ""),
+        city: prev.city || (locDetails.area ? locDetails.area : "New Delhi"),
+      }));
+      setDraftNewAddress((prev) => ({
+        ...prev,
+        latitude: prev.latitude ?? locDetails.latitude,
+        longitude: prev.longitude ?? locDetails.longitude,
+        street: prev.street || (locDetails.name ? locDetails.name : ""),
+        city: prev.city || (locDetails.area ? locDetails.area : "New Delhi"),
       }));
     }
   }, [session]);
@@ -198,6 +276,9 @@ export default function CheckoutClient() {
         setLoadingAddresses(true);
         const res = await fetch("/api/user/addresses");
         const data = await res.json();
+        const locDetails = useLocationStore.getState()?.locationDetails;
+        const hasExact = locDetails?.hasExactCoordinates && locDetails?.latitude != null && locDetails?.longitude != null;
+
         if (data.success && Array.isArray(data.addresses) && data.addresses.length > 0) {
           setSavedAddresses(data.addresses);
           const defaultAddress = data.addresses.find((a) => a.isDefault) || data.addresses[0];
@@ -209,6 +290,8 @@ export default function CheckoutClient() {
             city: defaultAddress.city || "New Delhi",
             state: defaultAddress.state || "Delhi",
             pincode: defaultAddress.pincode || "110001",
+            latitude: defaultAddress.latitude ?? (hasExact ? locDetails.latitude : null),
+            longitude: defaultAddress.longitude ?? (hasExact ? locDetails.longitude : null),
           });
         } else {
           setSelectedAddressId("new");
@@ -264,10 +347,25 @@ export default function CheckoutClient() {
     loadOffers();
   }, [searchParams]);
 
+  // Safety guard: ensure simulator is never selected if not permitted
+  useEffect(() => {
+    if (!isSimulatorAvailable && paymentMode === "simulator") {
+      setPaymentMode(orderType === "pickup" ? "cop" : "cod");
+    }
+  }, [isSimulatorAvailable, paymentMode, orderType]);
+
   // Sync payment mode when orderType changes
   const handleOrderTypeChange = (type) => {
+    if (type === "pickup" && !pickupCapability.isSupported) {
+      setError(pickupCapability.reason || "Self-pickup is not offered by this kitchen.");
+      return;
+    }
     setOrderType(type);
-    if (type === "pickup") {
+    setCheckoutServiceabilityAlert(null);
+    setError("");
+    if (!isSimulatorAvailable && paymentMode === "simulator") {
+      setPaymentMode(type === "pickup" ? "cop" : "cod");
+    } else if (type === "pickup") {
       if (paymentMode === "cod") setPaymentMode("cop");
     } else {
       if (paymentMode === "cop") setPaymentMode("cod");
@@ -278,6 +376,8 @@ export default function CheckoutClient() {
     if (selectedAddressId === "new") {
       setDraftNewAddress(address);
     }
+    const locDetails = useLocationStore.getState()?.locationDetails;
+    const hasExact = locDetails?.hasExactCoordinates && locDetails?.latitude != null && locDetails?.longitude != null;
     setSelectedAddressId(saved._id);
     setAddress({
       fullName: saved.fullName || session?.user?.name || "",
@@ -286,8 +386,8 @@ export default function CheckoutClient() {
       city: saved.city || "New Delhi",
       state: saved.state || "Delhi",
       pincode: saved.pincode || "110001",
-      latitude: saved.latitude || null,
-      longitude: saved.longitude || null,
+      latitude: saved.latitude ?? (hasExact ? locDetails.latitude : null),
+      longitude: saved.longitude ?? (hasExact ? locDetails.longitude : null),
       recipientName: "",
       recipientPhone: "",
       isDifferentRecipient: false,
@@ -295,10 +395,13 @@ export default function CheckoutClient() {
     setSaveAddressToProfile(false);
     setFieldErrors({});
     setError("");
+    setCheckoutServiceabilityAlert(null);
   };
 
   const handleSelectCustomAddress = () => {
     setSelectedAddressId("new");
+    const locDetails = useLocationStore.getState()?.locationDetails;
+    const hasExact = locDetails?.hasExactCoordinates && locDetails?.latitude != null && locDetails?.longitude != null;
     setAddress({
       fullName: draftNewAddress.fullName || session?.user?.name || "",
       phone: draftNewAddress.phone || session?.user?.phone || "",
@@ -306,8 +409,8 @@ export default function CheckoutClient() {
       city: draftNewAddress.city || "New Delhi",
       state: draftNewAddress.state || "Delhi",
       pincode: draftNewAddress.pincode || "110001",
-      latitude: draftNewAddress.latitude || null,
-      longitude: draftNewAddress.longitude || null,
+      latitude: draftNewAddress.latitude ?? (hasExact ? locDetails.latitude : null),
+      longitude: draftNewAddress.longitude ?? (hasExact ? locDetails.longitude : null),
       recipientName: draftNewAddress.recipientName || "",
       recipientPhone: draftNewAddress.recipientPhone || "",
       isDifferentRecipient: draftNewAddress.isDifferentRecipient || false,
@@ -315,6 +418,7 @@ export default function CheckoutClient() {
     setSaveAddressToProfile(true);
     setFieldErrors({});
     setError("");
+    setCheckoutServiceabilityAlert(null);
   };
 
   const handleSelectMapLocation = (coords) => {
@@ -331,6 +435,16 @@ export default function CheckoutClient() {
         longitude: coords.longitude,
       }));
     }
+    setCheckoutServiceabilityAlert(null);
+    setError("");
+    useLocationStore.getState()?.setCoordinatesAndCheck?.({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      name: address.street || "Pinned Location",
+      area: address.city || "Custom Location",
+      hasExactCoordinates: true,
+      isApproximate: false,
+    });
   };
 
   const handleQuickGps = () => {
@@ -356,6 +470,16 @@ export default function CheckoutClient() {
             longitude,
           }));
         }
+        setCheckoutServiceabilityAlert(null);
+        setError("");
+        useLocationStore.getState()?.setCoordinatesAndCheck?.({
+          latitude,
+          longitude,
+          name: "Current Device GPS",
+          area: address.city || "Device Location",
+          hasExactCoordinates: true,
+          isApproximate: false,
+        });
       },
       (err) => {
         setIsLocatingDevice(false);
@@ -382,6 +506,8 @@ export default function CheckoutClient() {
         longitude: null,
       }));
     }
+    setCheckoutServiceabilityAlert(null);
+    setError("");
   };
 
   const handleAddressKeyDown = (e, currentId) => {
@@ -478,6 +604,23 @@ export default function CheckoutClient() {
   const flatFee = primaryRest?.chargeSettings?.flatDeliveryFee ?? 40;
   const freeThreshold = primaryRest?.chargeSettings?.freeDeliveryThreshold ?? 500;
   const deliveryRadius = primaryRest?.deliverySettings?.deliveryRadiusKm;
+
+  // Determine authoritative restaurant pickup capability across all items in cart
+  const pickupCapability = useMemo(() => {
+    const rests = Object.values(groupedRestaurants).map((g) => g.restaurant).filter(Boolean);
+    return areAllRestaurantsPickupEnabled(rests);
+  }, [groupedRestaurants]);
+
+  // If customer landed with ?type=pickup but restaurant doesn't support pickup, fall back to delivery
+  useEffect(() => {
+    if (orderType === "pickup" && !pickupCapability.isSupported) {
+      setOrderType("delivery");
+      setPaymentMode("cod");
+      setError(
+        pickupCapability.reason || "Self-pickup is not offered by this kitchen. Defaulted to Doorstep Delivery."
+      );
+    }
+  }, [orderType, pickupCapability]);
 
   // Subtotal, Delivery & Discounts (Option A Coupon + Option B Auto)
   const subtotal = getTotalPrice();
@@ -619,6 +762,14 @@ export default function CheckoutClient() {
           errors.recipientPhone = "Please enter a valid 10-digit mobile number for the recipient.";
         }
       }
+
+      if (address.latitude == null || address.longitude == null) {
+        errors.coordinates = "Exact delivery location pin is required. Please use device GPS or drop a pin on the map.";
+        setCheckoutServiceabilityAlert({
+          code: "MISSING_CUSTOMER_COORDINATES",
+          message: "Exact delivery coordinates are required so our kitchen can verify delivery serviceability. Please use device GPS or drop a pin on the map.",
+        });
+      }
     }
 
     setFieldErrors(errors);
@@ -634,6 +785,26 @@ export default function CheckoutClient() {
       return false;
     }
     return true;
+  };
+
+  const handleStructuredApiError = (data, defaultMsg) => {
+    if (
+      data?.code &&
+      [
+        "OUT_OF_DELIVERY_RANGE",
+        "MISSING_CUSTOMER_COORDINATES",
+        "INVALID_CUSTOMER_COORDINATES",
+        "INVALID_RESTAURANT_COORDINATES",
+      ].includes(data.code)
+    ) {
+      setCheckoutServiceabilityAlert({
+        code: data.code,
+        message: data.message || defaultMsg,
+        serviceability: data.serviceability,
+      });
+    }
+    setError(data?.message || defaultMsg);
+    setLoading(false);
   };
 
   const saveAddressIfRequested = async () => {
@@ -658,6 +829,19 @@ export default function CheckoutClient() {
       });
     } catch (e) {
       console.warn("Could not save address to profile:", e);
+    }
+  };
+
+  const handleRetryRazorpaySdk = async () => {
+    if (retryingSdk) return;
+    setRetryingSdk(true);
+    setError("");
+    const loaded = await loadRazorpayScript();
+    setRetryingSdk(false);
+    if (loaded && typeof window.Razorpay !== "undefined") {
+      setRazorpayLoadError(false);
+    } else {
+      setError("Online payment SDK could not be loaded. Please check connection or switch to Cash payment.");
     }
   };
 
@@ -687,17 +871,18 @@ export default function CheckoutClient() {
 
       const orderData = await res.json();
       if (!orderData.success) {
-        setError(orderData.message || "Failed to initialize payment.");
-        setLoading(false);
+        handleStructuredApiError(orderData, "Failed to initialize payment.");
         return;
       }
 
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded || typeof window.Razorpay === "undefined") {
+        setRazorpayLoadError(true);
         setError("Failed to load Razorpay payment SDK. Please check your internet connection.");
         setLoading(false);
         return;
       }
+      setRazorpayLoadError(false);
 
       const razorpayKey = orderData.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
       if (!razorpayKey) {
@@ -758,7 +943,16 @@ export default function CheckoutClient() {
               await saveAddressIfRequested();
               await clearCart();
               const targetOrderId = verifyData.order?._id || verifyData.orderId || "";
-              router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
+              if (verifyData.guestAccessToken) {
+                try {
+                  sessionStorage.setItem(`pet_protocols_guest_token_${targetOrderId}`, verifyData.guestAccessToken);
+                  sessionStorage.setItem("pet_protocols_latest_guest_token", verifyData.guestAccessToken);
+                } catch (e) {}
+              }
+              const redirectUrl = targetOrderId
+                ? `/order-confirmation?orderId=${targetOrderId}${verifyData.guestAccessToken ? `&guestToken=${encodeURIComponent(verifyData.guestAccessToken)}` : ''}`
+                : "/order-confirmation";
+              router.push(redirectUrl);
             } else {
               setError(verifyData.message || "Payment verification failed. Contact support.");
               setLoading(false);
@@ -788,6 +982,11 @@ export default function CheckoutClient() {
   // 2. Instant Simulator Checkout Flow (Demo/Dev)
   const handleSimulatorCheckout = async () => {
     if (loading) return;
+    if (!isSimulatorAvailable) {
+      setError("Developer payment simulator is disabled in production.");
+      setPaymentMode(orderType === "pickup" ? "cop" : "cod");
+      return;
+    }
     if (!validateDetails()) return;
 
     setLoading(true);
@@ -822,8 +1021,7 @@ export default function CheckoutClient() {
 
       const data = await res.json();
       if (!data.success) {
-        setError(data.message || "Failed to place order.");
-        setLoading(false);
+        handleStructuredApiError(data, "Failed to place order.");
         return;
       }
 
@@ -834,7 +1032,16 @@ export default function CheckoutClient() {
       } catch (e) {}
       await clearCart();
       const targetOrderId = data.order?._id || data.orderId || "";
-      router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
+      if (data.guestAccessToken) {
+        try {
+          sessionStorage.setItem(`pet_protocols_guest_token_${targetOrderId}`, data.guestAccessToken);
+          sessionStorage.setItem("pet_protocols_latest_guest_token", data.guestAccessToken);
+        } catch (e) {}
+      }
+      const redirectUrl = targetOrderId
+        ? `/order-confirmation?orderId=${targetOrderId}${data.guestAccessToken ? `&guestToken=${encodeURIComponent(data.guestAccessToken)}` : ''}`
+        : "/order-confirmation";
+      router.push(redirectUrl);
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred during simulator checkout.");
@@ -882,8 +1089,7 @@ export default function CheckoutClient() {
 
       const data = await res.json();
       if (!data.success) {
-        setError(data.message || "Failed to place order.");
-        setLoading(false);
+        handleStructuredApiError(data, "Failed to place order.");
         return;
       }
 
@@ -894,7 +1100,16 @@ export default function CheckoutClient() {
       } catch (e) {}
       await clearCart();
       const targetOrderId = data.order?._id || data.orderId || "";
-      router.push(targetOrderId ? `/order-confirmation?orderId=${targetOrderId}` : "/order-confirmation");
+      if (data.guestAccessToken) {
+        try {
+          sessionStorage.setItem(`pet_protocols_guest_token_${targetOrderId}`, data.guestAccessToken);
+          sessionStorage.setItem("pet_protocols_latest_guest_token", data.guestAccessToken);
+        } catch (e) {}
+      }
+      const cashRedirectUrl = targetOrderId
+        ? `/order-confirmation?orderId=${targetOrderId}${data.guestAccessToken ? `&guestToken=${encodeURIComponent(data.guestAccessToken)}` : ''}`
+        : "/order-confirmation";
+      router.push(cashRedirectUrl);
     } catch (err) {
       console.error("Cash checkout error:", err);
       setError("An unexpected error occurred while placing order.");
@@ -910,8 +1125,16 @@ export default function CheckoutClient() {
       handleRazorpayCheckout();
     } else if (paymentMode === "cod" || paymentMode === "cop") {
       handleCashCheckout();
-    } else {
+    } else if (paymentMode === "simulator") {
+      if (!isSimulatorAvailable) {
+        setError("Developer payment simulator is disabled in production.");
+        setPaymentMode(orderType === "pickup" ? "cop" : "cod");
+        return;
+      }
       handleSimulatorCheckout();
+    } else {
+      setError("Please select a valid payment method.");
+      setPaymentMode(orderType === "pickup" ? "cop" : "cod");
     }
   };
 
@@ -919,19 +1142,26 @@ export default function CheckoutClient() {
 
   if (items.length === 0) {
     return (
-      <main className="min-h-screen pt-32 pb-24 px-6 flex items-center justify-center text-center text-[var(--text-main)]">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl">
-          <ShoppingBag size={40} className="mx-auto text-[var(--brand-accent)] mb-4" />
-          <h1 className="text-2xl font-black text-[var(--text-main)]">Your cart is empty</h1>
-          <p className="text-xs text-[var(--text-muted)] mt-2">
-            Add items from our partner kitchens before checking out.
+      <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 flex items-center justify-center text-center text-[var(--text-main)]">
+        <div className="max-w-md w-full p-8 sm:p-12 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-[var(--brand-accent)] flex items-center justify-center mb-6 shadow-xs">
+            <ShoppingBag size={38} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-[var(--text-main)]">
+            Your cart is empty
+          </h1>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+            Add freshly prepared dishes from our artisan partner kitchens before checking out.
           </p>
-          <Link
-            href="/menu"
-            className="inline-block mt-6 px-6 py-3 rounded-2xl bg-[var(--brand-accent)] text-white font-bold text-xs shadow-lg shadow-[var(--brand-accent)]/20"
-          >
-            Explore Menu
-          </Link>
+          <div className="mt-8">
+            <Link
+              href="/menu"
+              className="inline-flex items-center justify-center gap-2 w-full min-h-[48px] py-3.5 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-[var(--brand-accent)]/20 transition active:scale-98"
+            >
+              <span>Explore Menu</span>
+              <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -947,26 +1177,67 @@ export default function CheckoutClient() {
 
   return (
     <main className="min-h-screen pt-28 pb-20 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
-      {/* ── BREADCRUMB PROGRESS BAR ────────────────── */}
-      <div className="mb-8">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--brand-accent)] uppercase tracking-wider mb-2">
-          <ShieldCheck size={15} /> Multi-Kitchen Secure Checkout
-        </div>
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-[var(--text-main)]">
-          Checkout & Order Confirmation
-        </h1>
+      {/* ── BREADCRUMBS ─────────────────────────────────────────── */}
+      <nav
+        aria-label="Breadcrumb"
+        className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mb-6 overflow-x-auto pb-1 scrollbar-none"
+      >
+        <Link href="/" className="hover:text-[var(--brand-accent)] transition font-medium shrink-0">
+          Home
+        </Link>
+        <ChevronRight size={12} className="shrink-0 opacity-60" />
+        <Link href="/menu" className="hover:text-[var(--brand-accent)] transition font-medium shrink-0">
+          Menu
+        </Link>
+        <ChevronRight size={12} className="shrink-0 opacity-60" />
+        <Link href="/cart" className="hover:text-[var(--brand-accent)] transition font-medium shrink-0">
+          Cart
+        </Link>
+        <ChevronRight size={12} className="shrink-0 opacity-60" />
+        <span className="font-bold text-[var(--text-main)] shrink-0">
+          Checkout
+        </span>
+      </nav>
 
-        <div className="mt-6 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hidden md:flex items-center justify-between">
+      {/* ── HEADER & STEPPER ────────────────── */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 text-xs font-bold text-[var(--brand-accent)] uppercase tracking-wider mb-1.5">
+          <ShieldCheck size={16} /> Multi-Kitchen Secure Checkout
+        </div>
+        <h1 className="text-3xl sm:text-5xl font-serif font-black tracking-tight text-[var(--text-main)]">
+          Checkout & Confirmation
+        </h1>
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5">
+          Review fulfillment, delivery details, and complete your order • Fresh food. Zero compromises.
+        </p>
+
+        {/* Mobile Compact Step Indicator */}
+        <div className="md:hidden flex items-center justify-between p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mt-4 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-6 h-6 rounded-full bg-[var(--brand-accent)] text-white font-mono font-bold text-xs flex items-center justify-center shadow-xs">
+              {orderType === "delivery" ? (address.street ? "3" : "2") : "2"}
+            </span>
+            <span className="text-xs font-bold text-[var(--text-main)]">
+              {orderType === "delivery" ? (address.street ? "Step 3 of 5 • Payment & Review" : "Step 2 of 5 • Delivery Details") : "Step 2 of 5 • Pickup Details"}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-[var(--brand-accent)] uppercase tracking-wider bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded-full border border-[var(--brand-accent)]/20">
+            Secure
+          </span>
+        </div>
+
+        {/* Desktop Stepper */}
+        <div className="mt-6 p-4.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hidden md:flex items-center justify-between shadow-xs">
           {steps.map((st, i) => (
-            <div key={st.num} className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[var(--brand-accent)] text-white font-black text-xs flex items-center justify-center">
+            <div key={st.num} className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-full bg-[var(--brand-accent)] text-white font-mono font-bold text-xs flex items-center justify-center shadow-xs">
                 {st.num}
               </span>
               <span className="text-xs font-bold text-[var(--text-main)]">
                 {st.label}
               </span>
               {i < steps.length - 1 && (
-                <div className="w-12 h-0.5 bg-[var(--border-color)] ml-3" />
+                <div className="w-8 lg:w-16 h-0.5 bg-[var(--border-color)] ml-3" />
               )}
             </div>
           ))}
@@ -1029,16 +1300,24 @@ export default function CheckoutClient() {
                 </Tooltip>
 
                 <Tooltip
-                  content="Save on delivery charges! Pick up your freshly prepared meal in person at the kitchen counter."
+                  content={
+                    !pickupCapability.isSupported
+                      ? pickupCapability.reason || "Self-pickup is not available for this kitchen."
+                      : "Save on delivery charges! Pick up your freshly prepared meal in person at the kitchen counter."
+                  }
                   placement="top"
                 >
                   <button
                     type="button"
+                    disabled={!pickupCapability.isSupported}
+                    aria-disabled={!pickupCapability.isSupported}
                     onClick={() => handleOrderTypeChange("pickup")}
-                    className={`w-full p-4 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3.5 ${
-                      orderType === "pickup"
-                        ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)]"
-                        : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40"
+                    className={`w-full p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 ${
+                      !pickupCapability.isSupported
+                        ? "border-[var(--border-color)] bg-[var(--bg-sub)] opacity-50 cursor-not-allowed"
+                        : orderType === "pickup"
+                        ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-1 ring-[var(--brand-accent)] cursor-pointer"
+                        : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40 cursor-pointer"
                     }`}
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
@@ -1046,13 +1325,17 @@ export default function CheckoutClient() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-[var(--text-main)]">Self Pickup (COP)</span>
+                        <span className="font-bold text-sm text-[var(--text-main)]">
+                          Self Pickup {!pickupCapability.isSupported ? "(Unavailable)" : "(COP)"}
+                        </span>
                         {orderType === "pickup" && (
                           <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                         )}
                       </div>
                       <p className="text-xs text-emerald-500 font-semibold mt-1">
-                        ₹0 delivery charge • Pick up at kitchen
+                        {!pickupCapability.isSupported
+                          ? pickupCapability.reason || "Pickup not supported by kitchen"
+                          : "₹0 delivery charge • Pick up at kitchen"}
                       </p>
                     </div>
                   </button>
@@ -1531,7 +1814,7 @@ export default function CheckoutClient() {
                 />
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5" role="radiogroup" aria-label="Payment method selection">
+              <div className={`grid grid-cols-1 ${isSimulatorAvailable ? "md:grid-cols-3" : "sm:grid-cols-2"} gap-3.5`} role="radiogroup" aria-label="Payment method selection">
                 {/* 1. Cash on Delivery (COD) OR Cash on Pickup (COP) */}
                 {orderType === "delivery" ? (
                   <div
@@ -1669,50 +1952,90 @@ export default function CheckoutClient() {
                 </div>
 
                 {/* 3. Dev Simulator */}
-                <div
-                  role="radio"
-                  aria-checked={paymentMode === "simulator"}
-                  tabIndex={0}
-                  onClick={() => setPaymentMode("simulator")}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setPaymentMode("simulator");
-                    }
-                  }}
-                  className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-hidden ${
-                    paymentMode === "simulator"
-                      ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40"
-                      : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">
-                        <Zap size={18} />
+                {isSimulatorAvailable && (
+                  <div
+                    role="radio"
+                    aria-checked={paymentMode === "simulator"}
+                    tabIndex={0}
+                    onClick={() => setPaymentMode("simulator")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setPaymentMode("simulator");
+                      }
+                    }}
+                    className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-hidden ${
+                      paymentMode === "simulator"
+                        ? "border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40"
+                        : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--border-color)]/80"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">
+                          <Zap size={18} />
+                        </div>
+                        <div>
+                          <span className="font-bold text-sm text-[var(--text-main)] block">
+                            Test Simulator
+                          </span>
+                          <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">
+                            Instant Placement
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-bold text-sm text-[var(--text-main)] block">
-                          Test Simulator
-                        </span>
-                        <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">
-                          Instant Placement
-                        </span>
+                      <div
+                        className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                          paymentMode === "simulator" ? "border-blue-500 bg-blue-500 text-white" : "border-[var(--border-color)]"
+                        }`}
+                      >
+                        {paymentMode === "simulator" && <div className="w-2 h-2 rounded-full bg-white" />}
                       </div>
                     </div>
-                    <div
-                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                        paymentMode === "simulator" ? "border-blue-500 bg-blue-500 text-white" : "border-[var(--border-color)]"
-                      }`}
-                    >
-                      {paymentMode === "simulator" && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">
+                      Instant mock placement for end-to-end testing of cancellation & live tracking.
+                    </p>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)] mt-2">
-                    Instant mock placement for end-to-end testing of cancellation & live tracking.
-                  </p>
-                </div>
+                )}
               </div>
+
+              {/* Inline Razorpay SDK Load Recovery Panel */}
+              {razorpayLoadError && paymentMode === "razorpay" && (
+                <div
+                  className="mt-3 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-400 space-y-2.5 text-xs animate-in fade-in duration-200"
+                  role="alert"
+                >
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Online Checkout Gateway Unavailable</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    The Razorpay online payment script could not be loaded (e.g. ad-blocker or unstable connection). No charge was initiated and your selected address and order details are safe.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleRetryRazorpaySdk}
+                      disabled={retryingSdk}
+                      className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <RotateCcw size={13} className={retryingSdk ? "animate-spin" : ""} />
+                      {retryingSdk ? "Retrying Gateway..." : "Retry Loading Gateway"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentMode(orderType === "pickup" ? "cop" : "cod");
+                        setRazorpayLoadError(false);
+                        setError("");
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-accent)] text-[var(--text-main)] font-semibold text-xs transition cursor-pointer active:scale-95"
+                    >
+                      {orderType === "pickup" ? "Switch to Cash on Pickup" : "Switch to Cash on Delivery"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Helper for Razorpay test info */}
               {paymentMode === "razorpay" && (
@@ -1766,7 +2089,50 @@ export default function CheckoutClient() {
               </div>
             )}
 
-            {error && (
+            {/* Structured Serviceability Feedback (Phase 2.2 Error Codes) */}
+            {checkoutServiceabilityAlert && (
+              <div className="p-4.5 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-700 dark:text-amber-300 space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle size={20} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      {checkoutServiceabilityAlert.code === "OUT_OF_DELIVERY_RANGE"
+                        ? "Delivery Address Outside Service Area"
+                        : checkoutServiceabilityAlert.code === "MISSING_CUSTOMER_COORDINATES"
+                        ? "Exact Delivery Location Coordinates Required"
+                        : checkoutServiceabilityAlert.code === "INVALID_CUSTOMER_COORDINATES"
+                        ? "Invalid Delivery Coordinates"
+                        : "Kitchen Delivery Unconfigured"}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                      {checkoutServiceabilityAlert.message}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/25">
+                  {(checkoutServiceabilityAlert.code === "OUT_OF_DELIVERY_RANGE" ||
+                    checkoutServiceabilityAlert.code === "MISSING_CUSTOMER_COORDINATES" ||
+                    checkoutServiceabilityAlert.code === "INVALID_CUSTOMER_COORDINATES") && (
+                    <button
+                      type="button"
+                      onClick={() => setIsMapPickerOpen(true)}
+                      className="px-3.5 py-2 min-h-[36px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5 active:scale-95"
+                    >
+                      <MapPinned size={14} /> Adjust Pin on Map
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOrderTypeChange("pickup")}
+                    className="px-3.5 py-2 min-h-[36px] rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5 active:scale-95"
+                  >
+                    <ShoppingBag size={14} /> Switch to Self-Pickup (₹0)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!checkoutServiceabilityAlert && error && (
               <div className="bg-red-500/15 border border-red-500/30 rounded-2xl p-4 text-red-500 text-sm flex items-center gap-2">
                 <AlertCircle size={18} className="shrink-0" />
                 <span>{error}</span>
@@ -1808,7 +2174,9 @@ export default function CheckoutClient() {
                       ? `Place Order (Cash on Pickup) • ₹${total}`
                       : paymentMode === "razorpay"
                       ? `Pay ₹${total} via Razorpay (Online)`
-                      : `Place Order via Test Simulator (₹${total})`}
+                      : isSimulatorAvailable
+                      ? `Place Order via Test Simulator (₹${total})`
+                      : `Place Cash Order (₹${total})`}
                   </span>
                   <ArrowRight size={18} />
                 </>
@@ -1820,8 +2188,8 @@ export default function CheckoutClient() {
         {/* RIGHT: Order Summary Snapshot Card & Offers */}
         <div className="sticky top-28 space-y-5">
           {/* Coupon & Offers Card */}
-          <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl space-y-4">
-            <h2 className="text-base font-extrabold text-[var(--text-main)] flex items-center gap-2">
+          <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl space-y-4" aria-live="polite">
+            <h2 className="text-base font-serif font-black text-[var(--text-main)] flex items-center gap-2">
               <Ticket size={18} className="text-[var(--brand-accent)]" />
               Apply Offers & Promo Code
             </h2>
@@ -1829,14 +2197,14 @@ export default function CheckoutClient() {
             {appliedOffer ? (
               <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center font-bold text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
                     <Check size={16} />
                   </div>
                   <div>
-                    <span className="font-extrabold text-xs text-emerald-500 uppercase tracking-wider block">
+                    <span className="font-extrabold text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
                       {appliedOffer.code || "OFFER"} APPLIED
                     </span>
-                    <span className="text-[11px] text-[var(--text-muted)]">
+                    <span className="text-[11px] font-mono text-[var(--text-muted)]">
                       Saved ₹{discountAmount} on your feast!
                     </span>
                   </div>
@@ -1868,7 +2236,7 @@ export default function CheckoutClient() {
                   <button
                     type="button"
                     onClick={() => handleApplyCoupon(couponInput)}
-                    className="px-4 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-[var(--brand-accent)]/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
+                    className="px-4 py-2.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider transition shadow-md shadow-[var(--brand-accent)]/20 cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
                   >
                     Apply
                   </button>
@@ -1897,7 +2265,7 @@ export default function CheckoutClient() {
                           <div
                             key={off._id}
                             onClick={() => handleApplyCoupon(off)}
-                            className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2 ${
+                            className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2 active:scale-98 ${
                               qualifies
                                 ? "border-dashed border-[var(--brand-accent)]/50 bg-[var(--brand-accent)]/5 hover:bg-[var(--brand-accent)]/10"
                                 : "opacity-60 border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-amber-500/50"
@@ -1943,16 +2311,16 @@ export default function CheckoutClient() {
           </div>
 
           {/* Order Summary Snapshot Card */}
-          <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl">
-            <h2 className="text-base font-extrabold text-[var(--text-main)] mb-4 flex items-center justify-between">
+          <div className="bg-[var(--bg-card)] rounded-3xl p-6 border border-[var(--border-color)] shadow-xl space-y-4">
+            <h2 className="text-base font-serif font-black text-[var(--text-main)] flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
               <span>🧾 Order Summary</span>
-              <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-full border border-[var(--brand-accent)]/20">
                 {items.length} {items.length > 1 ? "items" : "item"}
               </span>
             </h2>
 
             {/* Items List */}
-            <div className="space-y-3 mb-6 max-h-72 overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
               {items.map((item) => (
                 <CheckoutItemRow key={item._id} item={item} />
               ))}
@@ -1962,7 +2330,7 @@ export default function CheckoutClient() {
             <div className="border-t border-[var(--border-color)] pt-4 space-y-2.5 text-xs">
               <div className="flex justify-between text-[var(--text-muted)]">
                 <span>Items Subtotal</span>
-                <span className="text-[var(--text-main)] font-semibold">₹{subtotal}</span>
+                <span className="text-[var(--text-main)] font-mono font-semibold">₹{subtotal}</span>
               </div>
               <div className="flex justify-between items-center text-[var(--text-muted)]">
                 <span className="flex items-center gap-1">
@@ -1979,9 +2347,9 @@ export default function CheckoutClient() {
                     side="right"
                   />
                 </span>
-                <span className="text-[var(--text-main)] font-semibold">
+                <span className="text-[var(--text-main)] font-mono font-semibold">
                   {deliveryFee === 0 ? (
-                    <span className="text-emerald-500 font-bold uppercase">FREE</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[11px]">FREE</span>
                   ) : (
                     `₹${deliveryFee}`
                   )}
@@ -1989,39 +2357,39 @@ export default function CheckoutClient() {
               </div>
 
               {autoDiscountAmount > 0 && (
-                <div className="flex justify-between text-emerald-500 font-semibold">
-                  <span>⚡ Auto Kitchen Discount</span>
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Sparkles size={12} /> Auto Kitchen Discount
+                  </span>
                   <span className="font-mono">- ₹{autoDiscountAmount}</span>
                 </div>
               )}
 
               {couponDiscountAmount > 0 && (
-                <div className="flex justify-between text-emerald-500 font-semibold">
-                  <span>🎟️ Promo Coupon ({appliedOffer?.code})</span>
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Ticket size={12} /> Promo Coupon ({appliedOffer?.code})
+                  </span>
                   <span className="font-mono">- ₹{couponDiscountAmount}</span>
                 </div>
               )}
 
               {orderType === "delivery" && isFreeDelivery && subtotal >= freeThreshold && (
-                <p className="text-[11px] text-emerald-500 font-semibold">
-                  ✦ Free delivery unlocked (Order &gt; ₹{freeThreshold})
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <Sparkles size={12} /> Free delivery unlocked (Order &gt; ₹{freeThreshold})
                 </p>
               )}
 
-              <div className="flex justify-between items-center font-extrabold text-base text-[var(--text-main)] border-t border-[var(--border-color)] pt-3">
-                <span className="flex items-center gap-1">
-                  <span>Grand Total</span>
-                  <HelpTooltip
-                    content="All taxes and charges included. No surprise fees at checkout."
-                    title="Total Payable"
-                    side="right"
-                  />
-                </span>
-                <span className="text-[var(--brand-accent)] font-mono text-xl">₹{total}</span>
+              <div className="flex justify-between items-baseline font-extrabold text-base text-[var(--text-main)] border-t border-[var(--border-color)] pt-3.5">
+                <div>
+                  <span className="font-serif font-bold text-base text-[var(--text-main)]">Grand Total</span>
+                  <p className="text-[10px] text-[var(--text-muted)]">All taxes and packaging included</p>
+                </div>
+                <span className="text-[var(--brand-accent)] font-mono text-2xl font-black">₹{total}</span>
               </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] space-y-1">
+            <div className="pt-3 border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] space-y-1">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck size={14} className="text-emerald-500" />
                 <span>256-bit encrypted checkout</span>
@@ -2031,7 +2399,7 @@ export default function CheckoutClient() {
 
             <Link
               href="/cart"
-              className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] mt-4 transition font-semibold"
+              className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] mt-3 transition font-semibold"
             >
               ← Modify Cart Items
             </Link>

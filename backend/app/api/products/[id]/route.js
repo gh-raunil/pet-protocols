@@ -3,11 +3,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/db'
 import Product from '@/models/Product'
+import mongoose from 'mongoose'
 
 // GET single product
 export async function GET(request, { params }) {
   try {
     const { id } = await params  // ← await params in Next.js 16
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid product ID format' },
+        { status: 400 }
+      );
+    }
     await connectDB()
     const product = await Product.findById(id).populate(
       'restaurant',
@@ -24,6 +31,12 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { id } = await params;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid product ID format' },
+        { status: 400 }
+      );
+    }
     const session = await getServerSession(authOptions);
     if (!session || !["admin", "restaurant_admin", "superadmin"].includes(session.user.role)) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -75,6 +88,12 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid product ID format' },
+        { status: 400 }
+      );
+    }
     const session = await getServerSession(authOptions);
     if (!session || !["admin", "restaurant_admin", "superadmin"].includes(session.user.role)) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });

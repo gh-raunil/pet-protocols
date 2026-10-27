@@ -13,6 +13,7 @@ export default function SearchBar({
   placeholder,
 }) {
   const isHero = variant === "hero";
+  const isMobileInline = variant === "mobile-inline";
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -471,6 +472,8 @@ export default function SearchBar({
         className={
           isHero
             ? "flex items-center gap-2 p-1.5 sm:p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-md shadow-black/5 focus-within:border-[var(--brand-accent)] focus-within:ring-2 focus-within:ring-[var(--brand-accent)]/20 transition-all text-sm w-full"
+            : isMobileInline
+            ? "flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs focus-within:border-[var(--brand-accent)] focus-within:ring-2 focus-within:ring-[var(--brand-accent)]/20 transition-all text-sm w-full"
             : "flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--bg-sub)] border border-[var(--border-color)] focus-within:border-[var(--brand-accent)] focus-within:ring-2 focus-within:ring-[var(--brand-accent)]/20 transition-all text-sm w-full"
         }
       >
@@ -488,7 +491,7 @@ export default function SearchBar({
           }}
           onKeyDown={handleInputKeyDown}
           onFocus={(e) => {
-            if (isHero && typeof window !== "undefined" && window.innerWidth < 768) {
+            if ((isHero || isMobileInline) && typeof window !== "undefined" && window.innerWidth < 768) {
               e.target.blur();
               window.dispatchEvent(new CustomEvent("open_mobile_search"));
             } else {
@@ -496,7 +499,7 @@ export default function SearchBar({
             }
           }}
           onClick={(e) => {
-            if (isHero && typeof window !== "undefined" && window.innerWidth < 768) {
+            if ((isHero || isMobileInline) && typeof window !== "undefined" && window.innerWidth < 768) {
               e.target.blur();
               window.dispatchEvent(new CustomEvent("open_mobile_search"));
             }

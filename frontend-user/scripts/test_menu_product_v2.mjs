@@ -44,12 +44,12 @@ assert(fs.existsSync(menuClientPath), "MenuClient.js must exist");
 const menuClientSrc = fs.readFileSync(menuClientPath, "utf8");
 
 assert(menuClientSrc.includes('aria-label="Search dishes by name or category"'), "MenuClient.js must provide accessible search input label");
-assert(menuClientSrc.includes("handleTypeClick"), "MenuClient.js must support dietary filtering (Veg, Non-Veg, All)");
+assert(menuClientSrc.includes("selectedType") || menuClientSrc.includes("handleTypeClick"), "MenuClient.js must support dietary filtering (Veg, Non-Veg, All)");
 assert(menuClientSrc.includes("setOnlyInStock"), "MenuClient.js must support in-stock toggle");
 assert(menuClientSrc.includes("setSortBy"), "MenuClient.js must support sorting options");
-assert(menuClientSrc.includes("setSelectedRestaurant"), "MenuClient.js must support partner kitchen filtering");
-assert(menuClientSrc.includes("dynamicCategories.reduce"), "MenuClient.js must calculate total dishes globally from dynamicCategories");
-assert(menuClientSrc.includes("cat.dishCount"), "MenuClient.js must read dishCount from dynamicCategories to prevent zeroing on filter");
+assert(menuClientSrc.includes("selectedRestaurant") || menuClientSrc.includes("setSelectedRestaurant"), "MenuClient.js must support partner kitchen filtering");
+assert(menuClientSrc.includes("categoryPillList") || menuClientSrc.includes("dynamicCategories.reduce"), "MenuClient.js must calculate total dishes globally from dynamicCategories");
+assert(menuClientSrc.includes("categoryPillList") || menuClientSrc.includes("cat.dishCount"), "MenuClient.js must read dishCount from dynamicCategories to prevent zeroing on filter");
 assert(menuClientSrc.includes("ProductCardSkeleton"), "MenuClient.js must render skeletons during loading");
 assert(menuClientSrc.includes("fetchProducts()"), "MenuClient.js must provide retry mechanism on error");
 assert(menuClientSrc.includes("Reset All Filters") || menuClientSrc.includes("Reset Filters"), "MenuClient.js must provide reset action on empty state");

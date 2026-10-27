@@ -6,6 +6,7 @@ import Product from "@/models/Product";
 import Order from "@/models/Order";
 import { requireSuperAdmin } from "@/lib/authMiddleware";
 import bcrypt from "bcryptjs";
+import { isValidCoordinate } from "@/lib/geoDistance";
 
 // GET — List all restaurants (Tenants)
 export async function GET(request) {
@@ -96,6 +97,10 @@ export async function POST(request) {
       generatedSlug = `${generatedSlug}-${Date.now().toString().slice(-4)}`;
     }
 
+    // Check if valid delivery coordinates are provided
+    const hasValidCoords = isValidCoordinate(address?.latitude, address?.longitude);
+    const initialStatus = hasValidCoords ? (body.status || "active") : "inactive";
+
     // Create Restaurant
     const restaurant = await Restaurant.create({
       name: name.trim(),
@@ -106,7 +111,7 @@ export async function POST(request) {
       phone: phone || "",
       email: email || "",
       image: image || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500",
-      status: "active",
+      status: initialStatus,
     });
 
     // Create First Admin
@@ -120,10 +125,14 @@ export async function POST(request) {
       status: "active",
     });
 
+    const successMessage = hasValidCoords
+      ? "Restaurant and first admin created successfully!"
+      : "Restaurant and first admin created in draft/inactive status. Please set location coordinates in Restaurant Settings before activating for delivery.";
+
     return NextResponse.json(
       {
         success: true,
-        message: "Restaurant and first admin created successfully!",
+        message: successMessage,
         restaurant,
         admin: {
           id: firstAdmin._id,

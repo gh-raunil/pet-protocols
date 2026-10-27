@@ -11,8 +11,7 @@ const SHARED_KEY = "pet_protocols_theme";
  * Keeping this component outside of 'use client' files ensures React 19 does not
  * warn about script tags inside client-rendered components.
  */
-export function ThemeScript() {
-  const scriptContent = `
+export const themeScriptContent = `
 (function() {
   try {
     function getCookie(name) {
@@ -110,11 +109,13 @@ export function ThemeScript() {
     }
   } catch (e) {}
 })();
-  `;
+`;
+
+export function ThemeScript() {
   return (
     <script
       id="theme-initializer"
-      dangerouslySetInnerHTML={{ __html: scriptContent }}
+      dangerouslySetInnerHTML={{ __html: themeScriptContent }}
     />
   );
 }
