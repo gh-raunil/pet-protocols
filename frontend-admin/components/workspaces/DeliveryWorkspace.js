@@ -1060,19 +1060,31 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden transition-all hover:border-blue-500/40"
               >
                 {/* ── CARD HEADER ───────────────────────────────────── */}
-                <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 dark:border-white/5">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <div className="p-3.5 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-stone-100 dark:border-white/5">
+                  <div className="flex items-start gap-3 w-full min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                       <Truck size={20} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-sm sm:text-base text-stone-900 dark:text-white">
-                          #{order.orderId || order._id.slice(-6).toUpperCase()}
-                        </span>
-                        {/* Status Badge */}
+                    <div className="flex-1 min-w-0">
+                      {/* Top line: Order ID, Time, and Status Badge */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                          <span className="font-extrabold text-sm sm:text-base text-stone-900 dark:text-white font-mono tracking-tight">
+                            #{order.orderId || order._id.slice(-6).toUpperCase()}
+                          </span>
+                          <span className="text-xs text-stone-400 hidden sm:inline">•</span>
+                          <span className="text-xs text-stone-500 dark:text-stone-400 hidden sm:inline-flex items-center gap-1">
+                            <Clock size={11} />
+                            {new Date(order.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Primary Status Badge */}
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wide border shrink-0 ${
                             order.status === "out_for_delivery"
                               ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 animate-pulse"
                               : order.status === "preparing"
@@ -1083,22 +1095,41 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           }`}
                         >
                           {order.status === "out_for_delivery"
-                            ? "🛵 OUT FOR DELIVERY"
+                            ? "🛵 Out for Delivery"
                             : order.status === "preparing"
-                            ? "🍳 KITCHEN PREPARING"
+                            ? "🍳 Preparing"
                             : order.status === "delivered"
-                            ? "✅ DELIVERED"
+                            ? "✅ Delivered"
                             : order.status?.toUpperCase()}
                         </span>
+                      </div>
 
-                        {/* Pickup or GPS Tracking Status Pill */}
+                      {/* Sub-info on mobile: Time, Dishes, Total */}
+                      <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 mt-1 flex-wrap">
+                        <span className="sm:hidden flex items-center gap-1 font-medium">
+                          <Clock size={11} />
+                          {new Date(order.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <span className="sm:hidden text-stone-300 dark:text-stone-700">•</span>
+                        <span>{order.items?.length || 0} Dishes</span>
+                        <span>•</span>
+                        <span className="font-extrabold text-stone-900 dark:text-white">
+                          Total: ₹{(order.totalAmount || 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Status Pills: GPS, Payment / COD, Assignment */}
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-stone-100 dark:border-white/5">
                         {isPickup ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                            🛍️ COUNTER PICKUP
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            🛍️ Counter Pickup
                           </span>
                         ) : order.status === "out_for_delivery" ? (
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center gap-1.5 ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
                               isOrderTracking
                                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                                 : "bg-stone-500/10 text-stone-600 dark:text-stone-400 border-stone-500/20"
@@ -1106,13 +1137,13 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           >
                             {isOrderTracking ? (
                               <>
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                                <span>LIVE GPS ACTIVE</span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                                <span>Live GPS Active</span>
                               </>
                             ) : (
                               <>
-                                <Navigation size={10} className="text-stone-400" />
-                                <span>GPS INACTIVE</span>
+                                <Navigation size={9} className="text-stone-400" />
+                                <span>GPS Inactive</span>
                               </>
                             )}
                           </span>
@@ -1120,12 +1151,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                         {/* Payment Status Pill */}
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             isCOD
                               ? isPaid
                                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                                 : order.status === "out_for_delivery"
-                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 animate-pulse"
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-extrabold"
                                 : "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/30"
                               : isPaid
                               ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
@@ -1134,48 +1165,32 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         >
                           {isCOD
                             ? isPaid
-                              ? "✓ CASH COLLECTED"
+                              ? "✓ Cash Collected"
                               : order.status === "out_for_delivery"
-                              ? "⚠️ COLLECT CASH AT DOORSTEP"
-                              : "💵 CASH ON DELIVERY"
+                              ? "⚠️ Collect Cash: ₹" + Number(order.totalAmount || 0).toFixed(0)
+                              : "💵 Cash on Delivery"
                             : isPaid
-                            ? "✓ PAID ONLINE"
-                            : "⚠️ PAYMENT PENDING"}
+                            ? "✓ Paid Online"
+                            : "⚠️ Payment Pending"}
                         </span>
-                      </div>
 
-                      <div className="flex items-center gap-3 text-xs text-stone-500 dark:text-stone-400 mt-1">
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {new Date(order.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        <span>•</span>
-                        <span>{order.items?.length || 0} Dishes</span>
-                        <span>•</span>
-                        <span className="font-bold text-stone-800 dark:text-stone-200">
-                          Total: ₹{(order.totalAmount || 0).toFixed(2)}
-                        </span>
-                      </div>
-
-                      {order.assignedDeliveryStaff?.name && (
-                        <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-                          <span>🛵</span>
-                          <span>
-                            {isMyOrder(order)
-                              ? "Assigned to You"
-                              : `Delivery Boy: ${order.assignedDeliveryStaff.name}`}
-                            {order.assignedDeliveryStaff.phone ? ` (${order.assignedDeliveryStaff.phone})` : ""}
+                        {/* Driver Assignment Footnote */}
+                        {order.assignedDeliveryStaff?.name && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-center gap-1">
+                            <span>🛵</span>
+                            <span>
+                              {isMyOrder(order)
+                                ? "Assigned to You"
+                                : order.assignedDeliveryStaff.name}
+                            </span>
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Quick Action Button for Delivery Flow */}
-                  <div className="w-full sm:w-auto flex items-center gap-2 flex-wrap justify-start sm:justify-end mt-2 sm:mt-0">
+                  {/* Action Buttons for Mobile / Desktop */}
+                  <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-stone-100 dark:border-white/5">
                     {(order.status === "preparing" || order.status === "ready") && (
                       isManager ? (
                         order.assignedDeliveryStaff?.id ? (
@@ -1183,7 +1198,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <button
                               onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
                               disabled={isUpdating}
-                              className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                              className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                             >
                               <Truck size={15} />
                               <span>Dispatch Order</span>
@@ -1192,7 +1207,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         ) : (
                           <a
                             href="/delivery/assign"
-                            className="min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                            className="min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2"
                           >
                             <Bike size={15} />
                             <span>Assign Driver First</span>
@@ -1203,7 +1218,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           <button
                             onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
                             disabled={isUpdating}
-                            className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                            className="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                           >
                             <Truck size={15} />
                             <span>Dispatch Order</span>
@@ -1214,7 +1229,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           <button
                             onClick={() => updateOrderStatus(order._id, "out_for_delivery", { selfPickup: true })}
                             disabled={isUpdating}
-                            className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                            className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                           >
                             <Bike size={15} />
                             <span>Pick Up Parcel</span>
@@ -1224,19 +1239,19 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     )}
 
                     {order.status === "out_for_delivery" && (
-                      <>
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                         {!isPickup && (
                           isManager ? (
-                            <span className="min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">
+                            <span className="col-span-2 sm:col-auto min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-600 dark:text-stone-300">
                               {order.deliveryTracking?.isLive ? (
                                 <>
                                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                  <span>Driver Live GPS Active</span>
+                                  <span>Driver Live GPS</span>
                                 </>
                               ) : (
                                 <>
                                   <span className="w-2 h-2 rounded-full bg-stone-400" />
-                                  <span>Awaiting Driver Live GPS</span>
+                                  <span>Awaiting Driver GPS</span>
                                 </>
                               )}
                             </span>
@@ -1244,22 +1259,22 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             <Tooltip content="Stop sharing your live GPS coordinates for this delivery" position="top">
                               <button
                                 onClick={() => gpsTransmitter.stopTracking("stopped")}
-                                className="min-h-[44px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="min-h-[44px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold text-xs px-3 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                                 title="Stop sending GPS coordinates for this order"
                               >
-                                <Power size={14} />
-                                <span>Stop Sharing GPS</span>
+                                <Power size={13} />
+                                <span>Stop GPS</span>
                               </button>
                             </Tooltip>
                           ) : (
                             <Tooltip content="Transmit your phone's real-time GPS location to the customer and restaurant manager" position="top">
                               <button
                                 onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
-                                className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95 flex-1 sm:flex-none"
+                                className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                                 title="Start transmitting real device GPS for this active delivery"
                               >
-                                <Navigation size={14} />
-                                <span>Share Live GPS</span>
+                                <Navigation size={13} />
+                                <span>Share GPS</span>
                               </button>
                             </Tooltip>
                           )
@@ -1275,21 +1290,23 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                               setHandoverRemainingAttempts(null);
                             }}
                             disabled={isUpdating}
-                            className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                            className={`min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm px-3.5 py-2 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 ${
+                              isPickup || isManager ? "col-span-2 sm:col-auto" : ""
+                            }`}
                           >
-                            <KeyRound size={15} />
-                            <span>Verify Handover (OTP)</span>
+                            <KeyRound size={14} />
+                            <span>Verify OTP</span>
                           </button>
                         </Tooltip>
-                      </>
+                      </div>
                     )}
 
                     <button
                       onClick={() => setExpandedOrderId(isExpanded ? null : order._id)}
-                      className="min-h-[44px] px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full sm:w-auto min-h-[44px] px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
                       <span>{isExpanded ? "Hide Details" : "View Full Details"}</span>
-                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                   </div>
                 </div>
@@ -1346,16 +1363,16 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="font-bold text-xs text-stone-900 dark:text-white">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-extrabold text-xs text-stone-900 dark:text-white">
                           {order.address?.fullName || "Valued Customer"}
                         </div>
                         {order.address?.phone && (
                           <a
                             href={`tel:${order.address.phone}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-500/20 transition"
+                            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs hover:bg-emerald-500/25 transition active:scale-95 shrink-0"
                           >
-                            <Phone size={11} />
+                            <Phone size={12} />
                             <span>Call ({order.address.phone})</span>
                           </a>
                         )}
@@ -1581,7 +1598,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     </div>
 
                     {isCOD && !isPaid && (
-                      <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         {order.status === "out_for_delivery" ? (
                           <>
                             <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
@@ -1593,9 +1610,9 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                 type="button"
                                 onClick={() => handleCollectCash(order)}
                                 disabled={updatingId !== null}
-                                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                                className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
                               >
-                                <Banknote size={14} />
+                                <Banknote size={15} />
                                 <span>Record Cash Collection</span>
                               </button>
                             </Tooltip>
