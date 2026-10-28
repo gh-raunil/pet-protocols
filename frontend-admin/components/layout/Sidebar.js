@@ -23,6 +23,7 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LogOut,
   Building,
   Store,
