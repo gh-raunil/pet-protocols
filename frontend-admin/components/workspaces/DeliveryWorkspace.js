@@ -1259,39 +1259,6 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           )
                         )}
 
-                        {/* Dual-Party Handover OTP View */}
-                        <Tooltip content="View active 4-digit handover OTP code for customer coordination" position="top">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const res = await fetch(`/api/restaurant/orders/${order._id}/otp`);
-                                const data = await res.json();
-                                if (data.success && data.otpCode) {
-                                  toast(
-                                    (t) => (
-                                      <div className="flex flex-col gap-1">
-                                        <span className="font-bold text-xs">Customer Handover Code:</span>
-                                        <span className="text-2xl font-mono font-black text-emerald-600 tracking-widest">
-                                          {data.otpCode}
-                                        </span>
-                                      </div>
-                                    ),
-                                    { duration: 6000, icon: "🔑" }
-                                  );
-                                } else {
-                                  toast.error(data.message || "Failed to retrieve OTP.");
-                                }
-                              } catch {
-                                toast.error("Network error retrieving OTP.");
-                              }
-                            }}
-                            className="min-h-[44px] bg-stone-800 hover:bg-stone-900 text-white dark:bg-stone-700 dark:hover:bg-stone-600 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <KeyRound size={14} />
-                            <span>View OTP</span>
-                          </button>
-                        </Tooltip>
-
                         {/* Delivery Handover Action (Requires Customer OTP Verification) */}
                         <Tooltip content="Verify customer's 4-digit handover code at doorstep and complete delivery." position="top">
                           <button

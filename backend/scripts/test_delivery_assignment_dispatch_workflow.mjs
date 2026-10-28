@@ -559,7 +559,7 @@ try {
     );
   }
 
-  // Test 16: Manager can access the OTP for their active self-delivery order
+  // Test 16: Restaurant side (including manager) cannot view handover OTP (403 Forbidden)
   {
     const ord = await createTestOrder({
       status: "out_for_delivery",
@@ -579,8 +579,8 @@ try {
     const data = await res.json();
 
     report(
-      "Manager can access the OTP for their active self-delivery order (200, 4 digits)",
-      res.status === 200 && data.success && /^\d{4}$/.test(data.otpCode)
+      "Restaurant side cannot view handover OTP (403 Forbidden)",
+      res.status === 403 && data.success === false
     );
   }
 
@@ -777,8 +777,8 @@ try {
     const req = new Request(`http://localhost:3000/api/restaurant/orders/${ordB._id}/otp`);
     const res = await orderOtpGET(req, { params: Promise.resolve({ id: ordB._id.toString() }) });
     report(
-      "Driver cannot access orders from another restaurant (404/Isolated)",
-      res.status === 404
+      "Driver cannot access orders from another restaurant (403/Forbidden)",
+      res.status === 404 || res.status === 403
     );
   }
 
@@ -843,7 +843,7 @@ try {
   console.log("GROUP 4: DUAL-PARTY OTP TESTS");
   console.log("------------------------------------------------------------------------");
 
-  // Test 27: Authorized manager can access the OTP for an eligible staff-delivered order
+  // Test 27: Restaurant manager cannot view customer OTP on restaurant endpoint (403 Forbidden)
   {
     const ord = await createTestOrder({
       status: "out_for_delivery",
@@ -862,12 +862,12 @@ try {
     const data = await res.json();
 
     report(
-      "Authorized manager can access OTP for eligible staff-delivered order (200)",
-      res.status === 200 && data.success && /^\d{4}$/.test(data.otpCode)
+      "Restaurant manager cannot view customer OTP on restaurant endpoint (403 Forbidden)",
+      res.status === 403 && data.success === false
     );
   }
 
-  // Test 28: Assigned delivery person can access the OTP for their eligible order
+  // Test 28: Assigned delivery person cannot view customer OTP on restaurant endpoint (403 Forbidden)
   {
     const ord = await createTestOrder({
       status: "out_for_delivery",
@@ -885,12 +885,12 @@ try {
     const data = await res.json();
 
     report(
-      "Assigned delivery person can access the OTP for their eligible order (200)",
-      res.status === 200 && data.success && /^\d{4}$/.test(data.otpCode)
+      "Assigned delivery person cannot view customer OTP on restaurant endpoint (403 Forbidden)",
+      res.status === 403 && data.success === false
     );
   }
 
-  // Test 29: Unauthorized manager cannot access another restaurant's OTP
+  // Test 29: Unauthorized manager cannot access another restaurant's OTP (403 Forbidden)
   {
     const ordA = await createTestOrder({
       restaurant: restA._id,
@@ -905,8 +905,8 @@ try {
     const res = await orderOtpGET(req, { params: Promise.resolve({ id: ordA._id.toString() }) });
 
     report(
-      "Unauthorized manager cannot access another restaurant's OTP (404/Isolated)",
-      res.status === 404
+      "Unauthorized manager cannot access another restaurant's OTP (403 Forbidden)",
+      res.status === 404 || res.status === 403
     );
   }
 

@@ -72,11 +72,6 @@ export default function AssignDeliveryClient() {
   const [selfDeliveryModalOrder, setSelfDeliveryModalOrder] = useState(null);
   const [selfDeliverySubmitting, setSelfDeliverySubmitting] = useState(false);
 
-  // OTP inspection modal state
-  const [otpModalOrder, setOtpModalOrder] = useState(null);
-  const [inspectingOtp, setInspectingOtp] = useState(false);
-  const [activeOtpData, setActiveOtpData] = useState(null);
-  const [otpError, setOtpError] = useState("");
 
   // Manager completion / handover modal
   const [completeHandoverModalOrder, setCompleteHandoverModalOrder] = useState(null);
@@ -284,27 +279,6 @@ export default function AssignDeliveryClient() {
     }
   }
 
-  // Handler: Inspect Active Delivery OTP
-  async function handleInspectOtp(order) {
-    setOtpModalOrder(order);
-    setInspectingOtp(true);
-    setActiveOtpData(null);
-    setOtpError("");
-
-    try {
-      const res = await fetch(`/api/restaurant/orders/${order._id}/otp`);
-      const data = await res.json();
-      if (data.success && data.otpCode) {
-        setActiveOtpData(data);
-      } else {
-        setOtpError(data.message || "Unable to retrieve active delivery OTP.");
-      }
-    } catch (err) {
-      setOtpError("Network error retrieving OTP.");
-    } finally {
-      setInspectingOtp(false);
-    }
-  }
 
   // Handler: Complete Delivery (Verify OTP as Manager)
   async function handleVerifyOtpSubmit(e) {
@@ -669,16 +643,6 @@ export default function AssignDeliveryClient() {
                               </button>
                             )}
 
-                            {/* View Handover OTP Button (Active during delivery) */}
-                            {isOutForDelivery && (
-                              <button
-                                onClick={() => handleInspectOtp(order)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1 cursor-pointer"
-                              >
-                                <KeyRound size={13} />
-                                <span>View Handover OTP</span>
-                              </button>
-                            )}
 
                             {/* Manager Complete Delivery (Self Delivery or Assistance) */}
                             {isOutForDelivery && (
@@ -1033,96 +997,6 @@ export default function AssignDeliveryClient() {
           </div>
         )}
 
-        {/* MODAL 3: Handover OTP Inspection Modal (Dual-Party OTP View) */}
-        {otpModalOrder && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-stone-900 w-full max-w-md rounded-3xl border border-stone-200 dark:border-white/10 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between pb-3 border-b border-stone-200 dark:border-white/10">
-                <h3 className="text-base font-black text-stone-900 dark:text-white flex items-center gap-2">
-                  <KeyRound size={18} className="text-emerald-500" />
-                  <span>Authorized Handover OTP</span>
-                </h3>
-                <button
-                  onClick={() => {
-                    setOtpModalOrder(null);
-                    setActiveOtpData(null);
-                  }}
-                  className="w-8 h-8 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 hover:text-stone-900 dark:hover:text-white flex items-center justify-center cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="text-xs text-stone-500 dark:text-stone-400">
-                Order #{otpModalOrder.orderId || otpModalOrder._id.slice(-6).toUpperCase()} • Assigned to{" "}
-                <strong>{otpModalOrder.assignedDeliveryStaff?.name || "Delivery Staff"}</strong>
-              </div>
-
-              {inspectingOtp ? (
-                <div className="py-8 text-center space-y-2">
-                  <RefreshCw size={24} className="animate-spin text-emerald-500 mx-auto" />
-                  <p className="text-xs font-bold text-stone-600 dark:text-stone-300">
-                    Retrieving active cryptographic OTP payload...
-                  </p>
-                </div>
-              ) : otpError ? (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs text-rose-700 dark:text-rose-400 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <AlertCircle size={14} />
-                    <span>Failed to retrieve OTP</span>
-                  </div>
-                  <p>{otpError}</p>
-                </div>
-              ) : activeOtpData ? (
-                <div className="space-y-4 text-center">
-                  <div className="p-6 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                      Active Customer Handover Code
-                    </span>
-                    <div className="text-4xl font-mono font-black tracking-widest text-emerald-600 dark:text-emerald-400">
-                      {activeOtpData.otpCode}
-                    </div>
-                    <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                      Single-use constant-time verified handover code.
-                    </p>
-                  </div>
-
-                  <div className="text-xs text-stone-500 space-y-1 text-left bg-stone-50 dark:bg-stone-800/40 p-3 rounded-xl">
-                    <div>
-                      <strong>Delivery Mode:</strong>{" "}
-                      {activeOtpData.deliveryAssignmentMode === "manager_self_delivery"
-                        ? "Manager Self-Delivery"
-                        : "Staff Delivery"}
-                    </div>
-                    <div>
-                      <strong>Attempts Used:</strong> {activeOtpData.attemptCount} /{" "}
-                      {activeOtpData.maxAttempts}
-                    </div>
-                    {activeOtpData.expiresAt && (
-                      <div>
-                        <strong>Expires At:</strong>{" "}
-                        {new Date(activeOtpData.expiresAt).toLocaleTimeString()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="flex items-center justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpModalOrder(null);
-                    setActiveOtpData(null);
-                  }}
-                  className="px-4 py-2 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-bold text-xs rounded-xl transition cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* MODAL 4: Manager OTP Verification & Delivery Completion Modal */}
         {completeHandoverModalOrder && (
