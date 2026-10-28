@@ -347,7 +347,7 @@ export const authOptions = {
   trustHost: true,
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session: updateData }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -359,6 +359,13 @@ export const authOptions = {
         token.staffRole = user.staffRole;
         token.staffRoles = user.staffRoles;
         token.permissions = user.permissions;
+      }
+
+      if (trigger === "update" && updateData) {
+        if (updateData.name) token.name = updateData.name;
+        if ("image" in updateData) {
+          token.image = sanitizeTokenImage(updateData.image);
+        }
       }
 
       // Refresh DB data on subsequent session calls (skip on initial sign-in since user is already freshly populated)
@@ -401,7 +408,8 @@ export const authOptions = {
               : null;
             token.restaurantName = dbUser.restaurant ? dbUser.restaurant.name : null;
             token.enabledFeatures = dbUser.restaurant ? (dbUser.restaurant.enabledFeatures || []) : [];
-            token.image = sanitizeTokenImage(dbUser.image) || sanitizeTokenImage(token.image);
+            token.image = sanitizeTokenImage(dbUser.image);
+            if (dbUser.name) token.name = dbUser.name;
             token.staffRole = dbUser.staffRole || "Staff";
             token.staffRoles = dbUser.staffRoles?.length ? dbUser.staffRoles : [dbUser.staffRole || "Staff"];
             token.permissions = dbUser.permissions || [];

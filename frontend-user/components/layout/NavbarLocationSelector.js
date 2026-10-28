@@ -1,20 +1,34 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
 import { MapPin, ChevronDown } from "lucide-react";
 import { useLocationStore } from "@/lib/locationStore";
 
 export default function NavbarLocationSelector() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const { location, openModal, initializeLocation } = useLocationStore();
 
   useEffect(() => {
     initializeLocation();
   }, [initializeLocation]);
 
+  const handleLocationClick = () => {
+    if (!session) {
+      toast.error("Please sign in to set your delivery location.", { icon: "🔒" });
+      router.push("/auth/login");
+      return;
+    }
+    openModal();
+  };
+
   return (
     <button
       type="button"
-      onClick={openModal}
+      onClick={handleLocationClick}
       aria-label={`Delivery location: ${location}. Click to change.`}
       className="hidden md:flex items-center gap-1.5 lg:gap-2 text-left group px-1.5 lg:px-2 py-1 rounded-xl hover:bg-[var(--bg-sub)] transition cursor-pointer select-none max-w-[130px] lg:max-w-[155px] xl:max-w-[220px] 2xl:max-w-[240px] shrink min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)]"
     >

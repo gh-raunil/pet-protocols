@@ -19,9 +19,12 @@ export default function DeliveryRouteMap({
   recipientName = "",
   initialStatus = "out_for_delivery",
   isManagerView = false,
+  compact = true,
+  isEnlarged = false,
+  onToggleEnlarge = null,
 }) {
   return (
-    <div className="w-full">
+    <div className={isEnlarged ? "" : "w-full h-full min-h-[220px]"}>
       <LiveDeliveryMap
         orderId={orderId}
         initialStatus={initialStatus}
@@ -33,6 +36,9 @@ export default function DeliveryRouteMap({
         recipientName={recipientName}
         isStaffView={!isManagerView}
         isManagerView={isManagerView}
+        compact={compact}
+        isEnlarged={isEnlarged}
+        onFullscreenChange={onToggleEnlarge}
       />
     </div>
   );

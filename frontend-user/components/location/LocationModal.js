@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   MapPin,
   Crosshair,
@@ -12,6 +14,7 @@ import {
   ArrowRight,
   Navigation,
   Info,
+  Lock,
 } from "lucide-react";
 import {
   useLocationStore,
@@ -20,6 +23,8 @@ import {
 import DeliveryLocationMapPicker from "@/components/checkout/DeliveryLocationMapPicker";
 
 export default function LocationModal() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const {
     location,
     locationDetails,
@@ -49,6 +54,57 @@ export default function LocationModal() {
   }, [isModalOpen, closeModal, isMapPickerOpen]);
 
   if (!isModalOpen) return null;
+
+  if (!session) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sign In to Select Location"
+        className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeModal();
+        }}
+      >
+        <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col p-6 sm:p-8 text-center space-y-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={closeModal}
+              aria-label="Close location selector"
+              className="w-8 h-8 rounded-full bg-[var(--bg-sub)] hover:bg-[var(--bg-card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] flex items-center justify-center transition border border-[var(--border-color)] cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="w-14 h-14 rounded-2xl bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] flex items-center justify-center mx-auto border border-[var(--brand-accent)]/20 shadow-xs">
+            <Lock size={26} />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-base font-extrabold text-[var(--text-main)]">
+              Sign In Required
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto leading-relaxed">
+              You must be logged in to set your delivery location and verify doorstep kitchen serviceability.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                closeModal();
+                router.push("/auth/login");
+              }}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs transition cursor-pointer shadow-xs active:scale-95"
+            >
+              <span>Sign In to Set Location</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filteredLocations = SUGGESTED_LOCATIONS.filter(
     (loc) =>

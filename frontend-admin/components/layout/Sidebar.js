@@ -388,32 +388,29 @@ export default function Sidebar({
         }`}
       >
         {/* Brand Header */}
-        <div className="shrink-0 p-3.5 border-b border-stone-200/80 dark:border-white/10">
-          <div className="flex items-center justify-between gap-2">
+        <div className="shrink-0 h-16 px-4 border-b border-stone-200/80 dark:border-white/10 flex items-center group/header">
+          <div className="flex items-center justify-between w-full">
             <Link
               href="/"
               className={`flex items-center gap-2.5 overflow-hidden ${
                 collapsed ? "justify-center w-full" : ""
               }`}
             >
-              <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-black border border-amber-500/80 p-0.5 flex items-center justify-center shrink-0 shadow-xs">
                 <Image
                   src="/images/logo1.png"
                   alt="पेट Protocols Logo"
                   width={32}
                   height={32}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               </div>
 
               {!collapsed && (
                 <div className="min-w-0">
-                  <div className="text-base font-extrabold tracking-tight flex items-center gap-1 leading-tight">
-                    <span className="text-orange-500 font-black text-xl leading-none">पेट</span>
-                    <span className="text-stone-900 dark:text-white">Protocols</span>
-                  </div>
-                  <div className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 truncate flex items-center gap-1">
-                    <span className="truncate">Fresh food. Zero compromises.</span>
+                  <div className="text-[15px] font-black tracking-tight flex items-center gap-1 leading-tight text-stone-900 dark:text-white">
+                    <span className="text-orange-500 font-black">पेट</span>
+                    <span>Protocols</span>
                   </div>
                 </div>
               )}
@@ -423,7 +420,7 @@ export default function Sidebar({
               <Tooltip content="Collapse sidebar" placement="bottom">
                 <button
                   onClick={onToggleCollapse}
-                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/10 transition cursor-pointer"
+                  className="opacity-0 group-hover/header:opacity-100 p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/10 transition cursor-pointer"
                   aria-label="Collapse sidebar"
                 >
                   <ChevronLeft size={16} />
@@ -525,21 +522,19 @@ export default function Sidebar({
             {/* Drawer Header */}
             <div className="shrink-0 flex items-center justify-between pb-3 border-b border-stone-200 dark:border-white/10">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-black border border-amber-500/80 p-0.5 flex items-center justify-center shrink-0 shadow-xs">
                   <Image
                     src="/images/logo1.png"
                     alt="Logo"
                     width={32}
                     height={32}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div>
-                  <span className="font-extrabold text-base tracking-tight">
-                    <span className="text-orange-500">पेट</span> Protocols
-                  </span>
-                  <div className="text-[10px] text-stone-400 font-semibold truncate">
-                    {restaurantName}
+                  <div className="font-extrabold text-[15px] tracking-tight flex items-center gap-1 text-stone-900 dark:text-white">
+                    <span className="text-orange-500 font-black">पेट</span>
+                    <span>Protocols</span>
                   </div>
                 </div>
               </div>

@@ -28,6 +28,11 @@ import {
   Camera,
   Upload,
   Sparkles,
+  Trash2,
+  List,
+  ShoppingBag,
+  IndianRupee,
+  User,
 } from "lucide-react";
 import { CHIME_OPTIONS, getSavedChime, setSavedChime, playChime } from "@/lib/soundChimes";
 
@@ -203,6 +208,44 @@ export default function RestaurantAdminProfileClient() {
     reader.readAsDataURL(file);
   }
 
+  async function handleRemoveImage() {
+    setProfileData((prev) => ({ ...prev, image: "" }));
+
+    try {
+      await fetch("/api/restaurant/profile", {
+        method: "DELETE",
+      });
+
+      const isStaffUser = session?.user?.role === "staff";
+      const storageKey = isStaffUser
+        ? `pet_protocols_staff_profile_${session?.user?.id || session?.user?.email || "staff"}`
+        : "pet_protocols_manager_profile";
+
+      const currentLocal = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      const updated = { ...currentLocal, ...profileData, image: "", email: session?.user?.email };
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("pet_protocols_profile_updated", {
+            detail: {
+              image: "",
+              isStaff: isStaffUser,
+              email: session?.user?.email,
+              userId: session?.user?.id,
+            },
+          })
+        );
+      }
+
+      setToastMessage("Profile photo removed successfully!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error("Failed to remove profile photo:", err);
+    }
+  }
+
   async function handleSaveProfile(e) {
     e.preventDefault();
     setSaving(true);
@@ -276,139 +319,177 @@ export default function RestaurantAdminProfileClient() {
       )}
 
       {/* ── PROFESSIONAL PROFILE HERO CARD ─────────────────────────────── */}
-      <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-sm dark:shadow-xl mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          {/* User Identity & Avatar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            {/* Avatar with Camera upload trigger */}
-            <div className="relative group shrink-0">
-              <div
-                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center text-3xl font-black overflow-hidden shadow-inner bg-stone-100 dark:bg-stone-800 border-2 ${
-                  isStaff
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                    : "bg-orange-500/10 border-orange-500/30 text-orange-500"
-                }`}
-              >
-                {profileData.image ? (
-                  <img
-                    src={profileData.image}
-                    alt={managerName}
-                    className="w-full h-full object-cover rounded-2xl"
-                  />
-                ) : (
-                  <span className={`font-extrabold text-2xl ${isStaff ? "text-emerald-500" : "text-orange-500"}`}>
-                    {userInitial}
-                  </span>
-                )}
-              </div>
+      <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-100 dark:border-white/10 rounded-3xl p-5 sm:p-7 shadow-xs dark:shadow-xl">
+        {/* User Identity & Avatar (Horizontal on mobile and desktop) */}
+        <div className="flex flex-row items-start gap-4 sm:gap-5">
+          {/* Avatar with Camera upload trigger */}
+          <div className="relative group shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[#eefbf4] dark:bg-emerald-950/20 border border-[#a7f3d0] dark:border-emerald-500/30 flex items-center justify-center overflow-hidden">
+              {profileData.image ? (
+                <img
+                  src={profileData.image}
+                  alt={managerName}
+                  className="w-full h-full object-cover rounded-3xl"
+                />
+              ) : (
+                <span className="font-extrabold text-3xl sm:text-4xl text-[#059669] dark:text-emerald-400">
+                  {userInitial}
+                </span>
+              )}
+            </div>
 
-              {/* Upload badge button */}
+            {/* Upload badge button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 -right-1 p-2 rounded-xl text-white shadow-sm bg-[#009b63] hover:bg-[#008756] border-2 border-white dark:border-[#10141f] transition cursor-pointer"
+              title="Change Profile Photo"
+            >
+              <Camera size={13} />
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Details */}
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#eefbf4] dark:bg-emerald-950/30 text-[#059669] dark:text-emerald-400 border border-[#bbf7d0] dark:border-emerald-500/30">
+              <User size={13} className="text-[#059669] dark:text-emerald-400" />
+              <span>{profileData.roleTitle || (isStaff ? "Delivery Staff" : "Branch Operations Lead")}</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-white mt-1">
+              {managerName}
+            </h1>
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm font-medium">
+              {managerEmail}
+            </p>
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#ff6a1f]">
+              <span className="w-2 h-2 rounded-full bg-[#ff6a1f]" />
+              <span>{restaurantName}</span>
+            </div>
+            <p className="text-stone-500 dark:text-stone-400 text-xs flex items-center gap-1.5 pt-0.5">
+              <Phone size={12} className="text-stone-400" />
+              <span>{profileData.phone}</span>
+            </p>
+
+            {/* Profile Image Action Controls */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className={`absolute -bottom-1.5 -right-1.5 p-2 rounded-xl text-white shadow-md transition-all duration-200 hover:scale-110 active:scale-95 border-2 border-white dark:border-[#10141f] ${
-                  isStaff ? "bg-emerald-600 hover:bg-emerald-700" : "bg-orange-500 hover:bg-orange-600"
-                }`}
-                title="Change Profile Photo"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#fff4ed] hover:bg-[#ffe8d9] text-[#ff6a1f] text-xs font-bold border border-[#ffd8bf] transition shadow-2xs cursor-pointer"
+                title="Upload or change profile photo"
               >
                 <Camera size={13} />
+                <span>{profileData.image ? "Change Photo" : "Upload Photo"}</span>
               </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
+              {profileData.image && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition shadow-2xs cursor-pointer"
+                  title="Remove profile picture"
+                >
+                  <Trash2 size={13} />
+                  <span>Remove Photo</span>
+                </button>
+              )}
             </div>
-
-            {/* Manager Details */}
-            <div className="space-y-1">
-              <div className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                isStaff
-                  ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
-                  : "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"
-              }`}>
-                {isStaff ? <UtensilsCrossed size={12} /> : <Store size={12} />} {profileData.roleTitle || (isStaff ? "Kitchen Staff" : "Branch Operations Lead")}
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-stone-900 dark:text-white">
-                {managerName}
-              </h1>
-              <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm font-medium">
-                {managerEmail} • <span className="text-orange-500 font-bold">{restaurantName}</span>
-              </p>
-              <p className="text-stone-500 dark:text-stone-400 text-xs flex items-center gap-1.5 pt-0.5">
-                <Phone size={12} className="text-stone-400" /> {profileData.phone}
-              </p>
-            </div>
-          </div>
-
-          {/* Clean Action Controls (No ThemeToggle clutter) */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 pt-2 md:pt-0">
-            <button
-              type="button"
-              onClick={() => setIsEditModalOpen(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-200 dark:border-white/10 hover:border-orange-500 bg-stone-50 dark:bg-white/5 text-stone-700 dark:text-stone-200 text-xs font-bold transition shadow-xs active:scale-95"
-            >
-              <Edit3 size={14} className="text-orange-500" />
-              <span>Edit Profile</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setOnDuty(!onDuty)}
-              className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition border flex items-center justify-center gap-1.5 active:scale-95 ${
-                onDuty
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                  : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700"
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${onDuty ? "bg-emerald-500 animate-pulse" : "bg-stone-400"}`} />
-              <span>{onDuty ? "On-Duty" : "Standby"}</span>
-            </button>
-
-            <button
-              onClick={async () => {
-                try {
-                  await performLogout({ redirect: false });
-                } catch (e) {}
-                window.location.href = "/login";
-              }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider transition active:scale-95"
-              title="End session"
-            >
-              <LogOut size={13} />
-              <span>Exit Shift</span>
-            </button>
           </div>
         </div>
 
-        {/* Clean Operational Metrics */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-stone-100 dark:border-white/10 text-center">
-          <div>
-            <span className="text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
-              Menu Dishes
+        {/* 3 Action Buttons Row */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-6">
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-2xl border border-stone-200/90 dark:border-white/10 hover:border-orange-500 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <Edit3 size={14} className="text-[#ff6a1f] shrink-0" />
+            <span className="truncate">Edit Profile</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOnDuty(!onDuty)}
+            className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-2xl text-xs font-bold uppercase transition border shadow-2xs active:scale-95 cursor-pointer ${
+              onDuty
+                ? "bg-[#eefbf4] dark:bg-emerald-950/30 text-[#059669] dark:text-emerald-400 border-[#bbf7d0] dark:border-emerald-500/30"
+                : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full shrink-0 ${onDuty ? "bg-[#059669] dark:bg-emerald-400" : "bg-stone-400"}`} />
+            <span className="whitespace-nowrap">{onDuty ? "ON DUTY" : "STANDBY"}</span>
+          </button>
+
+          <button
+            onClick={async () => {
+              try {
+                await performLogout({ redirect: false });
+              } catch (e) {}
+              window.location.href = "/login";
+            }}
+            className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-2xl border border-[#fecdd3] dark:border-rose-500/30 bg-[#fff1f2] dark:bg-rose-950/30 text-[#e11d48] dark:text-rose-400 font-bold text-xs uppercase tracking-wider transition active:scale-95 shadow-2xs cursor-pointer"
+            title="End session"
+          >
+            <LogOut size={13} className="shrink-0" />
+            <span className="whitespace-nowrap">EXIT SHIFT</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── METRICS SUMMARY CARD (Separate card with icon badges) ────────────────── */}
+      <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-100 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-xs dark:shadow-xl mt-4 sm:mt-5 mb-8">
+        <div className="grid grid-cols-3 divide-x divide-stone-100 dark:divide-white/10 text-center">
+          <div className="px-1 sm:px-2 flex flex-col items-center">
+            <div className="w-10 h-10 rounded-2xl bg-[#eefbf4] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 flex items-center justify-center mb-2.5">
+              <List size={18} />
+            </div>
+            <span className="text-[10px] sm:text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
+              MENU DISHES
             </span>
             <p className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white mt-1">
               {stats.totalProducts || stats.productsCount || 0}
             </p>
-          </div>
-          <div className="border-x border-stone-100 dark:border-white/10">
-            <span className="text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
-              Total Orders
+            <span className="text-[11px] sm:text-xs text-stone-400 font-medium block mt-0.5">
+              Total
             </span>
-            <p className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+          </div>
+
+          <div className="px-1 sm:px-2 flex flex-col items-center">
+            <div className="w-10 h-10 rounded-2xl bg-[#eff6ff] dark:bg-blue-500/10 text-[#2563eb] dark:text-blue-400 flex items-center justify-center mb-2.5">
+              <ShoppingBag size={18} />
+            </div>
+            <span className="text-[10px] sm:text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
+              TOTAL ORDERS
+            </span>
+            <p className="text-xl sm:text-2xl font-black text-[#2563eb] dark:text-blue-400 mt-1">
               {stats.totalOrders || stats.ordersCount || 0}
             </p>
-          </div>
-          <div>
-            <span className="text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
-              Total Revenue
+            <span className="text-[11px] sm:text-xs text-stone-400 font-medium block mt-0.5">
+              Completed
             </span>
-            <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+          </div>
+
+          <div className="px-1 sm:px-2 flex flex-col items-center">
+            <div className="w-10 h-10 rounded-2xl bg-[#eefbf4] dark:bg-emerald-500/10 text-[#059669] dark:text-emerald-400 flex items-center justify-center mb-2.5">
+              <IndianRupee size={18} />
+            </div>
+            <span className="text-[10px] sm:text-[11px] text-stone-500 dark:text-stone-400 uppercase font-bold tracking-wider block">
+              TOTAL REVENUE
+            </span>
+            <p className="text-xl sm:text-2xl font-black text-[#059669] dark:text-emerald-400 mt-1">
               ₹{stats.totalRevenue || 0}
             </p>
+            <span className="text-[11px] sm:text-xs text-stone-400 font-medium block mt-0.5">
+              Earned
+            </span>
           </div>
         </div>
       </div>
@@ -659,16 +740,27 @@ export default function RestaurantAdminProfileClient() {
                       )}
                     </div>
 
-                    <div className="flex-1 space-y-1.5">
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-bold text-xs cursor-pointer transition">
-                        <Upload size={13} /> Upload Photo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                      </label>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-bold text-xs cursor-pointer transition">
+                          <Upload size={13} /> Upload Photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {profileData.image && (
+                          <button
+                            type="button"
+                            onClick={() => setProfileData((prev) => ({ ...prev, image: "" }))}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs cursor-pointer transition border border-rose-500/20"
+                          >
+                            <Trash2 size={13} /> Remove Photo
+                          </button>
+                        )}
+                      </div>
                       <p className="text-[11px] text-stone-400">
                         Recommended: square JPG or PNG, max 2MB
                       </p>

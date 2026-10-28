@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import toast from "react-hot-toast";
 import {
   ShieldCheck,
   ArrowLeft,
@@ -16,15 +18,108 @@ import {
   User,
   Shield,
   Activity,
+  Camera,
+  Trash2,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 
 export default function SuperadminProfileClient() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
+  const fileInputRef = useRef(null);
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [imageActionLoading, setImageActionLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type?.toLowerCase())) {
+      toast.error("Please upload a JPG, PNG, or WebP image");
+      return;
+    }
+
+    try {
+      setImageActionLoading(true);
+      toast.loading("Uploading photo...", { id: "superadmin-avatar" });
+
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const uploadRes = await fetch("/api/user/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success || !uploadData.imageUrl) {
+        toast.error(uploadData.message || "Failed to upload image", { id: "superadmin-avatar" });
+        return;
+      }
+
+      const updateRes = await fetch("/api/user/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: uploadData.imageUrl }),
+      });
+
+      const updateResult = await updateRes.json();
+      if (!updateResult.success) {
+        toast.error(updateResult.message || "Failed to update profile", { id: "superadmin-avatar" });
+        return;
+      }
+
+      if (update) {
+        await update({ image: uploadData.imageUrl });
+      }
+
+      toast.success("Profile photo updated!", { id: "superadmin-avatar" });
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      toast.error("Failed to upload profile photo", { id: "superadmin-avatar" });
+    } finally {
+      setImageActionLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    try {
+      setImageActionLoading(true);
+      toast.loading("Removing photo...", { id: "superadmin-avatar" });
+
+      const res = await fetch("/api/user/update", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.message || "Failed to remove image", { id: "superadmin-avatar" });
+        return;
+      }
+
+      if (update) {
+        await update({ image: null });
+      }
+
+      setShowDeleteConfirm(false);
+      toast.success("Profile photo removed!", { id: "superadmin-avatar" });
+    } catch (err) {
+      console.error("Avatar deletion failed:", err);
+      toast.error("Failed to remove profile photo", { id: "superadmin-avatar" });
+    } finally {
+      setImageActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -102,10 +197,50 @@ export default function SuperadminProfileClient() {
         {/* ── PROFILE HEADER CARD ─────────────────────────────────── */}
         <div className="bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md shadow-indigo-200 dark:shadow-indigo-950 shrink-0">
-                {getInitials(superName)}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="relative group w-fit">
+                <div
+                  onClick={() => !imageActionLoading && fileInputRef.current?.click()}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md shadow-indigo-200 dark:shadow-indigo-950 shrink-0 overflow-hidden cursor-pointer relative"
+                  title="Click to update photo"
+                >
+                  {session?.user?.image ? (
+                    <Image
+                      src={session.user.image}
+                      alt={superName}
+                      width={80}
+                      height={80}
+                      unoptimized={session.user.image.startsWith("data:")}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                  ) : (
+                    <span>{getInitials(superName)}</span>
+                  )}
+
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-0.5 backdrop-blur-[1px]">
+                    <Camera size={16} className="drop-shadow" />
+                    <span className="text-[9px] font-bold tracking-wider uppercase">Change</span>
+                  </div>
+
+                  {imageActionLoading && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white backdrop-blur-[2px]">
+                      <RefreshCw size={18} className="animate-spin text-indigo-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Camera badge */}
+                <button
+                  type="button"
+                  onClick={() => !imageActionLoading && fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-600 hover:bg-indigo-700 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-white shadow transition cursor-pointer"
+                  title="Change photo"
+                >
+                  <Camera size={11} />
+                </button>
               </div>
+
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
@@ -123,6 +258,37 @@ export default function SuperadminProfileClient() {
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                   {superEmail}
                 </p>
+
+                {/* Profile Photo Controls */}
+                <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageActionLoading}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 text-xs font-semibold border border-indigo-200 dark:border-indigo-500/20 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera size={12} />
+                    <span>{session?.user?.image ? "Update Photo" : "Upload Photo"}</span>
+                  </button>
+                  {session?.user?.image && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={imageActionLoading}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-200 dark:border-rose-500/20 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 size={12} />
+                      <span>Remove Photo</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -262,6 +428,42 @@ export default function SuperadminProfileClient() {
             </div>
           </div>
         </div>
+
+        {/* ── DELETE PHOTO CONFIRMATION MODAL ────────────────────────── */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/25 text-rose-500 flex items-center justify-center mx-auto">
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Profile Photo?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                  Are you sure you want to remove your profile photo? Your initials will be displayed instead.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={imageActionLoading}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteImage}
+                  disabled={imageActionLoading}
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  {imageActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  <span>Remove Photo</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

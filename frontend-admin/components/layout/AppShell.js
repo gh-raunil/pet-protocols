@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Sidebar from "./Sidebar";
 import TopHeader from "./TopHeader";
 import GlobalKitchenOrderListener from "./GlobalKitchenOrderListener";
+import MobileBottomNav from "./MobileBottomNav";
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
@@ -193,8 +194,11 @@ export default function AppShell({ children }) {
           unrespondedCount={unrespondedOrdersCount}
         />
 
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0 pb-16 md:pb-0">{children}</main>
       </div>
+
+      {/* Mobile Bottom Shortcut Dock */}
+      <MobileBottomNav />
     </div>
   );
 }

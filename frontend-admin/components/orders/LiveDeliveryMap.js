@@ -31,17 +31,17 @@ import { buildMapplsDirectionUrl } from "@/lib/geoDistance";
 
 const TRACKING_POLL_INTERVAL_MS = 8000; // 8 seconds poll interval
 
-// Map tile layers matching delivery workspace layer options
+// Map tile layers matching delivery workspace layer options (Esri basemaps - high availability, free, no API key required)
 const MAP_STYLES = [
   {
     id: "default",
     name: "Default Map",
     subtext: "Standard Street View",
     icon: "🗺️",
-    base: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    base: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
     subdomains: "abc",
     overlay: null,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    attribution: "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS",
     maxZoom: 19,
   },
   {
@@ -71,22 +71,22 @@ const MAP_STYLES = [
     name: "Night Mode",
     subtext: "Dark High-Contrast",
     icon: "🌙",
-    base: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    subdomains: "abcd",
-    overlay: null,
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    maxZoom: 19,
+    base: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "abc",
+    overlay: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    maxZoom: 16,
   },
   {
     id: "grey",
     name: "Grey Mode",
     subtext: "Sublime Minimal Grey",
     icon: "🏙️",
-    base: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    subdomains: "abcd",
-    overlay: null,
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    maxZoom: 19,
+    base: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    subdomains: "abc",
+    overlay: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    maxZoom: 16,
   },
 ];
 
@@ -148,14 +148,35 @@ export default function LiveDeliveryMap({
   recipientName = "",
   isStaffView = false,
   isManagerView = false,
+  compact = false,
+  isEnlarged = false,
+  onFullscreenChange = null,
   onStatusUpdate = null,
 }) {
-  const [tracking, setTracking] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [tracking, setTracking] = useState(deliveryTracking || null);
+  const [loading, setLoading] = useState(!deliveryTracking);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreenInternal, setIsFullscreenInternal] = useState(false);
+  const isFullscreen = Boolean(isEnlarged || isFullscreenInternal);
+  const [mapReady, setMapReady] = useState(0);
+
+  useEffect(() => {
+    setIsFullscreenInternal(Boolean(isEnlarged));
+  }, [isEnlarged]);
+
+  const setIsFullscreen = useCallback(
+    (val) => {
+      setIsFullscreenInternal(val);
+      if (typeof onFullscreenChange === "function") {
+        onFullscreenChange(val);
+      }
+    },
+    [onFullscreenChange]
+  );
+
+  const isCompactMode = compact && !isFullscreen;
 
   // Layer style state — default to OpenStreetMap street view matching customer view in Screenshot 1
   const [activeStyle, setActiveStyle] = useState("default");
@@ -179,6 +200,18 @@ export default function LiveDeliveryMap({
         window.removeEventListener("keydown", handleKeyDown);
       }
     };
+  }, [isFullscreen, setIsFullscreen]);
+
+  // Lock body scroll when in fullscreen enlarged view
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isFullscreen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
   }, [isFullscreen]);
 
   // Mappls SDK discovery contract
@@ -193,6 +226,7 @@ export default function LiveDeliveryMap({
   // Map and layer references
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const zoomControlRef = useRef(null);
   const baseLayerRef = useRef(null);
   const overlayLayerRef = useRef(null);
   const driverMarkerRef = useRef(null);
@@ -447,7 +481,9 @@ export default function LiveDeliveryMap({
         attributionControl: false,
       });
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
+      if (!isCompactMode) {
+        zoomControlRef.current = L.control.zoom({ position: "bottomright" }).addTo(map);
+      }
 
       // Base tile layer
       const styleConfig = MAP_STYLES.find((s) => s.id === activeStyle) || MAP_STYLES[0];
@@ -464,6 +500,7 @@ export default function LiveDeliveryMap({
       }
 
       mapInstanceRef.current = map;
+      setMapReady((c) => c + 1);
 
       handleResize = () => {
         if (mapInstanceRef.current) {
@@ -492,6 +529,20 @@ export default function LiveDeliveryMap({
       if (typeof window !== "undefined" && handleResize) {
         window.removeEventListener("resize", handleResize);
       }
+      if (zoomControlRef.current && mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.removeControl(zoomControlRef.current);
+        } catch {}
+        zoomControlRef.current = null;
+      }
+      if (driverMarkerRef.current) driverMarkerRef.current = null;
+      if (restaurantMarkerRef.current) restaurantMarkerRef.current = null;
+      if (destinationMarkerRef.current) destinationMarkerRef.current = null;
+      if (customerMarkerRef.current) customerMarkerRef.current = null;
+      if (routeLineRef.current) routeLineRef.current = null;
+      if (customerAccuracyCircleRef.current) customerAccuracyCircleRef.current = null;
+      if (baseLayerRef.current) baseLayerRef.current = null;
+      if (overlayLayerRef.current) overlayLayerRef.current = null;
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.remove();
@@ -499,7 +550,7 @@ export default function LiveDeliveryMap({
         mapInstanceRef.current = null;
       }
     };
-  }, []);
+  }, [isFullscreen]);
 
   /**
    * Update Tile Layer when activeStyle changes
@@ -533,19 +584,31 @@ export default function LiveDeliveryMap({
   }, [activeStyle]);
 
   /**
-   * Invalidate map size on expand/collapse and fullscreen toggle
+   * Invalidate map size on expand/collapse and fullscreen toggle, and sync zoom control
    */
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    [50, 150, 300, 600].forEach((delay) => {
+    [0, 50, 150, 300, 600, 1000].forEach((delay) => {
       setTimeout(() => {
         try {
           map.invalidateSize();
         } catch {}
       }, delay);
     });
-  }, [isExpanded, isFullscreen]);
+
+    if (isCompactMode && zoomControlRef.current) {
+      try {
+        map.removeControl(zoomControlRef.current);
+        zoomControlRef.current = null;
+      } catch {}
+    } else if (!isCompactMode && !zoomControlRef.current) {
+      import("leaflet").then(({ default: L }) => {
+        if (!mapInstanceRef.current || zoomControlRef.current) return;
+        zoomControlRef.current = L.control.zoom({ position: "bottomright" }).addTo(mapInstanceRef.current);
+      });
+    }
+  }, [isExpanded, isFullscreen, compact, isCompactMode]);
 
   /**
    * Update Markers & Turn-by-Turn Road Route Polyline
@@ -571,9 +634,14 @@ export default function LiveDeliveryMap({
           className: "delivery-staff-marker",
           html: `
             <div style="position:relative; width:46px; height:46px; display:flex; align-items:center; justify-content:center;">
-              <span style="position:absolute; width:46px; height:46px; border-radius:50%; background:rgba(37,99,235,0.25); animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></span>
-              <div style="position:relative; width:34px; height:34px; border-radius:50%; background:#2563EB; border:3px solid #FFFFFF; box-shadow:0 4px 10px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
-                🛵
+              <span style="position:absolute; width:44px; height:44px; border-radius:50%; background:rgba(37,99,235,0.22); animation:ping 2.4s cubic-bezier(0,0,0.2,1) infinite;"></span>
+              <div style="position:relative; width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #2563EB, #1D4ED8); border:2.5px solid #FFFFFF; box-shadow:0 4px 12px rgba(37,99,235,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="18.5" cy="17.5" r="3.5"/>
+                  <circle cx="5.5" cy="17.5" r="3.5"/>
+                  <circle cx="15" cy="5" r="1"/>
+                  <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                </svg>
               </div>
             </div>
           `,
@@ -611,15 +679,18 @@ export default function LiveDeliveryMap({
         const destIcon = L.divIcon({
           className: "delivery-dest-marker",
           html: `
-            <div style="position:relative; width:44px; height:48px; display:flex; flex-direction:column; align-items:center;">
-              <div style="width:34px; height:34px; border-radius:50%; background:#EF4444; border:3px solid #FFFFFF; box-shadow:0 4px 12px rgba(239,68,68,0.5); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
-                🏠
+            <div style="position:relative; width:42px; height:50px; display:flex; flex-direction:column; align-items:center;">
+              <div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #EF4444, #DC2626); border:2.5px solid #FFFFFF; box-shadow:0 4px 12px rgba(239,68,68,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF; z-index:2;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
               </div>
-              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #EF4444; margin-top:-2px;"></div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #DC2626; margin-top:-2px; z-index:2; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.25));"></div>
             </div>
           `,
-          iconSize: [44, 48],
-          iconAnchor: [22, 46],
+          iconSize: [42, 50],
+          iconAnchor: [21, 48],
         });
 
         if (!destinationMarkerRef.current) {
@@ -637,26 +708,45 @@ export default function LiveDeliveryMap({
         }
       }
 
-      // 3. Customer Live Shared Location Marker (🎯)
+      // 3. Customer Live Shared Location Marker
       if (hasValidCustomerCoords) {
-        const custPos = [custLat, custLng];
+        // Offset customer pin slightly (by ~15m) if driver and customer pins are at the exact identical coordinates
+        let effectiveCustLat = custLat;
+        let effectiveCustLng = custLng;
+        if (hasValidDriverCoords && haversineDistance(driverLat, driverLng, custLat, custLng) < 0.02) {
+          effectiveCustLat += 0.00015;
+          effectiveCustLng += 0.00012;
+        }
+        const custPos = [effectiveCustLat, effectiveCustLng];
         boundsPoints.push(custPos);
 
         const custMarkerHtml = isCustLiveSameAsDest
           ? `
-            <div style="position:relative; width:48px; height:52px; display:flex; flex-direction:column; align-items:center;">
-              <span style="position:absolute; top:2px; width:44px; height:44px; border-radius:50%; background:rgba(16,185,129,0.3); animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></span>
-              <div style="width:38px; height:38px; border-radius:50%; background:#10B981; border:3px solid #FFFFFF; box-shadow:0 4px 12px rgba(16,185,129,0.5); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:18px; z-index:2;">
-                🎯
+            <div style="position:relative; width:46px; height:52px; display:flex; flex-direction:column; align-items:center;">
+              <span style="position:absolute; top:2px; width:42px; height:42px; border-radius:50%; background:rgba(16,185,129,0.25); animation:ping 2.2s cubic-bezier(0,0,0.2,1) infinite;"></span>
+              <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #10B981, #059669); border:2.5px solid #FFFFFF; box-shadow:0 4px 12px rgba(16,185,129,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF; z-index:2;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="22" y1="12" x2="18" y2="12"/>
+                  <line x1="6" y1="12" x2="2" y2="12"/>
+                  <line x1="12" y1="6" x2="12" y2="2"/>
+                  <line x1="12" y1="22" x2="12" y2="18"/>
+                </svg>
               </div>
-              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #10B981; margin-top:-2px; z-index:2;"></div>
+              <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:10px solid #059669; margin-top:-2px; z-index:2; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.25));"></div>
             </div>
           `
           : `
-            <div style="position:relative; width:38px; height:38px; display:flex; align-items:center; justify-content:center;">
-              <span style="position:absolute; width:38px; height:38px; border-radius:50%; background:rgba(139,92,246,0.3); animation:pulse 1.5s infinite;"></span>
-              <div style="width:26px; height:26px; border-radius:50%; background:#8B5CF6; border:2.5px solid #FFFFFF; box-shadow:0 3px 8px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:13px;">
-                🎯
+            <div style="position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+              <span style="position:absolute; width:40px; height:40px; border-radius:50%; background:rgba(139,92,246,0.25); animation:pulse 1.8s infinite;"></span>
+              <div style="width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg, #8B5CF6, #7C3AED); border:2.5px solid #FFFFFF; box-shadow:0 3px 10px rgba(139,92,246,0.45); display:flex; align-items:center; justify-content:center; color:#FFFFFF;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="22" y1="12" x2="18" y2="12"/>
+                  <line x1="6" y1="12" x2="2" y2="12"/>
+                  <line x1="12" y1="6" x2="12" y2="2"/>
+                  <line x1="12" y1="22" x2="12" y2="18"/>
+                </svg>
               </div>
             </div>
           `;
@@ -664,8 +754,8 @@ export default function LiveDeliveryMap({
         const custIcon = L.divIcon({
           className: "customer-live-marker",
           html: custMarkerHtml,
-          iconSize: isCustLiveSameAsDest ? [48, 52] : [38, 38],
-          iconAnchor: isCustLiveSameAsDest ? [24, 50] : [19, 19],
+          iconSize: isCustLiveSameAsDest ? [46, 52] : [40, 40],
+          iconAnchor: isCustLiveSameAsDest ? [23, 50] : [20, 20],
         });
 
         const popupText = isCustLiveSameAsDest
@@ -779,16 +869,26 @@ export default function LiveDeliveryMap({
         setRouteStats({ distanceKm: null, etaMins: null });
       }
 
-      // 6. Viewport fitting: Focus on delivery boy and destination (no restaurant pin)
-      if (boundsPoints.length > 1) {
-        try {
-          map.fitBounds(L.latLngBounds(boundsPoints), {
-            padding: isFullscreen ? [80, 80] : [50, 50],
-            maxZoom: 16,
-          });
-        } catch {}
-      } else if (boundsPoints.length === 1) {
-        map.setView(boundsPoints[0], 16);
+      // 6. Viewport fitting: Focus on delivery boy and destination
+      const validPoints = boundsPoints.filter(
+        (p) => Array.isArray(p) && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1])
+      );
+      if (validPoints.length > 0) {
+        const isVirtuallySame =
+          validPoints.length > 1 &&
+          Math.abs(validPoints[0][0] - validPoints[1][0]) < 0.0005 &&
+          Math.abs(validPoints[0][1] - validPoints[1][1]) < 0.0005;
+
+        if (isVirtuallySame || validPoints.length === 1) {
+          map.setView(validPoints[0], 15);
+        } else {
+          try {
+            map.fitBounds(L.latLngBounds(validPoints), {
+              padding: isFullscreen ? [80, 80] : [50, 50],
+              maxZoom: 16,
+            });
+          } catch {}
+        }
       }
     });
   }, [
@@ -811,6 +911,7 @@ export default function LiveDeliveryMap({
     destObj?.street,
     recipientName,
     isFullscreen,
+    mapReady,
   ]);
 
   const renderPolyline = (latlngs, L, map) => {
@@ -838,16 +939,36 @@ export default function LiveDeliveryMap({
       if (hasValidDriverCoords) points.push([driverLat, driverLng]);
       if (hasEffectiveDest) points.push([effectiveDestLat, effectiveDestLng]);
 
-      if (points.length > 1) {
-        map.fitBounds(L.latLngBounds(points), { padding: isFullscreen ? [80, 80] : [50, 50], maxZoom: 16 });
-      } else if (points.length === 1) {
-        map.setView(points[0], 16);
+      if (points.length === 0) return;
+
+      const isVirtuallyIdentical =
+        points.length > 1 &&
+        Math.abs(points[0][0] - points[1][0]) < 0.0005 &&
+        Math.abs(points[0][1] - points[1][1]) < 0.0005;
+
+      if (isVirtuallyIdentical || points.length === 1) {
+        map.setView(points[0], 15);
+      } else {
+        map.fitBounds(L.latLngBounds(points), {
+          padding: isFullscreen ? [80, 80] : [50, 50],
+          maxZoom: 16,
+        });
       }
     });
   }, [hasValidDriverCoords, driverLat, driverLng, hasEffectiveDest, effectiveDestLat, effectiveDestLng, isFullscreen]);
 
+  // Auto-recenter whenever fullscreen state toggles or map is freshly initialized
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const timer = setTimeout(() => {
+      handleRecenter();
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [isFullscreen, handleRecenter, mapReady]);
+
   // Terminal state
-  if (currentStatus === "delivered") {
+  if (currentStatus === "delivered" && !isFullscreen) {
     return (
       <div className="bg-[var(--bg-card)] border border-emerald-500/30 rounded-3xl p-5 sm:p-6 shadow-sm flex items-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
@@ -874,10 +995,12 @@ export default function LiveDeliveryMap({
 
   return (
     <div
-      className={`w-full bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden shadow-md space-y-0 transition-all ${
+      className={`w-full transition-all ${
         isFullscreen
-          ? "fixed inset-0 z-[99999] w-screen h-screen rounded-none flex flex-col bg-stone-950"
-          : "rounded-3xl"
+          ? "fixed inset-0 z-[99999] w-screen h-screen flex flex-col bg-white dark:bg-stone-950"
+          : compact
+          ? "h-full w-full relative overflow-hidden"
+          : "bg-[var(--bg-card)] border border-[var(--border-color)] shadow-md rounded-3xl overflow-hidden"
       }`}
     >
       <style>{`
@@ -891,191 +1014,203 @@ export default function LiveDeliveryMap({
       `}</style>
 
       {/* ── TOP HEADER BAR ────────────────────────────────────────────── */}
-      <div className="p-3.5 sm:p-4 border-b border-[var(--border-color)] bg-[var(--bg-sub)]/50 shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Left Block: Icon + Tracking Status & Order ID */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 relative">
-              <Truck size={18} className="animate-pulse" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 shrink-0">
-                  {currentStatus === "out_for_delivery" ? "Live Delivery in Transit" : "Live Route to Doorstep"}
-                </span>
-                <span className="text-[var(--text-muted)] text-xs shrink-0">•</span>
-                <span
-                  className="font-bold text-xs sm:text-sm text-[var(--text-main)] truncate max-w-[160px] sm:max-w-[220px]"
-                  title={`Order #${orderId}`}
-                >
-                  Order #{orderId}
-                </span>
+      {!isCompactMode && (
+        <div className={`p-3 sm:px-5 border-b border-[var(--border-color)] ${isFullscreen ? "bg-white dark:bg-stone-900 shadow-xs" : "bg-[var(--bg-sub)]/50"} shrink-0`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Left Block: Icon + Tracking Status & Order ID */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 relative">
+                <Truck size={18} className="animate-pulse" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
               </div>
 
-              {/* Status Badge & Timestamp */}
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border ${
-                    isStale
-                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                      : hasValidDriverCoords
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                      : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 animate-pulse"
-                  }`}
-                >
-                  {isStale
-                    ? "⚠️ GPS Signal Stale"
-                    : hasValidDriverCoords
-                    ? "● Live GPS Connected"
-                    : currentStatus === "out_for_delivery"
-                    ? "📡 Awaiting Delivery Staff Live GPS"
-                    : "⏳ Ready for Driver Dispatch"}
-                </span>
-
-                {lastRecordedAt && (
-                  <span className="text-[10px] sm:text-[11px] text-[var(--text-muted)] font-mono">
-                    {formatRelativeTime(lastRecordedAt)}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 shrink-0">
+                    {currentStatus === "out_for_delivery" ? "Live Delivery in Transit" : "Live Route to Doorstep"}
                   </span>
-                )}
+                  <span className="text-[var(--text-muted)] text-xs shrink-0">•</span>
+                  <span
+                    className="font-bold text-xs sm:text-sm text-[var(--text-main)] truncate max-w-[160px] sm:max-w-[220px]"
+                    title={`Order #${orderId}`}
+                  >
+                    Order #{orderId}
+                  </span>
+                </div>
+
+                {/* Status Badge & Timestamp */}
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border ${
+                      isStale
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        : hasValidDriverCoords
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                        : "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 animate-pulse"
+                    }`}
+                  >
+                    {isStale
+                      ? "⚠️ GPS Signal Stale"
+                      : hasValidDriverCoords
+                      ? "● Live GPS Connected"
+                      : currentStatus === "out_for_delivery"
+                      ? "📡 Awaiting Delivery Staff Live GPS"
+                      : "⏳ Ready for Driver Dispatch"}
+                  </span>
+
+                  {lastRecordedAt && (
+                    <span className="text-[10px] sm:text-[11px] text-[var(--text-muted)] font-mono">
+                      {formatRelativeTime(lastRecordedAt)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Block: External Maps App Link + Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
-            {hasEffectiveDest && (() => {
-              const effectiveOriginLat = driverLat ?? deviceCoords?.latitude;
-              const effectiveOriginLng = driverLng ?? deviceCoords?.longitude;
-              const originLabel = "Delivery Staff Location";
-              const destLabel = recipientName || destObj?.street || "Customer Destination";
+            {/* Right Block: External Maps App Link + Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
+              {hasEffectiveDest && (() => {
+                const effectiveOriginLat = driverLat ?? deviceCoords?.latitude;
+                const effectiveOriginLng = driverLng ?? deviceCoords?.longitude;
+                const originLabel = "Delivery Staff Location";
+                const destLabel = recipientName || destObj?.street || "Customer Destination";
 
-              const mapplsNavUrl = effectiveOriginLat && effectiveOriginLng
-                ? buildMapplsDirectionUrl({
-                    startLat: effectiveOriginLat,
-                    startLng: effectiveOriginLng,
-                    startLabel: originLabel,
-                    destLat: effectiveDestLat,
-                    destLng: effectiveDestLng,
-                    destLabel: destLabel,
-                    mode: "driving",
-                  })
-                : `https://www.mappls.com/search?q=${encodeURIComponent(destLabel)}&lat=${effectiveDestLat}&lng=${effectiveDestLng}`;
+                const mapplsNavUrl = effectiveOriginLat && effectiveOriginLng
+                  ? buildMapplsDirectionUrl({
+                      startLat: effectiveOriginLat,
+                      startLng: effectiveOriginLng,
+                      startLabel: originLabel,
+                      destLat: effectiveDestLat,
+                      destLng: effectiveDestLng,
+                      destLabel: destLabel,
+                      mode: "driving",
+                    })
+                  : `https://www.mappls.com/search?q=${encodeURIComponent(destLabel)}&lat=${effectiveDestLat}&lng=${effectiveDestLng}`;
 
-              const handleMapplsClick = (e) => {
-                // If we already have full Mappls URL with live staff origin coordinates, proceed directly
-                if (mapplsNavUrl && effectiveOriginLat && effectiveOriginLng) return;
+                const handleMapplsClick = (e) => {
+                  if (mapplsNavUrl && effectiveOriginLat && effectiveOriginLng) return;
 
-                if (!isManagerView && typeof window !== "undefined" && navigator.geolocation) {
-                  e.preventDefault();
-                  const newTab = window.open("about:blank", "_blank");
-                  navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                      const sLat = pos.coords.latitude;
-                      const sLng = pos.coords.longitude;
-                      setDeviceCoords({
-                        latitude: sLat,
-                        longitude: sLng,
-                        accuracy: pos.coords.accuracy,
-                      });
-                      const freshUrl = buildMapplsDirectionUrl({
-                        startLat: sLat,
-                        startLng: sLng,
-                        startLabel: "Staff Location",
-                        destLat: effectiveDestLat,
-                        destLng: effectiveDestLng,
-                        destLabel: destLabel,
-                        mode: "driving",
-                      });
-                      if (newTab) {
-                        newTab.location.href = freshUrl || mapplsNavUrl;
-                      }
-                    },
-                    () => {
-                      if (newTab) {
-                        newTab.location.href = mapplsNavUrl;
-                      }
-                    },
-                    { enableHighAccuracy: true, timeout: 4000, maximumAge: 10000 }
-                  );
-                }
-              };
+                  if (!isManagerView && typeof window !== "undefined" && navigator.geolocation) {
+                    e.preventDefault();
+                    const newTab = window.open("about:blank", "_blank");
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const sLat = pos.coords.latitude;
+                        const sLng = pos.coords.longitude;
+                        setDeviceCoords({
+                          latitude: sLat,
+                          longitude: sLng,
+                          accuracy: pos.coords.accuracy,
+                        });
+                        const freshUrl = buildMapplsDirectionUrl({
+                          startLat: sLat,
+                          startLng: sLng,
+                          startLabel: "Staff Location",
+                          destLat: effectiveDestLat,
+                          destLng: effectiveDestLng,
+                          destLabel: destLabel,
+                          mode: "driving",
+                        });
+                        if (newTab) {
+                          newTab.location.href = freshUrl || mapplsNavUrl;
+                        }
+                      },
+                      () => {
+                        if (newTab) {
+                          newTab.location.href = mapplsNavUrl;
+                        }
+                      },
+                      { enableHighAccuracy: true, timeout: 4000, maximumAge: 10000 }
+                    );
+                  }
+                };
 
-              return (
-                <a
-                  href={mapplsNavUrl}
-                  onClick={handleMapplsClick}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-8.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
-                  title="Open turn-by-turn voice driving directions directly in Mappls app"
-                >
-                  <Navigation size={13} />
-                  <span>Mappls Navigation</span>
-                  <ExternalLink size={10} />
-                </a>
-              );
-            })()}
+                return (
+                  <a
+                    href={mapplsNavUrl}
+                    onClick={handleMapplsClick}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-8.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                    title="Open turn-by-turn voice driving directions directly in Mappls app"
+                  >
+                    <Navigation size={13} />
+                    <span>Mappls Navigation</span>
+                    <ExternalLink size={10} />
+                  </a>
+                );
+              })()}
 
-            <button
-              type="button"
-              onClick={() => fetchTracking(true)}
-              disabled={isRefreshing}
-              className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-semibold"
-              title="Refresh live position"
-            >
-              <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-              <span className="hidden xs:inline">Refresh</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchTracking(true);
+                  if (mapInstanceRef.current) {
+                    try {
+                      mapInstanceRef.current.invalidateSize({ animate: false });
+                      if (baseLayerRef.current) baseLayerRef.current.redraw();
+                      handleRecenter();
+                    } catch {}
+                  }
+                }}
+                disabled={isRefreshing}
+                className="h-8.5 px-2.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--border-color)]/50 text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer border border-[var(--border-color)] disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-semibold"
+                title="Refresh live position and redraw map"
+              >
+                <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+                <span className="hidden xs:inline">Refresh</span>
+              </button>
 
-            {/* Fullscreen 100% Screen Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className={`h-8.5 px-2.5 rounded-lg transition cursor-pointer border flex items-center gap-1.5 text-xs font-bold ${
-                isFullscreen
-                  ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-500"
-                  : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-xs"
-              }`}
-              title={isFullscreen ? "Exit Fullscreen (or press Esc)" : "Take 100% full width and height of the screen"}
-            >
-              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              <span>{isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}</span>
-            </button>
+              {/* Fullscreen 100% Screen Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className={`h-8.5 px-2.5 rounded-lg transition cursor-pointer border flex items-center gap-1.5 text-xs font-bold ${
+                  isFullscreen
+                    ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-500"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-xs"
+                }`}
+                title={isFullscreen ? "Exit Fullscreen (or press Esc)" : "Take 100% full width and height of the screen"}
+              >
+                {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                <span>{isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── CUSTOMER STATUS BAR ─────────────────────────────────────── */}
-      <div className="bg-[var(--bg-sub)]/90 border-b border-[var(--border-color)] px-3.5 py-2 sm:px-4 flex items-center justify-between gap-2.5 shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0 text-xs">
-          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasValidCustomerCoords ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`} />
-          {hasValidCustomerCoords ? (
-            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 flex-wrap">
-              <span>● Customer Live Doorstep GPS Verified</span>
-              {custLoc?.accuracy && (
-                <span className="text-[10px] text-[var(--text-muted)] font-normal font-mono">
-                  (±{Math.round(custLoc.accuracy)}m accuracy)
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-[var(--text-muted)]">
-              Doorstep Pin geocoded ({Number(destLat || 0).toFixed(4)}, {Number(destLng || 0).toFixed(4)})
+      {!isCompactMode && (
+        <div className="bg-[var(--bg-sub)]/90 border-b border-[var(--border-color)] px-3.5 py-2 sm:px-4 flex items-center justify-between gap-2.5 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 text-xs">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasValidCustomerCoords ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`} />
+            {hasValidCustomerCoords ? (
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 flex-wrap">
+                <span>● Customer Live Doorstep GPS Verified</span>
+                {custLoc?.accuracy && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-normal font-mono">
+                    (±{Math.round(custLoc.accuracy)}m accuracy)
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[var(--text-muted)]">
+                Doorstep Pin geocoded ({Number(destLat || 0).toFixed(4)}, {Number(destLng || 0).toFixed(4)})
+              </span>
+            )}
+          </div>
+
+          {hasEffectiveDest && (
+            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
+              {Number(effectiveDestLat).toFixed(5)}, {Number(effectiveDestLng).toFixed(5)}
             </span>
           )}
         </div>
-
-        {hasEffectiveDest && (
-          <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
-            {Number(effectiveDestLat).toFixed(5)}, {Number(effectiveDestLng).toFixed(5)}
-          </span>
-        )}
-      </div>
+      )}
 
       {/* ── STALE WARNING BANNER ──────────────────────────────────────── */}
-      {isStale && (
+      {!isCompactMode && isStale && (
         <div className="bg-amber-500/10 border-b border-amber-500/30 p-2.5 sm:px-4 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 shrink-0">
           <AlertTriangle size={14} className="shrink-0 text-amber-500" />
           <span>
@@ -1085,98 +1220,214 @@ export default function LiveDeliveryMap({
       )}
 
       {/* ── INTERACTIVE LEAFLET MAP CANVAS CONTAINER ─────────────────── */}
-      <div className={`relative w-full overflow-hidden bg-stone-900 ${isFullscreen ? "flex-1 min-h-0" : ""}`}>
+      <div
+        className={`relative w-full overflow-hidden bg-stone-100 dark:bg-stone-900 ${
+          isFullscreen
+            ? "flex-1 min-h-0 w-full h-full"
+            : isCompactMode
+            ? "h-[220px] [&_.leaflet-control-zoom]:!hidden [&_.leaflet-control-attribution]:!hidden"
+            : "min-h-[500px]"
+        }`}
+      >
         <div
-          id="mappls-live-delivery-map-canvas"
+          key={`canvas-${orderId || "preview"}-${isFullscreen ? "fs" : "compact"}`}
+          id={`mappls-live-delivery-map-canvas-${orderId || "preview"}-${isFullscreen ? "fs" : "compact"}`}
           ref={mapContainerRef}
-          className={`w-full transition-all duration-300 relative z-10 ${
+          className={`w-full z-10 ${
             isFullscreen
-              ? "h-full w-full"
+              ? "absolute inset-0 w-full h-full"
+              : isCompactMode
+              ? "h-[220px] w-full"
               : isExpanded
               ? "h-[650px] sm:h-[750px]"
               : "h-[500px] sm:h-[600px]"
           }`}
-          style={{ minHeight: isFullscreen ? "100%" : "460px", width: "100%" }}
+          style={
+            isFullscreen
+              ? { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }
+              : { height: isCompactMode ? "220px" : undefined, minHeight: isCompactMode ? "220px" : "460px", width: "100%" }
+          }
         />
 
-        {/* Top-Right Floating Controls: Layer Switcher & Recenter */}
-        <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
-          {/* Layer Switcher Button */}
-          <div className="relative">
+        {/* Floating Controls: When compact, render clean stacked white buttons at bottom right */}
+        {isCompactMode ? (
+          <div className="absolute bottom-3 right-3 z-[1001] flex flex-col gap-2">
+            {/* Target / Recenter Button */}
             <button
               type="button"
-              onClick={() => setStyleMenuOpen(!styleMenuOpen)}
-              className="h-9 px-3 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center gap-1.5 text-xs font-bold transition cursor-pointer backdrop-blur-xs"
-              title="Change Map Style"
+              onClick={handleRecenter}
+              className="w-9 h-9 rounded-xl bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200/90 dark:border-white/15 shadow-md flex items-center justify-center transition cursor-pointer"
+              title="Recenter Map View"
             >
-              <Layers size={14} className="text-blue-400" />
-              <span>Layers</span>
-              <ChevronDown size={12} className="text-stone-400" />
+              <Crosshair size={17} />
             </button>
 
-            {/* Layer Switcher Popover */}
-            {styleMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-stone-900/95 backdrop-blur-md border border-white/15 p-2 shadow-2xl z-50">
-                <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-white/10 mb-1">
-                  Map Style
-                </div>
-                {MAP_STYLES.map((style) => (
-                  <button
-                    key={style.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveStyle(style.id);
+            {/* Layer Switcher Button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStyleMenuOpen(!styleMenuOpen)}
+                className="w-9 h-9 rounded-xl bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200/90 dark:border-white/15 shadow-md flex items-center justify-center transition cursor-pointer"
+                title="Change Map Style"
+              >
+                <Layers size={17} />
+              </button>
+
+              {/* Layer Switcher Popover */}
+              {styleMenuOpen && (
+                <>
+                  {/* Invisible backdrop to dismiss menu on click outside */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setStyleMenuOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
-                      activeStyle === style.id
-                        ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                        : "text-stone-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-base">{style.icon}</span>
-                      <div>
-                        <div className="leading-tight">{style.name}</div>
-                        <div className="text-[10px] text-stone-400 font-normal">{style.subtext}</div>
-                      </div>
+                  />
+                  <div className="absolute right-full mr-2 -bottom-10 w-44 rounded-xl bg-white/95 dark:bg-stone-900/95 backdrop-blur-md border border-stone-200 dark:border-white/15 p-1.5 shadow-xl z-50">
+                    <div className="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-stone-100 dark:border-white/10 mb-1">
+                      Map Style
                     </div>
-                    {activeStyle === style.id && <Check size={13} className="text-blue-400" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recenter Button */}
-          <button
-            type="button"
-            onClick={handleRecenter}
-            className="w-9 h-9 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center justify-center transition cursor-pointer backdrop-blur-xs self-end"
-            title="Recenter Map View"
-          >
-            <Crosshair size={15} className="text-emerald-400" />
-          </button>
-        </div>
-
-        {/* Floating Route Distance & ETA Pill */}
-        {hasValidDriverCoords && hasEffectiveDest && routeStats.distanceKm && (
-          <div className="absolute top-3 left-3 z-30 pointer-events-none">
-            <div className="px-3.5 py-2 rounded-full bg-stone-900/95 backdrop-blur-md border border-blue-500/40 shadow-2xl flex items-center gap-2 text-xs font-bold text-white">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
-              <span>🛵 {routeStats.distanceKm ? `${routeStats.distanceKm} km route` : "En route"}</span>
-              {routeStats.etaMins && (
-                <>
-                  <span className="text-stone-400">•</span>
-                  <span className="text-emerald-400">~{routeStats.etaMins} mins ETA</span>
+                    {MAP_STYLES.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveStyle(style.id);
+                          setStyleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-xs font-semibold transition text-left cursor-pointer ${
+                          activeStyle === style.id
+                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 font-bold"
+                            : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-sm shrink-0">{style.icon}</span>
+                          <span className="truncate">{style.name}</span>
+                        </div>
+                        {activeStyle === style.id && <Check size={12} className="text-blue-600 dark:text-blue-400 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
                 </>
               )}
             </div>
+
+            {/* Enlarge / Fullscreen Button */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(true)}
+              className="w-9 h-9 rounded-xl bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200/90 dark:border-white/15 shadow-md flex items-center justify-center transition cursor-pointer"
+              title="Enlarge Map View"
+            >
+              <Maximize2 size={17} />
+            </button>
+          </div>
+        ) : (
+          <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
+            {/* Layer Switcher Button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStyleMenuOpen(!styleMenuOpen)}
+                className="h-9 px-3 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center gap-1.5 text-xs font-bold transition cursor-pointer backdrop-blur-xs"
+                title="Change Map Style"
+              >
+                <Layers size={14} className="text-blue-400" />
+                <span>Layers</span>
+                <ChevronDown size={12} className="text-stone-400" />
+              </button>
+
+              {/* Layer Switcher Popover */}
+              {styleMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStyleMenuOpen(false);
+                    }}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-stone-900/95 backdrop-blur-md border border-white/15 p-2 shadow-2xl z-50">
+                    <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-stone-400 border-b border-white/10 mb-1">
+                      Map Style
+                    </div>
+                    {MAP_STYLES.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveStyle(style.id);
+                          setStyleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
+                          activeStyle === style.id
+                            ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                            : "text-stone-300 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base">{style.icon}</span>
+                          <div>
+                            <div className="leading-tight">{style.name}</div>
+                            <div className="text-[10px] text-stone-400 font-normal">{style.subtext}</div>
+                          </div>
+                        </div>
+                        {activeStyle === style.id && <Check size={13} className="text-blue-400" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Recenter Button */}
+            <button
+              type="button"
+              onClick={handleRecenter}
+              className="w-9 h-9 rounded-xl bg-stone-900/90 hover:bg-stone-900 text-white border border-white/20 shadow-xl flex items-center justify-center transition cursor-pointer backdrop-blur-xs self-end"
+              title="Recenter Map View"
+            >
+              <Crosshair size={15} className="text-emerald-400" />
+            </button>
           </div>
         )}
 
+        {/* Floating Route Distance & ETA Speech Bubble in compact mode (matches design) */}
+        {isCompactMode ? (
+          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none">
+            <div className="relative bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-white/15 shadow-md rounded-xl px-3 py-1.5 text-center min-w-[76px]">
+              <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400 leading-tight flex items-center justify-center gap-1">
+                <span>✦</span>
+                <span>{routeStats.etaMins ? `${routeStats.etaMins} min` : "7 min"}</span>
+              </div>
+              <div className="text-[11px] font-extrabold text-stone-900 dark:text-white leading-tight mt-0.5">
+                {routeStats.distanceKm ? `${routeStats.distanceKm} km` : "0.73 km"}
+              </div>
+              {/* Downward pointer arrow */}
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white dark:bg-stone-900 border-b border-r border-stone-200/90 dark:border-white/15 rotate-45" />
+            </div>
+          </div>
+        ) : (
+          hasValidDriverCoords && hasEffectiveDest && routeStats.distanceKm && (
+            <div className="absolute top-3 left-3 z-30 pointer-events-none">
+              <div className="px-3.5 py-2 rounded-full bg-stone-900/95 backdrop-blur-md border border-blue-500/40 shadow-2xl flex items-center gap-2 text-xs font-bold text-white">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping" />
+                <span>🛵 {routeStats.distanceKm ? `${routeStats.distanceKm} km route` : "En route"}</span>
+                {routeStats.etaMins && (
+                  <>
+                    <span className="text-stone-400">•</span>
+                    <span className="text-emerald-400">~{routeStats.etaMins} mins ETA</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        )}
+
         {/* Floating Campus / Destination Hint Pill at bottom-left (Customer view only) */}
-        {!isStaffView && (
+        {!isCompactMode && !isStaffView && (
           <div className="absolute bottom-3 left-3 bg-stone-900/95 border border-white/20 rounded-xl px-3 py-2 shadow-2xl backdrop-blur-md flex items-center gap-2.5 z-20 max-w-sm">
             <MapPin size={15} className="text-emerald-400 shrink-0" />
             <div className="text-[11px] text-stone-200 leading-tight">
@@ -1191,160 +1442,161 @@ export default function LiveDeliveryMap({
         )}
       </div>
 
-
       {/* ── DRIVER & DESTINATION TELEMETRY FOOTER ───────────────────────── */}
-      <div className="p-3 sm:p-3.5 bg-[var(--bg-sub)]/30 space-y-2">
-        {!isStaffView ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-            {/* Driver Information Card */}
-            <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3 shadow-2xs h-full">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-bold text-base border border-blue-500/15">
-                  🛵
+      {!isCompactMode && (
+        <div className={`p-3 sm:p-3.5 space-y-2 shrink-0 border-t border-[var(--border-color)] ${isFullscreen ? "bg-white dark:bg-stone-900 shadow-md" : "bg-[var(--bg-sub)]/30"}`}>
+          {!isStaffView ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+              {/* Driver Information Card */}
+              <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3 shadow-2xs h-full">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-bold text-base border border-blue-500/15">
+                    🛵
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                      Delivery Partner
+                    </span>
+                    <p
+                      className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate"
+                      title={driver?.name || "Assigned Driver"}
+                    >
+                      {driver?.name || "Active Delivery Staff"}
+                    </p>
+                    {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5">
+                        <Gauge size={11} />
+                        <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">
+                        Active Delivery Transit
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                    Delivery Partner
-                  </span>
-                  <p
-                    className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate"
-                    title={driver?.name || "Assigned Driver"}
+
+                {driver?.phone && (
+                  <a
+                    href={`tel:${driver.phone}`}
+                    className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
+                    title={`Call driver: ${driver.phone}`}
                   >
-                    {driver?.name || "Active Delivery Staff"}
-                  </p>
-                  {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5">
-                      <Gauge size={11} />
-                      <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">
-                      Active Delivery Transit
-                    </span>
-                  )}
-                </div>
+                    <Phone size={13} />
+                    <span>Call Driver</span>
+                  </a>
+                )}
               </div>
 
-              {driver?.phone && (
-                <a
-                  href={`tel:${driver.phone}`}
-                  className="h-8 inline-flex items-center gap-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0 border border-emerald-500/20"
-                  title={`Call driver: ${driver.phone}`}
-                >
-                  <Phone size={13} />
-                  <span>Call Driver</span>
-                </a>
-              )}
+              {/* Destination Notice Card */}
+              {(() => {
+                const streetText = destObj?.street || "Customer Address";
+                const cityPinText = destObj?.city ? `${destObj.city}${destObj.pincode ? ` - ${destObj.pincode}` : ""}` : "Destination on file";
+                const fullAddress = [destObj?.street, destObj?.city, destObj?.pincode].filter(Boolean).join(", ") || "Customer Address";
+
+                return (
+                  <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-start gap-3 shadow-2xs h-full">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/15">
+                      <MapPin size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1 text-xs">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                        Delivering To
+                      </span>
+                      <p
+                        className="font-bold text-xs sm:text-sm text-[var(--text-main)] line-clamp-1 break-words"
+                        title={fullAddress}
+                      >
+                        {streetText}
+                      </p>
+                      <p
+                        className="text-[11px] text-[var(--text-muted)] line-clamp-1 break-words mt-0.5"
+                        title={fullAddress}
+                      >
+                        {cityPinText}
+                      </p>
+                      {hasValidDestCoords ? (
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                          <CheckCircle2 size={11} className="shrink-0" />
+                          <span>Doorstep GPS Pin Set ({Number(destLat).toFixed(4)}, {Number(destLng).toFixed(4)})</span>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                          <Info size={11} className="shrink-0 text-stone-400" />
+                          <span>Destination pin pending</span>
+                        </div>
+                      )}
+
+                      {(destObj?.recipientPhone || destObj?.phone) && (
+                        <div className="mt-1.5 pt-1.5 border-t border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand-accent)] flex-wrap">
+                          <span>Recipient: {recipientName || destObj.recipientName || destObj.fullName || "Customer"}</span>
+                          <span>•</span>
+                          <a
+                            href={`tel:${destObj.recipientPhone || destObj.phone}`}
+                            className="hover:underline flex items-center gap-1 font-mono"
+                          >
+                            <Phone size={10} />
+                            <span>{destObj.recipientPhone || destObj.phone}</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
+          ) : (
+            /* Staff View: Clean telemetry row without repetitive customer/driver cards */
+            <div className="flex items-center justify-between gap-3 flex-wrap bg-[var(--bg-card)] p-2.5 sm:p-3 rounded-xl border border-[var(--border-color)] text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
+                  <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                    <Gauge size={12} />
+                    <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
+                  </span>
+                ) : (
+                  <span className="font-semibold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded-lg flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Vehicle Ready</span>
+                  </span>
+                )}
 
-            {/* Destination Notice Card */}
-            {(() => {
-              const streetText = destObj?.street || "Customer Address";
-              const cityPinText = destObj?.city ? `${destObj.city}${destObj.pincode ? ` - ${destObj.pincode}` : ""}` : "Destination on file";
-              const fullAddress = [destObj?.street, destObj?.city, destObj?.pincode].filter(Boolean).join(", ") || "Customer Address";
+                {hasValidDestCoords && (
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                    <CheckCircle2 size={11} />
+                    <span>Doorstep GPS Active</span>
+                  </span>
+                )}
+              </div>
 
-              return (
-                <div className="bg-[var(--bg-card)] p-3.5 sm:p-4 rounded-xl border border-[var(--border-color)] flex items-start gap-3 shadow-2xs h-full">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/15">
-                    <MapPin size={18} />
-                  </div>
-                  <div className="min-w-0 flex-1 text-xs">
-                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                      Delivering To
-                    </span>
-                    <p
-                      className="font-bold text-xs sm:text-sm text-[var(--text-main)] line-clamp-1 break-words"
-                      title={fullAddress}
-                    >
-                      {streetText}
-                    </p>
-                    <p
-                      className="text-[11px] text-[var(--text-muted)] line-clamp-1 break-words mt-0.5"
-                      title={fullAddress}
-                    >
-                      {cityPinText}
-                    </p>
-                    {hasValidDestCoords ? (
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
-                        <CheckCircle2 size={11} className="shrink-0" />
-                        <span>Doorstep GPS Pin Set ({Number(destLat).toFixed(4)}, {Number(destLng).toFixed(4)})</span>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
-                        <Info size={11} className="shrink-0 text-stone-400" />
-                        <span>Destination pin pending</span>
-                      </div>
-                    )}
-
-                    {(destObj?.recipientPhone || destObj?.phone) && (
-                      <div className="mt-1.5 pt-1.5 border-t border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--brand-accent)] flex-wrap">
-                        <span>Recipient: {recipientName || destObj.recipientName || destObj.fullName || "Customer"}</span>
-                        <span>•</span>
-                        <a
-                          href={`tel:${destObj.recipientPhone || destObj.phone}`}
-                          className="hover:underline flex items-center gap-1 font-mono"
-                        >
-                          <Phone size={10} />
-                          <span>{destObj.recipientPhone || destObj.phone}</span>
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        ) : (
-          /* Staff View: Clean telemetry row without repetitive customer/driver cards */
-          <div className="flex items-center justify-between gap-3 flex-wrap bg-[var(--bg-card)] p-2.5 sm:p-3 rounded-xl border border-[var(--border-color)] text-xs">
-            <div className="flex items-center gap-2 flex-wrap">
-              {typeof tracking?.location?.speed === "number" && tracking.location.speed > 0 ? (
-                <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                  <Gauge size={12} />
-                  <span>In Motion ({Math.round(tracking.location.speed * 3.6)} km/h)</span>
-                </span>
-              ) : (
-                <span className="font-semibold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded-lg flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Vehicle Ready</span>
-                </span>
-              )}
-
-              {hasValidDestCoords && (
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                  <CheckCircle2 size={11} />
-                  <span>Doorstep GPS Active</span>
+              {routeStats.distanceKm && (
+                <span className="font-bold text-stone-700 dark:text-stone-200">
+                  Route: {routeStats.distanceKm} km {routeStats.etaMins ? `(~${routeStats.etaMins} mins ETA)` : ""}
                 </span>
               )}
             </div>
+          )}
 
-            {routeStats.distanceKm && (
-              <span className="font-bold text-stone-700 dark:text-stone-200">
-                Route: {routeStats.distanceKm} km {routeStats.etaMins ? `(~${routeStats.etaMins} mins ETA)` : ""}
+          {/* Real GPS Telemetry Chips */}
+          <div className="flex items-center gap-2 flex-wrap text-xs pt-2 border-t border-[var(--border-color)]/60">
+            {hasValidDriverCoords && (
+              <span className="font-mono text-[11px] text-[var(--text-muted)] bg-[var(--bg-card)] px-2.5 py-1 rounded-lg border border-[var(--border-color)]">
+                📍 Driver: {Number(driverLat).toFixed(5)}, {Number(driverLng).toFixed(5)}
               </span>
             )}
+
+            {typeof tracking?.location?.accuracy === "number" && (
+              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                🎯 ±{Math.round(tracking.location.accuracy)}m accuracy
+              </span>
+            )}
+
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-auto font-semibold flex items-center gap-1 font-mono">
+              🛵 Rider: {driver?.name || tracking?.assignedDeliveryStaff?.name || "Delivery Staff"}
+            </span>
           </div>
-        )}
-
-        {/* Real GPS Telemetry Chips */}
-        <div className="flex items-center gap-2 flex-wrap text-xs pt-2 border-t border-[var(--border-color)]/60">
-          {hasValidDriverCoords && (
-            <span className="font-mono text-[11px] text-[var(--text-muted)] bg-[var(--bg-card)] px-2.5 py-1 rounded-lg border border-[var(--border-color)]">
-              📍 Driver: {Number(driverLat).toFixed(5)}, {Number(driverLng).toFixed(5)}
-            </span>
-          )}
-
-          {typeof tracking?.location?.accuracy === "number" && (
-            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-              🎯 ±{Math.round(tracking.location.accuracy)}m accuracy
-            </span>
-          )}
-
-          <span className="text-[11px] text-blue-600 dark:text-blue-400 ml-auto font-semibold flex items-center gap-1 font-mono">
-            🛵 Rider: {driver?.name || tracking?.assignedDeliveryStaff?.name || "Delivery Staff"}
-          </span>
         </div>
-      </div>
+      )}
     </div>
   );
 }

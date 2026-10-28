@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { performLogout } from "@/lib/logoutHelper";
 import { useRouter } from "next/navigation";
@@ -33,6 +33,7 @@ import {
   RefreshCw,
   CheckCircle2,
   Settings,
+  Camera,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import useFavoritesStore from "@/lib/favoritesStore";
@@ -52,6 +53,11 @@ export default function CustomerProfileClient() {
   const [dietaryPref, setDietaryPref] = useState("all");
   const [contactless, setContactless] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Profile image upload & delete state
+  const fileInputRef = useRef(null);
+  const [imageActionLoading, setImageActionLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Favorites store
   const { favorites, toggleFavorite } = useFavoritesStore();
@@ -164,6 +170,94 @@ export default function CustomerProfileClient() {
       toast.error("Error updating profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type?.toLowerCase())) {
+      toast.error("Please upload a JPG, PNG, or WebP image");
+      return;
+    }
+
+    try {
+      setImageActionLoading(true);
+      toast.loading("Uploading profile image...", { id: "profile-image-action" });
+
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const uploadRes = await fetch("/api/user/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success || !uploadData.imageUrl) {
+        toast.error(uploadData.message || "Failed to upload image", { id: "profile-image-action" });
+        return;
+      }
+
+      const updateRes = await fetch("/api/user/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: uploadData.imageUrl }),
+      });
+
+      const updateResult = await updateRes.json();
+      if (!updateResult.success) {
+        toast.error(updateResult.message || "Failed to update profile", { id: "profile-image-action" });
+        return;
+      }
+
+      if (update) {
+        await update({ image: uploadData.imageUrl });
+      }
+
+      toast.success("Profile photo updated successfully!", { id: "profile-image-action" });
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      toast.error("Failed to upload profile photo", { id: "profile-image-action" });
+    } finally {
+      setImageActionLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    try {
+      setImageActionLoading(true);
+      toast.loading("Removing profile image...", { id: "profile-image-action" });
+
+      const res = await fetch("/api/user/update", {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.message || "Failed to remove image", { id: "profile-image-action" });
+        return;
+      }
+
+      if (update) {
+        await update({ image: null });
+      }
+
+      setShowDeleteConfirm(false);
+      toast.success("Profile photo removed successfully", { id: "profile-image-action" });
+    } catch (err) {
+      console.error("Avatar delete failed:", err);
+      toast.error("Failed to remove profile photo", { id: "profile-image-action" });
+    } finally {
+      setImageActionLoading(false);
     }
   };
 
@@ -283,9 +377,13 @@ export default function CustomerProfileClient() {
       {/* ── PROFILE HERO CARD ─────────────────────────────────────── */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xl mb-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="relative">
-              <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-[var(--brand-accent)]/15 border-2 border-[var(--brand-accent)]/30 flex items-center justify-center text-3xl font-black text-[var(--brand-accent)] overflow-hidden shadow-inner">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="relative group w-fit">
+              <div
+                onClick={() => !imageActionLoading && fileInputRef.current?.click()}
+                className="w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-[var(--brand-accent)]/15 border-2 border-[var(--brand-accent)]/30 flex items-center justify-center text-3xl font-black text-[var(--brand-accent)] overflow-hidden shadow-inner cursor-pointer relative"
+                title="Click to change profile photo"
+              >
                 {session?.user?.image ? (
                   <Image
                     src={session.user.image}
@@ -293,19 +391,36 @@ export default function CustomerProfileClient() {
                     width={88}
                     height={88}
                     unoptimized={session.user.image.startsWith("data:")}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
                 ) : (
                   <span>{session?.user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
                 )}
+
+                {/* Hover overlay with edit indicator */}
+                <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-0.5 backdrop-blur-[1px]">
+                  <Camera size={18} className="drop-shadow" />
+                  <span className="text-[9px] font-bold tracking-wider uppercase">Change</span>
+                </div>
+
+                {imageActionLoading && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white backdrop-blur-[2px]">
+                    <RefreshCw size={20} className="animate-spin text-[var(--brand-accent)]" />
+                  </div>
+                )}
               </div>
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full flex items-center justify-center text-[10px] text-white font-bold">
+
+              {/* Verified badge */}
+              <span
+                className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full flex items-center justify-center text-[10px] text-white font-bold shadow"
+                title="Verified Customer"
+              >
                 ✓
               </span>
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 text-xs font-bold uppercase tracking-wider mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 text-xs font-bold uppercase tracking-wider mb-1.5">
                 <Crown size={13} /> {foodieTier}
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-main)]">
@@ -314,6 +429,40 @@ export default function CustomerProfileClient() {
               <p className="text-xs sm:text-sm font-medium text-[var(--text-muted)] mt-0.5">
                 {session?.user?.email}
               </p>
+
+              {/* Profile Image Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageActionLoading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-accent)]/15 hover:bg-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold border border-[var(--brand-accent)]/30 transition cursor-pointer disabled:opacity-50 shadow-sm"
+                  title="Upload or change profile photo"
+                >
+                  <Camera size={13} />
+                  <span>{session?.user?.image ? "Update Photo" : "Upload Photo"}</span>
+                </button>
+
+                {session?.user?.image && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={imageActionLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold border border-red-500/25 transition cursor-pointer disabled:opacity-50 shadow-sm"
+                    title="Delete profile photo"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete Photo</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -988,6 +1137,42 @@ export default function CustomerProfileClient() {
                 ) : (
                   <span>Delete Address</span>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE PHOTO CONFIRMATION MODAL ────────────────────────── */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/25 text-red-500 flex items-center justify-center mx-auto">
+              <Trash2 size={22} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-[var(--text-main)]">Delete Profile Photo?</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed">
+                Are you sure you want to remove your profile photo? Your initials will be displayed instead.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={imageActionLoading}
+                className="px-4 py-2.5 rounded-xl bg-[var(--bg-sub)] hover:bg-[var(--bg-sub)]/80 text-[var(--text-main)] text-xs font-bold border border-[var(--border-color)] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteImage}
+                disabled={imageActionLoading}
+                className="px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+              >
+                {imageActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                <span>Remove Photo</span>
               </button>
             </div>
           </div>

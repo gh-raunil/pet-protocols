@@ -69,9 +69,6 @@ const Navbar = () => {
             <span className="font-extrabold text-xs sm:text-base tracking-tight text-[var(--text-main)] group-hover:text-[var(--brand-accent)] transition leading-tight truncate">
               पेट Protocols
             </span>
-            <span className="text-[10px] text-[var(--text-muted)] font-normal hidden xl:inline leading-tight">
-              Fresh food. Zero compromises.
-            </span>
           </div>
         </Link>
 

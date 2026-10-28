@@ -97,11 +97,18 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { customerId, status } = body;
+    const { customerId, status, removeImage, image } = body;
 
-    if (!customerId || !["active", "suspended"].includes(status)) {
+    if (!customerId) {
       return NextResponse.json(
-        { success: false, message: "Invalid customer ID or status." },
+        { success: false, message: "Customer ID is required." },
+        { status: 400 }
+      );
+    }
+
+    if (status && !["active", "suspended"].includes(status)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid status value." },
         { status: 400 }
       );
     }
@@ -113,17 +120,66 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: "Customer not found." }, { status: 404 });
     }
 
-    customer.status = status;
+    if (status) {
+      customer.status = status;
+    }
+
+    if (removeImage || image === "" || image === null) {
+      customer.image = "";
+    } else if (image) {
+      customer.image = String(image).trim();
+    }
+
     await customer.save();
 
     return NextResponse.json({
       success: true,
-      message: `Customer ${status === "active" ? "activated" : "suspended"} successfully.`,
+      message: "Customer updated successfully.",
       customer: {
         _id: customer._id,
         name: customer.name,
         email: customer.email,
         status: customer.status,
+        image: customer.image,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// DELETE — Remove customer profile image
+export async function DELETE(request) {
+  try {
+    const auth = await requireSuperAdmin();
+    if (auth.error) {
+      return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const customerId = searchParams.get("customerId") || (await request.json().catch(() => ({})))?.customerId;
+
+    if (!customerId) {
+      return NextResponse.json({ success: false, message: "Customer ID is required." }, { status: 400 });
+    }
+
+    await connectDB();
+    const customer = await User.findById(customerId);
+    if (!customer) {
+      return NextResponse.json({ success: false, message: "Customer not found." }, { status: 404 });
+    }
+
+    customer.image = "";
+    await customer.save();
+
+    return NextResponse.json({
+      success: true,
+      message: "Customer profile photo removed successfully.",
+      customer: {
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        image: "",
       },
     });
   } catch (error) {

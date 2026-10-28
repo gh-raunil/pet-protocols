@@ -238,9 +238,6 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
               </Link>
             ) : (
               <div className="flex flex-col gap-2.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-[var(--brand-accent)]">
-                  <Sparkles size={14} /> Fresh food. Zero compromises.
-                </div>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                   Sign in to track orders, save favorites, and enjoy personalized offers.
                 </p>
@@ -319,7 +316,7 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
             </button>
           )}
           <p className="text-[11px] text-center text-[var(--text-muted)] mt-2">
-            पेट Protocols • Fresh food. Zero compromises.
+            पेट Protocols
           </p>
         </div>
       </aside>

@@ -336,7 +336,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
   };
 
   return (
-    <main className="min-h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] transition-colors grid grid-cols-1 lg:grid-cols-12 overflow-x-hidden pt-16 sm:pt-20 lg:pt-0">
+    <main className="min-h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] transition-colors grid grid-cols-1 lg:grid-cols-12 overflow-x-hidden pt-20 sm:pt-24 lg:pt-24">
       {/* ═══════════════════════════════════════════════════════════════
           LEFT COLUMN: BRANDED FOOD-PHOTOGRAPHY EXPERIENCE (DESKTOP)
           ═══════════════════════════════════════════════════════════════ */}

@@ -57,7 +57,7 @@ export async function PUT(request) {
 
     if (name) user.name = name.trim();
     if (typeof phone === "string") user.phone = phone.trim();
-    if (typeof image === "string") user.image = image.trim();
+    if (image !== undefined) user.image = image ? String(image).trim() : "";
     if (roleTitle) user.roleTitle = roleTitle.trim();
 
     await user.save();
@@ -71,6 +71,42 @@ export async function PUT(request) {
         email: user.email,
         phone: user.phone,
         image: user.image,
+        role: user.role,
+        roleTitle: user.roleTitle,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export const PATCH = PUT;
+
+export async function DELETE() {
+  try {
+    const auth = await requireRestaurantAdmin({ allowStaff: true });
+    if (auth.error) {
+      return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
+    }
+
+    await connectDB();
+    const user = await User.findOne({ email: auth.user.email });
+    if (!user) {
+      return NextResponse.json({ success: false, message: "User not found" }, { status: 404 });
+    }
+
+    user.image = "";
+    await user.save();
+
+    return NextResponse.json({
+      success: true,
+      message: "Profile image removed successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        image: "",
         role: user.role,
         roleTitle: user.roleTitle,
       },

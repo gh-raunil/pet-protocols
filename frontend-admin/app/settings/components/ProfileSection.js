@@ -18,6 +18,7 @@ import {
   Sparkles,
   ExternalLink,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { CHIME_OPTIONS, getSavedChime, setSavedChime, playChime } from "@/lib/soundChimes";
 
@@ -297,9 +298,10 @@ export default function ProfileSection() {
                 <button
                   type="button"
                   onClick={() => setProfileData((prev) => ({ ...prev, image: "" }))}
-                  className="text-xs text-rose-500 hover:text-rose-600 font-semibold cursor-pointer pt-0.5 block"
+                  className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-600 font-semibold cursor-pointer pt-0.5"
                 >
-                  Remove Photo
+                  <Trash2 size={12} />
+                  <span>Remove Photo</span>
                 </button>
               )}
             </div>

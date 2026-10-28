@@ -12,16 +12,22 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 })
     }
 
-    const { name, phone, image } = await request.json().catch(() => ({}))
+    const body = await request.json().catch(() => ({}))
+    const { name, phone, image } = body
 
-    if (!name || !name.trim()) {
-      return NextResponse.json(
-        { success: false, message: 'Name is required' },
-        { status: 400 }
-      )
+    const updateFields = {}
+
+    if (name !== undefined) {
+      const trimmedName = String(name).trim()
+      if (!trimmedName) {
+        return NextResponse.json(
+          { success: false, message: 'Name cannot be empty' },
+          { status: 400 }
+        )
+      }
+      updateFields.name = trimmedName
     }
 
-    let normalizedPhone = undefined
     if (phone !== undefined) {
       const trimmedPhone = String(phone).trim()
       if (trimmedPhone) {
@@ -31,23 +37,37 @@ export async function PATCH(request) {
             { status: 400 }
           )
         }
-        normalizedPhone = normalizePhone(trimmedPhone)
+        updateFields.phone = normalizePhone(trimmedPhone)
       } else {
-        normalizedPhone = ''
+        updateFields.phone = ''
       }
+    }
+
+    if (image !== undefined) {
+      updateFields.image = image ? String(image).trim() : ''
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'No fields provided to update.' },
+        { status: 400 }
+      )
     }
 
     await connectDB()
 
     const updatedUser = await User.findOneAndUpdate(
       { email: session.user.email },
-      {
-        name: name.trim(),
-        ...(normalizedPhone !== undefined && { phone: normalizedPhone }),
-        ...(image && { image }),
-      },
+      updateFields,
       { new: true }
     )
+
+    if (!updatedUser) {
+      return NextResponse.json(
+        { success: false, message: 'User not found' },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({
       success: true,
@@ -58,6 +78,40 @@ export async function PATCH(request) {
       }
     })
 
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+export const PUT = PATCH;
+
+export async function DELETE() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 })
+    }
+
+    await connectDB()
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: session.user.email },
+      { image: '' },
+      { new: true }
+    )
+
+    return NextResponse.json({
+      success: true,
+      message: 'Profile image removed successfully',
+      user: {
+        name: updatedUser?.name,
+        image: '',
+        phone: updatedUser?.phone,
+      }
+    })
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error.message },

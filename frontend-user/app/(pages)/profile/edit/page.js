@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Camera, ArrowLeft } from "lucide-react";
+import { Camera, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/ToastProvider";
 
 export default function EditProfilePage() {
@@ -16,6 +16,7 @@ export default function EditProfilePage() {
   const [phone, setPhone] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -50,11 +51,19 @@ export default function EditProfilePage() {
     }
 
     setImageFile(file);
+    setRemoveImage(false);
     setError("");
 
     const reader = new FileReader();
     reader.onload = (e) => setPreviewImage(e.target.result);
     reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setPreviewImage(null);
+    setRemoveImage(true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSave = async () => {
@@ -72,9 +81,11 @@ export default function EditProfilePage() {
     setError("");
 
     try {
-      let imageUrl = session?.user?.image;
+      let imageUrl = session?.user?.image || "";
 
-      if (imageFile) {
+      if (removeImage) {
+        imageUrl = "";
+      } else if (imageFile) {
         setUploading(true);
         const formData = new FormData();
         formData.append("image", imageFile);
@@ -189,13 +200,28 @@ export default function EditProfilePage() {
             onChange={handleImageChange}
             className="hidden"
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-[var(--brand-accent)] text-xs font-semibold hover:underline transition"
-          >
-            {imageFile ? "Image selected — click to change" : "Upload new profile photo"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[var(--brand-accent)] text-xs font-semibold hover:underline transition"
+            >
+              {imageFile ? "Image selected — click to change" : "Upload new profile photo"}
+            </button>
+            {previewImage && (
+              <>
+                <span className="text-[var(--text-muted)] text-xs">•</span>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="text-red-500 hover:text-red-400 text-xs font-semibold hover:underline transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 size={12} />
+                  <span>Remove photo</span>
+                </button>
+              </>
+            )}
+          </div>
           {uploading && (
             <p className="text-[var(--text-muted)] text-xs animate-pulse">
               Uploading picture...

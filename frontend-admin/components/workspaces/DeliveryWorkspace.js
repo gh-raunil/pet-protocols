@@ -45,6 +45,8 @@ import {
   ChefHat,
   MoreVertical,
   Filter,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   useDeliveryGpsTransmitter,
@@ -76,6 +78,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const [statusFilter, setStatusFilter] = useState("active"); // "active", "preparing", "out_for_delivery", "delivered", "all"
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
+  const [enlargedOrderMapId, setEnlargedOrderMapId] = useState(null);
+  const [moreMenuOrderId, setMoreMenuOrderId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [deliveryNote, setDeliveryNote] = useState({});
 
@@ -346,8 +350,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
 
   async function handleCollectCash(order) {
-    if (order.status !== "out_for_delivery") {
-      toast.error("Cash collection cannot be recorded before picking up the order.");
+    if (order.status !== "delivered") {
+      toast.error("Please verify customer handover OTP first before collecting cash.");
+      setHandoverModalOrder(order);
+      setHandoverOtpCode("");
+      setHandoverError("");
+      setHandoverRemainingAttempts(null);
       return;
     }
     const amount = Number(order.totalAmount || 0);
@@ -716,74 +724,74 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       {/* ── 4 COMPACT OPERATIONAL METRIC CARDS ─────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Metric 1: Ready at Kitchen */}
-        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-5 shadow-xs flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1 pr-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider block truncate">
               READY AT KITCHEN
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 font-mono mt-1">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black text-amber-600 dark:text-amber-400 font-mono mt-0.5 sm:mt-1 truncate">
               {metrics.ready}
             </div>
-            <span className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block">
+            <span className="text-[10px] sm:text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block truncate">
               Orders ready
             </span>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-            <ChefHat size={22} />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+            <ChefHat className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
         {/* Metric 2: Out in Transit */}
-        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-5 shadow-xs flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1 pr-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider block truncate">
               OUT FOR DELIVERY
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 font-mono mt-1">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black text-blue-600 dark:text-blue-400 font-mono mt-0.5 sm:mt-1 truncate">
               {metrics.inTransit}
             </div>
-            <span className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block">
+            <span className="text-[10px] sm:text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block truncate">
               Orders in transit
             </span>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
-            <Truck size={22} />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
         {/* Metric 3: Delivered Today */}
-        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-5 shadow-xs flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1 pr-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block truncate">
               DELIVERED TODAY
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 sm:mt-1 truncate">
               {metrics.deliveredToday}
             </div>
-            <span className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block">
+            <span className="text-[10px] sm:text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block truncate">
               Orders completed
             </span>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-            <CheckCircle2 size={22} />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
         {/* Metric 4: COD Due to Collect */}
-        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] sm:text-[11px] font-extrabold text-stone-600 dark:text-stone-300 uppercase tracking-wider block">
+        <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-5 shadow-xs flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1 pr-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold text-stone-600 dark:text-stone-300 uppercase tracking-wider block truncate">
               COD DUE TO COLLECT
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-stone-900 dark:text-white font-mono mt-1">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black text-stone-900 dark:text-white font-mono mt-0.5 sm:mt-1 truncate">
               ₹{metrics.codToCollect.toFixed(2)}
             </div>
-            <span className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block">
+            <span className="text-[10px] sm:text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 block truncate">
               From pending orders
             </span>
           </div>
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-            <Banknote size={22} />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+            <Banknote className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
@@ -924,27 +932,27 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                 className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl shadow-xs overflow-hidden transition-all hover:border-blue-500/40"
               >
                 {/* ── CARD HEADER ───────────────────────────────────── */}
-                <div className="p-3.5 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-stone-100 dark:border-white/5">
-                  <div className="flex items-start gap-3 w-full min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-stone-100 dark:border-white/5">
+                  <div className="flex items-start gap-3.5 w-full min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-[#edf5ff] dark:bg-blue-950/40 text-[#2563eb] dark:text-blue-400 flex items-center justify-center shrink-0 border border-[#dbeafe] dark:border-blue-500/20">
                       <Truck size={20} />
                     </div>
+
                     <div className="flex-1 min-w-0">
-                      {/* Top line: Order ID, items, Total, Time, and Status Badge */}
+                      {/* Top line: Order ID, and on mobile status badge */}
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2 min-w-0 flex-wrap">
                           <span className="font-extrabold text-sm sm:text-base text-stone-900 dark:text-white font-mono tracking-tight">
                             #{order.orderId || order._id.slice(-6).toUpperCase()}
                           </span>
-                          <span className="text-xs text-stone-300 dark:text-stone-700">•</span>
-                          <span className="text-xs text-stone-500 dark:text-stone-400">
+                          <span className="text-xs text-stone-300 dark:text-stone-700 hidden sm:inline">•</span>
+                          <span className="text-xs text-stone-500 dark:text-stone-400 hidden sm:inline">
                             {order.items?.length || 1} {order.items?.length === 1 ? "item" : "items"}
                           </span>
-                          <span className="text-xs text-stone-300 dark:text-stone-700">•</span>
-                          <span className="text-xs font-bold text-stone-900 dark:text-white">
+                          <span className="text-xs text-stone-300 dark:text-stone-700 hidden sm:inline">•</span>
+                          <span className="text-xs font-bold text-stone-900 dark:text-white hidden sm:inline">
                             Total: ₹{(order.totalAmount || 0).toFixed(2)}
                           </span>
-                          <span className="text-xs text-stone-300 dark:text-stone-700 hidden sm:inline">•</span>
                           <span className="text-xs text-stone-500 dark:text-stone-400 hidden sm:inline-flex items-center gap-1">
                             <Clock size={11} />
                             {new Date(order.createdAt).toLocaleTimeString([], {
@@ -954,68 +962,86 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           </span>
                         </div>
 
-                        {/* Status Badge */}
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wide border shrink-0 ${
-                            order.status === "out_for_delivery"
-                              ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30"
-                              : order.status === "preparing"
-                              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                              : order.status === "delivered"
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                              : "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/30"
-                          }`}
-                        >
-                          {order.status === "out_for_delivery"
-                            ? "🛵 OUT FOR DELIVERY"
-                            : order.status === "preparing"
-                            ? "🍳 PREPARING"
-                            : order.status === "delivered"
-                            ? "✅ DELIVERED"
-                            : order.status?.toUpperCase()}
-                        </span>
+                        {/* Status Badge (Desktop position - omitted for out_for_delivery per request) */}
+                        {order.status !== "out_for_delivery" && (
+                          <div className="hidden md:block">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold border shrink-0 inline-flex items-center gap-1.5 ${
+                                order.status === "preparing"
+                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                  : order.status === "delivered"
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                  : "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/30"
+                              }`}
+                            >
+                              <Bike size={13} className="text-stone-600 dark:text-stone-300" />
+                              <span>
+                                {order.status === "preparing"
+                                  ? "PREPARING"
+                                  : order.status === "delivered"
+                                  ? "DELIVERED"
+                                  : order.status?.toUpperCase()}
+                              </span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Badges Row: GPS, Payment / COD, Assignment */}
-                      <div className="flex items-center gap-2 flex-wrap mt-2">
+                      {/* Mobile status badge (omitted for out_for_delivery per request) */}
+                      {order.status !== "out_for_delivery" && (
+                        <div className="md:hidden mt-1">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1.5 ${
+                              order.status === "preparing"
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                : order.status === "delivered"
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                : "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/30"
+                            }`}
+                          >
+                            <Bike size={11} />
+                            <span>
+                              {order.status === "preparing"
+                                ? "PREPARING"
+                                : order.status === "delivered"
+                                ? "DELIVERED"
+                                : order.status?.toUpperCase()}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Badges Row: GPS & Payment/COD */}
+                      <div className="flex items-center gap-2 flex-wrap mt-2 sm:mt-2.5">
                         {order.status === "out_for_delivery" && (
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
                               isOrderTracking
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                ? "bg-[#ecfdf5] dark:bg-emerald-950/30 text-[#16a34a] dark:text-emerald-400 border-[#d1fae5] dark:border-emerald-500/30"
                                 : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-white/10"
                             }`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${isOrderTracking ? "bg-emerald-500 animate-ping" : "bg-stone-400"}`} />
-                            <span>{isOrderTracking ? "Live GPS Active" : "GPS Inactive"}</span>
+                            <Radio size={12} className={isOrderTracking ? "animate-pulse" : ""} />
+                            <span className="hidden sm:inline">{isOrderTracking ? "Live GPS Active" : "GPS Inactive"}</span>
+                            <span className="sm:hidden">{isOrderTracking ? "Live GPS" : "GPS Inactive"}</span>
                           </span>
                         )}
 
                         {isCOD ? (
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 ${
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
                               isPaid
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                                : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                ? "bg-[#ecfdf5] dark:bg-emerald-950/30 text-[#16a34a] dark:text-emerald-400 border-[#d1fae5] dark:border-emerald-500/30"
+                                : "bg-[#fff7ed] dark:bg-orange-950/30 text-[#ea580c] dark:text-orange-400 border-[#ffedd5] dark:border-orange-500/30"
                             }`}
                           >
-                            <AlertTriangle size={11} className={isPaid ? "text-emerald-600" : "text-amber-600"} />
-                            <span>{isPaid ? "COD: Paid" : `COD: ₹${Number(order.totalAmount || 0).toFixed(0)}`}</span>
+                            <AlertTriangle size={12} className={isPaid ? "text-[#16a34a]" : "text-[#ea580c]"} />
+                            <span>{isPaid ? "COD: Paid" : `COD: ₹${Math.round(order.totalAmount || 0)}`}</span>
                           </span>
                         ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20">
-                            ✓ Paid Online
-                          </span>
-                        )}
-
-                        {order.assignedDeliveryStaff?.name && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-center gap-1">
-                            <User size={10} />
-                            <span>
-                              {isMyOrder(order)
-                                ? "Assigned to You"
-                                : order.assignedDeliveryStaff.name}
-                            </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-[#ecfdf5] dark:bg-emerald-950/30 text-[#16a34a] dark:text-emerald-400 border-[#d1fae5] dark:border-emerald-500/30 flex items-center gap-1.5">
+                            <Check size={12} strokeWidth={2.5} />
+                            <span>Paid Online</span>
                           </span>
                         )}
                       </div>
@@ -1023,14 +1049,14 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   </div>
 
                   {/* Header Actions */}
-                  <div className="w-full md:w-auto flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-stone-100 dark:border-white/5 justify-end flex-wrap">
+                  <div className="w-full md:w-auto flex flex-col md:flex-col items-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-stone-100 dark:border-white/5">
                     {(order.status === "preparing" || order.status === "ready") && (
                       isManager ? (
                         order.assignedDeliveryStaff?.id ? (
                           <button
                             onClick={() => updateOrderStatus(order._id, "out_for_delivery")}
                             disabled={isUpdating}
-                            className="min-h-[40px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="w-full sm:w-auto min-h-[40px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             <Truck size={14} />
                             <span>Dispatch Order</span>
@@ -1038,7 +1064,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         ) : (
                           <a
                             href="/delivery/assign"
-                            className="min-h-[40px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
+                            className="w-full sm:w-auto min-h-[40px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
                           >
                             <Bike size={14} />
                             <span>Assign Driver</span>
@@ -1048,7 +1074,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         <button
                           onClick={() => updateOrderStatus(order._id, "out_for_delivery", { selfPickup: true })}
                           disabled={isUpdating}
-                          className="min-h-[40px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="w-full sm:w-auto min-h-[40px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           <Bike size={14} />
                           <span>Pick Up Parcel</span>
@@ -1057,25 +1083,25 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                     )}
 
                     {order.status === "out_for_delivery" && (
-                      <>
+                      <div className="w-full md:w-auto grid grid-cols-3 sm:flex sm:items-center gap-2">
                         {!isPickup && (
                           isOrderTracking ? (
                             <button
                               onClick={() => gpsTransmitter.stopTracking("stopped")}
-                              className="min-h-[40px] px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                              className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#fecaca] dark:border-rose-500/30 bg-[#fef2f2] dark:bg-rose-950/30 hover:bg-[#fee2e2] text-[#dc2626] dark:text-rose-400 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
                               title="Stop sending GPS coordinates for this order"
                             >
-                              <Power size={13} />
-                              <span>Stop GPS</span>
+                              <Power size={13} className="text-[#dc2626] dark:text-rose-400 shrink-0" />
+                              <span className="truncate">Stop GPS</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => gpsTransmitter.startTracking(order.orderId || order._id, order)}
-                              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                              className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#dbeafe] dark:border-blue-500/30 bg-[#eff6ff] dark:bg-blue-950/30 hover:bg-[#dbeafe] text-[#2563eb] dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
                               title="Transmit live device GPS"
                             >
-                              <Navigation size={13} />
-                              <span>Share GPS</span>
+                              <Navigation size={13} className="text-[#2563eb] dark:text-blue-400 shrink-0" />
+                              <span className="truncate">Share GPS</span>
                             </button>
                           )
                         )}
@@ -1088,26 +1114,99 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             setHandoverRemainingAttempts(null);
                           }}
                           disabled={isUpdating}
-                          className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 shadow-xs"
+                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#009966] hover:bg-[#008055] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 shadow-xs"
                         >
-                          <KeyRound size={14} />
-                          <span>Verify OTP</span>
+                          <KeyRound size={14} className="shrink-0" />
+                          <span className="truncate">Verify OTP</span>
                         </button>
-                      </>
-                    )}
 
-                    <button
-                      onClick={() => setExpandedOrderId(isExpanded ? null : order._id)}
-                      className="min-h-[40px] px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white transition flex items-center gap-1 cursor-pointer font-bold text-xs border border-stone-200/60 dark:border-white/5"
-                      title={isExpanded ? "Collapse Details" : "More Order Actions & Details"}
-                    >
-                      <span>More</span>
-                      <MoreVertical size={14} />
-                    </button>
+                        {/* More Menu Dropdown */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMoreMenuOrderId(moreMenuOrderId === order._id ? null : order._id)}
+                            className="w-full sm:w-auto min-h-[40px] px-3 py-2 rounded-xl bg-stone-50 hover:bg-stone-100 dark:bg-white/5 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition inline-flex items-center justify-center gap-1 cursor-pointer font-bold text-xs border border-stone-200/80 dark:border-white/10"
+                            title="More Secondary Actions"
+                            aria-label="More secondary actions"
+                          >
+                            <span className="hidden sm:inline">More</span>
+                            <MoreVertical size={14} />
+                          </button>
+
+                          {moreMenuOrderId === order._id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setMoreMenuOrderId(null)}
+                              />
+                              <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-[#151926] rounded-2xl border border-stone-200/90 dark:border-white/10 shadow-xl z-40 py-1.5 divide-y divide-stone-100 dark:divide-white/5 text-xs">
+                                <div className="p-1 space-y-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExpandedOrderId(isExpanded ? null : order._id);
+                                      setMoreMenuOrderId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 font-semibold text-left transition"
+                                  >
+                                    <Package size={14} className="text-orange-500 shrink-0" />
+                                    <span>{isExpanded ? "Hide Full Details" : "View Full Details"}</span>
+                                  </button>
+
+                                  {order.address && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const addrStr = [order.address.street, order.address.city, order.address.pincode].filter(Boolean).join(", ");
+                                        if (navigator.clipboard) {
+                                          navigator.clipboard.writeText(addrStr);
+                                          toast.success("Delivery address copied!");
+                                        }
+                                        setMoreMenuOrderId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 font-semibold text-left transition"
+                                    >
+                                      <Copy size={14} className="text-blue-500 shrink-0" />
+                                      <span>Copy Delivery Address</span>
+                                    </button>
+                                  )}
+
+                                  {(order.address?.recipientPhone || order.address?.phone) && (
+                                    <a
+                                      href={`tel:${order.address?.recipientPhone || order.address?.phone}`}
+                                      onClick={() => setMoreMenuOrderId(null)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/5 font-semibold text-left transition"
+                                    >
+                                      <Phone size={14} className="text-emerald-500 shrink-0" />
+                                      <span>Call Customer</span>
+                                    </a>
+                                  )}
+                                </div>
+
+                                <div className="p-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      loadOrders(true);
+                                      setMoreMenuOrderId(null);
+                                      toast.success("Order status refreshed");
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 font-medium text-left transition"
+                                  >
+                                    <RefreshCw size={13} className="shrink-0" />
+                                    <span>Refresh Status</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* ── 3-PANEL DISPATCH WORKSPACE (Desktop: 3 cols, Mobile: Stacked) ── */}
+                {/* ── MAP-FIRST DISPATCH WORKSPACE (Laptop: 60% Map / 40% Side Panel, Mobile: Stacked Map First) ── */}
                 {(() => {
                   const hasCustomerLiveGps = Boolean(order.customerLocation?.latitude && order.customerLocation?.longitude);
                   const navLat = order.address?.latitude || order.customerLocation?.latitude;
@@ -1195,129 +1294,44 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   };
 
                   return (
-                    <div className="p-4 sm:p-5 bg-stone-50/50 dark:bg-white/[0.02] grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {/* ── PANEL 1: Customer Details ── */}
-                      <div className="bg-white dark:bg-[#151926] p-4 rounded-xl border border-stone-200/80 dark:border-white/5 space-y-3 flex flex-col justify-between">
-                        <div className="space-y-3">
+                    <div className="p-4 sm:p-5 bg-[#fafafa] dark:bg-black/20 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      {/* ── PRIMARY WORKSPACE: Live Map (approx 60-65% width on laptop) ── */}
+                      <div className="lg:col-span-7 xl:col-span-8 bg-white dark:bg-[#151926] p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-white/5 space-y-3 flex flex-col justify-between shadow-2xs">
+                        <div className="space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 font-bold text-xs text-stone-900 dark:text-white">
-                              <MapPin size={14} className="text-blue-500" />
-                              <span>Customer Details</span>
-                            </div>
-                            {(order.address?.isDifferentRecipient || order.address?.recipientPhone) && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                                🎁 Alternate
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Recipient Name and Quick Call */}
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="font-extrabold text-xs text-stone-900 dark:text-white">
-                              {order.address?.recipientName || order.address?.fullName || "Customer"}
-                            </span>
-                            {(order.address?.recipientPhone || order.address?.phone) && (
-                              <a
-                                href={`tel:${order.address?.recipientPhone || order.address?.phone}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs hover:bg-emerald-500/25 transition active:scale-95 shrink-0"
-                              >
-                                <Phone size={12} />
-                                <span>Call ({order.address?.recipientPhone || order.address?.phone})</span>
-                              </a>
-                            )}
-                          </div>
-
-                          {/* Street Address */}
-                          <div className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
-                            <p>
-                              {order.address?.street}, {order.address?.city}
-                              {order.address?.state ? `, ${order.address?.state}` : ""}
-                              {order.address?.pincode ? ` - ${order.address?.pincode}` : ""}
-                            </p>
-                          </div>
-
-                          {/* GPS Badges and Distance */}
-                          {(navLat && navLng) ? (
-                            <div className="flex items-center gap-2 flex-wrap text-xs pt-1">
-                              {hasCustomerLiveGps ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  🎯 Customer Live GPS (±{Math.round(order.customerLocation.accuracy || 10)}m)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                                  📍 Pinned GPS
-                                </span>
-                              )}
-
-                              {distInfo?.distanceKm ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 dark:bg-white/10 text-stone-600 dark:text-stone-300">
-                                  📍 {distInfo.distanceKm} km away
-                                </span>
-                              ) : null}
-
-                              <span className="font-mono text-[11px] text-stone-400 dark:text-stone-500">
-                                {Number(navLat).toFixed(5)}, {Number(navLng).toFixed(5)}
-                              </span>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {/* Navigation & Toggle Map Buttons */}
-                        {(navLat && navLng) && (
-                          <div className="space-y-2 pt-2 border-t border-stone-100 dark:border-white/5">
-                            <a
-                              href={mapplsUrl}
-                              onClick={handleStartMappls}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-extrabold text-xs shadow-xs transition cursor-pointer bg-blue-600 hover:bg-blue-700 text-white active:scale-98"
-                            >
-                              <Navigation size={13} />
-                              <span>Navigate (Mappls)</span>
-                              <ExternalLink size={11} className="opacity-75" />
-                            </a>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleDoorstepMap(order._id)}
-                              className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl font-extrabold text-xs transition cursor-pointer border ${
-                                isMapOpen
-                                  ? "bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border-stone-300 dark:border-white/20"
-                                  : "bg-white dark:bg-transparent text-blue-600 dark:text-blue-400 border-stone-200 dark:border-white/10 hover:bg-stone-50 dark:hover:bg-white/5"
-                              }`}
-                            >
-                              <MapPin size={13} />
-                              <span>{isMapOpen ? "Hide Route Map" : "View Live Map"}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ── PANEL 2: Route Preview ── */}
-                      <div className="bg-white dark:bg-[#151926] p-4 rounded-xl border border-stone-200/80 dark:border-white/5 space-y-3 flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 font-bold text-xs text-stone-900 dark:text-white">
-                              <Compass size={14} className="text-blue-500" />
-                              <span>Route Preview</span>
+                            <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-stone-900 dark:text-white">
+                              <Compass size={15} className="text-blue-600 dark:text-blue-400" />
+                              <span>Live Doorstep Route Map</span>
                             </div>
                             {(navLat && navLng) && (
-                              <button
-                                type="button"
-                                onClick={() => toggleDoorstepMap(order._id)}
-                                className="p-1 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition cursor-pointer"
-                                title={isMapOpen ? "Collapse Map" : "Expand Map"}
-                              >
-                                <ChevronDown size={14} className={`transition-transform duration-200 ${isMapOpen ? "rotate-180" : ""}`} />
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                {isMapOpen && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEnlargedOrderMapId(enlargedOrderMapId === order._id ? null : order._id)}
+                                    className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
+                                    title={enlargedOrderMapId === order._id ? "Exit Enlarged Map" : "Enlarge Map View"}
+                                  >
+                                    {enlargedOrderMapId === order._id ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDoorstepMap(order._id)}
+                                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
+                                  title={isMapOpen ? "Collapse Map" : "Expand Map"}
+                                >
+                                  <ChevronUp size={16} className={`transition-transform duration-200 ${isMapOpen ? "" : "rotate-180"}`} />
+                                </button>
+                              </div>
                             )}
                           </div>
 
                           {(navLat && navLng) ? (
                             isMapOpen ? (
-                              <div className="w-full h-[220px] rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 relative">
+                              <div className={`w-full ${enlargedOrderMapId === order._id ? "" : "h-[340px] sm:h-[380px] lg:h-[430px] rounded-2xl overflow-hidden border border-stone-200 dark:border-white/10 relative"}`}>
                                 <DeliveryRouteMap
+                                  key={`delivery-map-${order._id}-${enlargedOrderMapId === order._id ? "fullscreen" : "compact"}`}
                                   origin={
                                     !isManager && gpsTransmitter.lastLocation?.latitude
                                       ? {
@@ -1357,30 +1371,33 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                                   orderId={order.orderId || order._id}
                                   initialStatus={order.status}
                                   recipientName={order.address?.recipientName || order.address?.fullName}
+                                  compact={enlargedOrderMapId !== order._id}
+                                  isEnlarged={enlargedOrderMapId === order._id}
+                                  onToggleEnlarge={(val) => setEnlargedOrderMapId(val ? order._id : null)}
                                 />
                               </div>
                             ) : (
                               <div
                                 onClick={() => toggleDoorstepMap(order._id)}
-                                className="h-[220px] rounded-xl border border-dashed border-stone-200 dark:border-white/10 bg-stone-50/50 dark:bg-white/[0.01] hover:bg-stone-100/50 dark:hover:bg-white/[0.03] transition cursor-pointer flex flex-col items-center justify-center p-4 text-center group"
+                                className="h-[220px] rounded-2xl border border-dashed border-stone-200 dark:border-white/10 bg-stone-50/50 dark:bg-white/[0.01] hover:bg-stone-100/50 dark:hover:bg-white/[0.03] transition cursor-pointer flex flex-col items-center justify-center p-4 text-center group"
                               >
                                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                   <Compass size={20} />
                                 </div>
                                 <span className="font-extrabold text-xs text-stone-800 dark:text-stone-200">
-                                  Interactive Route Map
+                                  Interactive Route Map Hidden
                                 </span>
                                 <span className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 max-w-[200px]">
-                                  Click to view doorstep navigation route & live transit
+                                  Click to show live map and GPS navigation
                                 </span>
                                 <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                                  <span>View Route Map</span>
+                                  <span>Show Route Map</span>
                                   <ExternalLink size={10} />
                                 </span>
                               </div>
                             )
                           ) : (
-                            <div className="h-[220px] rounded-xl border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-white/[0.02] flex flex-col items-center justify-center p-4 text-center">
+                            <div className="h-[220px] rounded-2xl border border-stone-200/80 dark:border-white/5 bg-stone-50/40 dark:bg-white/[0.02] flex flex-col items-center justify-center p-4 text-center">
                               <MapPin size={24} className="text-stone-300 dark:text-stone-600 mb-1" />
                               <span className="text-xs text-stone-500 dark:text-stone-400 font-medium">
                                 No coordinates pinned for this order
@@ -1390,124 +1407,195 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         </div>
 
                         {/* Map Legend Footer */}
-                        <div className="flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 pt-2 border-t border-stone-100 dark:border-white/5">
+                        <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 pt-2.5 border-t border-stone-100 dark:border-white/5">
                           <div className="flex items-center gap-3">
                             <span className="flex items-center gap-1.5 font-medium">
-                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                              <span>You</span>
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                              <span>Rider</span>
                             </span>
-                            <span className="flex items-center gap-1 font-medium">
-                              <span className="text-red-500">📍</span>
-                              <span>Customer Location</span>
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>Doorstep</span>
                             </span>
                           </div>
-                          <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium truncate max-w-[120px]">
+                          <span className="text-[11px] text-stone-400 dark:text-stone-500 font-medium truncate max-w-[150px]">
                             {order.address?.street ? `via ${order.address.street}` : "via Doorstep"}
                           </span>
                         </div>
                       </div>
 
-                      {/* ── PANEL 3: Payment & COD ── */}
-                      <div className="bg-white dark:bg-[#151926] p-4 rounded-xl border border-stone-200/80 dark:border-white/5 space-y-3 flex flex-col justify-between">
-                        <div className="space-y-3">
+                      {/* ── SECONDARY WORKSPACE: Compact Order & Delivery Panel (approx 35-40% width on laptop) ── */}
+                      <div className="lg:col-span-5 xl:col-span-4 space-y-4 flex flex-col justify-between">
+                        {/* Customer Details Box */}
+                        <div className="bg-white dark:bg-[#151926] p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-white/5 space-y-3 shadow-2xs">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 font-bold text-xs text-stone-900 dark:text-white">
-                              <Banknote size={14} className="text-emerald-500" />
-                              <span>Payment & COD</span>
+                            <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-stone-900 dark:text-white">
+                              <MapPin size={15} className="text-blue-600 dark:text-blue-400" />
+                              <span>Destination</span>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-stone-100 dark:bg-white/10 text-stone-600 dark:text-stone-400">
-                              {order.paymentMethod || "Online"}
-                            </span>
+                            {(order.address?.isDifferentRecipient || order.address?.recipientPhone) && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                                🎁 Alternate
+                              </span>
+                            )}
                           </div>
 
-                          <div className="flex items-center justify-between pt-1">
-                            <div>
-                              <span className="text-[11px] text-stone-500 dark:text-stone-400 block font-medium">
-                                Payment Method:
-                              </span>
-                              <span className="text-xs font-bold text-stone-800 dark:text-stone-200">
-                                {isCOD ? "Cash on Delivery (COD)" : "Online Payment"}
-                              </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-bold text-xs sm:text-sm text-stone-900 dark:text-white">
+                              {order.address?.recipientName || order.address?.fullName || order.user?.name || "Customer"}
                             </div>
-                            <div className="text-right">
-                              <span className="text-[11px] text-stone-500 dark:text-stone-400 block font-medium">
-                                {isPaid ? "Total Paid" : "Amount to Collect"}
-                              </span>
-                              <span className="text-base font-black text-stone-900 dark:text-white">
-                                ₹{(order.totalAmount || 0).toFixed(2)}
-                              </span>
-                            </div>
+                            {(order.address?.recipientPhone || order.address?.phone) && (
+                              <a
+                                href={`tel:${order.address?.recipientPhone || order.address?.phone}`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ecfdf5] dark:bg-emerald-950/30 text-[#16a34a] dark:text-emerald-400 border border-[#d1fae5] dark:border-emerald-500/30 font-bold text-xs hover:bg-[#dcfce7] transition active:scale-95 shrink-0"
+                              >
+                                <Phone size={12} className="shrink-0" />
+                                <span>Call</span>
+                              </a>
+                            )}
                           </div>
 
-                          {/* Payment Status / COD Alerts */}
-                          {isCOD && !isPaid && (
-                            <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 pt-1">
-                              <AlertTriangle size={13} className="shrink-0" />
-                              <span>Cash collection pending</span>
-                            </div>
-                          )}
+                          <div className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
+                            <p>
+                              {order.address?.street}, {order.address?.city}
+                              {order.address?.state ? `, ${order.address?.state}` : ""}
+                              {order.address?.pincode ? ` ${order.address?.pincode}` : ""}
+                            </p>
+                          </div>
 
-                          {isPaid && (
-                            <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 pt-1">
-                              <BadgeCheck size={13} className="shrink-0" />
-                              <span>{isCOD ? "Cash Collected at Doorstep" : "Paid Online (No Cash Required)"}</span>
-                            </div>
-                          )}
-
-                          {/* Record Cash Collection Action */}
-                          {isCOD && !isPaid && (
-                            <button
-                              type="button"
-                              onClick={() => handleCollectCash(order)}
-                              disabled={updatingId !== null}
-                              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#e65c00] hover:bg-[#cf5300] text-white font-extrabold text-xs transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
-                            >
-                              <Banknote size={15} />
-                              <span>Record Cash Collection</span>
-                            </button>
-                          )}
-
-                          {/* Cash settlement status if collected */}
-                          {isPaid && isOrderCod(order) && (order.status === "out_for_delivery" || order.status === "delivered") && order.codPaymentHandler?.collected && (
-                            <div className="pt-2 border-t border-stone-100 dark:border-white/5 flex items-center justify-between text-xs">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                order.codPaymentHandler?.settledWithManager
-                                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                                  : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                              }`}>
-                                {order.codPaymentHandler?.settledWithManager
-                                  ? "✓ Settled with Manager"
-                                  : "In Driver's Hand"}
-                              </span>
-                              {isManager && !order.codPaymentHandler?.settledWithManager && (
-                                <button
-                                  onClick={() => handleSettleCash(order._id)}
-                                  disabled={updatingId !== null}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
-                                >
-                                  Settle
-                                </button>
+                          {/* GPS / Distance Chips */}
+                          {(navLat && navLng) ? (
+                            <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
+                              {hasCustomerLiveGps ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ecfdf5] dark:bg-emerald-950/30 text-[#16a34a] dark:text-emerald-400 border border-[#d1fae5] dark:border-emerald-500/30">
+                                  <Compass size={11} className="shrink-0" />
+                                  <span>Live GPS (±{Math.round(order.customerLocation.accuracy || 10)}m)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                                  <MapPin size={11} className="shrink-0" />
+                                  <span>Pinned GPS</span>
+                                </span>
                               )}
+
+                              {distInfo?.distanceKm ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] dark:bg-rose-950/30 text-[#ef4444] dark:text-rose-400 border border-[#fecaca] dark:border-rose-500/30">
+                                  <span>{distInfo.distanceKm} km away</span>
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {(navLat && navLng) && (
+                            <div className="pt-2 border-t border-stone-100 dark:border-white/5">
+                              <a
+                                href={mapplsUrl}
+                                onClick={handleStartMappls}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer bg-[#1e60ff] hover:bg-blue-700 text-white active:scale-98"
+                              >
+                                <Navigation size={13} className="fill-white" />
+                                <span>Navigate (Mappls)</span>
+                              </a>
                             </div>
                           )}
                         </div>
 
-                        {/* Handover OTP Digits Indicator */}
-                        <div className="pt-2 border-t border-stone-100 dark:border-white/5 space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-stone-700 dark:text-stone-300 font-bold text-[11px]">
-                            <Lock size={12} className="text-amber-500" />
-                            <span>Delivery Handover OTP</span>
+                        {/* Payment & OTP-Gated COD Box */}
+                        <div className="bg-white dark:bg-[#151926] p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-white/5 space-y-3 shadow-2xs flex-1 flex flex-col justify-between">
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-stone-900 dark:text-white">
+                                <Banknote size={15} className="text-emerald-500" />
+                                <span>Payment & COD</span>
+                              </div>
+                              <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">
+                                {isCOD ? "Cash on Delivery" : "Online"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-1">
+                              <span className="text-xs text-stone-400 block font-medium">
+                                {isPaid ? "Total Paid" : "Amount to Collect"}
+                              </span>
+                              <span className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white">
+                                ₹{(order.totalAmount || 0).toFixed(2)}
+                              </span>
+                            </div>
+
+                            {/* Status notice */}
+                            {isCOD && !isPaid && (
+                              <div className="text-xs font-semibold text-[#ea580c] dark:text-orange-400 flex items-center gap-1.5 py-0.5">
+                                <AlertTriangle size={13} className="shrink-0" />
+                                <span>Cash collection pending</span>
+                              </div>
+                            )}
+
+                            {isPaid && (
+                              <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 py-0.5">
+                                <BadgeCheck size={13} className="shrink-0" />
+                                <span>{isCOD ? "Cash Collected at Doorstep" : "Paid Online (No Cash Required)"}</span>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center justify-center gap-2 py-1">
-                            <span className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 flex items-center justify-center font-black text-xs text-stone-400">•</span>
-                            <span className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 flex items-center justify-center font-black text-xs text-stone-400">•</span>
-                            <span className="text-stone-300 dark:text-stone-600 font-bold text-xs">—</span>
-                            <span className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 flex items-center justify-center font-black text-xs text-stone-400">•</span>
-                            <span className="w-8 h-8 rounded-lg bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 flex items-center justify-center font-black text-xs text-stone-400">•</span>
+
+                          {/* Cash Collection Action - GATED BY OTP */}
+                          <div className="pt-2 border-t border-stone-100 dark:border-white/5">
+                            {isCOD && !isPaid && (
+                              order.status === "delivered" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCollectCash(order)}
+                                  disabled={updatingId !== null}
+                                  className="w-full min-h-[42px] px-4 py-2.5 rounded-xl bg-[#ff5e00] hover:bg-[#e05200] text-white font-bold text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                                >
+                                  <Banknote size={15} />
+                                  <span>Record Cash Collection</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    toast.error("Verify customer handover OTP first to enable cash collection.");
+                                    setHandoverModalOrder(order);
+                                    setHandoverOtpCode("");
+                                    setHandoverError("");
+                                    setHandoverRemainingAttempts(null);
+                                  }}
+                                  className="w-full min-h-[42px] px-3.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-white/5 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 border border-stone-200/80 dark:border-white/10 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                                  title="First verify OTP from customer to enable cash collecting"
+                                >
+                                  <Lock size={14} className="text-amber-500 shrink-0" />
+                                  <span>Verify OTP to Unlock Cash Collection</span>
+                                </button>
+                              )
+                            )}
+
+                            {/* Settlement status */}
+                            {isPaid && isOrderCod(order) && (order.status === "out_for_delivery" || order.status === "delivered") && order.codPaymentHandler?.collected && (
+                              <div className="flex items-center justify-between text-xs pt-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  order.codPaymentHandler?.settledWithManager
+                                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                    : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                }`}>
+                                  {order.codPaymentHandler?.settledWithManager
+                                    ? "✓ Settled with Manager"
+                                    : "In Driver's Hand"}
+                                </span>
+                                {isManager && !order.codPaymentHandler?.settledWithManager && (
+                                  <button
+                                    onClick={() => handleSettleCash(order._id)}
+                                    disabled={updatingId !== null}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
+                                  >
+                                    Settle
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-[10px] text-stone-400 dark:text-stone-500 text-center block">
-                            Get OTP from customer to complete delivery
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -2138,6 +2226,8 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           </div>
         </div>
       )}
+
+
     </div>
   );
 }
