@@ -105,7 +105,7 @@ export default function TopHeader({
   };
 
   const userInitial = (
-    session?.user?.name?.trim()?.charAt(0) || (isStaff ? "S" : "M")
+    session?.user?.name?.trim()?.charAt(0) || (isStaff ? "B" : "M")
   ).toUpperCase();
 
   const primaryRoleLabel = isStaff
@@ -143,7 +143,7 @@ export default function TopHeader({
         {/* Center / Right Section */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Zero Platform Commission Pill */}
-          <div className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold">
+          <div className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/25 text-[11px] font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
             <span>Zero platform commision</span>
           </div>
@@ -238,7 +238,7 @@ export default function TopHeader({
                   href="/profile"
                   className="min-h-[40px] flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 transition text-xs font-semibold text-stone-800 dark:text-stone-200 active:scale-95"
                 >
-                  <div className="w-7 h-7 rounded-full overflow-hidden bg-orange-500/15 text-orange-600 dark:text-orange-400 font-black flex items-center justify-center text-xs shrink-0 border border-orange-500/30">
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-[#fde8d7] text-[#c25e00] font-black flex items-center justify-center text-xs shrink-0 border border-[#f5cbb1]">
                     {session?.user?.image ? (
                       <img
                         src={session.user.image}
@@ -250,7 +250,7 @@ export default function TopHeader({
                     )}
                   </div>
                   <span className="hidden md:inline truncate max-w-[90px] font-bold text-[11px]">
-                    {session?.user?.name?.split(" ")[0] || "Profile"}
+                    {session?.user?.name?.split(" ")[0] || (isStaff ? "Boy" : "Profile")}
                   </span>
                 </Link>
               </Tooltip>

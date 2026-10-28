@@ -159,10 +159,11 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   const toggleDoorstepMap = (orderId) => {
     setExpandedMapOrderIds((prev) => {
       const next = new Set(prev);
-      if (next.has(orderId)) {
-        next.delete(orderId);
+      const key = `collapsed_${orderId}`;
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(orderId);
+        next.add(key);
       }
       return next;
     });
@@ -806,7 +807,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           {[
             { id: "active", label: `Active (${metrics.ready + metrics.inTransit})` },
             { id: "preparing", label: "Ready at Kitchen" },
-            { id: "out_for_delivery", label: "Out in Transit" },
+            { id: "out_for_delivery", label: "Out for Delivery" },
             { id: "delivered", label: "Delivered" },
           ].map((tab) => (
             <button
@@ -818,35 +819,25 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 min-h-[36px] ${
                 activeTab === "deliveries" && statusFilter === tab.id
                   ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-white/10"
+                  : "bg-white dark:bg-white/5 border border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/10"
               }`}
             >
               {tab.label}
             </button>
           ))}
 
-          {/* COD Register Toggle Pill */}
+          {/* Filter / Register Toggle Pill */}
           <button
             onClick={() => setActiveTab(activeTab === "deliveries" ? "cod_register" : "deliveries")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 min-h-[36px] flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 min-h-[36px] flex items-center gap-1.5 border ${
               activeTab === "cod_register"
-                ? "bg-amber-600 text-white shadow-xs"
-                : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-white/10"
+                ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                : "bg-white dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-white/10"
             }`}
-            title="Toggle COD Cash Register view"
+            title="Toggle Filter & COD Reconciliation view"
           >
             <Filter size={13} />
-            <span>{activeTab === "cod_register" ? "Deliveries" : "Filter"}</span>
-          </button>
-
-          {/* Sync Button */}
-          <button
-            onClick={() => loadOrders(false)}
-            disabled={refreshing || loading}
-            className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-400 transition cursor-pointer shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center disabled:opacity-50"
-            title="Sync Live Orders"
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin text-blue-500" : ""} />
+            <span>Filter</span>
           </button>
         </div>
       </div>
@@ -891,117 +882,6 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             <strong className="block font-bold">Geolocation Unsupported</strong>
             This device browser does not provide standard GPS geolocation APIs.
           </div>
-        </div>
-      )}
-
-      {gpsTransmitter.activeOrderId && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/50 dark:from-emerald-950/40 dark:via-[#101928] dark:to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 shadow-xs dark:shadow-lg dark:shadow-emerald-500/5 space-y-2.5 sm:space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
-                <Radio size={18} className={gpsTransmitter.trackingStatus === "sharing" ? "animate-pulse" : ""} />
-                {gpsTransmitter.trackingStatus === "sharing" && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-ping" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
-                    Live GPS Active
-                  </span>
-                  <span className="text-stone-400 dark:text-stone-500 text-xs hidden sm:inline">•</span>
-                  <span className="font-extrabold text-xs sm:text-sm text-stone-900 dark:text-white font-mono truncate">
-                    #{gpsTransmitter.activeOrderId}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border ${
-                      gpsTransmitter.trackingStatus === "sharing"
-                        ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40"
-                        : gpsTransmitter.trackingStatus === "requesting_permission"
-                        ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40 animate-pulse"
-                        : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40"
-                    }`}
-                  >
-                    {gpsTransmitter.trackingStatus === "sharing" && "● Sharing location"}
-                    {gpsTransmitter.trackingStatus === "requesting_permission" && "⏳ Requesting..."}
-                    {gpsTransmitter.trackingStatus === "unavailable" && "⚠️ Weak signal"}
-                    {gpsTransmitter.trackingStatus === "permission_denied" && "❌ Denied"}
-                    {gpsTransmitter.trackingStatus === "stopped" && "⏹️ Stopped"}
-                    {gpsTransmitter.trackingStatus === "unauthorized" && "🚫 Unauthorized"}
-                  </span>
-
-                  {gpsTransmitter.wakeLockActive && (
-                    <Tooltip content="Keeps phone screen on while driving to prevent background GPS transmission pauses" position="top">
-                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-300 dark:text-blue-300 dark:bg-blue-500/15 dark:border-blue-500/30 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1 cursor-help">
-                        📱 Screen Awake
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Tooltip content="Stop sharing your real-time GPS coordinates with the customer" position="left">
-              <button
-                onClick={() => gpsTransmitter.stopTracking("stopped")}
-                className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 dark:border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95 shrink-0 min-h-[38px]"
-              >
-                <Power size={13} />
-                <span>Stop GPS</span>
-              </button>
-            </Tooltip>
-          </div>
-
-          {/* Telemetry Pills */}
-          {gpsTransmitter.lastLocation && (
-            <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap pt-2 border-t border-emerald-500/20 dark:border-white/10 text-xs">
-              <span className="font-mono text-emerald-900 bg-white/90 border border-emerald-500/25 dark:text-emerald-300 dark:bg-white/5 dark:border-white/10 px-2 py-0.5 rounded-lg shadow-xs font-semibold text-[11px]">
-                📍 {gpsTransmitter.lastLocation.latitude.toFixed(5)}, {gpsTransmitter.lastLocation.longitude.toFixed(5)}
-              </span>
-
-              {typeof gpsTransmitter.lastLocation.accuracy === "number" && (
-                <span
-                  className={`font-semibold px-2 py-0.5 rounded-lg border text-[10px] sm:text-[11px] ${
-                    gpsTransmitter.lastLocation.accuracy <= 20
-                      ? "text-emerald-800 bg-emerald-100/80 border-emerald-300/80 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/20"
-                      : gpsTransmitter.lastLocation.accuracy <= 50
-                      ? "text-amber-800 bg-amber-100/80 border-amber-300/80 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/20"
-                      : "text-rose-800 bg-rose-100/80 border-rose-300/80 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/20"
-                  }`}
-                >
-                  🎯 ±{Math.round(gpsTransmitter.lastLocation.accuracy)}m accuracy
-                </span>
-              )}
-
-              {typeof gpsTransmitter.lastLocation.speed === "number" && gpsTransmitter.lastLocation.speed > 0 && (
-                <span className="text-blue-800 bg-blue-100/80 border border-blue-300/80 dark:text-blue-300 dark:bg-blue-500/10 dark:border-blue-500/20 px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex items-center gap-1">
-                  <Gauge size={11} />
-                  <span>{Math.round(gpsTransmitter.lastLocation.speed * 3.6)} km/h</span>
-                </span>
-              )}
-
-              {gpsTransmitter.lastSentTime && (
-                <span className="text-stone-600 dark:text-stone-400 text-[10px] sm:text-[11px] ml-auto font-medium">
-                  Sent: {new Date(gpsTransmitter.lastSentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                </span>
-              )}
-            </div>
-          )}
-
-          {gpsTransmitter.errorMessage && (
-            <div className="text-xs text-amber-900 bg-amber-100 border border-amber-300 dark:text-amber-300/90 dark:bg-amber-500/10 dark:border-amber-500/20 rounded-xl p-2.5 flex items-center gap-2">
-              <AlertTriangle size={14} className="shrink-0" />
-              <span>{gpsTransmitter.errorMessage}</span>
-            </div>
-          )}
-
-          {/* Device and Background GPS Note */}
-          <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed pt-1">
-            <span className="sm:hidden">⚠️ <strong>Staff Note:</strong> Keep tab active while driving. Live GPS sends every 8–10s.</span>
-            <span className="hidden sm:inline">⚠️ <strong className="text-stone-800 dark:text-stone-200">Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.</span>
-          </p>
         </div>
       )}
 
@@ -1218,10 +1098,11 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
                     <button
                       onClick={() => setExpandedOrderId(isExpanded ? null : order._id)}
-                      className="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition flex items-center justify-center cursor-pointer"
+                      className="min-h-[40px] px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white transition flex items-center gap-1 cursor-pointer font-bold text-xs border border-stone-200/60 dark:border-white/5"
                       title={isExpanded ? "Collapse Details" : "More Order Actions & Details"}
                     >
-                      <MoreVertical size={16} />
+                      <span>More</span>
+                      <MoreVertical size={14} />
                     </button>
                   </div>
                 </div>
@@ -1231,8 +1112,10 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                   const hasCustomerLiveGps = Boolean(order.customerLocation?.latitude && order.customerLocation?.longitude);
                   const navLat = order.address?.latitude || order.customerLocation?.latitude;
                   const navLng = order.address?.longitude || order.customerLocation?.longitude;
-                  const isMapOpen = expandedMapOrderIds.has(order._id);
+                  const isMapOpen = !expandedMapOrderIds.has(`collapsed_${order._id}`);
                   const distInfo = getOrderDistanceInfo(order);
+                  const isCOD = isOrderCod(order);
+                  const isPaid = isCashCollected(order);
 
                   // Determine staff / rider live origin coordinates
                   const effectiveStaffLat =
@@ -1515,14 +1398,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                             </span>
                             <span className="flex items-center gap-1 font-medium">
                               <span className="text-red-500">📍</span>
-                              <span>Customer</span>
+                              <span>Customer Location</span>
                             </span>
                           </div>
-                          {distInfo?.distanceKm ? (
-                            <span className="font-semibold text-stone-700 dark:text-stone-300">
-                              ~{distInfo.distanceKm} km
-                            </span>
-                          ) : null}
+                          <span className="text-[10px] text-stone-400 dark:text-stone-500 font-medium truncate max-w-[120px]">
+                            {order.address?.street ? `via ${order.address.street}` : "via Doorstep"}
+                          </span>
                         </div>
                       </div>
 
@@ -1574,12 +1455,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           )}
 
                           {/* Record Cash Collection Action */}
-                          {isCOD && !isPaid && order.status === "out_for_delivery" && (
+                          {isCOD && !isPaid && (
                             <button
                               type="button"
                               onClick={() => handleCollectCash(order)}
                               disabled={updatingId !== null}
-                              className="w-full min-h-[42px] px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#e65c00] hover:bg-[#cf5300] text-white font-extrabold text-xs transition shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
                             >
                               <Banknote size={15} />
                               <span>Record Cash Collection</span>

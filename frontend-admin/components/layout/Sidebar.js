@@ -65,6 +65,9 @@ export default function Sidebar({
     ? [session.user.staffRole]
     : [];
 
+  const userName = session?.user?.name || (isStaff ? "Boy" : "Manager");
+  const userInitial = userName.trim().charAt(0).toUpperCase() || "B";
+
   const [enabledFeatures, setEnabledFeatures] = useState(
     session?.user?.enabledFeatures !== undefined ? session.user.enabledFeatures : null
   );
@@ -291,10 +294,6 @@ export default function Sidebar({
     window.location.href = isStaff ? "/login/staff" : "/login";
   };
 
-  const userInitial = (
-    session?.user?.name?.trim()?.charAt(0) || (isStaff ? "S" : "M")
-  ).toUpperCase();
-
   const restaurantName = session?.user?.restaurantName || "Partner Kitchen";
 
   // Sidebar navigation item component
@@ -414,12 +413,7 @@ export default function Sidebar({
                     <span className="text-stone-900 dark:text-white">Protocols</span>
                   </div>
                   <div className="text-[10px] font-semibold text-stone-400 dark:text-stone-500 truncate flex items-center gap-1">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        kitchenActive ? "bg-emerald-500" : "bg-rose-500"
-                      }`}
-                    />
-                    <span className="truncate">{restaurantName}</span>
+                    <span className="truncate">Fresh food. Zero compromises.</span>
                   </div>
                 </div>
               )}
@@ -470,7 +464,7 @@ export default function Sidebar({
                 collapsed ? "justify-center" : "bg-white dark:bg-white/5 border border-stone-200/80 dark:border-white/10 hover:border-orange-500/40"
               }`}
             >
-              <div className="w-7 h-7 rounded-full overflow-hidden bg-orange-500/15 text-orange-600 dark:text-orange-400 font-black flex items-center justify-center text-xs shrink-0 border border-orange-500/30">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-[#fde8d7] text-[#c25e00] font-black flex items-center justify-center text-xs shrink-0 border border-[#f5cbb1]">
                 {session?.user?.image ? (
                   <img
                     src={session.user.image}
@@ -486,7 +480,7 @@ export default function Sidebar({
                 <>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold text-stone-900 dark:text-white truncate leading-tight">
-                      {session?.user?.name || "Kitchen Staff"}
+                      {session?.user?.name || (isStaff ? "Boy" : "Kitchen Staff")}
                     </div>
                     <div className="text-[10px] text-stone-400 truncate flex items-center gap-1.5 mt-0.5">
                       <span>{isStaff ? (staffRoles.includes("Delivery") ? "Delivery Staff" : staffRoles.join(", ") || "Staff") : "Store Manager"}</span>
