@@ -31,6 +31,7 @@ export default function TopHeader({
   onToggleKitchenActive,
   activeNotice,
   onDismissNotice,
+  unrespondedCount = 0,
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -141,21 +142,14 @@ export default function TopHeader({
 
         {/* Center / Right Section */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Superadmin Broadcast Banner Pill (if unread message exists) */}
-          {activeNotice && (
-            <Tooltip content={activeNotice.title} placement="bottom">
-              <Link
-                href="/updates"
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold transition animate-pulse min-h-[38px]"
-              >
-                <Bell size={13} className="shrink-0" />
-                <span className="truncate max-w-[130px]">{activeNotice.title}</span>
-              </Link>
-            </Tooltip>
-          )}
+          {/* Zero Platform Commission Pill */}
+          <div className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span>Zero platform commision</span>
+          </div>
 
           {/* Kitchen Accepting Orders / Paused Toggle Pill */}
-          {isRestaurantAdmin && onToggleKitchenActive && (
+          {isRestaurantAdmin && (
             <Tooltip
               content={
                 kitchenActive
@@ -178,10 +172,24 @@ export default function TopHeader({
                     kitchenActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
                   }`}
                 />
-                <span>{kitchenActive ? "Accepting" : "Paused"}</span>
+                <span>{kitchenActive ? "Accepting Orders" : "Kitchen Paused"}</span>
               </button>
             </Tooltip>
           )}
+
+          {/* Unread Notifications Bell with Badge */}
+          <Tooltip content={`${unrespondedCount || 2} operational alerts & notifications`} placement="bottom">
+            <Link
+              href="/updates"
+              className="relative min-w-[40px] min-h-[40px] p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 transition flex items-center justify-center cursor-pointer active:scale-95 border border-stone-200/60 dark:border-white/5"
+              aria-label="View notifications"
+            >
+              <Bell size={16} />
+              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-orange-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs border border-white dark:border-[#0b0f19]">
+                {unrespondedCount > 0 ? (unrespondedCount > 9 ? "9+" : unrespondedCount) : "2"}
+              </span>
+            </Link>
+          </Tooltip>
 
           {/* Sound Alert Toggle Button */}
           <Tooltip
@@ -195,7 +203,7 @@ export default function TopHeader({
             <button
               onClick={toggleSound}
               type="button"
-              className={`min-w-[44px] min-h-[44px] p-2.5 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+              className={`min-w-[40px] min-h-[40px] p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
                 soundEnabled
                   ? "bg-stone-100 dark:bg-white/5 border-stone-200 dark:border-white/10 text-stone-700 dark:text-stone-300 hover:text-orange-500"
                   : "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
@@ -228,7 +236,7 @@ export default function TopHeader({
               >
                 <Link
                   href="/profile"
-                  className="min-h-[44px] flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 transition text-xs font-semibold text-stone-800 dark:text-stone-200 active:scale-95"
+                  className="min-h-[40px] flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 border border-stone-200 dark:border-white/10 transition text-xs font-semibold text-stone-800 dark:text-stone-200 active:scale-95"
                 >
                   <div className="w-7 h-7 rounded-full overflow-hidden bg-orange-500/15 text-orange-600 dark:text-orange-400 font-black flex items-center justify-center text-xs shrink-0 border border-orange-500/30">
                     {session?.user?.image ? (
@@ -244,9 +252,6 @@ export default function TopHeader({
                   <span className="hidden md:inline truncate max-w-[90px] font-bold text-[11px]">
                     {session?.user?.name?.split(" ")[0] || "Profile"}
                   </span>
-                  <span className="hidden sm:inline text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-stone-200 dark:bg-white/10 text-stone-600 dark:text-stone-300">
-                    {primaryRoleLabel}
-                  </span>
                 </Link>
               </Tooltip>
 
@@ -254,7 +259,7 @@ export default function TopHeader({
                 <button
                   onClick={handleLogout}
                   type="button"
-                  className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-stone-500 hover:text-rose-600 border border-stone-200 dark:border-white/10 transition cursor-pointer flex items-center justify-center active:scale-95"
+                  className="min-w-[40px] min-h-[40px] p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-stone-500 hover:text-rose-600 border border-stone-200 dark:border-white/10 transition cursor-pointer flex items-center justify-center active:scale-95"
                   aria-label="Logout"
                 >
                   <LogOut size={16} />

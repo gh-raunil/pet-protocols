@@ -257,7 +257,7 @@ export default function Sidebar({
 
       return [
         {
-          title: "Your Assigned Duty",
+          title: "YOUR DUTY",
           items: staffItems.filter((item) => isFeatureEnabled(item.href)),
         },
       ];
@@ -482,14 +482,21 @@ export default function Sidebar({
               </div>
 
               {!collapsed && (
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-stone-900 dark:text-white truncate leading-tight">
-                    {session?.user?.name || "Kitchen Staff"}
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-stone-900 dark:text-white truncate leading-tight">
+                      {session?.user?.name || "Kitchen Staff"}
+                    </div>
+                    <div className="text-[10px] text-stone-400 truncate flex items-center gap-1.5 mt-0.5">
+                      <span>{isStaff ? (staffRoles.includes("Delivery") ? "Delivery Staff" : staffRoles.join(", ") || "Staff") : "Store Manager"}</span>
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <span>Online</span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-stone-400 truncate">
-                    {isStaff ? staffRoles.join(", ") || "Staff" : "Store Manager"}
-                  </div>
-                </div>
+                  <ChevronDown size={14} className="text-stone-400 shrink-0" />
+                </>
               )}
             </Link>
           )}

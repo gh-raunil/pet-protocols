@@ -123,16 +123,16 @@ export default function RestaurantHomeClient() {
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 font-jakarta">
         {/* ── TOP ROLE ACCESS BAR ─────────────────────────────────────── */}
         <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold shadow-xs ${currentMeta.color}`}>
-              <Icon size={22} />
+          <div className="flex items-center gap-3.5">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold shadow-xs ${currentMeta.color}`}>
+              <Icon size={24} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-black text-stone-900 dark:text-white">
                   {session?.user?.name || "Staff Member"}
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/25">
                   {activeRole} Duty Active
                 </span>
               </div>
@@ -142,41 +142,52 @@ export default function RestaurantHomeClient() {
             </div>
           </div>
 
-          {/* If staff has multiple assigned roles, show role access switcher tabs at top */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-stone-500 dark:text-stone-400 mr-1 hidden sm:inline">
-              Workstations:
+          {/* Workstations / Fullscreen Link */}
+          <div className="flex items-center gap-2 flex-wrap self-stretch sm:self-auto justify-end">
+            <span className="text-xs font-medium text-stone-500 dark:text-stone-400 mr-1 hidden sm:inline">
+              Workstation
             </span>
-            {staffRoles.map((roleKey) => {
-              const meta = roleMeta[roleKey];
-              if (!meta) return null;
-              const RoleIcon = meta.icon;
-              const isSelected = activeRole === roleKey;
+            {staffRoles.length > 1 ? (
+              staffRoles.map((roleKey) => {
+                const meta = roleMeta[roleKey];
+                if (!meta) return null;
+                const RoleIcon = meta.icon;
+                const isSelected = activeRole === roleKey;
 
-              return (
-                <button
-                  key={roleKey}
-                  onClick={() => setSelectedStaffRole(roleKey)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    isSelected
-                      ? meta.activeTab
-                      : "bg-stone-100 dark:bg-white/5 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/10"
-                  }`}
-                >
-                  <RoleIcon size={14} />
-                  <span>{meta.label}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={roleKey}
+                    onClick={() => setSelectedStaffRole(roleKey)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer min-h-[38px] ${
+                      isSelected
+                        ? meta.activeTab
+                        : "bg-stone-100 dark:bg-white/5 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    <RoleIcon size={14} />
+                    <span>{meta.label}</span>
+                  </button>
+                );
+              })
+            ) : (
+              <Link
+                href={currentMeta.href}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition active:scale-95 min-h-[38px]"
+              >
+                <span>{currentMeta.label}</span>
+                <ExternalLink size={13} />
+              </Link>
+            )}
 
-            {/* Direct Fullscreen Link */}
-            <Link
-              href={currentMeta.href}
-              className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-400 transition"
-              title={`Open ${currentMeta.label} Fullscreen Page`}
-            >
-              <ExternalLink size={15} />
-            </Link>
+            {staffRoles.length > 1 && (
+              <Link
+                href={currentMeta.href}
+                className="min-h-[38px] min-w-[38px] p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-600 dark:text-stone-400 transition flex items-center justify-center"
+                title={`Open ${currentMeta.label} Fullscreen Page`}
+              >
+                <ExternalLink size={15} />
+              </Link>
+            )}
           </div>
         </div>
 

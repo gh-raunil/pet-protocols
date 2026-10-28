@@ -190,6 +190,7 @@ export default function AppShell({ children }) {
           onToggleKitchenActive={isRestaurantAdmin ? toggleKitchenActive : undefined}
           activeNotice={activeNotice}
           onDismissNotice={handleDismissNotice}
+          unrespondedCount={unrespondedOrdersCount}
         />
 
         <main className="flex-1 min-w-0">{children}</main>
