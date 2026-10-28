@@ -91,6 +91,7 @@ export async function PUT(request, { params }) {
       restaurant.cuisineType = Array.isArray(body.cuisineType)
         ? body.cuisineType
         : String(body.cuisineType).split(",").map((s) => s.trim()).filter(Boolean);
+    }
     if (body.rating !== undefined) {
       restaurant.rating = body.rating === null || body.rating === "" ? null : Number(body.rating);
     }

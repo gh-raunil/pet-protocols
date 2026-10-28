@@ -219,6 +219,15 @@ select option {
   background: var(--scrollbar-thumb-hover, #f97316);
 }
 
+/* Hide scrollbar while preserving smooth touch scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
 /* ── Universal Input Focus & Autofill Overrides ── */
 input, textarea, select {
   color-scheme: dark light;

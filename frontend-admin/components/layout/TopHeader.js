@@ -72,7 +72,7 @@ export default function TopHeader({
       "/dashboard": { group: "Operations", label: "Dashboard & Sales" },
       "/orders": { group: "Operations", label: "Live Orders Queue" },
       "/kitchen": { group: "Operations", label: "Kitchen KDS" },
-      "/delivery": { group: "Operations", label: "Delivery & Dispatch" },
+      "/delivery": { group: "Operations", label: "Delivery & Dispatch", mobileLabel: "Deliveries" },
       "/cashier": { group: "Front Desk", label: "Cashier & Billing" },
       "/support": { group: "Front Desk", label: "Customer Support" },
       "/products": { group: "Catalog", label: "Dishes & Menu" },
@@ -115,25 +115,26 @@ export default function TopHeader({
     <header className="sticky top-0 z-30 h-14 bg-white/90 dark:bg-[#0b0f19]/90 backdrop-blur-md border-b border-stone-200/80 dark:border-white/10 px-4 sm:px-6 transition-colors font-jakarta">
       <div className="h-full flex items-center justify-between gap-3">
         {/* Left Section: Mobile Trigger & Breadcrumbs */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
           {/* Mobile hamburger button */}
           <button
             onClick={onOpenMobileMenu}
             type="button"
-            className="md:hidden min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/15 transition cursor-pointer flex items-center justify-center active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none"
+            className="md:hidden min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-white/15 transition cursor-pointer flex items-center justify-center active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:outline-none shrink-0"
             aria-label="Open navigation menu"
           >
             <Menu size={20} />
           </button>
 
           {/* Breadcrumb Trail */}
-          <div className="flex items-center gap-1.5 text-xs truncate">
+          <div className="flex items-center gap-1.5 text-xs truncate min-w-0">
             <span className="text-stone-400 dark:text-stone-500 font-medium hidden sm:inline">
               {breadcrumb.group}
             </span>
             <ChevronRight size={12} className="text-stone-300 dark:text-stone-600 hidden sm:inline shrink-0" />
             <h1 className="font-bold text-stone-900 dark:text-white truncate text-xs sm:text-sm">
-              {breadcrumb.label}
+              <span className="sm:hidden">{breadcrumb.mobileLabel || breadcrumb.label}</span>
+              <span className="hidden sm:inline">{breadcrumb.label}</span>
             </h1>
           </div>
         </div>
