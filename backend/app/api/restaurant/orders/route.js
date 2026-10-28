@@ -691,20 +691,21 @@ export async function PUT(request) {
       };
       validatedAssignmentMode = "staff";
       validatedAssignmentStatus = "assigned";
-    } else if (status === "out_for_delivery" && !order.assignedDeliveryStaff?.id) {
-      // If no driver specified and order has no assigned driver:
-      // Only auto-assign if the actor is an actual delivery driver self-dispatching
+    } else if (status === "out_for_delivery") {
+      // If no driver specified and order has no assigned driver, OR if driver explicitly self-picks up parcel (if manager assigns or not):
       const isActorDriver = auth.isStaff && Array.isArray(auth.staffRoles) && auth.staffRoles.includes("Delivery");
       if (isActorDriver && !isPickup) {
-        validatedDriverDoc = {
-          id: auth.user._id,
-          name: auth.user.name || "Delivery Staff",
-          phone: auth.user.phone || "",
-          email: auth.user.email || "",
-          assignedAt: new Date(),
-        };
-        validatedAssignmentMode = "staff";
-        validatedAssignmentStatus = "accepted";
+        if (!order.assignedDeliveryStaff?.id || body.selfPickup === true || body.claimSelf === true) {
+          validatedDriverDoc = {
+            id: auth.user._id,
+            name: auth.user.name || "Delivery Staff",
+            phone: auth.user.phone || "",
+            email: auth.user.email || "",
+            assignedAt: new Date(),
+          };
+          validatedAssignmentMode = "staff";
+          validatedAssignmentStatus = "accepted";
+        }
       }
     }
 

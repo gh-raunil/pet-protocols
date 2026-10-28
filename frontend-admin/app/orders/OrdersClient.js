@@ -31,6 +31,9 @@ import {
   Banknote,
   Zap,
   PackageCheck,
+  Bike,
+  UserCheck,
+  X,
 } from "lucide-react";
 import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
@@ -248,6 +251,8 @@ export default function OrdersClient() {
   const isManagerOrAdmin =
     session?.user?.role === "lead_admin" ||
     session?.user?.role === "admin" ||
+    session?.user?.role === "restaurant_admin" ||
+    session?.user?.role === "superadmin" ||
     (session?.user?.role === "staff" &&
       Array.isArray(session?.user?.staffRoles) &&
       session.user.staffRoles.includes("Manager"));
@@ -275,6 +280,13 @@ export default function OrdersClient() {
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
+
+  // Assign Delivery Boy Modal States
+  const [assignModalOrder, setAssignModalOrder] = useState(null);
+  const [deliveryStaffList, setDeliveryStaffList] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [assignError, setAssignError] = useState("");
 
   const toggleLiveMap = (orderId) => {
     setExpandedMapOrderIds((prev) => {
@@ -546,6 +558,116 @@ export default function OrdersClient() {
       setUpdatingOrderId(null);
     }
   }
+
+  // Delivery Staff Assignment Handlers
+  const fetchDeliveryStaff = useCallback(async () => {
+    try {
+      setLoadingStaff(true);
+      setAssignError("");
+      const res = await fetch("/api/restaurant/delivery-staff");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.deliveryStaff)) {
+        setDeliveryStaffList(data.deliveryStaff);
+      } else {
+        setAssignError(data.message || "Failed to load delivery staff list.");
+      }
+    } catch (err) {
+      console.error("Fetch delivery staff error:", err);
+      setAssignError("Network error fetching delivery personnel.");
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, []);
+
+  const handleOpenAssignModal = (order) => {
+    setAssignModalOrder(order);
+    setAssignError("");
+    fetchDeliveryStaff();
+  };
+
+  const handleAssignDriver = async (orderId, staffId, staffName) => {
+    try {
+      setAssignSubmitting(true);
+      setAssignError("");
+      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStaffId: staffId }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
+        setFeedback({
+          type: "success",
+          message: `Order #${formatOrderId(data.order)} assigned to ${staffName}! 🛵`,
+        });
+        setAssignModalOrder(null);
+      } else {
+        setAssignError(data.message || "Failed to assign delivery staff.");
+      }
+    } catch (err) {
+      console.error("Assign driver error:", err);
+      setAssignError("Network error assigning delivery staff.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const handleSelfDelivery = async (orderId) => {
+    try {
+      setAssignSubmitting(true);
+      setAssignError("");
+      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selfDelivery: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
+        setFeedback({
+          type: "success",
+          message: `Self-delivery confirmed for Order #${formatOrderId(data.order)}! 🚗`,
+        });
+        setAssignModalOrder(null);
+      } else {
+        setAssignError(data.message || "Failed to assign self-delivery.");
+      }
+    } catch (err) {
+      console.error("Self-delivery error:", err);
+      setAssignError("Network error assigning self-delivery.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const handleUnassignDriver = async (orderId) => {
+    try {
+      setAssignSubmitting(true);
+      setAssignError("");
+      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unassign: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
+        setFeedback({
+          type: "success",
+          message: `Delivery driver unassigned from Order #${formatOrderId(data.order)}. Awaiting driver pickup.`,
+        });
+        setAssignModalOrder(null);
+      } else {
+        setAssignError(data.message || "Failed to unassign driver.");
+      }
+    } catch (err) {
+      console.error("Unassign driver error:", err);
+      setAssignError("Network error unassigning driver.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
 
   // Filter orders client-side for instantaneous feedback across orderId, #PET-xxx, mongo _id, customer name & phone
   const displayedOrders = useMemo(() => {
@@ -1462,9 +1584,21 @@ export default function OrdersClient() {
                             {/* Delivery Boy / Staff Assigned */}
                             {order.assignedDeliveryStaff?.name ? (
                               <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
-                                <span className="font-bold uppercase tracking-wider text-[10px] text-blue-600 dark:text-blue-400 block">
-                                  Delivery Boy / Assigned Staff
-                                </span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold uppercase tracking-wider text-[10px] text-blue-600 dark:text-blue-400 block">
+                                    Delivery Boy / Assigned Staff
+                                  </span>
+                                  {isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenAssignModal(order)}
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                    >
+                                      <Bike size={12} />
+                                      <span>Change</span>
+                                    </button>
+                                  )}
+                                </div>
                                 <div className="flex items-center justify-between gap-2 mt-1">
                                   <span className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
                                     <span>🛵</span>
@@ -1481,9 +1615,21 @@ export default function OrdersClient() {
                                 </div>
                               </div>
                             ) : !isPickup ? (
-                              <div className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 text-[11px] text-stone-500 flex items-center gap-1.5">
-                                <span>🛵</span>
-                                <span>Delivery Boy: Awaiting driver pickup</span>
+                              <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 text-xs flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 text-[11px]">
+                                  <span>🛵</span>
+                                  <span>Delivery Boy: Awaiting driver pickup</span>
+                                </div>
+                                {isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAssignModal(order)}
+                                    className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-bold text-[11px] cursor-pointer transition shadow-xs flex items-center gap-1 shrink-0"
+                                  >
+                                    <Bike size={12} />
+                                    <span>Assign</span>
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1.5">
@@ -1631,17 +1777,33 @@ export default function OrdersClient() {
 
                       {/* Primary One-Click Action Stepper Bar */}
                       <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                        {/* Print KOT Button */}
-                        <Tooltip content="Print a Kitchen Order Ticket (KOT) receipt for the cooking station" position="top">
-                          <button
-                            type="button"
-                            onClick={() => handlePrintKOT(order)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
-                          >
-                            <Printer size={13} className="text-stone-500" />
-                            <span>Print KOT Slip</span>
-                          </button>
-                        </Tooltip>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Print KOT Button */}
+                          <Tooltip content="Print a Kitchen Order Ticket (KOT) receipt for the cooking station" position="top">
+                            <button
+                              type="button"
+                              onClick={() => handlePrintKOT(order)}
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
+                            >
+                              <Printer size={13} className="text-stone-500" />
+                              <span>Print KOT Slip</span>
+                            </button>
+                          </Tooltip>
+
+                          {/* Assign Delivery Boy Option */}
+                          {!isPickup && isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
+                            <Tooltip content="Assign an active delivery boy or deliver yourself directly from this ticket" position="top">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignModal(order)}
+                                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30 text-xs font-bold transition active:scale-95 cursor-pointer"
+                              >
+                                <Bike size={13} />
+                                <span>{order.assignedDeliveryStaff?.name ? "Reassign Driver" : "Assign Delivery Boy"}</span>
+                              </button>
+                            </Tooltip>
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-2 justify-end">
                           {order.status === "pending" && (
@@ -1706,7 +1868,13 @@ export default function OrdersClient() {
                                 <button
                                   type="button"
                                   disabled={updatingOrderId === order._id}
-                                  onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                  onClick={() => {
+                                    if (!order.assignedDeliveryStaff?.id) {
+                                      handleOpenAssignModal(order);
+                                    } else {
+                                      handleUpdateStatus(order._id, "out_for_delivery");
+                                    }
+                                  }}
                                   className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
                                   <Truck size={14} />
@@ -1734,7 +1902,13 @@ export default function OrdersClient() {
                                 <button
                                   type="button"
                                   disabled={updatingOrderId === order._id}
-                                  onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
+                                  onClick={() => {
+                                    if (!order.assignedDeliveryStaff?.id) {
+                                      handleOpenAssignModal(order);
+                                    } else {
+                                      handleUpdateStatus(order._id, "out_for_delivery");
+                                    }
+                                  }}
                                   className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
                                   <Truck size={14} />
@@ -1819,6 +1993,221 @@ export default function OrdersClient() {
           }}
           onClose={() => setOutOfRangePrompt(null)}
         />
+      )}
+
+      {/* Assign Delivery Boy Modal */}
+      {assignModalOrder && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => !assignSubmitting && setAssignModalOrder(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-white/10 flex items-center justify-between bg-stone-50/50 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                  <Bike size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-stone-900 dark:text-white text-base">
+                    Assign Delivery Boy
+                  </h3>
+                  <p className="text-xs text-stone-500 dark:text-stone-400">
+                    Order #{formatOrderId(assignModalOrder)} • ₹{assignModalOrder.totalAmount}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !assignSubmitting && setAssignModalOrder(null)}
+                disabled={assignSubmitting}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+              {/* Order Quick Context */}
+              <div className="p-3 rounded-xl bg-stone-50 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/5 text-xs text-stone-600 dark:text-stone-300 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-stone-500 dark:text-stone-400">Customer:</span>
+                  <span className="font-bold text-stone-900 dark:text-white">
+                    {assignModalOrder.address?.fullName || assignModalOrder.user?.name || "Customer"}
+                  </span>
+                </div>
+                {assignModalOrder.address?.street && (
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium text-stone-500 dark:text-stone-400 shrink-0">Address:</span>
+                    <span className="text-right truncate">{assignModalOrder.address.street}, {assignModalOrder.address.city || ""}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-stone-500 dark:text-stone-400">Current Status:</span>
+                  <span className="font-semibold text-orange-600 dark:text-orange-400 uppercase text-[10px] tracking-wider">
+                    {assignModalOrder.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Note about delivery boy self pickup */}
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200 text-xs flex items-start gap-2">
+                <span className="text-sm shrink-0">💡</span>
+                <p className="leading-relaxed">
+                  <strong>Note:</strong> Delivery boys can also pick up this parcel directly at the kitchen counter even if not pre-assigned.
+                </p>
+              </div>
+
+              {/* Error Banner */}
+              {assignError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+                  <AlertTriangle size={15} className="shrink-0" />
+                  <span>{assignError}</span>
+                </div>
+              )}
+
+              {/* Manager Self-Delivery Option */}
+              <div className="p-3.5 rounded-xl border-2 border-dashed border-stone-200 dark:border-white/10 hover:border-orange-500/50 dark:hover:border-orange-500/50 transition">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="font-bold text-xs text-stone-900 dark:text-white flex items-center gap-1.5">
+                      <span>🚗</span>
+                      <span>Deliver This Order Myself</span>
+                    </span>
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                      Assign manager directly for immediate delivery dispatch
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={assignSubmitting}
+                    onClick={() => handleSelfDelivery(assignModalOrder._id)}
+                    className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs cursor-pointer transition shadow-xs disabled:opacity-50 shrink-0"
+                  >
+                    {assignSubmitting ? "Assigning..." : "Deliver Myself"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Delivery Staff List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                    Active Delivery Boys ({deliveryStaffList.filter((s) => s.isActive).length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchDeliveryStaff}
+                    disabled={loadingStaff}
+                    className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className={loadingStaff ? "animate-spin" : ""} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+
+                {loadingStaff ? (
+                  <div className="p-8 text-center text-xs text-stone-400 flex flex-col items-center gap-2">
+                    <RefreshCw size={18} className="animate-spin text-orange-500" />
+                    <span>Loading delivery staff...</span>
+                  </div>
+                ) : deliveryStaffList.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl bg-stone-50 dark:bg-white/[0.02] border border-stone-200/60 dark:border-white/5 space-y-2">
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      No staff accounts with the <strong>Delivery</strong> role found.
+                    </p>
+                    <a
+                      href="/settings?tab=staff"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline"
+                    >
+                      <span>Add Delivery Staff in Settings</span>
+                      <ArrowRight size={12} />
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {deliveryStaffList.map((staff) => {
+                      const isCurrentlyAssigned =
+                        assignModalOrder.assignedDeliveryStaff?.id &&
+                        String(assignModalOrder.assignedDeliveryStaff.id) === String(staff._id);
+
+                      return (
+                        <div
+                          key={staff._id}
+                          className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 ${
+                            isCurrentlyAssigned
+                              ? "bg-blue-500/10 border-blue-500/40"
+                              : "bg-white dark:bg-white/[0.02] border-stone-200/80 dark:border-white/5 hover:border-orange-500/30"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-stone-900 dark:text-white truncate">
+                                {staff.name}
+                              </span>
+                              {isCurrentlyAssigned && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0">
+                                  Currently Assigned
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 dark:text-stone-400 flex-wrap">
+                              {staff.phone && (
+                                <a
+                                  href={`tel:${staff.phone}`}
+                                  className="font-mono hover:text-orange-600 dark:hover:text-orange-400"
+                                >
+                                  {staff.phone}
+                                </a>
+                              )}
+                              <span>•</span>
+                              <span className={staff.activeDeliveries > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
+                                {staff.activeDeliveries || 0} active deliveries
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={assignSubmitting || isCurrentlyAssigned}
+                            onClick={() => handleAssignDriver(assignModalOrder._id, staff._id, staff.name)}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer transition shadow-xs shrink-0 ${
+                              isCurrentlyAssigned
+                                ? "bg-stone-200 dark:bg-white/10 text-stone-500 cursor-default"
+                                : "bg-orange-600 hover:bg-orange-700 text-white active:scale-95 disabled:opacity-50"
+                            }`}
+                          >
+                            {isCurrentlyAssigned ? "Assigned" : "Assign"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Unassign Option if order already has an assigned driver */}
+              {assignModalOrder.assignedDeliveryStaff?.id && (
+                <div className="pt-2 border-t border-stone-200 dark:border-white/10 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={assignSubmitting}
+                    onClick={() => handleUnassignDriver(assignModalOrder._id)}
+                    className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    Unassign Current Driver (Return to Pool)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

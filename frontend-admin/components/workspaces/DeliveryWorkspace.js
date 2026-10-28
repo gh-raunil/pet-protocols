@@ -1204,9 +1204,16 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                           </button>
                         </Tooltip>
                       ) : (
-                        <span className="min-h-[44px] inline-flex items-center text-xs font-semibold px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-500">
-                          Awaiting Manager Assignment
-                        </span>
+                        <Tooltip content="Pick up this packed food parcel directly from kitchen counter and deliver to customer" position="top">
+                          <button
+                            onClick={() => updateOrderStatus(order._id, "out_for_delivery", { selfPickup: true })}
+                            disabled={isUpdating}
+                            className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 flex-1 sm:flex-none"
+                          >
+                            <Bike size={15} />
+                            <span>Pick Up Parcel</span>
+                          </button>
+                        </Tooltip>
                       )
                     )}
 

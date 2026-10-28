@@ -42,12 +42,19 @@ async function handleAssignment(request, params) {
       return NextResponse.json({ success: false, message: "Order ID is required." }, { status: 400 });
     }
 
-    // Role check: Only restaurant_admin or staff with Manager role can assign delivery personnel
+    const body = await request.json().catch(() => ({}));
+    const { deliveryStaffId, selfDelivery, unassign, note = "" } = body;
+
+    // Role check: Restaurant admin or staff with Manager role can assign delivery personnel
+    // Delivery drivers can self-claim / pickup the parcel for themselves (Rule: Delivery boy can itself pickup the parcel if manager assigns or not)
     const isLeadAdmin = auth.isAdmin || auth.user?.role === "restaurant_admin" || auth.user?.role === "admin";
     const userRoles = Array.isArray(auth.staffRoles) ? auth.staffRoles : (auth.user?.staffRoles || []);
     const isManager = isLeadAdmin || userRoles.includes("Manager");
+    const isDriver = auth.isStaff && (userRoles.includes("Delivery") || auth.user?.staffRole === "Delivery");
 
-    if (!isManager) {
+    const isSelfClaim = isDriver && (body.selfClaim === true || (deliveryStaffId && String(deliveryStaffId) === String(auth.user?._id)));
+
+    if (!isManager && !isSelfClaim) {
       return NextResponse.json(
         { success: false, message: "Access denied. Only restaurant managers or admins can assign delivery personnel." },
         { status: 403 }
@@ -79,16 +86,66 @@ async function handleAssignment(request, params) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { deliveryStaffId, selfDelivery, note = "" } = body;
-
     const assignerInfo = {
       id: auth.user?._id,
-      name: auth.user?.name || "Manager",
-      role: auth.user?.role || "restaurant_admin",
+      name: auth.user?.name || (isDriver ? "Delivery Staff" : "Manager"),
+      role: auth.user?.role || (isDriver ? "staff" : "restaurant_admin"),
     };
 
     const now = new Date();
+
+    // =========================================================================
+    // CASE 0: Manager Unassigns Driver
+    // =========================================================================
+    if (unassign === true) {
+      if (!isManager) {
+        return NextResponse.json(
+          { success: false, message: "Access denied. Only restaurant managers or admins can unassign delivery personnel." },
+          { status: 403 }
+        );
+      }
+
+      const updateDoc = {
+        $unset: {
+          assignedDeliveryStaff: 1,
+          deliveryAssignmentMode: 1,
+          assignmentStatus: 1,
+          assignedBy: 1,
+        },
+        $push: {
+          statusHistory: {
+            status: order.status,
+            changedAt: now,
+            changedBy: {
+              userId: auth.user?._id,
+              role: auth.user?.role || "restaurant_admin",
+              name: auth.user?.name || "Manager",
+            },
+            note: note.trim() || `Manager ${assignerInfo.name} unassigned delivery driver. Order returned to awaiting pickup queue.`,
+          },
+        },
+        $inc: { __v: 1 },
+      };
+
+      const updated = await Order.findOneAndUpdate(
+        { _id: order._id, restaurant: restaurantId, status: { $nin: ["delivered", "cancelled"] } },
+        updateDoc,
+        { returnDocument: "after" }
+      );
+
+      if (!updated) {
+        return NextResponse.json(
+          { success: false, conflict: true, message: "Order was concurrently modified or cancelled. Please reload." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Delivery staff unassigned successfully. Order awaiting driver pickup.",
+        order: updated,
+      });
+    }
 
     // =========================================================================
     // CASE 1: Manager Self-Delivery ("Deliver This Order Myself" - Rule C)
@@ -143,10 +200,8 @@ async function handleAssignment(request, params) {
       });
     }
 
-    // =========================================================================
-    // CASE 2: Staff Assignment (Rule A)
-    // =========================================================================
-    if (!deliveryStaffId) {
+    const targetStaffId = deliveryStaffId || (isSelfClaim ? auth.user._id : null);
+    if (!targetStaffId) {
       return NextResponse.json(
         { success: false, message: "Delivery staff ID or selfDelivery flag is required." },
         { status: 400 }
@@ -155,7 +210,7 @@ async function handleAssignment(request, params) {
 
     // Tenant isolation & driver eligibility validation
     const candidateStaff = await User.findOne({
-      _id: deliveryStaffId,
+      _id: targetStaffId,
       restaurant: restaurantId,
       role: "staff",
     });
