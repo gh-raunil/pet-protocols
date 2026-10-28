@@ -708,20 +708,30 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* ── TOP ROLE OPERATIONAL HEADER ───────────────────────────── */}
-      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-bold mb-2 border border-blue-500/20">
-              <Truck size={14} className="text-blue-500" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] sm:text-xs font-bold mb-1.5 sm:mb-2 border border-blue-500/20">
+              <Truck size={13} className="text-blue-500" />
               <span>DELIVERY & TRANSIT DISPATCH</span>
               {restaurantName && <span>• {restaurantName}</span>}
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-stone-900 dark:text-white">
-              Delivery Operations Portal
-            </h1>
-            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl">
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-stone-900 dark:text-white">
+                Delivery Operations Portal
+              </h1>
+              <button
+                onClick={() => loadOrders(false)}
+                disabled={refreshing || loading}
+                className="md:hidden inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 shrink-0 min-h-[36px]"
+              >
+                <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+                <span>{refreshing ? "..." : "Sync"}</span>
+              </button>
+            </div>
+            <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm mt-1 max-w-xl hidden sm:block">
               Complete visibility into order contents, customer addresses, contact numbers, and payment collection status.
             </p>
           </div>
@@ -729,7 +739,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           <button
             onClick={() => loadOrders(false)}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
+            className="hidden md:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs transition active:scale-95 cursor-pointer disabled:opacity-70 self-start md:self-auto"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             <span>{refreshing ? "Refreshing..." : "Sync Live Orders"}</span>
@@ -737,30 +747,30 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         </div>
 
         {/* ── 4 KEY METRICS ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-5 pt-5 border-t border-stone-100 dark:border-white/5">
-          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
-            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-3.5 sm:mt-5 pt-3.5 sm:pt-5 border-t border-stone-100 dark:border-white/5">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-2.5 sm:p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[9px] sm:text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
               In Kitchen / Ready
             </span>
-            <div className="text-2xl font-black mt-1 text-amber-600 dark:text-amber-400 font-mono">{metrics.ready}</div>
+            <div className="text-xl sm:text-2xl font-black mt-0.5 text-amber-600 dark:text-amber-400 font-mono">{metrics.ready}</div>
           </div>
-          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
-            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-2.5 sm:p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[9px] sm:text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
               Out in Transit
             </span>
-            <div className="text-2xl font-black mt-1 text-blue-600 dark:text-blue-400 font-mono">{metrics.inTransit}</div>
+            <div className="text-xl sm:text-2xl font-black mt-0.5 text-blue-600 dark:text-blue-400 font-mono">{metrics.inTransit}</div>
           </div>
-          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-2.5 sm:p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
               Delivered Today
             </span>
-            <div className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400 font-mono">{metrics.deliveredToday}</div>
+            <div className="text-xl sm:text-2xl font-black mt-0.5 text-emerald-600 dark:text-emerald-400 font-mono">{metrics.deliveredToday}</div>
           </div>
-          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-3.5 border border-stone-200/60 dark:border-white/5">
-            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
+          <div className="bg-stone-50 dark:bg-white/5 rounded-xl p-2.5 sm:p-3.5 border border-stone-200/60 dark:border-white/5">
+            <span className="text-[9px] sm:text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
               COD To Collect
             </span>
-            <div className="text-2xl font-black mt-1 text-stone-900 dark:text-white font-mono">
+            <div className="text-xl sm:text-2xl font-black mt-0.5 text-stone-900 dark:text-white font-mono">
               ₹{metrics.codToCollect.toFixed(2)}
             </div>
           </div>
@@ -768,20 +778,21 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       </div>
 
       {/* ── WORKSPACE TABS: DELIVERIES VS COD CASH REGISTER ─────────── */}
-      <div className="flex items-center gap-2 border-b border-stone-200/80 dark:border-white/10 pb-3 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 border-b border-stone-200/80 dark:border-white/10 pb-3">
         <Tooltip content="View active delivery tasks, turn-by-turn navigation, and customer doorstep orders" position="bottom">
           <button
             onClick={() => setActiveTab("deliveries")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+            className={`w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer min-h-[44px] ${
               activeTab === "deliveries"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
             }`}
           >
-            <Truck size={16} />
-            <span>Live Deliveries & Transit</span>
+            <Truck size={15} />
+            <span>Deliveries</span>
+            <span className="hidden sm:inline">& Transit</span>
             <span
-              className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              className={`ml-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold ${
                 activeTab === "deliveries"
                   ? "bg-white/20 text-white"
                   : "bg-stone-100 dark:bg-white/10 text-stone-700 dark:text-stone-300"
@@ -795,23 +806,24 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
         <Tooltip content="Audit cash collected at doorsteps and reconcile cash deposits to the restaurant register" position="bottom">
           <button
             onClick={() => setActiveTab("cod_register")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer ${
+            className={`w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer min-h-[44px] ${
               activeTab === "cod_register"
                 ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                 : "bg-white dark:bg-[#10141f] text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-white/5 border border-stone-200 dark:border-white/10"
             }`}
           >
-            <Wallet size={16} />
-            <span>COD Cash Register & Manager Reconciliation</span>
+            <Wallet size={15} />
+            <span>COD Cash</span>
+            <span className="hidden sm:inline">Register & Reconciliation</span>
             {codSummary.totalUnsettled > 0 && (
               <span
-                className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                className={`ml-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold ${
                   activeTab === "cod_register"
                     ? "bg-white/20 text-white"
                     : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                 }`}
               >
-                ₹{codSummary.totalUnsettled.toFixed(0)} to Settle
+                ₹{codSummary.totalUnsettled.toFixed(0)}
               </span>
             )}
           </button>
@@ -844,7 +856,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
           </div>
           <button
             onClick={() => gpsTransmitter.stopTracking("idle")}
-            className="px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0 cursor-pointer min-h-[38px]"
           >
             Dismiss Alert
           </button>
@@ -862,28 +874,28 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
       )}
 
       {gpsTransmitter.activeOrderId && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/50 dark:from-emerald-950/40 dark:via-[#101928] dark:to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xs dark:shadow-lg dark:shadow-emerald-500/5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
-                <Radio size={20} className={gpsTransmitter.trackingStatus === "sharing" ? "animate-pulse" : ""} />
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/50 dark:from-emerald-950/40 dark:via-[#101928] dark:to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/30 rounded-2xl p-3.5 sm:p-5 shadow-xs dark:shadow-lg dark:shadow-emerald-500/5 space-y-2.5 sm:space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 relative">
+                <Radio size={18} className={gpsTransmitter.trackingStatus === "sharing" ? "animate-pulse" : ""} />
                 {gpsTransmitter.trackingStatus === "sharing" && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-ping" />
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
-                    Live GPS Transmission Active
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
+                    Live GPS Active
                   </span>
-                  <span className="text-stone-400 dark:text-stone-500 text-xs">•</span>
-                  <span className="font-extrabold text-sm text-stone-900 dark:text-white">
-                    Order #{gpsTransmitter.activeOrderId}
+                  <span className="text-stone-400 dark:text-stone-500 text-xs hidden sm:inline">•</span>
+                  <span className="font-extrabold text-xs sm:text-sm text-stone-900 dark:text-white font-mono truncate">
+                    #{gpsTransmitter.activeOrderId}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-0.5">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border ${
                       gpsTransmitter.trackingStatus === "sharing"
                         ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40"
                         : gpsTransmitter.trackingStatus === "requesting_permission"
@@ -891,12 +903,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
                         : "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40"
                     }`}
                   >
-                    {gpsTransmitter.trackingStatus === "sharing" && "● Sharing live location"}
-                    {gpsTransmitter.trackingStatus === "requesting_permission" && "⏳ Requesting permission..."}
-                    {gpsTransmitter.trackingStatus === "unavailable" && "⚠️ GPS signal unavailable or stale"}
-                    {gpsTransmitter.trackingStatus === "permission_denied" && "❌ Location permission denied"}
-                    {gpsTransmitter.trackingStatus === "stopped" && "⏹️ Delivery completed / tracking stopped"}
-                    {gpsTransmitter.trackingStatus === "unauthorized" && "🚫 Driver reassigned / unauthorized"}
+                    {gpsTransmitter.trackingStatus === "sharing" && "● Sharing location"}
+                    {gpsTransmitter.trackingStatus === "requesting_permission" && "⏳ Requesting..."}
+                    {gpsTransmitter.trackingStatus === "unavailable" && "⚠️ Weak signal"}
+                    {gpsTransmitter.trackingStatus === "permission_denied" && "❌ Denied"}
+                    {gpsTransmitter.trackingStatus === "stopped" && "⏹️ Stopped"}
+                    {gpsTransmitter.trackingStatus === "unauthorized" && "🚫 Unauthorized"}
                   </span>
 
                   {gpsTransmitter.wakeLockActive && (
@@ -913,24 +925,24 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             <Tooltip content="Stop sharing your real-time GPS coordinates with the customer" position="left">
               <button
                 onClick={() => gpsTransmitter.stopTracking("stopped")}
-                className="self-start sm:self-auto inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 dark:border-rose-500/40 font-bold px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95"
+                className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 dark:border-rose-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95 shrink-0 min-h-[38px]"
               >
                 <Power size={13} />
-                <span>Stop GPS Transmission</span>
+                <span>Stop GPS</span>
               </button>
             </Tooltip>
           </div>
 
           {/* Telemetry Pills */}
           {gpsTransmitter.lastLocation && (
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap pt-2 border-t border-emerald-500/20 dark:border-white/10 text-xs">
-              <span className="font-mono text-emerald-900 bg-white/90 border border-emerald-500/25 dark:text-emerald-300 dark:bg-white/5 dark:border-white/10 px-2.5 py-1 rounded-lg shadow-xs font-semibold">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap pt-2 border-t border-emerald-500/20 dark:border-white/10 text-xs">
+              <span className="font-mono text-emerald-900 bg-white/90 border border-emerald-500/25 dark:text-emerald-300 dark:bg-white/5 dark:border-white/10 px-2 py-0.5 rounded-lg shadow-xs font-semibold text-[11px]">
                 📍 {gpsTransmitter.lastLocation.latitude.toFixed(5)}, {gpsTransmitter.lastLocation.longitude.toFixed(5)}
               </span>
 
               {typeof gpsTransmitter.lastLocation.accuracy === "number" && (
                 <span
-                  className={`font-semibold px-2 py-1 rounded-lg border text-[11px] ${
+                  className={`font-semibold px-2 py-0.5 rounded-lg border text-[10px] sm:text-[11px] ${
                     gpsTransmitter.lastLocation.accuracy <= 20
                       ? "text-emerald-800 bg-emerald-100/80 border-emerald-300/80 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/20"
                       : gpsTransmitter.lastLocation.accuracy <= 50
@@ -943,21 +955,14 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
               )}
 
               {typeof gpsTransmitter.lastLocation.speed === "number" && gpsTransmitter.lastLocation.speed > 0 && (
-                <span className="text-blue-800 bg-blue-100/80 border border-blue-300/80 dark:text-blue-300 dark:bg-blue-500/10 dark:border-blue-500/20 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
-                  <Gauge size={12} />
+                <span className="text-blue-800 bg-blue-100/80 border border-blue-300/80 dark:text-blue-300 dark:bg-blue-500/10 dark:border-blue-500/20 px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-semibold flex items-center gap-1">
+                  <Gauge size={11} />
                   <span>{Math.round(gpsTransmitter.lastLocation.speed * 3.6)} km/h</span>
                 </span>
               )}
 
-              {typeof gpsTransmitter.lastLocation.heading === "number" && gpsTransmitter.lastLocation.heading >= 0 && (
-                <span className="text-stone-700 bg-white/90 border border-emerald-500/20 dark:text-stone-300 dark:bg-white/5 dark:border-white/10 px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1">
-                  <Compass size={12} />
-                  <span>{Math.round(gpsTransmitter.lastLocation.heading)}°</span>
-                </span>
-              )}
-
               {gpsTransmitter.lastSentTime && (
-                <span className="text-stone-600 dark:text-stone-400 text-[11px] ml-auto font-medium">
+                <span className="text-stone-600 dark:text-stone-400 text-[10px] sm:text-[11px] ml-auto font-medium">
                   Sent: {new Date(gpsTransmitter.lastSentTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                 </span>
               )}
@@ -973,13 +978,14 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
 
           {/* Device and Background GPS Note */}
           <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed pt-1">
-            ⚠️ <strong className="text-stone-800 dark:text-stone-200">Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.
+            <span className="sm:hidden">⚠️ <strong>Staff Note:</strong> Keep tab active while driving. Live GPS sends every 8–10s.</span>
+            <span className="hidden sm:inline">⚠️ <strong className="text-stone-800 dark:text-stone-200">Staff Note:</strong> Device location permission is required. Live updates are throttled to every 8–10 seconds. Note: GPS transmission runs in this active browser tab; background transmission may pause if your phone screen locks or the browser is minimized.</span>
           </p>
         </div>
       )}
 
       {/* ── FILTER & SEARCH TOOLBAR ─────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-2.5 sm:gap-3">
         {/* Search */}
         <div className="relative w-full md:w-80">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -988,12 +994,12 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             placeholder="Search customer, phone, order #..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs sm:text-sm text-stone-800 dark:text-stone-200 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-xs sm:text-sm text-stone-800 dark:text-stone-200 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 min-h-[40px]"
           />
         </div>
 
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        {/* Status Filter Tabs (Horizontal touch scroll with no-scrollbar) */}
+        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth pb-0.5 md:pb-0">
           {[
             { id: "active", label: "Active Deliveries" },
             { id: "preparing", label: "Ready at Kitchen" },
@@ -1004,7 +1010,7 @@ export default function DeliveryWorkspace({ restaurantName = "" }) {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 min-h-[36px] ${
                 statusFilter === tab.id
                   ? "bg-blue-600 text-white shadow-xs"
                   : "bg-stone-100 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-white/10"
