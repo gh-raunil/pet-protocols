@@ -150,7 +150,7 @@ export default function CategoryShortcuts({ categories: propCategories = [] }) {
                 <LayoutGrid size={20} />
               </div>
             </div>
-            <span className="mt-2 text-xs sm:text-[13px] font-bold text-[var(--text-main)] tracking-tight text-center whitespace-nowrap">
+            <span className="mt-2 text-xs sm:text-[13px] font-medium text-[var(--text-main)] group-hover:text-[var(--brand-accent)] tracking-tight text-center whitespace-nowrap transition-colors">
               All
             </span>
           </Link>
@@ -179,7 +179,7 @@ export default function CategoryShortcuts({ categories: propCategories = [] }) {
                     <span className="text-2xl sm:text-3xl">{cat.icon || "🍽️"}</span>
                   )}
                 </div>
-                <span className="mt-2 text-xs sm:text-[13px] font-medium text-[var(--text-muted)] group-hover:text-[var(--text-main)] group-hover:font-bold tracking-tight text-center whitespace-nowrap transition-colors">
+                <span className="mt-2 text-xs sm:text-[13px] font-medium text-[var(--text-muted)] group-hover:text-[var(--brand-accent)] tracking-tight text-center whitespace-nowrap transition-colors">
                   {cat.name}
                 </span>
               </Link>

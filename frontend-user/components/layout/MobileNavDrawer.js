@@ -29,6 +29,7 @@ import useCartStore from "@/lib/cartStore";
 import useFavoritesStore from "@/lib/favoritesStore";
 import PWAInstallButton from "@/components/pwa/PWAInstallButton";
 import { useNavBadges } from "@/hooks/useNavBadges";
+import ThemeToggle from "../ui/ThemeToggle";
 
 export default function MobileNavDrawer({ isOpen, onClose }) {
   const pathname = usePathname();
@@ -192,15 +193,18 @@ export default function MobileNavDrawer({ isOpen, onClose }) {
               पेट Protocols
             </span>
           </div>
-          <button
-            ref={closeButtonRef}
-            onClick={onClose}
-            type="button"
-            aria-label="Close menu"
-            className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:outline-none"
-          >
-            <X size={22} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <button
+              ref={closeButtonRef}
+              onClick={onClose}
+              type="button"
+              aria-label="Close menu"
+              className="min-w-[40px] min-h-[40px] p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] transition flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:outline-none"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Center Body */}

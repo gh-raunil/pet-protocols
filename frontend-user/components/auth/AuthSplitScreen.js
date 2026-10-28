@@ -336,7 +336,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
   };
 
   return (
-    <main className="min-h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] transition-colors grid grid-cols-1 lg:grid-cols-12 overflow-x-hidden">
+    <main className="min-h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] transition-colors grid grid-cols-1 lg:grid-cols-12 overflow-x-hidden pt-16 sm:pt-20 lg:pt-0">
       {/* ═══════════════════════════════════════════════════════════════
           LEFT COLUMN: BRANDED FOOD-PHOTOGRAPHY EXPERIENCE (DESKTOP)
           ═══════════════════════════════════════════════════════════════ */}
@@ -433,7 +433,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       {/* ═══════════════════════════════════════════════════════════════
           RIGHT COLUMN: REFINED AUTHENTICATION CARD & FORM
           ═══════════════════════════════════════════════════════════════ */}
-      <div className="col-span-12 lg:col-span-7 xl:col-span-6 flex flex-col justify-center items-center px-4 sm:px-8 lg:px-12 py-12 lg:py-16 min-h-screen relative">
+      <div className="col-span-12 lg:col-span-7 xl:col-span-6 flex flex-col justify-center items-center px-4 sm:px-8 lg:px-12 py-10 sm:py-14 lg:py-16 min-h-screen relative pt-8 sm:pt-10 lg:pt-20">
         {/* Subtle background ambient lighting on right */}
         <div className="absolute top-1/4 right-0 w-80 h-80 bg-[var(--brand-accent)]/5 rounded-full blur-3xl pointer-events-none -z-10" />
 
@@ -466,12 +466,21 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
             </p>
           </div>
 
-          {/* ── SEGMENTED TAB SWITCHER ── */}
+          {/* ── SEGMENTED TAB SWITCHER WITH SLIDING ANIMATION ── */}
           <div
             role="tablist"
             aria-label="Authentication mode"
-            className="grid grid-cols-2 p-1 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)]"
+            className="relative grid grid-cols-2 p-1 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] overflow-hidden"
           >
+            {/* Smooth animated sliding background pill */}
+            <div
+              className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-color)]/60 transition-transform duration-300 ease-out"
+              style={{
+                transform: activeTab === "signin" ? "translateX(4px)" : "translateX(calc(100% + 4px))",
+              }}
+              aria-hidden="true"
+            />
+
             <button
               ref={signInTabRef}
               type="button"
@@ -482,9 +491,9 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
               aria-controls="panel-signin"
               onKeyDown={(e) => handleTabKeyDown(e, "signin")}
               onClick={() => handleSwitchTab("signin")}
-              className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
+              className={`relative z-10 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
                 activeTab === "signin"
-                  ? "bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]/60"
+                  ? "text-[var(--text-main)] font-extrabold"
                   : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
               }`}
             >
@@ -502,9 +511,9 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
               aria-controls="panel-signup"
               onKeyDown={(e) => handleTabKeyDown(e, "signup")}
               onClick={() => handleSwitchTab("signup")}
-              className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
+              className={`relative z-10 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
                 activeTab === "signup"
-                  ? "bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]/60"
+                  ? "text-[var(--text-main)] font-extrabold"
                   : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
               }`}
             >
@@ -532,7 +541,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
               role="tabpanel"
               id="panel-signin"
               aria-labelledby="tab-signin"
-              className="space-y-4 animate-[fadeIn_0.2s_ease]"
+              className="space-y-4 auth-fade-slide"
             >
               <form onSubmit={handleSignInSubmit} className="space-y-4" noValidate>
                 {/* Email Address Field */}
@@ -660,7 +669,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
               role="tabpanel"
               id="panel-signup"
               aria-labelledby="tab-signup"
-              className="space-y-4 animate-[fadeIn_0.2s_ease]"
+              className="space-y-4 auth-fade-slide"
             >
               <form onSubmit={handleSignUpSubmit} className="space-y-4" noValidate>
                 {/* Full Name Field */}

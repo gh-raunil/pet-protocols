@@ -490,7 +490,7 @@ export default function MenuClient() {
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
                 aria-label="Sort products"
-                className="h-10 w-full sm:w-auto pl-3 sm:pl-3.5 pr-8 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
+                className="h-10 w-full sm:w-auto min-w-[155px] sm:min-w-[165px] pl-2.5 sm:pl-3.5 pr-7 sm:pr-8 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
               >
                 <option value="default">Sort: Recommended</option>
                 <option value="popularity">Popularity</option>
@@ -508,9 +508,9 @@ export default function MenuClient() {
               type="button"
               onClick={() => setIsFilterDrawerOpen(true)}
               aria-label="Open filter panel"
-              className={`h-10 flex-1 sm:flex-initial px-3.5 sm:px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
+              className={`h-10 flex-1 sm:flex-initial px-3 sm:px-4 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
                 activeFiltersCount > 0
-                  ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)]"
+                  ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] font-semibold"
                   : "bg-[var(--bg-sub)] text-[var(--text-main)] border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card-hover)]"
               }`}
             >

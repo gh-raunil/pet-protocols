@@ -38,7 +38,7 @@ export const useFavoritesStore = create((set, get) => ({
 
     const activeUser = get().currentUserId;
 
-    // 2. If guest, persist strictly to user's own device (localStorage) and NEVER call server API
+    // 2. If guest or not yet loaded, persist strictly to user's device and attempt silent sync if authenticated session exists
     if (!activeUser) {
       try {
         if (typeof window !== "undefined") {
@@ -46,6 +46,22 @@ export const useFavoritesStore = create((set, get) => ({
         }
       } catch (e) {
         console.warn("Could not cache guest favorites locally:", e);
+      }
+
+      try {
+        const res = await fetch("/api/favorites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.favorites)) {
+            set({ favorites: data.favorites });
+          }
+        }
+      } catch (e) {
+        // Unauthenticated guest or offline
       }
       return;
     }
@@ -218,5 +234,13 @@ export const useFavoritesStore = create((set, get) => ({
     }
   },
 }));
+
+export function useIsFavorite(productId) {
+  return useFavoritesStore((state) => {
+    if (!productId) return false;
+    const targetId = typeof productId === "object" ? String(productId._id || productId.id) : String(productId);
+    return state.favorites.some((item) => String(item._id || item.id) === targetId);
+  });
+}
 
 export default useFavoritesStore;

@@ -225,56 +225,58 @@ export default function HeroCard() {
       </div>
 
       {/* ── MOBILE HERO LAYOUT (< md) ── */}
-      <div className="md:hidden p-4 sm:p-5 relative z-10 flex flex-col gap-3 min-h-[180px]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0 space-y-1.5">
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-[10px] font-bold bg-[var(--brand-accent)]/10">
-              <span>GOOD FOOD</span>
-              <span>&bull;</span>
-              <span>GREAT MOOD</span>
+      <div className="md:hidden relative overflow-hidden rounded-3xl min-h-[195px] flex flex-col justify-between p-4 sm:p-5">
+        {/* Seamless full-height background dish photography on the right */}
+        <div className="absolute right-0 top-0 bottom-0 w-[58%] sm:w-[50%] pointer-events-none overflow-hidden">
+          {slides.map((slide, idx) => (
+            <div
+              key={slide.id}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                idx === activeIndex ? "opacity-100 z-0" : "opacity-0 z-0 pointer-events-none"
+              }`}
+            >
+              <Image
+                src={slide.src}
+                alt={slide.alt}
+                fill
+                priority={idx === 0}
+                sizes="(max-width: 768px) 60vw, 320px"
+                className="object-cover object-center w-full h-full"
+              />
             </div>
-            <h1 className="text-xl font-black text-[var(--text-main)] tracking-tight leading-tight">
-              Fresh food.<br />
-              <span className="text-[var(--brand-accent)]">Zero compromises.</span>
-            </h1>
-            <p className="text-[11px] text-[var(--text-muted)] leading-tight">
-              Order from favorite restaurants, delivered hot.
-            </p>
-            <div className="pt-1">
-              <Link
-                href="/menu"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-95"
-              >
-                <span>Explore Menu</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-          </div>
+          ))}
+          {/* Subtle directional gradient blends for text contrast and edge softening */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-card)]/90 via-transparent to-transparent" />
+        </div>
 
-          {/* Dish Image Thumbnail */}
-          <div className="relative w-28 h-24 sm:w-32 sm:h-28 rounded-2xl overflow-hidden shadow-md border border-white/10 shrink-0">
-            {slides.map((slide, idx) => (
-              <div
-                key={slide.id}
-                className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
-                  idx === activeIndex ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
-                }`}
-              >
-                <Image
-                  src={slide.src}
-                  alt={slide.alt}
-                  fill
-                  priority={idx === 0}
-                  sizes="140px"
-                  className="object-cover object-center w-full h-full"
-                />
-              </div>
-            ))}
+        {/* Content on the left */}
+        <div className="relative z-10 max-w-[64%] space-y-2">
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-[var(--brand-accent)]/30 text-[var(--brand-accent)] text-[10px] font-bold bg-[var(--brand-accent)]/10">
+            <span>GOOD FOOD</span>
+            <span>&bull;</span>
+            <span>GREAT MOOD</span>
+          </div>
+          <h1 className="text-xl font-black text-[var(--text-main)] tracking-tight leading-tight">
+            Fresh food.<br />
+            <span className="text-[var(--brand-accent)]">Zero compromises.</span>
+          </h1>
+          <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+            Order from favorite restaurants, delivered hot.
+          </p>
+          <div className="pt-1">
+            <Link
+              href="/menu"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-xs active:scale-95 transition"
+            >
+              <span>Explore Menu</span>
+              <ArrowRight size={13} />
+            </Link>
           </div>
         </div>
 
         {/* Mobile Trust Bar */}
-        <div className="pt-2 border-t border-[var(--border-color)]/60 flex items-center justify-between text-[10px] text-[var(--text-muted)] font-medium">
+        <div className="relative z-10 pt-2.5 mt-2 border-t border-[var(--border-color)]/60 flex items-center justify-between text-[10px] text-[var(--text-muted)] font-medium">
           <span className="flex items-center gap-1">
             <UtensilsCrossed size={11} className="text-[var(--brand-accent)]" /> Fresh Food
           </span>

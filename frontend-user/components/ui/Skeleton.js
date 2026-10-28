@@ -14,7 +14,7 @@ export function ProductCardSkeleton({ isCarousel = false }) {
   return (
     <div
       className={`flex flex-col justify-between bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden animate-pulse ${
-        isCarousel ? "w-[170px] sm:w-[190px] md:w-[205px] shrink-0" : "w-full"
+        isCarousel ? "w-[215px] sm:w-[240px] md:w-[260px] shrink-0" : "w-full"
       }`}
     >
       <div className="relative aspect-[4/3] w-full bg-[var(--bg-sub)]" />

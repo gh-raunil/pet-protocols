@@ -29,7 +29,7 @@ import {
   Award,
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
-import useFavoritesStore from "@/lib/favoritesStore";
+import useFavoritesStore, { useIsFavorite } from "@/lib/favoritesStore";
 import useRecentStore from "@/lib/recentStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
@@ -57,6 +57,22 @@ export default function ProductDetailClient({ product }) {
   );
   const [offers, setOffers] = useState([]);
   const [imgSrc, setImgSrc] = useState(product?.image || FALLBACK_IMAGE);
+  const [helpfulReviews, setHelpfulReviews] = useState({});
+
+  const handleToggleHelpful = (reviewKey, baseCount = 0) => {
+    setHelpfulReviews((prev) => {
+      const current = prev[reviewKey] || { liked: false, count: baseCount };
+      const nextLiked = !current.liked;
+      const nextCount = nextLiked ? current.count + 1 : Math.max(0, current.count - 1);
+      if (nextLiked) {
+        toast.success("Thank you! Marked review as helpful.");
+      }
+      return {
+        ...prev,
+        [reviewKey]: { liked: nextLiked, count: nextCount },
+      };
+    });
+  };
 
   // Rate Modal State & Accessibility Refs
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -69,10 +85,10 @@ export default function ProductDetailClient({ product }) {
   const triggerRef = useRef(null);
 
   const addItem = useCartStore((s) => s.addItem);
-  const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const addRecentDish = useRecentStore((s) => s.addRecentDish);
 
-  const isFav = product?._id ? isFavorite(product._id) : false;
+  const isFav = useIsFavorite(product?._id);
   const restStatus = useOperationalStatus(product?.restaurant);
 
   useEffect(() => {
@@ -1057,9 +1073,34 @@ export default function ProductDetailClient({ product }) {
                       ? new Date(rev.createdAt).toLocaleDateString()
                       : "Recent Order"}
                   </span>
-                  <span className="flex items-center gap-1 hover:text-[var(--text-main)] cursor-pointer">
-                    <ThumbsUp size={11} /> Helpful
-                  </span>
+                  {(() => {
+                    const reviewKey = rev._id || rev.id || `rev-${rev.userName || idx}`;
+                    const helpfulData = helpfulReviews[reviewKey] || {
+                      liked: false,
+                      count: typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0,
+                    };
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHelpful(reviewKey, typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0)}
+                        aria-label={helpfulData.liked ? "Unmark review as helpful" : "Mark review as helpful"}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition active:scale-95 cursor-pointer ${
+                          helpfulData.liked
+                            ? "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 font-bold"
+                            : "hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] border border-transparent text-[var(--text-muted)]"
+                        }`}
+                      >
+                        <ThumbsUp
+                          size={11}
+                          className={helpfulData.liked ? "fill-[var(--brand-accent)] stroke-[var(--brand-accent)]" : ""}
+                        />
+                        <span>Helpful</span>
+                        {helpfulData.count > 0 && (
+                          <span className="font-bold">({helpfulData.count})</span>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

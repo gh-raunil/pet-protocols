@@ -216,6 +216,21 @@ select:-webkit-autofill:focus {
   }
 }
 
+@keyframes authFadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-fade-slide {
+  animation: authFadeSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* ── Leaflet Map & Tile Rendering Fixes (Tailwind Override) ── */
 .leaflet-container img {
   max-width: none !important;

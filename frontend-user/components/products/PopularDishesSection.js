@@ -29,7 +29,8 @@ function getProductCleanImage(product) {
 export default function PopularDishesSection({ products = [], loading = false }) {
   const router = useRouter();
   const { addItem } = useCartStore();
-  const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const favorites = useFavoritesStore((s) => s.favorites);
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const handleAddToCart = (e, product) => {
     e.preventDefault();
@@ -129,7 +130,7 @@ export default function PopularDishesSection({ products = [], loading = false })
         /* ── 4-COLUMN RESPONSIVE DISH GRID MATCHING REFERENCE IMAGE ── */
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {displayProducts.map((product) => {
-            const fav = isFavorite(product._id);
+            const fav = favorites.some((item) => String(item._id || item.id) === String(product._id));
             const img = getProductCleanImage(product);
             const isVeg = product.type === "veg";
             const isNonVeg = product.type === "non-veg";

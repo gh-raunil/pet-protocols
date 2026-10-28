@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Plus, Star, Heart, Clock, Sparkles, Tag, Zap, Layers } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
-import useFavoritesStore from "@/lib/favoritesStore";
+import useFavoritesStore, { useIsFavorite } from "@/lib/favoritesStore";
 import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
@@ -52,7 +52,7 @@ export function ProductCardSkeleton({ isCarousel = false }) {
   return (
     <div
       className={`flex flex-col justify-between bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] overflow-hidden animate-pulse ${
-        isCarousel ? "w-[170px] sm:w-[190px] md:w-[205px] shrink-0" : "w-full"
+        isCarousel ? "w-[215px] sm:w-[240px] md:w-[260px] shrink-0" : "w-full"
       }`}
     >
       <div className="relative aspect-[4/3] w-full bg-[var(--bg-sub)]" />
@@ -79,9 +79,9 @@ export default function ProductCard({
 }) {
   const router = useRouter();
   const { addItem } = useCartStore();
-  const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const [imgSrc, setImgSrc] = useState(() => getSmartInitialImage(product));
-  const isFav = product?._id ? isFavorite(product._id) : false;
+  const isFav = useIsFavorite(product?._id);
   const restStatus = useOperationalStatus(product?.restaurant);
 
   useEffect(() => {
@@ -362,7 +362,7 @@ export default function ProductCard({
     <div
       onClick={handleCardClick}
       className={`group relative flex flex-col justify-between bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 hover:shadow-md transition-all duration-200 overflow-hidden ${
-        isCarousel ? "w-[170px] sm:w-[190px] md:w-[205px] shrink-0 snap-start" : "w-full"
+        isCarousel ? "w-[215px] sm:w-[240px] md:w-[260px] shrink-0 snap-start" : "w-full"
       } ${!product.isAvailable ? "opacity-75" : ""}`}
     >
       <Link href={`/menu/${product._id}`} className="block flex-1 flex flex-col">
@@ -372,7 +372,7 @@ export default function ProductCard({
             src={imgSrc}
             alt={product.name}
             fill
-            sizes={isCarousel ? "(max-width: 640px) 170px, 205px" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
+            sizes={isCarousel ? "(max-width: 640px) 215px, 260px" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
             className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
               product.isAvailable ? "" : "grayscale-[40%]"
             }`}
