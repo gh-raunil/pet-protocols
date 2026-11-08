@@ -40,7 +40,60 @@ export default function LocationModal() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
+  const [activeHubs, setActiveHubs] = useState(SUGGESTED_LOCATIONS);
+  const [loadingHubs, setLoadingHubs] = useState(false);
   const inputRef = useRef(null);
+
+  // Fetch actual restaurants to dynamically show locations where restaurants exist
+  useEffect(() => {
+    let isMounted = true;
+    async function loadActiveHubs() {
+      try {
+        setLoadingHubs(true);
+        const res = await fetch("/api/restaurants");
+        const data = await res.json();
+        if (isMounted && data.success && Array.isArray(data.restaurants)) {
+          const activeWithAddress = data.restaurants.filter(
+            (r) => r.status === "active" && r.address && (r.address.city || r.address.street)
+          );
+          if (activeWithAddress.length > 0) {
+            const derivedHubs = activeWithAddress.map((r) => {
+              const city = (r.address.city || "").trim();
+              const state = (r.address.state || "").trim();
+              const street = (r.address.street || r.address.landmark || "").trim();
+              const displayCity = city && state ? `${city}, ${state}` : (city || r.name);
+              const displayArea = street ? `${street} • ${r.name}` : r.name;
+
+              return {
+                id: `hub_${r._id}`,
+                name: displayCity,
+                area: displayArea,
+                city: city || displayCity,
+                state: state,
+                restaurantName: r.name,
+                restaurantId: r._id,
+                latitude: r.address.latitude,
+                longitude: r.address.longitude,
+                hasExactCoordinates: Boolean(r.address.latitude && r.address.longitude),
+                isApproximate: false,
+                deliveryRadiusKm: r.deliverySettings?.deliveryRadiusKm || 10,
+                cuisine: Array.isArray(r.cuisineType) ? r.cuisineType.join(", ") : r.cuisineType || "",
+              };
+            });
+            setActiveHubs(derivedHubs);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load active kitchen hubs:", err);
+      } finally {
+        if (isMounted) setLoadingHubs(false);
+      }
+    }
+    loadActiveHubs();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -61,12 +114,12 @@ export default function LocationModal() {
         role="dialog"
         aria-modal="true"
         aria-label="Sign In to Select Location"
-        className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-xs transition-opacity duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) closeModal();
         }}
       >
-        <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col p-6 sm:p-8 text-center space-y-4 animate-[fadeIn_0.2s_ease-out]">
+        <div className="w-full max-w-md rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col p-6 sm:p-8 text-center space-y-4 animate-[fadeIn_0.2s_ease-out]">
           <div className="flex justify-end">
             <button
               type="button"
@@ -106,11 +159,14 @@ export default function LocationModal() {
     );
   }
 
-  const filteredLocations = SUGGESTED_LOCATIONS.filter(
+  const displayHubs = activeHubs && activeHubs.length > 0 ? activeHubs : SUGGESTED_LOCATIONS;
+
+  const filteredLocations = displayHubs.filter(
     (loc) =>
-      loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      loc.area.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      loc.city.toLowerCase().includes(searchQuery.toLowerCase())
+      (loc.name && loc.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (loc.area && loc.area.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (loc.city && loc.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (loc.restaurantName && loc.restaurantName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleCustomSubmit = (e) => {
@@ -119,14 +175,37 @@ export default function LocationModal() {
     selectLocation(searchQuery.trim());
   };
 
+  const handleSelectHub = (locItem) => {
+    if (locItem.latitude && locItem.longitude) {
+      setCoordinatesAndCheck({
+        latitude: locItem.latitude,
+        longitude: locItem.longitude,
+        name: locItem.name,
+        area: locItem.area,
+        city: locItem.city,
+        state: locItem.state,
+        restaurantId: locItem.restaurantId,
+        restaurantName: locItem.restaurantName,
+        isApproximate: false,
+      });
+    } else {
+      selectLocation(locItem);
+    }
+  };
+
+  const handleConfirmAndExploreMenu = () => {
+    confirmSelectedLocation();
+    router.push("/menu");
+  };
+
   const handleMapPinSelected = (coords) => {
     setIsMapPickerOpen(false);
     if (coords && coords.latitude && coords.longitude) {
       setCoordinatesAndCheck({
         latitude: coords.latitude,
         longitude: coords.longitude,
-        name: `Map Pin (${coords.latitude.toFixed(2)}°, ${coords.longitude.toFixed(2)}°)`,
-        area: "Interactive Map Selection",
+        name: "Pinned Location",
+        area: "Selected on Map",
         isApproximate: false,
       });
     }
@@ -138,14 +217,14 @@ export default function LocationModal() {
         role="dialog"
         aria-modal="true"
         aria-label="Select Delivery Location"
-        className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
+        className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-xs transition-opacity duration-200 ${
           isMapPickerOpen ? "hidden pointer-events-none" : ""
         }`}
         onClick={(e) => {
           if (e.target === e.currentTarget && !isMapPickerOpen) closeModal();
         }}
       >
-        <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-[fadeIn_0.2s_ease-out]">
+        <div className="w-full max-w-lg rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden flex flex-col max-h-[min(82vh,680px)] animate-[fadeIn_0.2s_ease-out]">
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-main)]/50">
             <div className="flex items-center gap-2.5">
@@ -172,7 +251,7 @@ export default function LocationModal() {
           </div>
 
           {/* Content Body */}
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
             {/* Search bar */}
             <form onSubmit={handleCustomSubmit} className="relative">
               <Search
@@ -271,17 +350,18 @@ export default function LocationModal() {
                 {locationDetails?.hasExactCoordinates && (
                   <p className="text-[11px] text-[var(--text-muted)]">
                     {locationDetails.isApproximate
-                      ? "Device GPS coordinates saved. You can fine-tune your street address at checkout."
-                      : "Exact map coordinates saved for doorstep delivery."}
+                      ? "Delivery location saved. You can fine-tune your street address at checkout."
+                      : "Exact doorstep delivery location confirmed."}
                   </p>
                 )}
                 <div className="pt-1">
                   <button
                     type="button"
-                    onClick={confirmSelectedLocation}
-                    className="w-full py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 transition active:scale-98 cursor-pointer"
+                    onClick={handleConfirmAndExploreMenu}
+                    className="w-full py-2.5 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold shadow-md shadow-[var(--brand-accent)]/20 transition active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    Confirm & Explore Menu
+                    <span>Confirm & Explore Menu</span>
+                    <ArrowRight size={14} />
                   </button>
                 </div>
               </div>
@@ -307,10 +387,11 @@ export default function LocationModal() {
                 <div className="pt-1 flex gap-2">
                   <button
                     type="button"
-                    onClick={confirmSelectedLocation}
-                    className="flex-1 py-2 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold transition active:scale-98 cursor-pointer"
+                    onClick={handleConfirmAndExploreMenu}
+                    className="flex-1 py-2 rounded-xl bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white text-xs font-bold transition active:scale-98 cursor-pointer flex items-center justify-center gap-1"
                   >
-                    Browse Kitchens
+                    <span>Explore Menu</span>
+                    <ArrowRight size={13} />
                   </button>
                   <button
                     type="button"
@@ -356,25 +437,37 @@ export default function LocationModal() {
               </div>
             )}
 
-            {/* Popular City & Region Hubs */}
+            {/* Popular City & Region Hubs with Actual Active Restaurants */}
             <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] px-1">
-                Popular Cities & Hubs
-              </h3>
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Active Kitchen Cities & Hubs ({filteredLocations.length})
+                </h3>
+                {loadingHubs && (
+                  <span className="text-[10px] text-[var(--text-muted)] animate-pulse">
+                    Refreshing hubs...
+                  </span>
+                )}
+              </div>
               <div className="divide-y divide-[var(--border-color)] rounded-2xl border border-[var(--border-color)] bg-[var(--bg-sub)]/50 overflow-hidden">
                 {filteredLocations.length === 0 ? (
                   <div className="p-4 text-center text-xs text-[var(--text-muted)]">
-                    No matching hubs found for &ldquo;{searchQuery}&rdquo;. Press Enter to use custom address.
+                    No matching restaurant cities found for &ldquo;{searchQuery}&rdquo;. Try another city or drop a pin on the map.
                   </div>
                 ) : (
                   filteredLocations.map((locItem) => {
                     const isSelected =
-                      locationDetails?.name?.toLowerCase() === locItem.name.toLowerCase();
+                      locationDetails?.name?.toLowerCase() === locItem.name.toLowerCase() ||
+                      (locationDetails?.latitude &&
+                        locItem.latitude &&
+                        Math.abs(locationDetails.latitude - locItem.latitude) < 0.001 &&
+                        Math.abs(locationDetails.longitude - locItem.longitude) < 0.001);
+
                     return (
                       <button
                         key={locItem.id}
                         type="button"
-                        onClick={() => selectLocation(locItem)}
+                        onClick={() => handleSelectHub(locItem)}
                         className={`w-full flex items-center justify-between p-3 text-left transition hover:bg-[var(--bg-card)] cursor-pointer ${
                           isSelected ? "bg-[var(--brand-accent)]/10" : ""
                         }`}
@@ -389,8 +482,13 @@ export default function LocationModal() {
                             }
                           />
                           <div className="min-w-0">
-                            <div className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate">
-                              {locItem.name}
+                            <div className="text-xs sm:text-sm font-bold text-[var(--text-main)] truncate flex items-center gap-1.5">
+                              <span>{locItem.name}</span>
+                              {locItem.restaurantName && (
+                                <span className="text-[10px] font-semibold text-[var(--brand-accent)] bg-[var(--brand-accent)]/10 px-1.5 py-0.2 rounded-md">
+                                  {locItem.restaurantName}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-[var(--text-muted)] truncate">
                               {locItem.area}
@@ -399,8 +497,9 @@ export default function LocationModal() {
                         </div>
 
                         <div className="shrink-0 flex items-center gap-2 pl-2">
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border-color)]">
-                            City Hub
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--bg-card)] text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Active Hub</span>
                           </span>
                           {isSelected && (
                             <CheckCircle2 size={16} className="text-[var(--brand-accent)]" />
@@ -417,7 +516,7 @@ export default function LocationModal() {
           {/* Footer */}
           <div className="p-3.5 sm:p-4 border-t border-[var(--border-color)] bg-[var(--bg-main)]/50 flex items-center justify-between gap-3 shrink-0">
             <div className="text-[11px] text-[var(--text-muted)] truncate">
-              Selected: <span className="font-bold text-[var(--text-main)]">{location}</span>
+              Selected: <span className="font-bold text-[var(--text-main)]">{location && (location.includes("°") || location.startsWith("Device GPS") || location.startsWith("Map Pin")) ? "My Location" : location}</span>
             </div>
             <button
               type="button"

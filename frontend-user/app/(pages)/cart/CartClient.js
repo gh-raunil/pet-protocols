@@ -659,9 +659,16 @@ function CartPageItemRow({ item, decreaseQty, increaseQty, removeItem }) {
               </span>
             )}
           </div>
-          <p className="text-xs font-mono text-[var(--text-muted)] mt-1">
-            ₹{item.price} each
-          </p>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <span className="text-xs font-mono text-[var(--text-muted)]">
+              ₹{item.price} each
+            </span>
+            {item.compareAtPrice && Number(item.compareAtPrice) > Number(item.price) && (
+              <span className="text-[10px] font-mono text-[var(--text-muted)] line-through">
+                ₹{item.compareAtPrice}
+              </span>
+            )}
+          </div>
           <p className="text-xs font-mono font-extrabold text-[var(--brand-accent)] mt-0.5">
             Total: ₹{itemTotal}
           </p>

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useCartStore from "@/lib/cartStore";
 import Link from "next/link";
 import Image from "next/image";
+import { toast } from "@/components/ui/ToastProvider";
 import {
   CreditCard,
   ShieldCheck,
@@ -155,7 +156,11 @@ export default function CheckoutClient() {
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
-  const [error, setError] = useState("");
+  const [error, setRawError] = useState("");
+  const setError = useCallback((msg) => {
+    setRawError(msg);
+    if (msg) toast.error(msg);
+  }, []);
   const [checkoutServiceabilityAlert, setCheckoutServiceabilityAlert] = useState(null);
 
   // Fulfillment: Delivery vs Pickup
@@ -173,7 +178,11 @@ export default function CheckoutClient() {
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [appliedOffer, setAppliedOffer] = useState(null);
   const [couponInput, setCouponInput] = useState("");
-  const [couponError, setCouponError] = useState("");
+  const [couponError, setRawCouponError] = useState("");
+  const setCouponError = useCallback((msg) => {
+    setRawCouponError(msg);
+    if (msg) toast.error(msg);
+  }, []);
 
   // Address and Saved Addresses states
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -710,6 +719,7 @@ export default function CheckoutClient() {
     setAppliedOffer(targetOffer);
     setCouponInput(targetOffer.code || "");
     setCouponError("");
+    toast.success(`Coupon "${targetOffer.code}" applied!`);
     try {
       if (targetOffer.code) {
         localStorage.setItem("pet_protocols_applied_coupon", targetOffer.code);
@@ -2132,12 +2142,7 @@ export default function CheckoutClient() {
               </div>
             )}
 
-            {!checkoutServiceabilityAlert && error && (
-              <div className="bg-red-500/15 border border-red-500/30 rounded-2xl p-4 text-red-500 text-sm flex items-center gap-2">
-                <AlertCircle size={18} className="shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+
 
             {/* Step 5: Place Order Action Button */}
             <button
@@ -2241,9 +2246,7 @@ export default function CheckoutClient() {
                     Apply
                   </button>
                 </div>
-                {couponError && (
-                  <p className="text-[11px] text-rose-500 font-medium">{couponError}</p>
-                )}
+
 
                 {/* Available Offers Pills */}
                 {availableOffers.length > 0 && (

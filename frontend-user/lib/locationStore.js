@@ -25,64 +25,113 @@ export function isValidClientCoordinate(lat, lng) {
 }
 
 /**
- * Preset popular hubs / city search preferences.
- * Note: These are city-level preferences, NOT proof of delivery serviceability.
+ * Resolves a human-readable place name for latitude and longitude.
+ * Strictly avoids exposing raw numeric coordinates to the user.
+ */
+export async function resolvePlaceName(lat, lng, fallbackName = null) {
+  if (!isValidClientCoordinate(lat, lng)) return fallbackName || "Selected Location";
+
+  // If a valid non-coordinate name was already provided, return it
+  if (
+    fallbackName &&
+    typeof fallbackName === "string" &&
+    !fallbackName.includes("°") &&
+    !fallbackName.toLowerCase().startsWith("device gps") &&
+    !fallbackName.toLowerCase().startsWith("map pin") &&
+    !fallbackName.toLowerCase().startsWith("gps location")
+  ) {
+    return fallbackName;
+  }
+
+  // 1. Check distance to known active restaurant hubs (Vellore, Jhumri Telaiya, etc.)
+  for (const hub of SUGGESTED_LOCATIONS) {
+    if (hub.latitude && hub.longitude) {
+      const dLat = (lat - hub.latitude) * 111;
+      const dLng = (lng - hub.longitude) * 111 * Math.cos((lat * Math.PI) / 180);
+      const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
+      if (distKm <= (hub.deliveryRadiusKm || 10) + 15) {
+        return hub.name;
+      }
+    }
+  }
+
+  // 2. Try OpenStreetMap Nominatim reverse geocoding
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const addr = data.address || {};
+      const neighborhood =
+        addr.suburb ||
+        addr.neighbourhood ||
+        addr.residential ||
+        addr.commercial ||
+        addr.road ||
+        "";
+      const city =
+        addr.city ||
+        addr.town ||
+        addr.village ||
+        addr.county ||
+        addr.state_district ||
+        "";
+      const state = addr.state || "";
+
+      if (neighborhood && city) {
+        return `${neighborhood}, ${city}`;
+      } else if (city && state) {
+        return `${city}, ${state}`;
+      } else if (city) {
+        return city;
+      } else if (data.name) {
+        return data.name;
+      }
+    }
+  } catch {}
+
+  return "My Location";
+}
+
+/**
+ * Preset hubs / city search preferences for locations with actual active Pet Protocols kitchens.
  * Exact delivery eligibility requires valid coordinates.
  */
 export const SUGGESTED_LOCATIONS = [
   {
     id: "loc_vellore",
     name: "Vellore, Tamil Nadu",
-    area: "VIT & Katpadi Area",
+    restaurantName: "Burger & Co. Kitchen",
+    area: "Katpadi Main Road, Near VIT",
     city: "Vellore",
     state: "Tamil Nadu",
-    hasExactCoordinates: false,
-    isApproximate: true,
-  },
-  {
-    id: "loc_indiranagar",
-    name: "Indiranagar, Bangalore",
-    area: "100ft Road & Defence Colony",
-    city: "Bengaluru",
-    state: "Karnataka",
-    hasExactCoordinates: false,
-    isApproximate: true,
-  },
-  {
-    id: "loc_koramangala",
-    name: "Koramangala, Bangalore",
-    area: "5th Block & Sony World Jn",
-    city: "Bengaluru",
-    state: "Karnataka",
-    hasExactCoordinates: false,
-    isApproximate: true,
+    latitude: 12.966744,
+    longitude: 79.160496,
+    hasExactCoordinates: true,
+    isApproximate: false,
+    deliveryRadiusKm: 10,
   },
   {
     id: "loc_jhumri",
     name: "Jhumri Telaiya, Jharkhand",
+    restaurantName: "Shivam Bhog",
     area: "Ranchi-Patna Road",
     city: "Jhumri Telaiya",
     state: "Jharkhand",
-    hasExactCoordinates: false,
-    isApproximate: true,
-  },
-  {
-    id: "loc_mumbai",
-    name: "Bandra West, Mumbai",
-    area: "Linking Road & Hill Road",
-    city: "Mumbai",
-    state: "Maharashtra",
-    hasExactCoordinates: false,
-    isApproximate: true,
-  },
-  {
-    id: "loc_delhi",
-    name: "Connaught Place, New Delhi",
-    area: "Inner Circle & Rajiv Chowk",
-    city: "New Delhi",
-    state: "Delhi",
-    hasExactCoordinates: false,
-    isApproximate: true,
+    latitude: 24.399502,
+    longitude: 85.544781,
+    hasExactCoordinates: true,
+    isApproximate: false,
+    deliveryRadiusKm: 10,
   },
 ];
 
@@ -123,15 +172,39 @@ export const useLocationStore = create((set, get) => ({
     }
 
     if (savedLoc?.name) {
+      // Strip any raw numeric coordinate strings saved previously (e.g. "Device GPS (12.97°, 79.16°)")
+      if (
+        savedLoc.name.includes("°") ||
+        savedLoc.name.startsWith("Device GPS") ||
+        savedLoc.name.startsWith("Map Pin") ||
+        savedLoc.name.startsWith("GPS Location")
+      ) {
+        savedLoc.name = savedLoc.city
+          ? `${savedLoc.city}${savedLoc.state ? `, ${savedLoc.state}` : ""}`
+          : "My Location";
+        try {
+          localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(savedLoc));
+        } catch {}
+      }
+
       set({
         location: savedLoc.name,
         locationDetails: savedLoc,
         hasInitialized: true,
       });
 
-      // If saved location has real coordinates, check live serviceability on initialization
+      // If saved location has real coordinates, check live serviceability on initialization and resolve human-readable place
       if (savedLoc.latitude && savedLoc.longitude && isValidClientCoordinate(savedLoc.latitude, savedLoc.longitude)) {
         get().evaluateServiceability(savedLoc.latitude, savedLoc.longitude);
+        resolvePlaceName(savedLoc.latitude, savedLoc.longitude, savedLoc.name).then((resolved) => {
+          if (resolved && resolved !== savedLoc.name) {
+            const updated = { ...savedLoc, name: resolved };
+            set({ location: resolved, locationDetails: updated });
+            try {
+              localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(updated));
+            } catch {}
+          }
+        });
       }
     } else {
       // First-time visitor check: keep modal closed so users can browse seamlessly
@@ -253,7 +326,17 @@ export const useLocationStore = create((set, get) => ({
   /**
    * Sets exact coordinates (from device GPS or Leaflet Map pin) and triggers authoritative backend serviceability check
    */
-  setCoordinatesAndCheck: async ({ latitude, longitude, name, area, isApproximate = false }) => {
+  setCoordinatesAndCheck: async ({
+    latitude,
+    longitude,
+    name,
+    area,
+    city,
+    state,
+    restaurantId,
+    restaurantName,
+    isApproximate = false,
+  }) => {
     if (!isValidClientCoordinate(latitude, longitude)) {
       set({
         status: "unavailable",
@@ -265,11 +348,26 @@ export const useLocationStore = create((set, get) => ({
     const nLat = Number(latitude);
     const nLng = Number(longitude);
 
-    const displayName = name || `GPS Location (${nLat.toFixed(2)}°, ${nLng.toFixed(2)}°)`;
+    // Initial human-readable name without exposing raw coordinates
+    let initialName = name;
+    if (
+      !initialName ||
+      initialName.includes("°") ||
+      initialName.startsWith("Device GPS") ||
+      initialName.startsWith("Map Pin") ||
+      initialName.startsWith("GPS Location")
+    ) {
+      initialName = "Selected Location";
+    }
+
     const locObj = {
-      id: `coords_${nLat.toFixed(4)}_${nLng.toFixed(4)}`,
-      name: displayName,
-      area: area || "Exact GPS Coordinates",
+      id: `loc_${nLat.toFixed(4)}_${nLng.toFixed(4)}`,
+      name: initialName,
+      area: area && !area.includes("°") ? area : "Current Location",
+      city: city || "",
+      state: state || "",
+      restaurantId: restaurantId || null,
+      restaurantName: restaurantName || null,
       latitude: nLat,
       longitude: nLng,
       hasExactCoordinates: true,
@@ -277,7 +375,7 @@ export const useLocationStore = create((set, get) => ({
     };
 
     set({
-      location: displayName,
+      location: initialName,
       locationDetails: locObj,
       restaurantsServiceability: {},
       isEvaluating: true,
@@ -286,6 +384,26 @@ export const useLocationStore = create((set, get) => ({
     try {
       localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(locObj));
     } catch {}
+
+    // Resolve human-readable place name asynchronously and update store
+    resolvePlaceName(nLat, nLng, name).then((resolvedName) => {
+      if (resolvedName) {
+        set((state) => {
+          const updated = {
+            ...state.locationDetails,
+            name: resolvedName,
+            area: state.locationDetails?.area === "Current Location" ? resolvedName : state.locationDetails?.area,
+          };
+          try {
+            localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(updated));
+          } catch {}
+          return {
+            location: resolvedName,
+            locationDetails: updated,
+          };
+        });
+      }
+    });
 
     await get().evaluateServiceability(nLat, nLng);
   },
@@ -305,12 +423,16 @@ export const useLocationStore = create((set, get) => ({
     const match =
       typeof locObj === "object" && locObj !== null
         ? locObj
-        : SUGGESTED_LOCATIONS.find((l) => l.name.toLowerCase() === locName.toLowerCase()) || {
+        : SUGGESTED_LOCATIONS.find((l) => l.name.toLowerCase() === locName.toLowerCase() || (l.city && l.city.toLowerCase() === locName.toLowerCase())) || {
             name: locName,
             area: "Selected Address",
             hasExactCoordinates: false,
             isApproximate: true,
           };
+
+    if (match.latitude && match.longitude) {
+      return get().setCoordinatesAndCheck(match);
+    }
 
     // Preset cities / text addresses without GPS are treated as city preferences
     const updatedDetails = {
@@ -383,11 +505,11 @@ export const useLocationStore = create((set, get) => ({
           return;
         }
 
-        const detectedName = `Device GPS (${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°)`;
+        const placeName = await resolvePlaceName(latitude, longitude, "Current Location");
         const detectedObj = {
           id: "gps_detected",
-          name: detectedName,
-          area: accuracy ? `Approximate GPS (within ~${Math.round(accuracy)}m)` : "Device GPS Position",
+          name: placeName,
+          area: placeName,
           latitude,
           longitude,
           accuracy: accuracy || null,
@@ -396,7 +518,7 @@ export const useLocationStore = create((set, get) => ({
         };
 
         set({
-          location: detectedName,
+          location: placeName,
           locationDetails: detectedObj,
         });
 

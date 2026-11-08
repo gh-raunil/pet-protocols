@@ -19,10 +19,13 @@ import {
   ArrowRight,
   Award,
   Bell,
+  Sun,
+  Moon,
 } from "lucide-react";
-import ThemeToggle from "../ui/ThemeToggle";
 import NotificationBell from "../notifications/NotificationBell";
 import useNotificationStore from "@/lib/notificationStore";
+import { useTheme } from "../ui/ThemeProvider";
+import ThemeToggle from "../ui/ThemeToggle";
 import Tooltip from "../ui/Tooltip";
 import Link from "next/link";
 import Image from "next/image";
@@ -34,6 +37,8 @@ const RightSection = ({
 }) => {
   const { getTotalItems, openCart, clearCartLocal } = useCartStore();
   const { openNotifications, unreadCount } = useNotificationStore();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
   const { data: session } = useSession();
   const [isMounted, setIsMounted] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -75,11 +80,6 @@ const RightSection = ({
 
   return (
     <div className="flex items-center gap-1 sm:gap-2 md:gap-2.5 shrink-0">
-      {/* Light / Dark Mode Quick Toggle (desktop & tablet; mobile has toggle inside MobileNavDrawer) */}
-      <div className="hidden md:flex items-center shrink-0">
-        <ThemeToggle />
-      </div>
-
       {/* Customer Notifications (visible on sm+ screens to preserve mobile header space) */}
       {!isRestaurantAdmin && !isSuperadmin && (
         <div className="hidden sm:flex items-center shrink-0">
@@ -142,20 +142,44 @@ const RightSection = ({
 
           {dropdownOpen && (
             <div className="absolute right-0 top-11 w-64 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-2xl z-50 py-1">
-              {/* Account Header */}
-              <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sub)]">
-                <p className="text-xs font-bold text-[var(--text-main)] truncate">{session.user.name}</p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">{session.user.email}</p>
-                {isRestaurantAdmin && (
-                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30">
-                    🏢 {session.user.restaurantName || "Partner Kitchen"}
-                  </span>
-                )}
-                {isSuperadmin && (
-                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/15 text-red-500 border border-red-500/30">
-                    🛡️ Root Platform Owner
-                  </span>
-                )}
+              {/* Account Header with Theme Toggle */}
+              <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-sub)] flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-[var(--text-main)] truncate">{session.user.name}</p>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate">{session.user.email}</p>
+                  {isRestaurantAdmin && (
+                    <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30">
+                      🏢 {session.user.restaurantName || "Partner Kitchen"}
+                    </span>
+                  )}
+                  {isSuperadmin && (
+                    <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/15 text-red-500 border border-red-500/30">
+                      🛡️ Root Platform Owner
+                    </span>
+                  )}
+                </div>
+
+                {/* Theme Toggle Button */}
+                <Tooltip
+                  content={isDark ? "Switch to daylight mode" : "Switch to dark mode"}
+                  placement="left"
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTheme();
+                    }}
+                    aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                    className="w-8 h-8 rounded-xl bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] hover:border-[var(--brand-accent)]/50 text-[var(--text-main)] flex items-center justify-center transition shrink-0 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    {isDark ? (
+                      <Sun size={15} className="text-amber-400 transition-transform duration-200 hover:rotate-45" />
+                    ) : (
+                      <Moon size={15} className="text-[var(--text-main)] transition-transform duration-200 hover:-rotate-12" />
+                    )}
+                  </button>
+                </Tooltip>
               </div>
 
               {/* ── RESTAURANT ADMIN LINKS ── */}
@@ -263,6 +287,7 @@ const RightSection = ({
         </div>
       ) : (
         <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <ThemeToggle />
           <Link
             href="/auth/login"
             className="bg-[var(--brand-accent)] hover:opacity-90 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition shadow-md shadow-[var(--brand-accent)]/20 shrink-0 whitespace-nowrap"

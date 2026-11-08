@@ -93,52 +93,80 @@ export async function calculateOrderDetails({
     }
 
     let authoritativePrice = Number(dbProd.price) || 0;
+    let snapshotVariantId = null;
     let snapshotVariantName = null;
+    let snapshotCompareAtPrice = null;
+    let snapshotImage = dbProd.image || '';
     let snapshotPortionQuantity = dbProd.portion?.quantity ?? null;
     let snapshotPortionUnit = dbProd.portion?.unit ?? null;
     let snapshotServingLabel = dbProd.portion?.servingLabel ?? null;
     let snapshotSize = dbProd.portion?.size ?? null;
 
-    if (item.variantName && typeof item.variantName === "string" && item.variantName.trim()) {
-      const cleanVarName = item.variantName.trim();
+    const hasItemVariant = Boolean(
+      (item.variantId && typeof item.variantId === "string" && item.variantId.trim()) ||
+      (item.variantName && typeof item.variantName === "string" && item.variantName.trim())
+    );
+
+    if (hasItemVariant || (dbProd.hasVariants && Array.isArray(dbProd.variants) && dbProd.variants.length > 0)) {
       const variantsList = Array.isArray(dbProd.variants) ? dbProd.variants : [];
-      const matchedVariant = variantsList.find(
-        (v) => v.name && v.name.trim().toLowerCase() === cleanVarName.toLowerCase()
-      );
+      let matchedVariant = null;
 
-      if (!matchedVariant) {
+      // 1. Try matching by stable variant ID
+      if (item.variantId && typeof item.variantId === "string" && item.variantId.trim()) {
+        const vIdStr = item.variantId.trim();
+        matchedVariant = variantsList.find(
+          (v) => (v._id && v._id.toString() === vIdStr) || (v.id && String(v.id) === vIdStr)
+        );
+      }
+
+      // 2. Fallback to matching by variant name (case-insensitive)
+      if (!matchedVariant && item.variantName && typeof item.variantName === "string" && item.variantName.trim()) {
+        const cleanVarName = item.variantName.trim().toLowerCase();
+        matchedVariant = variantsList.find(
+          (v) => v.name && v.name.trim().toLowerCase() === cleanVarName
+        );
+      }
+
+      if (dbProd.hasVariants && !matchedVariant) {
         return {
           success: false,
           status: 400,
-          message: `Variant '${cleanVarName}' for dish '${dbProd.name}' is invalid or no longer exists.`,
+          message: `Please select a valid size/variant for dish '${dbProd.name}'.`,
         };
       }
 
-      if (matchedVariant.isAvailable === false) {
-        return {
-          success: false,
-          status: 400,
-          message: `Variant '${matchedVariant.name}' for '${dbProd.name}' is currently out of stock.`,
-        };
-      }
+      if (matchedVariant) {
+        if (matchedVariant.isAvailable === false) {
+          return {
+            success: false,
+            status: 400,
+            message: `Variant '${matchedVariant.name}' for '${dbProd.name}' is currently out of stock.`,
+          };
+        }
 
-      authoritativePrice = Number(matchedVariant.price);
-      if (isNaN(authoritativePrice) || authoritativePrice < 0) {
-        authoritativePrice = Number(dbProd.price) || 0;
-      }
+        authoritativePrice = Number(matchedVariant.price);
+        if (isNaN(authoritativePrice) || authoritativePrice < 0) {
+          authoritativePrice = Number(dbProd.price) || 0;
+        }
 
-      snapshotVariantName = matchedVariant.name;
-      if (matchedVariant.portionQuantity != null) {
-        snapshotPortionQuantity = matchedVariant.portionQuantity;
-      }
-      if (matchedVariant.portionUnit) {
-        snapshotPortionUnit = matchedVariant.portionUnit;
-      }
-      if (matchedVariant.servingLabel) {
-        snapshotServingLabel = matchedVariant.servingLabel;
-      }
-      if (matchedVariant.size) {
-        snapshotSize = matchedVariant.size;
+        snapshotVariantId = matchedVariant._id ? matchedVariant._id.toString() : (matchedVariant.id ? String(matchedVariant.id) : null);
+        snapshotVariantName = matchedVariant.name;
+        snapshotCompareAtPrice = matchedVariant.compareAtPrice ?? null;
+        if (matchedVariant.image) {
+          snapshotImage = matchedVariant.image;
+        }
+        if (matchedVariant.portionQuantity != null) {
+          snapshotPortionQuantity = matchedVariant.portionQuantity;
+        }
+        if (matchedVariant.portionUnit) {
+          snapshotPortionUnit = matchedVariant.portionUnit;
+        }
+        if (matchedVariant.servingLabel) {
+          snapshotServingLabel = matchedVariant.servingLabel;
+        }
+        if (matchedVariant.size) {
+          snapshotSize = matchedVariant.size;
+        }
       }
     }
 
@@ -166,10 +194,12 @@ export async function calculateOrderDetails({
       quantity: qty,
       selectedOptions: sanitizedOptions,
       optionsTotal,
-      image: dbProd.image || '',
+      image: snapshotImage || dbProd.image || '',
       category: dbProd.category || '',
       foodType: dbProd.foodType || dbProd.type || 'veg',
+      variantId: snapshotVariantId,
       variantName: snapshotVariantName,
+      compareAtPrice: snapshotCompareAtPrice,
       portionQuantity: snapshotPortionQuantity,
       portionUnit: snapshotPortionUnit,
       servingLabel: snapshotServingLabel,

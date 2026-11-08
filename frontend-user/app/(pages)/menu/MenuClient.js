@@ -15,11 +15,13 @@ import {
   Tag,
   Check,
   Star,
+  MapPin,
 } from "lucide-react";
 import ProductCard, { ProductCardSkeleton } from "@/components/products/ProductCard";
 import ProductCarousel from "@/components/products/ProductCarousel";
 import FilterDrawer from "@/components/menu/FilterDrawer";
 import { getRestaurantOperationalStatus } from "@/lib/restaurantHours";
+import { useLocationStore } from "@/lib/locationStore";
 import {
   getRecommendedProducts,
   hasUserPreferences,
@@ -34,6 +36,14 @@ import {
 export default function MenuClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Location from global store
+  const {
+    location,
+    locationDetails,
+    restaurantsServiceability,
+    openLocationModal,
+  } = useLocationStore();
 
   // Read filter params from URL
   const categoryFromUrl = searchParams.get("category") || "All";
@@ -159,12 +169,17 @@ export default function MenuClient() {
     return () => clearTimeout(timer);
   }, [searchInput, searchFromUrl, updateFilters]);
 
-  // Load Metadata (Restaurants, Categories, Offers)
+  // Load Metadata (Restaurants, Categories, Offers) with live location serviceability
   useEffect(() => {
     async function loadMeta() {
       try {
+        const restQuery =
+          locationDetails?.latitude && locationDetails?.longitude
+            ? `?lat=${locationDetails.latitude}&lng=${locationDetails.longitude}`
+            : "";
+
         const [restRes, catRes, offRes] = await Promise.allSettled([
-          fetch("/api/restaurants").then((r) => r.json()),
+          fetch(`/api/restaurants${restQuery}`).then((r) => r.json()),
           fetch("/api/categories").then((r) => r.json()),
           fetch("/api/offers").then((r) => r.json()),
         ]);
@@ -182,7 +197,54 @@ export default function MenuClient() {
       }
     }
     loadMeta();
-  }, []);
+  }, [locationDetails?.latitude, locationDetails?.longitude]);
+
+  // Compute restaurants that are delivering to the current location
+  const deliveringRestaurants = useMemo(() => {
+    if (!restaurants.length) return [];
+
+    // 1. If exact coordinates are provided, check authoritative serviceability
+    if (locationDetails?.latitude && locationDetails?.longitude) {
+      return restaurants.filter((r) => {
+        const serv =
+          r.serviceability ||
+          restaurantsServiceability[String(r._id)] ||
+          restaurantsServiceability[r.slug];
+        return serv ? Boolean(serv.isServiceable) : false;
+      });
+    }
+
+    // 2. If user selected a city preference by text without coordinates
+    if (locationDetails?.city) {
+      const targetCity = locationDetails.city.toLowerCase().trim();
+      const matched = restaurants.filter((r) => {
+        const rCity = (r.address?.city || "").toLowerCase().trim();
+        return rCity && targetCity && (rCity.includes(targetCity) || targetCity.includes(rCity));
+      });
+      if (matched.length > 0) return matched;
+    }
+
+    // Default to active restaurants if location hasn't been set yet
+    return restaurants;
+  }, [restaurants, locationDetails, restaurantsServiceability]);
+
+  const deliveringRestaurantIds = useMemo(() => {
+    return new Set(deliveringRestaurants.map((r) => String(r._id)));
+  }, [deliveringRestaurants]);
+
+  // If the user's location updates or delivering kitchens change,
+  // ensure any active restaurant filter is strictly delivering to this location.
+  useEffect(() => {
+    if (selectedRestaurant && selectedRestaurant !== "all" && deliveringRestaurants.length > 0) {
+      const isDelivering = deliveringRestaurants.some(
+        (r) => String(r._id) === selectedRestaurant || r.slug === selectedRestaurant
+      );
+      if (!isDelivering) {
+        setSelectedRestaurant("all");
+        updateFilters({ restaurant: "all" });
+      }
+    }
+  }, [deliveringRestaurants, selectedRestaurant, updateFilters]);
 
   // Fetch Products matching backend filters
   const fetchProducts = useCallback(async () => {
@@ -214,29 +276,37 @@ export default function MenuClient() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Curate Recommended and Newly Arrived items
+  // Curate Recommended and Newly Arrived items strictly from delivering restaurants
   useEffect(() => {
-    if (products.length > 0) {
-      const rec = getRecommendedProducts(products, 8);
+    const deliveringPool = products.filter((p) => {
+      if (deliveringRestaurantIds.size === 0 && !locationDetails?.latitude) return true;
+      const restId = String(p.restaurant?._id || p.restaurant || "");
+      return deliveringRestaurantIds.has(restId);
+    });
+
+    if (deliveringPool.length > 0) {
+      const rec = getRecommendedProducts(deliveringPool, 8);
       if (rec.length > 0) {
         setRecommendedList(rec);
       } else {
-        // Fallback to top-rated / popular items for immediate display
-        const fallback = [...products]
+        const fallback = [...deliveringPool]
           .sort((a, b) => (Number(b.numRatings || 0) * Number(b.rating || 0)) - (Number(a.numRatings || 0) * Number(a.rating || 0)))
           .slice(0, 8);
         setRecommendedList(fallback);
       }
 
-      const newArrivals = products.filter((p) => getProductNewArrivalStatus(p, restaurants));
+      const newArrivals = deliveringPool.filter((p) => getProductNewArrivalStatus(p, deliveringRestaurants));
       setNewArrivalsList(
         (newArrivals.length > 0
           ? newArrivals
-          : [...products].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+          : [...deliveringPool].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
         ).slice(0, 8)
       );
+    } else {
+      setRecommendedList([]);
+      setNewArrivalsList([]);
     }
-  }, [products, restaurants]);
+  }, [products, deliveringRestaurants, deliveringRestaurantIds, locationDetails]);
 
   // Compute absolute min & max prices across current products
   const priceBounds = useMemo(() => {
@@ -277,6 +347,14 @@ export default function MenuClient() {
   // Client-side filtering & real sorting
   const displayedProducts = useMemo(() => {
     let result = [...products];
+
+    // Filter dishes strictly to delivering restaurants serving this location
+    if (deliveringRestaurantIds.size > 0 || (locationDetails?.latitude && locationDetails?.longitude)) {
+      result = result.filter((p) => {
+        const restId = String(p.restaurant?._id || p.restaurant || "");
+        return deliveringRestaurantIds.has(restId);
+      });
+    }
 
     // Availability filter
     if (onlyInStock) {
@@ -380,7 +458,7 @@ export default function MenuClient() {
     }
 
     return result;
-  }, [products, onlyInStock, onlyOffers, minPrice, maxPrice, minRating, sortBy, getProductDiscountInfo, offers]);
+  }, [products, onlyInStock, onlyOffers, minPrice, maxPrice, minRating, sortBy, getProductDiscountInfo, offers, deliveringRestaurantIds, locationDetails]);
 
   // Categories list with global counts (from /api/categories or dynamic scan)
   const categories = useMemo(() => {
@@ -447,11 +525,38 @@ export default function MenuClient() {
 
   const selectedRestaurantObj = useMemo(() => {
     if (!selectedRestaurant || selectedRestaurant === "all") return null;
-    return restaurants.find((r) => r._id === selectedRestaurant) || null;
-  }, [restaurants, selectedRestaurant]);
+    return deliveringRestaurants.find((r) => r._id === selectedRestaurant) || restaurants.find((r) => r._id === selectedRestaurant) || null;
+  }, [deliveringRestaurants, restaurants, selectedRestaurant]);
 
   return (
     <main className="min-h-screen pt-20 sm:pt-24 pb-24 px-3 sm:px-6 lg:px-8 w-full max-w-7xl mx-auto text-[var(--text-main)] transition-colors overflow-x-hidden min-w-0">
+      {/* ── NO SERVICEABLE RESTAURANTS BANNER (only when no kitchens deliver) ─────────── */}
+      {deliveringRestaurants.length === 0 && (
+        <div className="mb-4 sm:mb-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-xs text-[var(--text-main)]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <MapPin size={15} />
+              </div>
+              <div>
+                <div className="font-bold text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
+                  No partner kitchens currently deliver to {location}
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  Partner kitchens are outside this delivery radius. Select another hub or adjust your location.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openLocationModal}
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs shrink-0 cursor-pointer transition shadow-2xs active:scale-95"
+            >
+              Select Delivery Location
+            </button>
+          </div>
+        </div>
+      )}
       {/* ── COMPACT TOOLBAR (SEARCH + SORT + FILTER) ────────────────── */}
       <div className="p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] mb-4 sm:mb-5 shadow-xs w-full max-w-full overflow-hidden min-w-0 space-y-2.5">
         {/* Responsive Toolbar Row */}
@@ -482,15 +587,15 @@ export default function MenuClient() {
             )}
           </div>
 
-          {/* Controls: Compact Sort & Filter Button */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Controls: Compact Sort & Filter Button (Equal width, same font and size) */}
+          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto shrink-0">
             {/* Real Sorting Dropdown */}
-            <div className="relative flex-1 sm:flex-initial">
+            <div className="relative w-full sm:w-44 min-w-0">
               <select
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
                 aria-label="Sort products"
-                className="h-10 w-full sm:w-auto min-w-[155px] sm:min-w-[165px] pl-2.5 sm:pl-3.5 pr-7 sm:pr-8 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none"
+                className="h-10 w-full pl-3 pr-7 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-main)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition cursor-pointer appearance-none truncate font-sans"
               >
                 <option value="default">Sort: Recommended</option>
                 <option value="popularity">Popularity</option>
@@ -508,7 +613,7 @@ export default function MenuClient() {
               type="button"
               onClick={() => setIsFilterDrawerOpen(true)}
               aria-label="Open filter panel"
-              className={`h-10 flex-1 sm:flex-initial px-3 sm:px-4 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] ${
+              className={`h-10 w-full sm:w-44 px-3 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] font-sans ${
                 activeFiltersCount > 0
                   ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] font-semibold"
                   : "bg-[var(--bg-sub)] text-[var(--text-main)] border-[var(--border-color)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card-hover)]"
@@ -720,25 +825,7 @@ export default function MenuClient() {
         })()}
       </div>
 
-      {/* ── FILTER DRAWER MODAL ─────────────────────────────────────── */}
-      <FilterDrawer
-        isOpen={isFilterDrawerOpen}
-        onClose={() => setIsFilterDrawerOpen(false)}
-        categories={categories}
-        restaurants={restaurants}
-        appliedFilters={{
-          category: selectedCategory,
-          restaurant: selectedRestaurant,
-          type: selectedType,
-          inStock: onlyInStock,
-          hasOffers: onlyOffers,
-          minPrice: minPrice,
-          maxPrice: maxPrice,
-        }}
-        priceBounds={priceBounds}
-        onApply={handleApplyDrawerFilters}
-        onReset={handleResetFilters}
-      />
+
 
       {/* ── PRODUCTS CONTENT & STATES ───────────────────────────────── */}
       {loading ? (
@@ -823,7 +910,7 @@ export default function MenuClient() {
               {recommendedList.length > 0 && (
                 <ProductCarousel
                   title="Recommended For You"
-                  subtitle="Curated from your recent taste preferences and search history"
+                  subtitle="Curated from your taste preferences"
                   badge="Personalized"
                   icon={<Sparkles size={18} />}
                   products={recommendedList}
@@ -835,7 +922,7 @@ export default function MenuClient() {
               {newArrivalsList.length > 0 && (
                 <ProductCarousel
                   title="Newly Arrived Additions"
-                  subtitle="Recently launched items prepared fresh by our partner kitchens"
+                  subtitle="Fresh additions from partner kitchens"
                   badge="Fresh In"
                   icon={<Sparkles size={18} className="text-amber-500 fill-amber-500/20" />}
                   products={newArrivalsList}
@@ -903,7 +990,7 @@ export default function MenuClient() {
         isOpen={isFilterDrawerOpen}
         onClose={() => setIsFilterDrawerOpen(false)}
         categories={categories}
-        restaurants={restaurants}
+        restaurants={deliveringRestaurants.length > 0 ? deliveringRestaurants : restaurants}
         appliedFilters={{
           category: selectedCategory,
           restaurant: selectedRestaurant,

@@ -888,11 +888,7 @@ export default function OrderConfirmationClient() {
               Are you sure you want to cancel this order? The restaurant has not started preparing your food yet.
             </p>
 
-            {cancelError && (
-              <p className="text-xs text-rose-500 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20 font-medium">
-                {cancelError}
-              </p>
-            )}
+
 
             <div className="space-y-2">
               <label htmlFor="cancel-reason-input" className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { processStalePickupOrders } from "@/lib/orderMaintenanceService";
+import { processStalePickupOrders, processAllStaleOrders } from "@/lib/orderMaintenanceService";
 
 let _testCronSecret = null;
 let _isMaintenanceRunning = false;
@@ -66,10 +66,10 @@ async function handleMaintenanceTrigger(request) {
 
   _isMaintenanceRunning = true;
   try {
-    const results = await processStalePickupOrders();
+    const results = await processAllStaleOrders();
     return NextResponse.json({
       success: true,
-      message: `Order maintenance completed: ${results.processedCount} stale pickup orders dismissed.`,
+      message: `Order maintenance completed: ${results.processedCount} stale orders dismissed (${results.unrespondedProcessedCount} unresponded, ${results.pickupProcessedCount} uncollected).`,
       results,
     });
   } catch (error) {

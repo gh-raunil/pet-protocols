@@ -163,12 +163,12 @@ export default function FeedbackModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (rating < 1 || rating > 5) {
-      setErrorMessage("Please select a rating between 1 and 5 stars.");
+      toast.error("Please select a rating between 1 and 5 stars.");
       return;
     }
 
     if (hasComplaint && !complaintCategory) {
-      setErrorMessage("Please select a complaint category.");
+      toast.error("Please select a complaint category.");
       return;
     }
 
@@ -209,7 +209,7 @@ export default function FeedbackModal({
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setErrorMessage(data.message || "Failed to submit feedback. Please try again.");
+        toast.error(data.message || "Failed to submit feedback. Please try again.");
         return;
       }
 
@@ -220,7 +220,7 @@ export default function FeedbackModal({
         onFeedbackSubmitted(data.feedback);
       }
     } catch {
-      setErrorMessage("A network error occurred. Please try again.");
+      toast.error("A network error occurred. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -413,12 +413,6 @@ export default function FeedbackModal({
           ) : (
             // Feedback Submission / Edit Form
             <form onSubmit={handleSubmit} className="space-y-5">
-              {errorMessage && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 flex items-start gap-2.5 text-xs text-rose-500">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
 
               {/* Overall Star Rating */}
               <div className="space-y-1.5">

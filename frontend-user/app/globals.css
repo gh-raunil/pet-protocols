@@ -106,8 +106,9 @@ body {
 }
 
 /* ── Universal Input Focus & Autofill Overrides ── */
-input, textarea, select {
+input, textarea, select, button {
   color-scheme: dark light;
+  font-family: inherit;
 }
 
 /* Accessible focus rings with visible contrast */
@@ -170,9 +171,8 @@ select:-webkit-autofill:focus {
 /* Prevent unwanted automatic zoom shifts on iOS Safari / WebKit when focusing inputs */
 @media (max-width: 640px) {
   input:not([type="checkbox"]):not([type="radio"]),
-  select,
   textarea {
-    font-size: 16px !important;
+    font-size: 16px;
   }
 }
 

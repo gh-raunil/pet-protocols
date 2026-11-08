@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { toast } from "@/components/ui/ToastProvider";
 import {
   MapPin,
   Crosshair,
@@ -65,7 +66,11 @@ export default function DeliveryLocationMapPicker({
 }) {
   const [selectedCoords, setSelectedCoords] = useState(initialCoordinates || null);
   const [locatingUser, setLocatingUser] = useState(false);
-  const [geoError, setGeoError] = useState("");
+  const [geoError, setRawGeoError] = useState("");
+  const setGeoError = useCallback((msg) => {
+    setRawGeoError(msg);
+    if (msg) toast.error(msg);
+  }, []);
   const [activeStyle, setActiveStyle] = useState("default");
   const [styleMenuOpen, setStyleMenuOpen] = useState(false);
   const [isMapMoving, setIsMapMoving] = useState(false);
@@ -457,31 +462,18 @@ export default function DeliveryLocationMapPicker({
           </div>
         </div>
 
-        {/* Error message if geolocation fails */}
-        {geoError && (
-          <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle size={14} className="shrink-0" />
-            <span>{geoError}</span>
-          </div>
-        )}
+
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 bg-[var(--bg-main,#0D0E10)] border-t border-[var(--border-color,rgba(255,255,255,0.1))] flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             {selectedCoords ? (
-              <>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  {Number(selectedCoords.latitude).toFixed(5)}, {Number(selectedCoords.longitude).toFixed(5)}
-                </span>
-                {selectedCoords.accuracy && (
-                  <span className="text-[11px] text-stone-400 font-medium">
-                    (Accuracy: ~{Math.round(selectedCoords.accuracy)}m)
-                  </span>
-                )}
-              </>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Doorstep Location Pinned</span>
+              </span>
             ) : (
-              <span className="text-xs text-stone-500 italic">No coordinates selected</span>
+              <span className="text-xs text-stone-500 italic">Tap or move map to pin location</span>
             )}
           </div>
 

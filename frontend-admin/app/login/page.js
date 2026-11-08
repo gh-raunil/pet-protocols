@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { toast } from "react-hot-toast";
 
 function LoginForm({ defaultRole = "admin" }) {
   const router = useRouter();
@@ -65,6 +66,7 @@ function LoginForm({ defaultRole = "admin" }) {
 
       if (result?.error) {
         setAdminError(result.error);
+        toast.error(result.error);
         return;
       }
 
@@ -76,6 +78,7 @@ function LoginForm({ defaultRole = "admin" }) {
           ? err.message
           : "Invalid email or password, or temporary connection issue.";
       setAdminError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setAdminLoading(false);
     }
@@ -96,6 +99,7 @@ function LoginForm({ defaultRole = "admin" }) {
 
       if (result?.error) {
         setStaffError(result.error);
+        toast.error(result.error);
         return;
       }
 
@@ -107,6 +111,7 @@ function LoginForm({ defaultRole = "admin" }) {
           ? err.message
           : "Invalid email or password, or temporary connection issue.";
       setStaffError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setStaffLoading(false);
     }
@@ -238,20 +243,7 @@ function LoginForm({ defaultRole = "admin" }) {
                 </div>
               </div>
 
-              {adminError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 dark:text-red-400 text-xs text-center font-medium space-y-1">
-                  <p>{adminError}</p>
-                  {adminError.includes("Staff Login") && (
-                    <button
-                      type="button"
-                      onClick={() => handleFlipTo(true)}
-                      className="min-h-[44px] px-3 py-2 text-xs font-bold text-orange-600 dark:text-orange-400 underline hover:no-underline cursor-pointer inline-flex items-center justify-center mx-auto"
-                    >
-                      Click here to flip to Staff Login →
-                    </button>
-                  )}
-                </div>
-              )}
+
 
               <button
                 type="submit"
@@ -375,20 +367,7 @@ function LoginForm({ defaultRole = "admin" }) {
                 </div>
               </div>
 
-              {staffError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 dark:text-red-400 text-xs text-center font-medium space-y-1">
-                  <p>{staffError}</p>
-                  {staffError.includes("Admin Login") && (
-                    <button
-                      type="button"
-                      onClick={() => handleFlipTo(false)}
-                      className="min-h-[44px] px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer inline-flex items-center justify-center mx-auto"
-                    >
-                      Click here to flip to Admin Login →
-                    </button>
-                  )}
-                </div>
-              )}
+
 
               <button
                 type="submit"

@@ -63,14 +63,38 @@ export default function AppShell({ children }) {
         }
       }
 
+      function handleKitchenEvent(e) {
+        if (e.detail && typeof e.detail.active === "boolean") {
+          setTimeout(() => {
+            setKitchenActive(e.detail.active);
+          }, 0);
+        }
+      }
+
       window.addEventListener("pet_protocols_unresponded_orders_count", handleCountEvent);
+      window.addEventListener("pet_protocols_kitchen_active_changed", handleKitchenEvent);
       window.addEventListener("storage", handleStorage);
+
+      if (isRestaurantAdmin) {
+        fetch("/api/restaurant/settings")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.restaurant) {
+              const active = data.restaurant.isOpen !== false && data.restaurant.acceptingOrders !== false;
+              setKitchenActive(active);
+              localStorage.setItem("restaurant_kitchen_active", String(active));
+            }
+          })
+          .catch(() => {});
+      }
+
       return () => {
         window.removeEventListener("pet_protocols_unresponded_orders_count", handleCountEvent);
+        window.removeEventListener("pet_protocols_kitchen_active_changed", handleKitchenEvent);
         window.removeEventListener("storage", handleStorage);
       };
     }
-  }, []);
+  }, [isRestaurantAdmin]);
 
   function toggleSidebarCollapse() {
     setSidebarCollapsed((prev) => {
@@ -82,14 +106,12 @@ export default function AppShell({ children }) {
     });
   }
 
-  function toggleKitchenActive() {
-    setKitchenActive((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("restaurant_kitchen_active", String(next));
-      }
-      return next;
-    });
+  function toggleKitchenActive(explicitNext) {
+    const next = typeof explicitNext === "boolean" ? explicitNext : !kitchenActive;
+    setKitchenActive(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("restaurant_kitchen_active", String(next));
+    }
   }
 
   // Superadmin broadcast notice loader

@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
 import {
   ShoppingBag,
   Clock,
   Phone,
+  PhoneCall,
   MapPin,
-  CheckCircle,
   RefreshCw,
   ChefHat,
   Truck,
@@ -19,6 +20,7 @@ import {
   Bell,
   Sparkles,
   AlertTriangle,
+  AlertCircle,
   Calendar,
   Download,
   Search,
@@ -34,6 +36,11 @@ import {
   Bike,
   UserCheck,
   X,
+  SlidersHorizontal,
+  ExternalLink,
+  ChevronRight,
+  MoreVertical,
+  Layers,
 } from "lucide-react";
 import { playChime } from "@/lib/soundChimes";
 import { formatOrderId } from "../dashboard/DashboardClient";
@@ -42,10 +49,18 @@ import OutOfRangeOrderModal from "@/components/orders/OutOfRangeOrderModal";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
 import Tooltip, { HelpTooltip } from "@/components/ui/Tooltip";
 
+// Command Center Modular Components
+import OrderCommandMetrics from "@/components/orders/OrderCommandMetrics";
+import InlineDeliveryAssignModal from "@/components/orders/InlineDeliveryAssignModal";
+import HandoverOtpModal from "@/components/orders/HandoverOtpModal";
+import CancelOrderModal from "@/components/orders/CancelOrderModal";
+import OrderDetailsDrawer from "@/components/orders/OrderDetailsDrawer";
+
 const POLL_INTERVAL = 10000; // Poll every 10 seconds
 
 export function checkIsPickup(order) {
   if (!order) return false;
+  if (order.orderType === "pickup") return true;
   const method = String(order.paymentMethod || "").toLowerCase();
   const notes = String(order.notes || "").toLowerCase();
   const addressType = String(order.address?.addressType || "").toLowerCase();
@@ -59,7 +74,6 @@ export function checkIsPickup(order) {
 
 // Live elapsed kitchen timer helper with progressive urgency colors
 export function getOrderElapsedInfo(createdAt, status, updatedAt) {
-  // If order is delivered, stop timer and show completion badge
   if (status === "delivered") {
     let completionText = "Delivered";
     if (updatedAt && createdAt) {
@@ -73,7 +87,6 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
     };
   }
 
-  // If order is cancelled, stop timer and show cancelled badge
   if (status === "cancelled") {
     return {
       text: "✕ Cancelled",
@@ -82,7 +95,6 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
     };
   }
 
-  // If order is ready for pickup/handoff
   if (status === "ready") {
     return {
       text: "🍽️ Ready for Handoff",
@@ -91,7 +103,6 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
     };
   }
 
-  // If order is confirmed
   if (status === "confirmed") {
     return {
       text: "✓ Confirmed",
@@ -100,7 +111,6 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
     };
   }
 
-  // If order is out for delivery, show in-transit badge
   if (status === "out_for_delivery") {
     return {
       text: "🛵 Dispatched (On Delivery)",
@@ -118,66 +128,68 @@ export function getOrderElapsedInfo(createdAt, status, updatedAt) {
   }
 
   const elapsedMs = Date.now() - new Date(createdAt).getTime();
-  const elapsedMins = Math.max(0, Math.floor(elapsedMs / (1000 * 60)));
+  const elapsedMins = Math.floor(elapsedMs / 60000);
+
   if (elapsedMins < 1) {
     return {
-      text: "Just now",
+      text: "< 1m",
       color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
       urgent: false,
     };
   }
+
   if (elapsedMins < 10) {
     return {
-      text: `${elapsedMins}m ago • On track`,
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30",
+      text: `${elapsedMins}m ago`,
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30 font-semibold",
       urgent: false,
     };
   }
+
   if (elapsedMins < 20) {
     return {
-      text: `${elapsedMins}m ago • Cooking`,
-      color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30",
+      text: `⚠️ ${elapsedMins}m ago`,
+      color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30 font-bold",
       urgent: false,
     };
   }
+
   return {
-    text: `🚨 ${elapsedMins}m ago • Delayed!`,
-    color: "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-500/40 animate-pulse font-black",
+    text: `🚨 ${elapsedMins}m (Delayed)`,
+    color: "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-500/40 font-black animate-pulse",
     urgent: true,
   };
 }
 
-// 80mm Kitchen Order Ticket (KOT) Thermal Receipt Printer
+// Global Kitchen Order Ticket (KOT) standard thermal print slip
 export function handlePrintKOT(order) {
-  const uniqueId = formatOrderId(order);
-  const dateStr = new Date(order.createdAt).toLocaleString();
+  if (!order) return;
+  const printWindow = window.open("", "_blank", "width=400,height=600");
+  if (!printWindow) return;
+
+  const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString();
   const customer = order.address?.fullName || order.user?.name || "Customer";
-  const phone = order.address?.phone || "N/A";
-  const address = `${order.address?.street || ""}, ${order.address?.city || ""}`.trim();
-  const paymentMode = order.paymentMethod || (order.paymentStatus === "pending" ? "Cash on Delivery (COD)" : "Paid Online");
-  const isCod = paymentMode.toLowerCase().includes("cod") || paymentMode.toLowerCase().includes("cash") || order.paymentStatus === "pending";
+  const phone = order.address?.phone || order.user?.phone || "N/A";
+  const address = order.address?.street ? `${order.address.street}, ${order.address.city || ""}` : "";
+  const uniqueId = formatOrderId(order);
+  const paymentMode = (order.paymentMethod || "").toLowerCase();
+  const isCod = paymentMode.includes("cod") || paymentMode.includes("cash") || order.paymentStatus === "pending";
 
-  const itemsHtml = (order.items || []).map((it) => {
-    const variantTag = it.variantName ? `<span style="font-weight:bold; color:#d97706;">[${it.variantName}]</span> ` : "";
-    const portionTag = (it.servingLabel || (it.portionQuantity ? `${it.portionQuantity} ${it.portionUnit || ""}` : "")) + (it.size ? ` (${it.size})` : "");
-    const metaLine = (variantTag || portionTag) ? `<div style="font-size:10px; color:#555;">${variantTag}${portionTag}</div>` : "";
-    return `
-      <tr style="border-bottom: 1px dashed #bbb;">
-        <td style="padding: 5px 0; font-weight: bold; font-size: 13px;">${it.quantity}x</td>
-        <td style="padding: 5px 4px; font-size: 13px;">
-          ${it.name}
-          ${metaLine}
+  const itemsHtml = (order.items || [])
+    .map(
+      (item) => `
+      <tr>
+        <td style="font-weight: bold; width: 32px; vertical-align: top;">${item.quantity}×</td>
+        <td style="vertical-align: top;">
+          <strong>${item.name}</strong>
+          ${item.variantName ? `<br><small style="color:#555;">[${item.variantName}]</small>` : ""}
+          ${item.servingLabel ? `<br><small style="color:#555;">Portion: ${item.servingLabel}</small>` : ""}
         </td>
-        <td style="padding: 5px 0; text-align: right; font-size: 13px;">₹${(it.price || 0) * (it.quantity || 1)}</td>
+        <td style="text-align: right; vertical-align: top; font-family: monospace;">₹${(item.price || 0) * (item.quantity || 1)}</td>
       </tr>
-    `;
-  }).join("");
-
-  const printWindow = window.open("", "_blank", "width=380,height=600");
-  if (!printWindow) {
-    alert("Please allow popups in your browser to print Kitchen Order Tickets.");
-    return;
-  }
+    `
+    )
+    .join("");
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -185,8 +197,8 @@ export function handlePrintKOT(order) {
       <head>
         <title>KOT - ${uniqueId}</title>
         <style>
-          @page { size: 80mm auto; margin: 4mm; }
-          body { font-family: monospace, -apple-system, sans-serif; width: 72mm; margin: 0 auto; color: #000; font-size: 12px; line-height: 1.3; }
+          @page { margin: 0; size: 80mm auto; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; margin: 8px; color: #000; }
           .center { text-align: center; }
           .divider { border-top: 1px dashed #000; margin: 6px 0; }
           .tag { display: inline-block; padding: 3px 8px; border: 2px solid #000; font-weight: bold; font-size: 15px; margin: 4px 0; }
@@ -224,7 +236,7 @@ export function handlePrintKOT(order) {
           <tr><td>Payment:</td><td style="text-align: right; font-size: 11px;">${isCod ? "COLLECT CASH (COD)" : "PAID ONLINE"}</td></tr>
         </table>
         <div class="divider"></div>
-        <p class="center" style="font-size: 9px; margin-top: 8px;">• Check all dish seals before dispatch •</p>
+        <p class="center" style="font-size: 9px; margin-top: 8px;">• Check dish seals before dispatch •</p>
         <script>
           window.onload = function() {
             window.print();
@@ -240,6 +252,7 @@ export function handlePrintKOT(order) {
 export default function OrdersClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const isDeliveryOnlyStaff =
     session?.user?.role === "staff" &&
@@ -272,35 +285,31 @@ export default function OrdersClient() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(todayStr); // Default to current date
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [searchQuery, setSearchQuery] = useState("");
   const [restaurantCreatedAt, setRestaurantCreatedAt] = useState(null);
   const [currentRestaurant, setCurrentRestaurant] = useState(null);
-  const [outOfRangePrompt, setOutOfRangePrompt] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
-  const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [expandedMapOrderIds, setExpandedMapOrderIds] = useState(new Set());
 
-  // Assign Delivery Boy Modal States
+  // Modal & Drawer States
+  const [selectedDrawerOrder, setSelectedDrawerOrder] = useState(null);
   const [assignModalOrder, setAssignModalOrder] = useState(null);
+  const [handoverOtpModalOrder, setHandoverOtpModalOrder] = useState(null);
+  const [cancelModalOrder, setCancelModalOrder] = useState(null);
+  const [outOfRangePrompt, setOutOfRangePrompt] = useState(null);
+
+  // Delivery fleet staff list
   const [deliveryStaffList, setDeliveryStaffList] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [assignSubmitting, setAssignSubmitting] = useState(false);
-  const [assignError, setAssignError] = useState("");
 
-  const toggleLiveMap = (orderId) => {
-    setExpandedMapOrderIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderId)) {
-        next.delete(orderId);
-      } else {
-        next.add(orderId);
-      }
-      return next;
-    });
-  };
+  // OTP Verification Modal state
+  const [handoverOtpSubmitting, setHandoverOtpSubmitting] = useState(false);
+  const [handoverOtpError, setHandoverOtpError] = useState("");
+  const [handoverAttemptsRemaining, setHandoverAttemptsRemaining] = useState(null);
 
-  // Kitchen Alert, Audio & Operational States
+  // Operational toggles
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [newOrderAlert, setNewOrderAlert] = useState(null);
   const [highlightedOrderIds, setHighlightedOrderIds] = useState(new Set());
@@ -312,26 +321,96 @@ export default function OrdersClient() {
     }
     return true;
   });
+  const [isUpdatingKitchen, setIsUpdatingKitchen] = useState(false);
 
-  // Ticking timer clock every 30 seconds for live order urgency badges
+  useEffect(() => {
+    function handleKitchenChange(e) {
+      if (e.detail && typeof e.detail.active === "boolean") {
+        setTimeout(() => {
+          setKitchenActive(e.detail.active);
+        }, 0);
+      }
+    }
+    function handleStorage(e) {
+      if (e.key === "restaurant_kitchen_active") {
+        setTimeout(() => {
+          setKitchenActive(e.newValue !== "false");
+        }, 0);
+      }
+    }
+    window.addEventListener("pet_protocols_kitchen_active_changed", handleKitchenChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("pet_protocols_kitchen_active_changed", handleKitchenChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const resumeOrdersFromBanner = async () => {
+    if (isUpdatingKitchen) return;
+    setIsUpdatingKitchen(true);
+    try {
+      const res = await fetch("/api/restaurant/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isOpen: true,
+          acceptingOrders: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success !== false) {
+        setKitchenActive(true);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("restaurant_kitchen_active", "true");
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("pet_protocols_kitchen_active_changed", {
+                detail: { active: true },
+              })
+            );
+          }, 0);
+        }
+        toast.success("Accepting orders — storefront is now open.");
+      } else {
+        toast.error(data.message || "Failed to update restaurant status.");
+      }
+    } catch (err) {
+      toast.error("Network error updating restaurant status.");
+    } finally {
+      setIsUpdatingKitchen(false);
+    }
+  };
+
+  // Auto-Print KOT Preference
+  const [autoPrintKot, setAutoPrintKot] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("restaurant_auto_print_kot") === "true";
+    }
+    return false;
+  });
+
+  const toggleAutoPrintKot = () => {
+    const next = !autoPrintKot;
+    setAutoPrintKot(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("restaurant_auto_print_kot", String(next));
+    }
+    toast.success(next ? "Auto-print KOT on order accept: ENABLED" : "Auto-print KOT: DISABLED");
+  };
+
+  // Timer ticker
   useEffect(() => {
     setCurrentTimeTick(Date.now());
     const timer = setInterval(() => setCurrentTimeTick(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
 
-  // Refs for polling and concurrency management
   const isFetchingRef = useRef(false);
   const knownOrderIdsRef = useRef(new Set());
   const isInitialLoadRef = useRef(true);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login?callbackUrl=/orders");
-    }
-  }, [status, router]);
-
-  // Load orders from backend
+  // Load orders
   const fetchOrders = useCallback(
     async (isManual = false) => {
       if (isFetchingRef.current) return;
@@ -343,7 +422,11 @@ export default function OrdersClient() {
 
       try {
         const params = new URLSearchParams();
-        if (filterStatus && filterStatus !== "all") params.append("status", filterStatus);
+        // Only pass recognized backend statuses in query
+        const backendStatuses = ["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"];
+        if (backendStatuses.includes(filterStatus)) {
+          params.append("status", filterStatus);
+        }
         if (selectedDate) params.append("date", selectedDate);
         if (searchQuery.trim()) params.append("search", searchQuery.trim());
 
@@ -363,22 +446,18 @@ export default function OrdersClient() {
             incomingOrders.forEach((o) => knownOrderIdsRef.current.add(o._id));
             isInitialLoadRef.current = false;
           } else {
-            // Check for new pending orders
             const newPendingOrders = incomingOrders.filter(
               (o) => o.status === "pending" && !knownOrderIdsRef.current.has(o._id)
             );
 
             if (newPendingOrders.length > 0) {
-              // Sound alert
               if (soundEnabled) {
                 playChime(null, 1.0);
               }
 
               const newest = newPendingOrders[0];
-              const totalItems = newest.items?.reduce(
-                (sum, it) => sum + (it.quantity || 1),
-                0
-              ) || 1;
+              const totalItems =
+                newest.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 1;
 
               setNewOrderAlert({
                 id: newest._id,
@@ -406,11 +485,32 @@ export default function OrdersClient() {
           }
 
           setOrders(incomingOrders);
+
+          // Keep selected drawer order in sync if open
+          setSelectedDrawerOrder((prev) => {
+            if (!prev) return null;
+            return incomingOrders.find((o) => o._id === prev._id) || prev;
+          });
+
+          // Sync pending count to local storage & header
+          if (selectedDate === todayStr || !selectedDate || selectedDate === "all") {
+            const activePendingCount = incomingOrders.filter((o) => o.status === "pending").length;
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem("pet_protocols_pending_orders_count", String(activePendingCount));
+              } catch (e) {}
+              window.dispatchEvent(
+                new CustomEvent("pet_protocols_unresponded_orders_count", {
+                  detail: { count: activePendingCount },
+                })
+              );
+            }
+          }
         }
       } catch (err) {
         console.error("Order polling failed:", err);
         if (isManual) {
-          setFeedback({ type: "error", message: "Failed to load orders." });
+          toast.error("Failed to refresh orders.");
         }
       } finally {
         isFetchingRef.current = false;
@@ -418,26 +518,147 @@ export default function OrdersClient() {
         setIsRefreshing(false);
       }
     },
-    [filterStatus, selectedDate, searchQuery, soundEnabled]
+    [filterStatus, selectedDate, searchQuery, soundEnabled, todayStr]
   );
 
-  // Initial load and periodic polling interval
+
+
+  // Load delivery staff
+  const fetchDeliveryStaff = useCallback(async () => {
+    try {
+      setLoadingStaff(true);
+      const res = await fetch("/api/restaurant/delivery-staff");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.deliveryStaff)) {
+        setDeliveryStaffList(data.deliveryStaff);
+      } else {
+        toast.error(data.message || "Failed to load delivery staff list.");
+      }
+    } catch (err) {
+      console.error("Fetch delivery staff error:", err);
+      toast.error("Network error fetching delivery personnel.");
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, []);
+
+  // Polling loop
   useEffect(() => {
     if (!session?.user) return;
-
     setLoading(true);
     fetchOrders(false);
+    fetchDeliveryStaff();
 
     const intervalId = setInterval(() => {
       fetchOrders(false);
     }, POLL_INTERVAL);
 
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [session, filterStatus, selectedDate, fetchOrders]);
+    return () => clearInterval(intervalId);
+  }, [session, fetchOrders, fetchDeliveryStaff]);
 
+  // Deep Link Handling from Dashboard `?orderId=...`
+  const deepLinkedOrderId = searchParams.get("orderId");
+  useEffect(() => {
+    if (!deepLinkedOrderId || orders.length === 0) return;
+    const cleanTarget = deepLinkedOrderId.trim().toLowerCase().replace(/^#/, "").replace(/^pet-/i, "").replace(/^ord_/i, "");
+    const found = orders.find((o) => {
+      const oId = (o._id || "").toString().toLowerCase();
+      const rawId = (o.orderId || "").toLowerCase();
+      const formatted = formatOrderId(o).toLowerCase();
+      return (
+        oId === deepLinkedOrderId.toLowerCase() ||
+        oId.includes(cleanTarget) ||
+        rawId.includes(cleanTarget) ||
+        formatted.includes(cleanTarget)
+      );
+    });
+
+    if (found) {
+      setSelectedDrawerOrder(found);
+      setHighlightedOrderIds((prev) => new Set([...prev, found._id]));
+      setTimeout(() => {
+        const cardEl = document.getElementById(`order-card-${found._id}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 200);
+    }
+  }, [deepLinkedOrderId, orders]);
+
+
+
+  // Compute active order workload map for couriers from actual active orders
+  const activeOrdersMap = useMemo(() => {
+    const map = {};
+    orders.forEach((o) => {
+      const driverId = o.assignedDeliveryStaff?.id;
+      if (driverId && ["confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)) {
+        map[driverId] = (map[driverId] || 0) + 1;
+      }
+    });
+    return map;
+  }, [orders]);
+
+  // Compute Summary Metrics for Command Center
+  const commandMetrics = useMemo(() => {
+    let actionNeeded = 0;
+    let preparing = 0;
+    let ready = 0;
+    let outForDelivery = 0;
+    let deliveredToday = 0;
+
+    orders.forEach((o) => {
+      const isPickup = checkIsPickup(o);
+      const isPending = o.status === "pending";
+      const isReadyUnassigned = o.status === "ready" && !isPickup && !o.assignedDeliveryStaff?.id;
+      const isDelayedPrep =
+        o.status === "preparing" &&
+        o.createdAt &&
+        currentTimeTick - new Date(o.createdAt).getTime() > 20 * 60 * 1000;
+
+      if (isPending || isReadyUnassigned || isDelayedPrep) {
+        actionNeeded++;
+      }
+
+      if (o.status === "preparing") {
+        preparing++;
+      } else if (o.status === "ready") {
+        ready++;
+      } else if (o.status === "out_for_delivery") {
+        outForDelivery++;
+      } else if (o.status === "delivered") {
+        deliveredToday++;
+      }
+    });
+
+    return { actionNeeded, preparing, ready, outForDelivery, deliveredToday };
+  }, [orders, currentTimeTick]);
+
+  // Status updates
   async function handleUpdateStatus(orderId, nextStatus, extra = {}) {
+    const targetOrder = orders.find((o) => o._id === orderId);
+    const isPickup = targetOrder ? checkIsPickup(targetOrder) : false;
+
+    // Enforce business rules:
+    if (nextStatus === "out_for_delivery" && !isPickup) {
+      if (targetOrder && targetOrder.status !== "ready") {
+        toast.error("Order must be cooked and marked 'Ready for Handoff' before dispatching!");
+        return;
+      }
+      if (!targetOrder?.assignedDeliveryStaff?.id) {
+        toast.error("Please assign a delivery courier before dispatching!");
+        handleOpenAssignModal(targetOrder);
+        return;
+      }
+    }
+
+    if (nextStatus === "delivered" && !isPickup) {
+      setHandoverOtpError("");
+      setHandoverAttemptsRemaining(null);
+      setHandoverOtpModalOrder(targetOrder);
+      return;
+    }
+
     try {
       setUpdatingOrderId(orderId);
       const res = await fetch("/api/restaurant/orders", {
@@ -448,25 +669,39 @@ export default function OrdersClient() {
 
       const data = await res.json();
       if (data.success) {
-        const orderObj = orders.find((o) => o._id === orderId);
+        const orderObj = orders.find((o) => o._id === orderId) || targetOrder;
         const wasPending = orderObj?.status === "pending";
         const displayId = formatOrderId(orderObj || { _id: orderId });
-        setFeedback({
-          type: "success",
-          message: extra.acceptedOutOfRange
-            ? `Out-of-range order ${displayId} (${extra.deliveryDistanceKm} km) ACCEPTED by Manager!`
-            : `Order ${displayId} updated to ${nextStatus.toUpperCase()}`,
-        });
-        setOrders((prev) =>
-          prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus, ...extra, updatedAt: new Date().toISOString() } : o))
+
+        toast.success(
+          extra.acceptedOutOfRange
+            ? `Out-of-range order ${displayId} ACCEPTED by Manager!`
+            : `Order ${displayId} updated to ${nextStatus.toUpperCase()}`
         );
+
+        if (autoPrintKot && wasPending && (nextStatus === "confirmed" || nextStatus === "preparing")) {
+          handlePrintKOT(orderObj);
+        }
+
+        const updatedOrder = {
+          ...orderObj,
+          status: nextStatus,
+          ...extra,
+          updatedAt: new Date().toISOString(),
+        };
+
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? updatedOrder : o)));
+
+        if (selectedDrawerOrder?._id === orderId) {
+          setSelectedDrawerOrder(updatedOrder);
+        }
+
         setHighlightedOrderIds((prev) => {
           const next = new Set(prev);
           next.delete(orderId);
           return next;
         });
 
-        // If a pending order was responded to, immediately broadcast reduced count & sync
         if (wasPending && nextStatus !== "pending" && typeof window !== "undefined") {
           const remainingPending = orders.filter(
             (o) => o._id !== orderId && o.status === "pending"
@@ -481,18 +716,13 @@ export default function OrdersClient() {
               detail: { count: remainingPending },
             })
           );
-          window.dispatchEvent(
-            new CustomEvent("pet_protocols_order_responded", {
-              detail: { orderId, nextStatus },
-            })
-          );
         }
       } else {
-        setFeedback({ type: "error", message: data.message });
+        toast.error(data.message || "Failed to update order status.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Failed to update order status." });
+      toast.error("Network error updating order status.");
     } finally {
       setUpdatingOrderId(null);
     }
@@ -522,6 +752,118 @@ export default function OrdersClient() {
     handleUpdateStatus(order._id, "preparing");
   }
 
+  // Assign Driver Modal Handlers
+  const handleOpenAssignModal = (order) => {
+    setAssignModalOrder(order);
+    fetchDeliveryStaff();
+  };
+
+  const handleConfirmAssignDriver = async (orderId, staffObj) => {
+    try {
+      setAssignSubmitting(true);
+      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStaffId: staffObj._id || staffObj.id }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        toast.success(`Order assigned to ${staffObj.name}! 🛵`);
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
+        if (selectedDrawerOrder?._id === orderId) {
+          setSelectedDrawerOrder((prev) => ({ ...prev, ...data.order }));
+        }
+        setAssignModalOrder(null);
+      } else {
+        toast.error(data.message || "Failed to assign driver.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error assigning delivery driver.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const handleConfirmSelfDelivery = async (orderId) => {
+    try {
+      setAssignSubmitting(true);
+      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selfDelivery: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        toast.success("Self-delivery confirmed! 🚗");
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
+        if (selectedDrawerOrder?._id === orderId) {
+          setSelectedDrawerOrder((prev) => ({ ...prev, ...data.order }));
+        }
+        setAssignModalOrder(null);
+      } else {
+        toast.error(data.message || "Failed to set self-delivery.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error selecting self-delivery.");
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  // Handover OTP Verification
+  const handleVerifyHandoverOtp = async (orderId, otpCode) => {
+    try {
+      setHandoverOtpSubmitting(true);
+      setHandoverOtpError("");
+      const res = await fetch(`/api/restaurant/orders/${orderId}/verify-handover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          otpCode,
+          notes: `Delivery completed by manager ${session?.user?.name || "Manager"}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        toast.success("Delivery completed successfully! Handover verified. 🎉");
+        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order, status: "delivered" } : o)));
+        if (selectedDrawerOrder?._id === orderId) {
+          setSelectedDrawerOrder((prev) => ({ ...prev, ...data.order, status: "delivered" }));
+        }
+        setHandoverOtpModalOrder(null);
+      } else {
+        setHandoverOtpError(data.message || "Failed to verify handover OTP.");
+        if (typeof data.remainingAttempts === "number") {
+          setHandoverAttemptsRemaining(data.remainingAttempts);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setHandoverOtpError("Network error verifying handover OTP.");
+    } finally {
+      setHandoverOtpSubmitting(false);
+    }
+  };
+
+  // Cancel order handler
+  const handleConfirmCancel = async (orderId, reason) => {
+    await handleUpdateStatus(orderId, "cancelled", { cancellationReason: reason });
+    setCancelModalOrder(null);
+  };
+
+  // Toggle Live Map
+  const toggleLiveMap = (orderId) => {
+    setExpandedMapOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  // COD Cash Settlement
   async function handleSettleCodCash(orderId) {
     if (!confirm("Confirm settling this COD cash collection with manager?")) return;
     try {
@@ -533,7 +875,7 @@ export default function OrdersClient() {
       });
       const data = await res.json();
       if (data.success) {
-        setFeedback({ type: "success", message: "COD Cash marked as settled with manager." });
+        toast.success("COD Cash marked as settled with manager.");
         setOrders((prev) =>
           prev.map((o) =>
             o._id === orderId
@@ -549,160 +891,97 @@ export default function OrdersClient() {
           )
         );
       } else {
-        setFeedback({ type: "error", message: data.message || "Failed to settle cash." });
+        toast.error(data.message || "Failed to settle cash.");
       }
     } catch (err) {
       console.error(err);
-      setFeedback({ type: "error", message: "Network error settling COD cash." });
+      toast.error("Network error settling COD cash.");
     } finally {
       setUpdatingOrderId(null);
     }
   }
 
-  // Delivery Staff Assignment Handlers
-  const fetchDeliveryStaff = useCallback(async () => {
-    try {
-      setLoadingStaff(true);
-      setAssignError("");
-      const res = await fetch("/api/restaurant/delivery-staff");
-      const data = await res.json();
-      if (data.success && Array.isArray(data.deliveryStaff)) {
-        setDeliveryStaffList(data.deliveryStaff);
-      } else {
-        setAssignError(data.message || "Failed to load delivery staff list.");
-      }
-    } catch (err) {
-      console.error("Fetch delivery staff error:", err);
-      setAssignError("Network error fetching delivery personnel.");
-    } finally {
-      setLoadingStaff(false);
-    }
-  }, []);
-
-  const handleOpenAssignModal = (order) => {
-    setAssignModalOrder(order);
-    setAssignError("");
-    fetchDeliveryStaff();
-  };
-
-  const handleAssignDriver = async (orderId, staffId, staffName) => {
-    try {
-      setAssignSubmitting(true);
-      setAssignError("");
-      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryStaffId: staffId }),
-      });
-      const data = await res.json();
-      if (data.success && data.order) {
-        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
-        setFeedback({
-          type: "success",
-          message: `Order #${formatOrderId(data.order)} assigned to ${staffName}! 🛵`,
-        });
-        setAssignModalOrder(null);
-      } else {
-        setAssignError(data.message || "Failed to assign delivery staff.");
-      }
-    } catch (err) {
-      console.error("Assign driver error:", err);
-      setAssignError("Network error assigning delivery staff.");
-    } finally {
-      setAssignSubmitting(false);
-    }
-  };
-
-  const handleSelfDelivery = async (orderId) => {
-    try {
-      setAssignSubmitting(true);
-      setAssignError("");
-      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selfDelivery: true }),
-      });
-      const data = await res.json();
-      if (data.success && data.order) {
-        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
-        setFeedback({
-          type: "success",
-          message: `Self-delivery confirmed for Order #${formatOrderId(data.order)}! 🚗`,
-        });
-        setAssignModalOrder(null);
-      } else {
-        setAssignError(data.message || "Failed to assign self-delivery.");
-      }
-    } catch (err) {
-      console.error("Self-delivery error:", err);
-      setAssignError("Network error assigning self-delivery.");
-    } finally {
-      setAssignSubmitting(false);
-    }
-  };
-
-  const handleUnassignDriver = async (orderId) => {
-    try {
-      setAssignSubmitting(true);
-      setAssignError("");
-      const res = await fetch(`/api/restaurant/orders/${orderId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unassign: true }),
-      });
-      const data = await res.json();
-      if (data.success && data.order) {
-        setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, ...data.order } : o)));
-        setFeedback({
-          type: "success",
-          message: `Delivery driver unassigned from Order #${formatOrderId(data.order)}. Awaiting driver pickup.`,
-        });
-        setAssignModalOrder(null);
-      } else {
-        setAssignError(data.message || "Failed to unassign driver.");
-      }
-    } catch (err) {
-      console.error("Unassign driver error:", err);
-      setAssignError("Network error unassigning driver.");
-    } finally {
-      setAssignSubmitting(false);
-    }
-  };
-
-  // Filter orders client-side for instantaneous feedback across orderId, #PET-xxx, mongo _id, customer name & phone
+  // Filtered orders list
   const displayedOrders = useMemo(() => {
-    if (!searchQuery || !searchQuery.trim()) return orders;
-    const q = searchQuery.trim().toLowerCase().replace(/^#/, "");
-    const cleanQ = q.replace(/^pet-/i, "").replace(/^ord_/i, "");
     return orders.filter((order) => {
-      const formatted = formatOrderId(order).toLowerCase().replace(/^#/, "");
-      const rawId = (order.orderId || "").toLowerCase();
-      const mongoId = (order._id || "").toString().toLowerCase();
-      const customer = (order.address?.fullName || order.user?.name || "").toLowerCase();
-      const phone = (order.address?.phone || order.user?.phone || "").toLowerCase();
-      return (
-        formatted.includes(q) ||
-        formatted.includes(cleanQ) ||
-        rawId.includes(q) ||
-        rawId.includes(cleanQ) ||
-        mongoId.includes(q) ||
-        mongoId.includes(cleanQ) ||
-        customer.includes(q) ||
-        phone.includes(q)
-      );
+      const isPickup = checkIsPickup(order);
+      const isCod =
+        String(order.paymentMethod || "").toLowerCase().includes("cod") ||
+        String(order.paymentMethod || "").toLowerCase().includes("cash") ||
+        order.paymentStatus === "pending";
+
+      // 1. Search Query Match
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase().replace(/^#/, "");
+        const cleanQ = q.replace(/^pet-/i, "").replace(/^ord_/i, "");
+        const formatted = formatOrderId(order).toLowerCase().replace(/^#/, "");
+        const rawId = (order.orderId || "").toLowerCase();
+        const mongoId = (order._id || "").toString().toLowerCase();
+        const customer = (order.address?.fullName || order.user?.name || "").toLowerCase();
+        const phone = (order.address?.phone || order.user?.phone || "").toLowerCase();
+        const matchesSearch =
+          formatted.includes(q) ||
+          formatted.includes(cleanQ) ||
+          rawId.includes(q) ||
+          rawId.includes(cleanQ) ||
+          mongoId.includes(q) ||
+          mongoId.includes(cleanQ) ||
+          customer.includes(q) ||
+          phone.includes(q);
+
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Status / Category Filter
+      if (filterStatus === "all") return true;
+
+      if (filterStatus === "action_needed") {
+        const isPending = order.status === "pending";
+        const isReadyUnassigned = order.status === "ready" && !isPickup && !order.assignedDeliveryStaff?.id;
+        const isDelayed =
+          order.status === "preparing" &&
+          order.createdAt &&
+          currentTimeTick - new Date(order.createdAt).getTime() > 20 * 60 * 1000;
+        return isPending || isReadyUnassigned || isDelayed;
+      }
+
+      if (filterStatus === "incoming") {
+        return order.status === "pending";
+      }
+
+      if (filterStatus === "delivery") {
+        return !isPickup && order.orderType !== "pickup";
+      }
+
+      if (filterStatus === "pickup") {
+        return isPickup || order.orderType === "pickup";
+      }
+
+      if (filterStatus === "unassigned") {
+        return !isPickup && !["delivered", "cancelled"].includes(order.status) && !order.assignedDeliveryStaff?.id;
+      }
+
+      if (filterStatus === "exceptions") {
+        const isDelayed =
+          order.status === "preparing" &&
+          order.createdAt &&
+          currentTimeTick - new Date(order.createdAt).getTime() > 25 * 60 * 1000;
+        const isUnresponded =
+          (order.status === "pending" || order.status === "confirmed") &&
+          order.createdAt &&
+          currentTimeTick - new Date(order.createdAt).getTime() > 15 * 60 * 1000;
+        return order.status === "cancelled" || order.isOutOfRange || isDelayed || isUnresponded || (isCod && order.paymentStatus === "pending");
+      }
+
+      return order.status === filterStatus;
     });
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, filterStatus, currentTimeTick]);
 
-  function handleSearch(e) {
-    if (e) e.preventDefault();
-    fetchOrders(true);
-  }
-
-  // Export orders to CSV using Blob with BOM (prevents truncation on # fragments and supports Excel)
+  // CSV Report Export
   function downloadOrdersReport() {
     const exportTarget = displayedOrders.length > 0 ? displayedOrders : orders;
     if (!exportTarget || exportTarget.length === 0) {
-      alert("No orders to download for this selection.");
+      toast.error("No orders to download for this selection.");
       return;
     }
 
@@ -712,12 +991,13 @@ export default function OrdersClient() {
       "Time",
       "Customer Name",
       "Phone",
-      "Items Count",
+      "Fulfillment",
       "Dishes Summary",
       "Total Amount (INR)",
       "Status",
+      "Payment Method",
       "Payment Status",
-      "Delivery Address",
+      "Driver Assigned",
     ];
 
     const rows = exportTarget.map((o) => {
@@ -725,14 +1005,14 @@ export default function OrdersClient() {
       const formattedDate = !isNaN(orderDate) ? orderDate.toISOString().split("T")[0] : "";
       const formattedTime = !isNaN(orderDate) ? orderDate.toLocaleTimeString() : "";
       const uniqueId = formatOrderId(o);
-      const itemsCount = o.items?.reduce((acc, it) => acc + (it.quantity || 1), 0) || 0;
+      const isPickup = checkIsPickup(o);
       const itemsSummary = (o.items || [])
         .map((it) => `${it.quantity || 1}x ${it.name || "Dish"}`)
         .join(" | ")
         .replace(/"/g, '""');
-      const address = `${o.address?.street || ""}, ${o.address?.city || ""}`.replace(/"/g, '""');
       const customerName = (o.address?.fullName || o.user?.name || "Customer").replace(/"/g, '""');
       const phone = (o.address?.phone || o.user?.phone || "").replace(/"/g, '""');
+      const driver = (o.assignedDeliveryStaff?.name || "Unassigned").replace(/"/g, '""');
 
       return [
         `"${uniqueId}"`,
@@ -740,12 +1020,13 @@ export default function OrdersClient() {
         `"${formattedTime}"`,
         `"${customerName}"`,
         `"${phone}"`,
-        itemsCount,
+        `"${isPickup ? "Pickup" : "Delivery"}"`,
         `"${itemsSummary}"`,
         o.totalAmount || 0,
         `"${o.status}"`,
+        `"${o.paymentMethod || "COD"}"`,
         `"${o.paymentStatus || "paid"}"`,
-        `"${address}"`,
+        `"${driver}"`,
       ];
     });
 
@@ -759,9 +1040,11 @@ export default function OrdersClient() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    toast.success("Orders report exported!");
   }
 
-  // Min selectable date: restaurant createdAt date
+  const isTodaySelected = selectedDate === todayStr;
+
   const minSelectableDate = useMemo(() => {
     if (restaurantCreatedAt) {
       try {
@@ -771,65 +1054,112 @@ export default function OrdersClient() {
     return "2024-01-01";
   }, [restaurantCreatedAt]);
 
-  const isTodaySelected = selectedDate === todayStr;
+  const countsByTab = useMemo(() => {
+    const counts = {
+      all: orders.length,
+      action_needed: 0,
+      incoming: 0,
+      delivery: 0,
+      pickup: 0,
+      unassigned: 0,
+      pending: 0,
+      confirmed: 0,
+      preparing: 0,
+      ready: 0,
+      out_for_delivery: 0,
+      delivered: 0,
+      cancelled: 0,
+      exceptions: 0,
+    };
 
-  const statusTabs = [
-    { id: "all", label: "All Orders" },
-    { id: "pending", label: "Pending" },
-    { id: "confirmed", label: "Confirmed" },
-    { id: "preparing", label: "Preparing" },
-    { id: "ready", label: "Ready" },
-    { id: "out_for_delivery", label: "Out for Delivery" },
-    { id: "delivered", label: "Delivered" },
-    { id: "cancelled", label: "Cancelled" },
+    orders.forEach((order) => {
+      const isPickup = checkIsPickup(order);
+      const isCod =
+        String(order.paymentMethod || "").toLowerCase().includes("cod") ||
+        String(order.paymentMethod || "").toLowerCase().includes("cash") ||
+        order.paymentStatus === "pending";
+
+      if (isPickup) counts.pickup++;
+      else counts.delivery++;
+
+      if (order.status in counts) {
+        counts[order.status]++;
+      }
+
+      if (order.status === "pending") {
+        counts.incoming++;
+      }
+
+      const isReadyUnassigned = order.status === "ready" && !isPickup && !order.assignedDeliveryStaff?.id;
+      const isDelayed =
+        order.status === "preparing" &&
+        order.createdAt &&
+        currentTimeTick - new Date(order.createdAt).getTime() > 20 * 60 * 1000;
+
+      if (order.status === "pending" || isReadyUnassigned || isDelayed) {
+        counts.action_needed++;
+      }
+
+      if (!isPickup && !["delivered", "cancelled"].includes(order.status) && !order.assignedDeliveryStaff?.id) {
+        counts.unassigned++;
+      }
+
+      const isOrderDelayed =
+        order.status === "preparing" &&
+        order.createdAt &&
+        currentTimeTick - new Date(order.createdAt).getTime() > 25 * 60 * 1000;
+      const isUnresponded =
+        (order.status === "pending" || order.status === "confirmed") &&
+        order.createdAt &&
+        currentTimeTick - new Date(order.createdAt).getTime() > 15 * 60 * 1000;
+
+      if (order.status === "cancelled" || order.isOutOfRange || isOrderDelayed || isUnresponded || (isCod && order.paymentStatus === "pending")) {
+        counts.exceptions++;
+      }
+    });
+
+    return counts;
+  }, [orders, currentTimeTick]);
+
+  const filterTabs = [
+    { id: "all", label: "All Orders", count: countsByTab.all },
+    {
+      id: "action_needed",
+      label: "⚡ Action Needed",
+      badgeCount: countsByTab.action_needed,
+      count: countsByTab.action_needed,
+    },
+    {
+      id: "incoming",
+      label: "🛎️ Incoming New",
+      badgeCount: countsByTab.incoming,
+      count: countsByTab.incoming,
+    },
+    { id: "delivery", label: "🛵 Delivery", count: countsByTab.delivery },
+    { id: "pickup", label: "🛍️ Pickup", count: countsByTab.pickup },
+    {
+      id: "unassigned",
+      label: "⚠️ Needs Courier",
+      badgeCount: countsByTab.unassigned,
+      count: countsByTab.unassigned,
+    },
+    { id: "pending", label: "Pending", count: countsByTab.pending },
+    { id: "confirmed", label: "Confirmed", count: countsByTab.confirmed },
+    { id: "preparing", label: "In Kitchen", count: countsByTab.preparing },
+    { id: "ready", label: "Ready", count: countsByTab.ready },
+    { id: "out_for_delivery", label: "On Road", count: countsByTab.out_for_delivery },
+    { id: "delivered", label: "Delivered", count: countsByTab.delivered },
+    { id: "cancelled", label: "Cancelled", count: countsByTab.cancelled },
+    { id: "exceptions", label: "⚠️ Exceptions", badgeCount: countsByTab.exceptions, count: countsByTab.exceptions },
   ];
 
-  const statusBadgeStyles = {
-    pending:
-      "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30",
-    confirmed:
-      "bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/30",
-    preparing:
-      "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30",
-    ready:
-      "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30",
-    out_for_delivery:
-      "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/30",
-    delivered:
-      "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30",
-    cancelled:
-      "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30",
-  };
-
-  if (isDeliveryOnlyStaff) {
-    return (
-      <div className="min-h-screen bg-stone-50/60 dark:bg-[#07090e] flex items-center justify-center p-6 text-center font-jakarta">
-        <div className="max-w-md bg-white dark:bg-[#10141f] p-8 rounded-3xl border border-stone-200 dark:border-white/10 shadow-xl space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-            <Truck size={28} />
-          </div>
-          <h2 className="text-xl font-extrabold text-stone-900 dark:text-white">Delivery Operations Workspace</h2>
-          <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
-            Delivery staff are assigned to the <strong>Delivery Operations</strong> portal to pick up packages, share live GPS transit, and collect cash at doorstep. Redirecting you now...
-          </p>
-          <button
-            onClick={() => router.replace("/delivery")}
-            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
-          >
-            Go to Delivery Portal Now →
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-transparent text-stone-900 dark:text-white font-jakarta transition-colors relative">
+    <div className="min-h-screen bg-transparent text-stone-900 dark:text-white font-jakarta transition-colors relative pb-16">
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 min-w-0">
         
-        {/* ── STICKY KITCHEN PAUSED WARNING BANNER ─────────────────── */}
+        {/* Sticky Kitchen Paused Alert */}
         {!kitchenActive && (
-          <div className="bg-rose-500/15 border border-rose-500/30 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm animate-in fade-in">
+          <div className="bg-rose-500/15 border border-rose-500/30 rounded-2xl p-4 text-rose-800 dark:text-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-in fade-in">
             <div className="flex items-center gap-3">
               <span className="text-xl shrink-0">⚠️</span>
               <div>
@@ -842,197 +1172,212 @@ export default function OrdersClient() {
               </div>
             </div>
             <button
-              onClick={() => {
-                setKitchenActive(true);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("restaurant_kitchen_active", "true");
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm transition active:scale-95 shrink-0 cursor-pointer"
+              onClick={resumeOrdersFromBanner}
+              disabled={isUpdatingKitchen}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition active:scale-95 shrink-0 cursor-pointer disabled:opacity-50"
             >
               Resume Orders Now
             </button>
           </div>
         )}
 
-        {/* ── HEADER & LIVE STATUS CHIP ───────────────────────────── */}
+        {/* ── HEADER & OPERATION CONTROLS ───────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200/80 dark:border-white/10 pb-5">
           <div>
             <div className="flex items-center gap-2.5 mb-1 flex-wrap">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 dark:text-white">
-                Kitchen Display <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">System</span>
+                Order <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">Command Center</span>
               </h1>
               
-              {/* Professional Live Status Indicator */}
               <div
                 className="flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shadow-xs"
-                title="Live connection active: Kitchen orders poll every 10 seconds automatically"
+                title="Live connection active: Orders sync in real-time"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span className="tracking-wide text-[11px]">Live Kitchen Sync</span>
+                <span className="tracking-wide text-[11px]">Live Sync Active</span>
               </div>
             </div>
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
-              Live incoming kitchen tickets with instant alerts and date history.
+              Unified kitchen operations, driver assignment, real-time dispatch and delivery monitoring.
             </p>
           </div>
 
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Rush Mode Toggle */}
-            <Tooltip
-              content="Toggle compact ticket grid for high-volume kitchen rush hours"
-              placement="bottom"
-            >
+            {/* Auto Print KOT Toggle */}
+            <Tooltip content="Automatically trigger KOT printer window when accepting an order" placement="bottom">
               <button
+                type="button"
+                onClick={toggleAutoPrintKot}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+                  autoPrintKot
+                    ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30"
+                    : "bg-white dark:bg-white/5 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
+                }`}
+              >
+                <Printer size={13} className={autoPrintKot ? "text-orange-500" : "text-stone-400"} />
+                <span>{autoPrintKot ? "Auto-KOT: ON" : "Auto-KOT"}</span>
+              </button>
+            </Tooltip>
+
+            {/* Rush Mode Toggle */}
+            <Tooltip content="Toggle compact ticket grid for high-volume rush hours" placement="bottom">
+              <button
+                type="button"
                 onClick={() => setRushMode(!rushMode)}
                 className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
                   rushMode
-                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 shadow-xs"
+                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30"
                     : "bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
                 }`}
-                aria-label="Toggle Rush Hour compact ticket grid"
               >
                 <LayoutGrid size={13} className={rushMode ? "text-amber-600 dark:text-amber-400" : "text-stone-400"} />
                 <span>{rushMode ? "Rush Mode ON" : "Rush Mode"}</span>
               </button>
             </Tooltip>
 
-            {/* Chime sound test / toggle */}
-            <Tooltip
-              content={
-                soundEnabled
-                  ? "Audio alerts enabled for incoming orders • Click to mute"
-                  : "Audio alerts muted • Click to enable sound notifications"
-              }
-              placement="bottom"
-            >
+            {/* Chime toggle */}
+            <Tooltip content={soundEnabled ? "Audio chime on incoming orders • Click to mute" : "Chime muted • Click to enable"} placement="bottom">
               <button
+                type="button"
                 onClick={() => {
                   setSoundEnabled(!soundEnabled);
                   if (!soundEnabled) playChime(null, 1.0);
                 }}
                 className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
                   soundEnabled
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                     : "bg-white dark:bg-white/5 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/10"
                 }`}
-                aria-label="Toggle kitchen audio alert"
               >
-                {soundEnabled ? <Volume2 size={13} className="text-emerald-600 dark:text-emerald-400" /> : <VolumeX size={13} className="text-stone-400" />}
-                <span>{soundEnabled ? "Chime On" : "Chime Muted"}</span>
+                {soundEnabled ? <Volume2 size={13} className="text-emerald-600" /> : <VolumeX size={13} className="text-stone-400" />}
+                <span>{soundEnabled ? "Chime On" : "Muted"}</span>
               </button>
             </Tooltip>
 
-            {/* Download Report Button */}
-            <Tooltip content="Export filtered orders into a downloadable CSV report" placement="bottom">
+            {/* Export CSV */}
+            <Tooltip content="Export active queue to CSV spreadsheet" placement="bottom">
               <button
+                type="button"
                 onClick={downloadOrdersReport}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-white/5 hover:bg-stone-100 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
-                aria-label="Download Orders CSV Report"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
               >
-                <Download size={13} className="text-stone-500 dark:text-stone-400" />
+                <FileSpreadsheet size={13} className="text-emerald-600" />
                 <span>Export CSV</span>
               </button>
             </Tooltip>
 
-            {/* Manual Refresh Button */}
-            <Tooltip content="Refresh orders immediately and sync ticket timers" placement="bottom">
-              <button
-                onClick={() => fetchOrders(true)}
-                disabled={isRefreshing}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
-                aria-label="Refresh orders"
-              >
-                <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-                <span>Refresh</span>
-              </button>
-            </Tooltip>
+            {/* Manual Refresh */}
+            <button
+              type="button"
+              disabled={isRefreshing}
+              onClick={() => fetchOrders(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-white/5 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-white/10 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={isRefreshing ? "animate-spin text-orange-500" : "text-stone-500"} />
+              <span>Refresh</span>
+            </button>
           </div>
         </div>
 
-        {/* ── DATE FILTER BAR & SEARCH BAR ────────────────────────── */}
-        <div className="bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md border border-stone-200/90 dark:border-white/10 rounded-2xl p-3 sm:p-4 shadow-xs">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Date Controls */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <div className="flex items-center gap-2 bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs flex-1 sm:flex-initial">
-                <Calendar className="w-3.5 h-3.5 text-stone-500 shrink-0" />
-                <span className="font-semibold text-stone-500 dark:text-stone-400 shrink-0">Date:</span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  min={minSelectableDate}
-                  max={todayStr}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-stone-900 dark:text-white font-mono font-bold outline-none cursor-pointer text-xs w-full sm:w-auto"
-                />
-              </div>
+        {/* ── METRICS SUMMARY CARDS ─────────────────────────────────── */}
+        <OrderCommandMetrics
+          metrics={commandMetrics}
+          activeFilter={filterStatus}
+          onSelectFilter={setFilterStatus}
+        />
 
-              <div className="inline-flex rounded-xl bg-stone-100 dark:bg-white/5 p-1 border border-stone-200/60 dark:border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(todayStr)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    isTodaySelected
-                      ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
-                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
-                  }`}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate("all")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    selectedDate === "all"
-                      ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-xs"
-                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
-                  }`}
-                >
-                  All Dates
-                </button>
-              </div>
-            </div>
+        {/* ── SEARCH & FILTER CONTROLS BAR ─────────────────────────── */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Date Selector */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-stone-100/90 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 shrink-0">
+            <input
+              type="date"
+              value={selectedDate === "all" ? "" : selectedDate}
+              min={minSelectableDate}
+              max={todayStr}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value);
+                }
+              }}
+              className="px-2.5 py-1 text-xs font-bold rounded-xl bg-white dark:bg-stone-800 text-stone-900 dark:text-white border border-stone-200/60 dark:border-white/10 outline-hidden"
+            />
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                isTodaySelected
+                  ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-xs"
+                  : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate("all")}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                selectedDate === "all"
+                  ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-xs"
+                  : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+              }`}
+            >
+              All Dates
+            </button>
+          </div>
 
-            {/* Search Input */}
-            <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 md:max-w-sm">
-              <div className="flex items-center flex-1 bg-stone-50 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 rounded-xl px-3 py-2 focus-within:border-stone-400 dark:focus-within:border-stone-600 transition">
-                <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Order ID (#PET-...) or customer..."
-                  className="w-full bg-transparent text-stone-900 dark:text-white placeholder-stone-400 text-xs outline-none"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      fetchOrders(true);
-                    }}
-                    className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 text-xs px-1"
-                  >
-                    ✕
-                  </button>
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Order ID (#PET-...), Customer, or Phone..."
+              className="w-full pl-9 pr-8 py-2 text-xs rounded-2xl bg-white dark:bg-stone-800/80 border border-stone-200/80 dark:border-white/10 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 text-stone-900 dark:text-white outline-hidden transition shadow-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── FILTER CHIPS SCROLLBAR ───────────────────────────────── */}
+        <div className="flex items-center gap-1.5 overflow-x-auto subtle-scrollbar pb-1 w-full min-w-0">
+          {filterTabs.map((tab) => {
+            const isSelected = filterStatus === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterStatus(tab.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-xs"
+                    : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10 hover:bg-stone-100/60 dark:hover:bg-white/10"
+                }`}
+              >
+                <span>{tab.label}</span>
+                {typeof tab.badgeCount === "number" && tab.badgeCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                    {tab.badgeCount}
+                  </span>
                 )}
-              </div>
-
-              <button
-                type="submit"
-                className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-xs shrink-0 active:scale-95 cursor-pointer"
-              >
-                Search
               </button>
-            </form>
-          </div>
+            );
+          })}
         </div>
 
-        {/* ── NEW ORDER VISUAL NOTIFICATION BANNER ─────────────────── */}
+        {/* ── NEW ORDER BANNER ALERT ─────────────────────────────────── */}
         {newOrderAlert && (
           <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 rounded-2xl p-4 text-white shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="flex items-center gap-3">
@@ -1063,57 +1408,11 @@ export default function OrdersClient() {
           </div>
         )}
 
-        {/* Feedback Alert */}
-        {feedback.message && (
-          <div
-            className={`p-3.5 rounded-xl flex items-center justify-between border text-xs font-semibold ${
-              feedback.type === "success"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
-                : "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-400"
-            }`}
-          >
-            <span>{feedback.message}</span>
-            <button
-              onClick={() => setFeedback({ type: "", message: "" })}
-              className="opacity-70 hover:opacity-100 ml-4 font-bold cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto subtle-scrollbar pb-1.5 w-full min-w-0">
-          {statusTabs.map((tab) => {
-            const isPendingTab = tab.id === "pending";
-            const pendingCount = isPendingTab ? orders.filter((o) => o.status === "pending").length : 0;
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setFilterStatus(tab.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                  filterStatus === tab.id
-                    ? "bg-stone-900 dark:bg-white text-white dark:text-stone-900 shadow-sm"
-                    : "bg-white/90 dark:bg-white/5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white border border-stone-200/80 dark:border-white/10 hover:bg-stone-100/60 dark:hover:bg-white/10"
-                }`}
-              >
-                <span>{tab.label}</span>
-                {isPendingTab && pendingCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
-                    {pendingCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── ORDERS LIST ─────────────────────────────────────────── */}
+        {/* ── ORDERS QUEUE ─────────────────────────────────────────── */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-orange-500">
             <RefreshCw className="animate-spin w-8 h-8" />
-            <p className="text-xs text-stone-500 font-semibold">Loading live kitchen orders...</p>
+            <p className="text-xs text-stone-500 font-semibold">Loading orders queue...</p>
           </div>
         ) : displayedOrders.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-stone-200 dark:border-stone-800 rounded-3xl bg-white/50 dark:bg-[#10141f]/50 p-8">
@@ -1122,855 +1421,419 @@ export default function OrdersClient() {
               {searchQuery
                 ? "No matching orders found"
                 : isTodaySelected
-                ? "No orders placed today yet"
+                ? "No orders found in this view"
                 : `No orders found for ${selectedDate}`}
             </h3>
             <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-sm mx-auto">
               {searchQuery
-                ? "Check your spelling or try searching by customer name."
-                : isTodaySelected
-                ? "Incoming customer orders for today will appear here in real-time."
-                : "You can switch to another date or choose 'All Dates' above."}
+                ? "Try searching by another Order ID, customer name or phone number."
+                : "Incoming customer orders will appear here in real-time."}
             </p>
           </div>
         ) : (
-          <div>
-            {rushMode ? (
-              /* ── RUSH MODE: COMPACT KITCHEN TICKET GRID ─────────────────────── */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {displayedOrders.map((order) => {
-                  const uniqueId = formatOrderId(order);
-                  const isNewlyArrived = highlightedOrderIds.has(order._id);
-                  const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
-                  const paymentModeStr = (order.paymentMethod || "").toLowerCase();
-                  const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
-                  const isPickup = checkIsPickup(order);
+          <div className="space-y-4">
+            {displayedOrders.map((order) => {
+              const uniqueId = formatOrderId(order);
+              const isNewlyArrived = highlightedOrderIds.has(order._id);
+              const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
+              const isPickup = checkIsPickup(order);
+              const isCod =
+                String(order.paymentMethod || "").toLowerCase().includes("cod") ||
+                String(order.paymentMethod || "").toLowerCase().includes("cash") ||
+                order.paymentStatus === "pending";
 
-                  const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
+              const totalItems =
+                order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
 
-                  return (
-                    <div
-                      key={order._id}
-                      className={`bg-white/95 dark:bg-[#10141f]/95 backdrop-blur-md rounded-2xl p-4 border transition flex flex-col justify-between gap-3 shadow-xs ${
-                        isNewlyArrived
-                          ? "border-orange-500 shadow-md ring-2 ring-orange-500/20"
-                          : "border-stone-200/90 dark:border-white/10 hover:border-stone-300 dark:hover:border-white/20"
-                      }`}
-                    >
-                      <div className="space-y-2.5">
-                        {/* Compact Header: ID, Live Timer, Price */}
-                        <div className="flex items-center justify-between gap-2 border-b border-stone-100 dark:border-white/10 pb-2.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-stone-900 dark:text-white bg-stone-100 dark:bg-white/10 px-2 py-0.5 rounded-md border border-stone-200/80 dark:border-white/10">
-                              {uniqueId}
-                            </span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${elapsedInfo.color}`}>
-                              <Clock size={10} />
-                              <span>{elapsedInfo.text}</span>
-                            </span>
-                          </div>
+              const isUpdating = updatingOrderId === order._id;
 
-                          <div className="flex items-center gap-1.5">
-                            <Tooltip content="Print Kitchen Order Ticket (KOT) for chef prep line and packaging" placement="top">
-                              <button
-                                type="button"
-                                onClick={() => handlePrintKOT(order)}
-                                aria-label="Print Kitchen Ticket (KOT)"
-                                className="p-1 rounded-lg bg-stone-100 dark:bg-white/10 hover:bg-stone-200 dark:hover:bg-white/20 text-stone-600 dark:text-stone-300 transition cursor-pointer"
-                              >
-                                <Printer size={13} />
-                              </button>
-                            </Tooltip>
-                            <span className="font-mono font-black text-sm text-stone-900 dark:text-white">
-                              ₹{order.totalAmount}
-                            </span>
-                          </div>
-                        </div>
+              return (
+                <div
+                  key={order._id}
+                  id={`order-card-${order._id}`}
+                  className={`bg-white dark:bg-stone-900/90 rounded-3xl p-5 border transition-all duration-200 shadow-xs hover:shadow-md ${
+                    isNewlyArrived
+                      ? "border-orange-500 ring-2 ring-orange-500/20"
+                      : "border-stone-200/80 dark:border-white/10 hover:border-stone-300 dark:hover:border-white/20"
+                  }`}
+                >
+                  {/* Card Top: Header / Status / Timer / Badges */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100 dark:border-white/5">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-mono font-black text-sm text-stone-900 dark:text-white bg-stone-100 dark:bg-white/10 px-2.5 py-1 rounded-xl">
+                        {uniqueId}
+                      </span>
+                      <span
+                        className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                          isPickup
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
+                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                        }`}
+                      >
+                        {isPickup ? "🛍️ Counter Pickup" : "🛵 Delivery"}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 ${elapsedInfo.color}`}
+                      >
+                        <Clock size={10} />
+                        <span>{elapsedInfo.text}</span>
+                      </span>
+                    </div>
 
-                        {/* Customer & Payment Chip */}
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <div className="truncate font-bold text-stone-800 dark:text-stone-200">
-                            {order.address?.fullName || order.user?.name || "Customer"}
-                            {order.address?.phone && (
-                              <span className="font-normal font-mono text-[11px] text-stone-500 ml-1.5">
-                                • {order.address.phone}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isPickup && (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
-                                Pickup
-                              </span>
-                            )}
-                            {order.isOutOfRange && (
-                              <Tooltip
-                                content={`Delivery distance is ${order.deliveryDistanceKm || ">10"} km, which exceeds standard kitchen delivery radius.`}
-                                placement="top"
-                              >
-                                <span
-                                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 cursor-help ${
-                                    order.acceptedOutOfRange
-                                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
-                                      : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
-                                  }`}
-                                >
-                                  <AlertTriangle size={10} />
-                                  <span>
-                                    {order.acceptedOutOfRange
-                                      ? `Out of Range (${order.deliveryDistanceKm}k)`
-                                      : `⚠️ ${order.deliveryDistanceKm || ">10"}km`}
-                                  </span>
-                                </span>
-                              </Tooltip>
-                            )}
-                            {isCod ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                                COD ₹{order.totalAmount}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
-                                Paid Online
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* COD Cash Collection & Manager Settlement status in Rush Mode */}
-                        {isCod && order.codPaymentHandler?.collected && (
-                          <div className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 p-2 rounded-xl flex items-center justify-between">
-                            <span className="font-semibold flex items-center gap-1 truncate max-w-[200px]">
-                              <Banknote size={12} className="text-amber-600 shrink-0" />
-                              <span>₹{order.codPaymentHandler?.amount || order.totalAmount} by {order.codPaymentHandler?.name || "Delivery Staff"}</span>
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] uppercase tracking-wider shrink-0 ${
-                              order.codPaymentHandler?.settledWithManager
-                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                                : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                            }`}>
-                              {order.codPaymentHandler?.settledWithManager ? "Settled" : "Pending Handover"}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Delivery Boy Details / Which Staff Took the Order */}
-                        {order.assignedDeliveryStaff?.name ? (
-                          <div className="text-[11px] bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-200 p-2 rounded-xl flex items-center justify-between">
-                            <span className="font-semibold flex items-center gap-1.5 truncate">
-                              <span>🛵</span>
-                              <span>Delivery Boy: {order.assignedDeliveryStaff.name}</span>
-                            </span>
-                            {order.assignedDeliveryStaff.phone && (
-                              <a
-                                href={`tel:${order.assignedDeliveryStaff.phone}`}
-                                className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold hover:underline shrink-0"
-                              >
-                                {order.assignedDeliveryStaff.phone}
-                              </a>
-                            )}
-                          </div>
-                        ) : !isPickup && (order.status === "out_for_delivery" || order.status === "ready") ? (
-                          <div className="text-[10px] bg-stone-100 dark:bg-white/5 text-stone-500 px-2 py-1 rounded-lg flex items-center gap-1">
-                            <span>🛵</span>
-                            <span>Delivery Boy: Awaiting pickup assignment</span>
-                          </div>
-                        ) : null}
-
-                        {/* Special Note if any */}
-                        {order.notes && (
-                          <div className="text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-2 rounded-xl font-medium">
-                            <strong>Note:</strong> {order.notes}
-                          </div>
-                        )}
-
-                        {/* Dishes List (Fast display for kitchen in Rush Mode - no checkboxes) */}
-                        <div className="space-y-1 pt-1 border-t border-stone-100 dark:border-white/5">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider pb-0.5">
-                            <span>Dishes ({order.items?.length || 0})</span>
-                            <span className="text-[10px] font-medium text-stone-400">Total: {totalItems}</span>
-                          </div>
-
-                          <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
-                            {(order.items || []).map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between p-1.5 rounded-lg border border-stone-200/70 dark:border-white/5 bg-stone-50/80 dark:bg-white/[0.02] text-xs select-none text-stone-800 dark:text-stone-200"
-                              >
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="inline-flex items-center justify-center px-1 rounded text-[10px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
-                                    {item.quantity}×
-                                  </span>
-                                  <span className="font-semibold truncate">
-                                    {item.name}
-                                  </span>
-                                </div>
-                                <span className="font-mono text-[11px] text-stone-400 shrink-0 ml-1">
-                                  ₹{(item.price || 0) * (item.quantity || 1)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Primary Action Button Stepper */}
-                      <div className="pt-2 border-t border-stone-100 dark:border-white/10 flex items-center gap-2">
-                        {order.status === "pending" && (
-                          <>
-                            <Tooltip content="Accept order and notify kitchen staff to prepare the dishes" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleAcceptOrderWithRangeCheck(order)}
-                                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <ChefHat size={13} />
-                                <span>Accept & Cook</span>
-                              </button>
-                            </Tooltip>
-                            <Tooltip content="Reject or cancel this order if unable to fulfill" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => {
-                                  if (confirm(`Cancel order ${uniqueId}?`)) {
-                                    handleUpdateStatus(order._id, "cancelled");
-                                  }
-                                }}
-                                className="py-2 px-2.5 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-semibold cursor-pointer disabled:opacity-50"
-                              >
-                                ✕
-                              </button>
-                            </Tooltip>
-                          </>
-                        )}
-
-                        {order.status === "confirmed" && (
-                          <Tooltip content="Confirm cooking has started at the kitchen station" position="top">
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "preparing")}
-                              className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <ChefHat size={13} />
-                              <span>Start Cooking</span>
-                            </button>
-                          </Tooltip>
-                        )}
-
-                        {order.status === "preparing" && (
-                          isPickup ? (
-                            <Tooltip fullWidth className="w-full" content="Mark food packed and ready for counter pickup by customer" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "ready")}
-                                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] transition-all duration-200 shadow-md shadow-emerald-600/20 hover:shadow-emerald-600/35 border border-emerald-400/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                              >
-                                <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                                  <PackageCheck size={13} className="text-white" />
-                                </div>
-                                <span>Mark Ready for Pickup</span>
-                                <span className="text-[10px] opacity-80 font-bold ml-0.5">✓</span>
-                              </button>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip content="Hand over food parcel to driver and mark out for delivery" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                                className="w-full py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <Truck size={13} />
-                                <span>Dispatch for Delivery</span>
-                              </button>
-                            </Tooltip>
-                          )
-                        )}
-
-                        {order.status === "ready" && (
-                          isPickup ? (
-                            <Tooltip content="Confirm customer has collected order at the counter" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "delivered")}
-                                className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <CheckCircle2 size={13} />
-                                <span>Confirm Customer Picked Up</span>
-                              </button>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip content="Hand over to delivery driver and dispatch to customer" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "out_for_delivery")}
-                                className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <Truck size={13} />
-                                <span>Dispatch for Delivery</span>
-                              </button>
-                            </Tooltip>
-                          )
-                        )}
-
-                        {order.status === "out_for_delivery" && (
-                          <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
-                            <button
-                              type="button"
-                              disabled={updatingOrderId === order._id}
-                              onClick={() => handleUpdateStatus(order._id, "delivered")}
-                              className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                              <Truck size={13} />
-                              <span>Confirm Delivered</span>
-                            </button>
-                          </Tooltip>
-                        )}
-
-                        {order.status === "delivered" && (
-                          <Tooltip content="This order has been fulfilled and completed successfully" position="top">
-                            <div className="w-full py-1.5 text-center text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20 cursor-default">
-                              ✓ Fulfilled
-                            </div>
-                          </Tooltip>
-                        )}
-
-                        {order.status === "cancelled" && (
-                          <Tooltip content="This order was cancelled and was not fulfilled" position="top">
-                            <div className="w-full py-1.5 text-center text-xs font-bold text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20 cursor-default">
-                              ✕ Cancelled
-                            </div>
-                          </Tooltip>
-                        )}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="font-mono font-black text-base text-stone-900 dark:text-white">
+                          ₹{order.totalAmount}
+                        </span>
+                        <span
+                          className={`ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                            isCod
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          }`}
+                        >
+                          {isCod ? "COD" : "Paid"}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* ── DETAILED CARDS VIEW ─────────────────────────────────────────── */
-              <div className="space-y-4">
-                {displayedOrders.map((order) => {
-                  const uniqueId = formatOrderId(order);
-                  const isNewlyArrived = highlightedOrderIds.has(order._id);
-                  const elapsedInfo = getOrderElapsedInfo(order.createdAt, order.status, order.updatedAt);
-                  const paymentModeStr = (order.paymentMethod || "").toLowerCase();
-                  const isCod = paymentModeStr.includes("cod") || paymentModeStr.includes("cash") || order.paymentStatus === "pending";
-                  const isPickup = checkIsPickup(order);
+                  </div>
 
-                  const totalItems = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
-
-                  return (
-                    <div
-                      key={order._id}
-                      className={`bg-white/95 dark:bg-[#10141f]/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 transition-all duration-200 border ${
-                        isNewlyArrived
-                          ? "border-orange-500 shadow-lg shadow-orange-500/10 ring-2 ring-orange-500/20"
-                          : "border-stone-200/90 dark:border-white/10 shadow-xs hover:border-stone-300 dark:hover:border-white/20"
-                      }`}
-                    >
-                      {/* Top Bar: Order ID, Live Kitchen Timer, Status & Total */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-stone-100 dark:border-white/10">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* Sleek Monospace POS ID Badge */}
-                          <span className="font-mono text-xs sm:text-sm font-extrabold tracking-tight bg-stone-900 text-white dark:bg-white dark:text-stone-950 px-2.5 py-1 rounded-lg shadow-xs">
-                            {uniqueId}
-                          </span>
-
-                          {/* Live Kitchen Elapsed Timer */}
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 shadow-xs ${elapsedInfo.color}`}>
-                            <Clock size={11} />
-                            <span>{elapsedInfo.text}</span>
-                          </span>
-
-                          <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
-                            {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • {new Date(order.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
-                          {/* Pickup Badge */}
-                          {isPickup && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
-                              Pickup
-                            </span>
-                          )}
-
-                          {/* Payment Badge (COD vs Online) */}
-                          {isCod ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
-                              <Banknote size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                              <span>COD</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
-                              <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                              <span>Paid Online</span>
-                            </span>
-                          )}
-
-                          {/* Status Badge */}
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
-                              statusBadgeStyles[order.status] || "bg-stone-100 text-stone-700 border-stone-200"
-                            }`}
+                  {/* Card Middle: Customer, Address, Courier Status, Items */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                    {/* Customer & Address */}
+                    <div className="space-y-1.5 text-xs">
+                      <div className="font-bold text-stone-900 dark:text-white flex items-center justify-between">
+                        <span>{order.address?.fullName || order.user?.name || "Customer"}</span>
+                        {order.address?.phone && (
+                          <a
+                            href={`tel:${order.address.phone}`}
+                            className="text-orange-600 dark:text-orange-400 hover:underline font-mono"
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                            <span>{order.status.replace("_", " ")}</span>
+                            {order.address.phone}
+                          </a>
+                        )}
+                      </div>
+                      {!isPickup && (
+                        <div className="text-stone-500 dark:text-stone-400 flex items-start gap-1">
+                          <MapPin size={13} className="text-stone-400 shrink-0 mt-0.5" />
+                          <span className="truncate">
+                            {order.address?.street
+                              ? `${order.address.street}, ${order.address.city || ""}`
+                              : "Address on file"}
                           </span>
+                        </div>
+                      )}
+                      {order.notes && (
+                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-500/20 truncate">
+                          Note: {order.notes}
+                        </div>
+                      )}
+                    </div>
 
-                          {/* Out of Range Notice Badge */}
-                          {order.isOutOfRange && (
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider border ${
-                                order.acceptedOutOfRange
-                                  ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
-                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse"
-                              }`}
+                    {/* Delivery Partner Status */}
+                    <div className="text-xs space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                        Fulfillment &amp; Courier
+                      </span>
+                      {isPickup ? (
+                        <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold flex items-center gap-1.5">
+                          <span>🛍️</span>
+                          <span>Counter Pickup by Customer</span>
+                        </div>
+                      ) : order.assignedDeliveryStaff?.id ? (
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0">🛵</span>
+                            <div className="truncate">
+                              <span className="font-bold">{order.assignedDeliveryStaff.name}</span>
+                              {order.assignedDeliveryStaff.phone && (
+                                <span className="font-mono text-[11px] text-blue-500 block truncate">
+                                  {order.assignedDeliveryStaff.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {order.status !== "delivered" && order.status !== "cancelled" && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignModal(order)}
+                              className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 cursor-pointer"
                             >
-                              <AlertTriangle size={12} />
-                              <span>
-                                {order.acceptedOutOfRange
-                                  ? `✓ Out of Range (${order.deliveryDistanceKm} km)`
-                                  : `⚠️ Out of Range (${order.deliveryDistanceKm} km)`}
-                              </span>
-                            </span>
+                              Change
+                            </button>
                           )}
-
-                          {/* Order Total */}
-                          <span className="text-base sm:text-lg font-black text-stone-900 dark:text-white font-mono ml-1">
-                            ₹{order.totalAmount}
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex items-center justify-between gap-2">
+                          <span className="font-bold flex items-center gap-1">
+                            <AlertCircle size={13} />
+                            <span>Unassigned Driver</span>
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAssignModal(order)}
+                            className="px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-[11px] transition cursor-pointer"
+                          >
+                            Assign Driver
+                          </button>
                         </div>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Order Details Body */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                        {/* Customer & Delivery Address Details */}
-                        <div className="space-y-2.5 bg-stone-50/80 dark:bg-white/[0.02] p-3.5 sm:p-4 rounded-2xl border border-stone-200/70 dark:border-white/5 flex flex-col justify-between gap-3">
-                          <div className="space-y-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 block">
-                              Customer & Delivery Details
+                    {/* Items Summary Preview */}
+                    <div className="text-xs space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                        Dishes ({totalItems})
+                      </span>
+                      <div className="max-h-16 overflow-y-auto space-y-1 pr-1 subtle-scrollbar">
+                        {order.items?.map((it, idx) => (
+                          <div key={idx} className="flex justify-between text-stone-700 dark:text-stone-300">
+                            <span className="truncate">
+                              {it.quantity}× {it.name}
                             </span>
-                            <div className="text-sm font-bold text-stone-900 dark:text-white">
-                              {order.address?.fullName || order.user?.name || "Customer"}
-                            </div>
-                            {order.address?.phone && (
-                              <div className="text-xs text-stone-600 dark:text-stone-300 flex items-center gap-1.5">
-                                <Phone size={12} className="text-stone-400 shrink-0" />
-                                <a
-                                  href={`tel:${order.address.phone}`}
-                                  className="font-mono font-semibold text-stone-700 dark:text-stone-200 hover:text-orange-500 transition"
-                                >
-                                  {order.address.phone}
-                                </a>
-                              </div>
-                            )}
-                            {order.address?.street && (
-                              <div className="text-xs text-stone-500 dark:text-stone-400 flex items-start gap-1.5 leading-relaxed">
-                                <MapPin size={12} className="text-stone-400 shrink-0 mt-0.5" />
-                                <span>
-                                  {order.address.street}, {order.address.city || ""}{" "}
-                                  {order.address.pincode ? `(${order.address.pincode})` : ""}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Delivery Boy / Staff Assigned */}
-                            {order.assignedDeliveryStaff?.name ? (
-                              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-bold uppercase tracking-wider text-[10px] text-blue-600 dark:text-blue-400 block">
-                                    Delivery Boy / Assigned Staff
-                                  </span>
-                                  {isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenAssignModal(order)}
-                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                                    >
-                                      <Bike size={12} />
-                                      <span>Change</span>
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-between gap-2 mt-1">
-                                  <span className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
-                                    <span>🛵</span>
-                                    <span>{order.assignedDeliveryStaff.name}</span>
-                                  </span>
-                                  {order.assignedDeliveryStaff.phone && (
-                                    <a
-                                      href={`tel:${order.assignedDeliveryStaff.phone}`}
-                                      className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                                    >
-                                      {order.assignedDeliveryStaff.phone}
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            ) : !isPickup ? (
-                              <div className="p-2.5 rounded-xl bg-stone-100 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 text-xs flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 text-[11px]">
-                                  <span>🛵</span>
-                                  <span>Delivery Boy: Awaiting driver pickup</span>
-                                </div>
-                                {isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenAssignModal(order)}
-                                    className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-bold text-[11px] cursor-pointer transition shadow-xs flex items-center gap-1 shrink-0"
-                                  >
-                                    <Bike size={12} />
-                                    <span>Assign</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-semibold flex items-center gap-1.5">
-                                <span>🛍️</span>
-                                <span>Counter Self-Pickup Order</span>
-                              </div>
-                            )}
+                            <span className="font-mono shrink-0 ml-1">
+                              ₹{(it.price || 0) * (it.quantity || 1)}
+                            </span>
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
 
-                          {/* Highlighted Special Cooking Instructions */}
-                          {order.notes && (
-                            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
-                              <span className="text-sm leading-none shrink-0">🏷️</span>
-                              <div>
-                                <span className="font-bold uppercase tracking-wider text-[10px] block text-amber-700 dark:text-amber-400">
-                                  Customer Request:
-                                </span>
-                                <span className="font-medium">{order.notes}</span>
-                              </div>
-                            </div>
+                  {/* Live Map Drawer if expanded */}
+                  {expandedMapOrderIds.has(order._id) && !isPickup && (
+                    <div className="my-3 rounded-2xl overflow-hidden border border-stone-200 dark:border-white/10 shadow-inner">
+                      <LiveDeliveryMap order={order} />
+                    </div>
+                  )}
+
+                  {/* Card Bottom: Contextual Action Buttons */}
+                  <div className="pt-3.5 border-t border-stone-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-2.5">
+                    {/* Secondary Actions */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintKOT(order)}
+                        title="Print Kitchen Ticket (KOT)"
+                        className="p-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Printer size={13} />
+                        <span className="hidden sm:inline">KOT</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDrawerOrder(order)}
+                        className="px-3 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Details</span>
+                        <ChevronRight size={13} />
+                      </button>
+
+                      {!isPickup && ["out_for_delivery", "delivered"].includes(order.status) && (
+                        <button
+                          type="button"
+                          onClick={() => toggleLiveMap(order._id)}
+                          className="px-3 py-2 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                        >
+                          <MapPin size={13} />
+                          <span>{expandedMapOrderIds.has(order._id) ? "Hide Map" : "GPS Route"}</span>
+                        </button>
+                      )}
+
+                      {order.status !== "delivered" && order.status !== "cancelled" && (
+                        <button
+                          type="button"
+                          onClick={() => setCancelModalOrder(order)}
+                          className="px-3 py-2 rounded-xl border border-rose-300/80 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold transition cursor-pointer"
+                        >
+                          {order.status === "pending" ? "Reject" : "Cancel"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Primary Lifecycle Buttons */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {order.status === "pending" && (
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => handleAcceptOrderWithRangeCheck(order)}
+                          className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Accept &amp; Cook</span>
+                        </button>
+                      )}
+
+                      {order.status === "confirmed" && (
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => handleUpdateStatus(order._id, "preparing")}
+                          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <ChefHat size={14} />
+                          <span>Start Cooking</span>
+                        </button>
+                      )}
+
+                      {order.status === "preparing" && (
+                        isPickup ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleUpdateStatus(order._id, "ready")}
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <PackageCheck size={14} />
+                            <span>Mark Ready for Pickup</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleUpdateStatus(order._id, "ready")}
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <PackageCheck size={14} />
+                            <span>Mark Cooked &amp; Ready</span>
+                          </button>
+                        )
+                      )}
+
+                      {order.status === "ready" && (
+                        isPickup ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => handleUpdateStatus(order._id, "delivered")}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <CheckCircle2 size={14} />
+                            <span>Confirm Counter Handover</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => {
+                              if (!order.assignedDeliveryStaff?.id) {
+                                toast.error("Please assign a delivery courier before dispatching!");
+                                handleOpenAssignModal(order);
+                              } else {
+                                handleUpdateStatus(order._id, "out_for_delivery");
+                              }
+                            }}
+                            className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <Truck size={14} />
+                            <span>Dispatch for Delivery</span>
+                          </button>
+                        )
+                      )}
+
+                      {order.status === "out_for_delivery" && !isPickup && (
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => {
+                            setHandoverOtpError("");
+                            setHandoverAttemptsRemaining(null);
+                            setHandoverOtpModalOrder(order);
+                          }}
+                          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-extrabold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Verify Handover OTP</span>
+                        </button>
+                      )}
+
+                      {order.status === "delivered" && (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 text-xs font-bold">
+                            <CheckCircle2 size={14} /> Delivered
+                          </span>
+                          {isCod && order.codPaymentHandler?.collected && !order.codPaymentHandler?.settledWithManager && (
+                            <button
+                              type="button"
+                              onClick={() => handleSettleCodCash(order._id)}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition cursor-pointer"
+                            >
+                              Settle COD Cash
+                            </button>
                           )}
-                        </div>
-
-                        {/* Order Items List */}
-                        <div className="space-y-2.5 bg-stone-50/80 dark:bg-white/[0.02] p-3.5 sm:p-4 rounded-2xl border border-stone-200/70 dark:border-white/5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                              Order Items ({order.items?.length || 0} {order.items?.length === 1 ? "item" : "items"})
-                            </span>
-                            <span className="text-[11px] font-medium text-stone-400">
-                              Total dishes: {totalItems}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-                            {(order.items || []).map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between p-2 rounded-xl border border-stone-200/80 dark:border-white/5 bg-white dark:bg-white/[0.03] text-xs select-none"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-stone-200 border border-stone-200/60 dark:border-white/10 shrink-0">
-                                    {item.quantity}×
-                                  </span>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="font-semibold truncate text-stone-900 dark:text-white">
-                                      {item.name}
-                                    </span>
-                                    <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                                      {item.variantName && (
-                                        <span className="font-bold text-amber-600 dark:text-amber-400">
-                                          [{item.variantName}]
-                                        </span>
-                                      )}
-                                      {(item.servingLabel || item.portionQuantity || item.size) && (
-                                        <span className="text-stone-400">
-                                          {item.servingLabel || (item.portionQuantity ? `${item.portionQuantity} ${item.portionUnit || ''}` : '')}
-                                          {item.size ? ` (${item.size})` : ''}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="font-mono text-stone-500 dark:text-stone-400 text-xs shrink-0 ml-2">
-                                  ₹{(item.price || 0) * (item.quantity || 1)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="pt-2 flex flex-col gap-1.5 text-xs text-stone-500 dark:text-stone-400 border-t border-stone-200/60 dark:border-white/5">
-                            <div className="flex items-center justify-between">
-                              <span>Payment: <strong className="text-stone-700 dark:text-stone-300">{order.paymentMethod || "Direct"}</strong></span>
-                              <span className={`font-bold uppercase text-[10px] tracking-wide ${isCod ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                {order.paymentStatus === "pending" ? "Pending at Doorstep" : (order.paymentStatus || "Paid")}
-                              </span>
-                            </div>
-
-                            {/* Detailed COD Cash Collected & Manager Settlement Info */}
-                            {isCod && order.codPaymentHandler?.collected && (
-                              <div className="mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200">
-                                <span className="font-medium flex items-center gap-1.5">
-                                  <Banknote size={14} className="text-amber-600 shrink-0" />
-                                  <span>Cash Collected: <strong className="font-bold">₹{order.codPaymentHandler?.amount || order.totalAmount}</strong> by <strong className="font-bold">{order.codPaymentHandler?.name || "Delivery Staff"}</strong></span>
-                                </span>
-                                <div className="flex items-center gap-2 self-end sm:self-auto">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    order.status === "cancelled"
-                                      ? "bg-stone-500/10 text-stone-600 dark:text-stone-400"
-                                      : order.codPaymentHandler?.settledWithManager
-                                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                                      : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                                  }`}>
-                                    {order.status === "cancelled"
-                                      ? "Void (Cancelled)"
-                                      : order.codPaymentHandler?.settledWithManager
-                                      ? "✓ Settled with Manager"
-                                      : "⚠️ Pending Manager Handover"}
-                                  </span>
-                                  {isManagerOrAdmin && order.status !== "cancelled" && !order.codPaymentHandler?.settledWithManager && (
-                                    <Tooltip content="Confirm that the delivery driver has handed over the collected cash to the register" position="top">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSettleCodCash(order._id)}
-                                        disabled={updatingOrderId === order._id}
-                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer transition disabled:opacity-50"
-                                      >
-                                        Mark Settled
-                                      </button>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Live Delivery Map for Manager (Static Restaurant + Staff Live GPS + Customer Doorstep) */}
-                      {expandedMapOrderIds.has(order._id) && (
-                        <div className="my-3 rounded-2xl overflow-hidden border border-blue-500/30 bg-stone-900 shadow-md">
-                          <div className="p-2.5 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between text-xs">
-                            <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                              <Radio size={14} className="animate-pulse text-blue-500" />
-                              <span>Live Delivery Dispatch Map</span>
-                            </span>
-                            <span className="text-[11px] text-stone-400">
-                              Restaurant (Fixed) • Driver (Live GPS) • Customer (Doorstep)
-                            </span>
-                          </div>
-                          <div className="p-2">
-                            <LiveDeliveryMap
-                              orderId={order.orderId || order._id}
-                              initialStatus={order.status}
-                              restaurant={order.restaurant}
-                              destination={order.address}
-                              deliveryTracking={order.deliveryTracking}
-                              recipientName={order.address?.fullName}
-                              isStaffView={false}
-                              isManagerView={true}
-                            />
-                          </div>
                         </div>
                       )}
 
-                      {/* Primary One-Click Action Stepper Bar */}
-                      <div className="pt-3 border-t border-stone-100 dark:border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* Print KOT Button */}
-                          <Tooltip content="Print a Kitchen Order Ticket (KOT) receipt for the cooking station" position="top">
-                            <button
-                              type="button"
-                              onClick={() => handlePrintKOT(order)}
-                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-white/5 hover:bg-stone-200 dark:hover:bg-white/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer"
-                            >
-                              <Printer size={13} className="text-stone-500" />
-                              <span>Print KOT Slip</span>
-                            </button>
-                          </Tooltip>
-
-                          {/* Assign Delivery Boy Option */}
-                          {!isPickup && isManagerOrAdmin && !["delivered", "cancelled"].includes(order.status) && (
-                            <Tooltip content="Assign an active delivery boy or deliver yourself directly from this ticket" position="top">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAssignModal(order)}
-                                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30 text-xs font-bold transition active:scale-95 cursor-pointer"
-                              >
-                                <Bike size={13} />
-                                <span>{order.assignedDeliveryStaff?.name ? "Reassign Driver" : "Assign Delivery Boy"}</span>
-                              </button>
-                            </Tooltip>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 justify-end">
-                          {order.status === "pending" && (
-                            <>
-                              <Tooltip content="Accept order and notify kitchen to begin preparation" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => handleAcceptOrderWithRangeCheck(order)}
-                                  className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <ChefHat size={14} />
-                                  <span>Accept & Start Cooking</span>
-                                </button>
-                              </Tooltip>
-                              <Tooltip content="Reject or cancel this order if unable to fulfill" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => {
-                                    if (confirm(`Cancel order ${uniqueId}?`)) {
-                                      handleUpdateStatus(order._id, "cancelled");
-                                    }
-                                  }}
-                                  className="px-3 py-2 rounded-xl border border-rose-300 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold text-xs transition active:scale-95 cursor-pointer disabled:opacity-50"
-                                >
-                                  Cancel
-                                </button>
-                              </Tooltip>
-                            </>
-                          )}
-
-                          {order.status === "confirmed" && (
-                            <Tooltip content="Confirm kitchen has started cooking this order" position="top">
-                              <button
-                                type="button"
-                                disabled={updatingOrderId === order._id}
-                                onClick={() => handleUpdateStatus(order._id, "preparing")}
-                                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                              >
-                                <ChefHat size={14} />
-                                <span>Start Cooking</span>
-                              </button>
-                            </Tooltip>
-                          )}
-
-                          {order.status === "preparing" && (
-                            isPickup ? (
-                              <Tooltip content="Mark food packed and ready for counter pickup by customer" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => handleUpdateStatus(order._id, "ready")}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all shadow-sm border border-emerald-400/30 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <PackageCheck size={14} />
-                                  <span>Mark Ready for Pickup</span>
-                                </button>
-                              </Tooltip>
-                            ) : (
-                              <Tooltip content="Hand over food parcel to driver and mark out for delivery" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => {
-                                    if (!order.assignedDeliveryStaff?.id) {
-                                      handleOpenAssignModal(order);
-                                    } else {
-                                      handleUpdateStatus(order._id, "out_for_delivery");
-                                    }
-                                  }}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <Truck size={14} />
-                                  <span>Dispatch for Delivery</span>
-                                </button>
-                              </Tooltip>
-                            )
-                          )}
-
-                          {order.status === "ready" && (
-                            isPickup ? (
-                              <Tooltip content="Confirm customer has collected order at the counter" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => handleUpdateStatus(order._id, "delivered")}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <CheckCircle2 size={14} />
-                                  <span>Confirm Customer Picked Up</span>
-                                </button>
-                              </Tooltip>
-                            ) : (
-                              <Tooltip content="Hand over to delivery driver and dispatch to customer" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => {
-                                    if (!order.assignedDeliveryStaff?.id) {
-                                      handleOpenAssignModal(order);
-                                    } else {
-                                      handleUpdateStatus(order._id, "out_for_delivery");
-                                    }
-                                  }}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <Truck size={14} />
-                                  <span>Dispatch for Delivery</span>
-                                </button>
-                              </Tooltip>
-                            )
-                          )}
-
-                          {order.status === "out_for_delivery" && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {!isPickup && (
-                                <Tooltip content="View live delivery route showing restaurant, delivery staff GPS, and customer doorstep" position="top">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleLiveMap(order._id)}
-                                    className="px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                                  >
-                                    <MapPin size={13} />
-                                    <span>{expandedMapOrderIds.has(order._id) ? "Hide Live Map" : "View Live Route"}</span>
-                                  </button>
-                                </Tooltip>
-                              )}
-
-                              <Tooltip content="Confirm successful doorstep delivery to customer" position="top">
-                                <button
-                                  type="button"
-                                  disabled={updatingOrderId === order._id}
-                                  onClick={() => handleUpdateStatus(order._id, "delivered")}
-                                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                  <Truck size={14} />
-                                  <span>Confirm Order Delivered</span>
-                                </button>
-                              </Tooltip>
-                            </div>
-                          )}
-
-                          {order.status === "delivered" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-xl border border-emerald-500/25 text-xs font-bold">
-                              <CheckCircle2 size={14} /> Order Fulfilled
-                            </span>
-                          )}
-
-                          {order.status === "cancelled" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/25 text-xs font-bold">
-                              <XCircle size={14} /> Cancelled
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      {order.status === "cancelled" && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 text-xs font-bold">
+                          <XCircle size={14} /> Cancelled
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-
       </div>
 
-      {/* Explicit Out-of-Range Order Manager Confirmation Dialog */}
+      {/* ── MODALS & SLIDE-OVER DRAWERS ───────────────────────────── */}
+
+      {/* 1. Contextual Order Details Drawer */}
+      <OrderDetailsDrawer
+        isOpen={Boolean(selectedDrawerOrder)}
+        order={selectedDrawerOrder}
+        onClose={() => setSelectedDrawerOrder(null)}
+        onUpdateStatus={handleUpdateStatus}
+        onOpenAssign={handleOpenAssignModal}
+        onOpenHandoverOtp={(ord) => {
+          setHandoverOtpError("");
+          setHandoverAttemptsRemaining(null);
+          setHandoverOtpModalOrder(ord);
+        }}
+        onOpenCancel={(ord) => setCancelModalOrder(ord)}
+        onPrintKot={handlePrintKOT}
+        updatingOrderId={updatingOrderId}
+      />
+
+      {/* 2. Inline Delivery Assignment Drawer / Modal */}
+      <InlineDeliveryAssignModal
+        isOpen={Boolean(assignModalOrder)}
+        order={assignModalOrder}
+        deliveryStaff={deliveryStaffList}
+        loadingStaff={loadingStaff}
+        activeOrdersMap={activeOrdersMap}
+        isManager={isManagerOrAdmin}
+        onAssign={handleConfirmAssignDriver}
+        onSelfDelivery={handleConfirmSelfDelivery}
+        onClose={() => setAssignModalOrder(null)}
+        submitting={assignSubmitting}
+      />
+
+      {/* 3. Secure Handover OTP Verification Modal */}
+      <HandoverOtpModal
+        isOpen={Boolean(handoverOtpModalOrder)}
+        order={handoverOtpModalOrder}
+        onVerify={handleVerifyHandoverOtp}
+        onClose={() => setHandoverOtpModalOrder(null)}
+        submitting={handoverOtpSubmitting}
+        error={handoverOtpError}
+        remainingAttempts={handoverAttemptsRemaining}
+      />
+
+      {/* 4. Cancellation & Rejection Reason Modal */}
+      <CancelOrderModal
+        isOpen={Boolean(cancelModalOrder)}
+        order={cancelModalOrder}
+        onConfirm={handleConfirmCancel}
+        onClose={() => setCancelModalOrder(null)}
+        submitting={updatingOrderId === cancelModalOrder?._id}
+      />
+
+      {/* 5. Out-of-Range Order Manager Confirmation Dialog */}
       {outOfRangePrompt && (
         <OutOfRangeOrderModal
           isOpen={Boolean(outOfRangePrompt)}
@@ -1993,221 +1856,6 @@ export default function OrdersClient() {
           }}
           onClose={() => setOutOfRangePrompt(null)}
         />
-      )}
-
-      {/* Assign Delivery Boy Modal */}
-      {assignModalOrder && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => !assignSubmitting && setAssignModalOrder(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-white/10 flex items-center justify-between bg-stone-50/50 dark:bg-white/[0.02]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                  <Bike size={20} />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-stone-900 dark:text-white text-base">
-                    Assign Delivery Boy
-                  </h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400">
-                    Order #{formatOrderId(assignModalOrder)} • ₹{assignModalOrder.totalAmount}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => !assignSubmitting && setAssignModalOrder(null)}
-                disabled={assignSubmitting}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
-              {/* Order Quick Context */}
-              <div className="p-3 rounded-xl bg-stone-50 dark:bg-white/[0.03] border border-stone-200/60 dark:border-white/5 text-xs text-stone-600 dark:text-stone-300 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-500 dark:text-stone-400">Customer:</span>
-                  <span className="font-bold text-stone-900 dark:text-white">
-                    {assignModalOrder.address?.fullName || assignModalOrder.user?.name || "Customer"}
-                  </span>
-                </div>
-                {assignModalOrder.address?.street && (
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium text-stone-500 dark:text-stone-400 shrink-0">Address:</span>
-                    <span className="text-right truncate">{assignModalOrder.address.street}, {assignModalOrder.address.city || ""}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-500 dark:text-stone-400">Current Status:</span>
-                  <span className="font-semibold text-orange-600 dark:text-orange-400 uppercase text-[10px] tracking-wider">
-                    {assignModalOrder.status.replace(/_/g, " ")}
-                  </span>
-                </div>
-              </div>
-
-              {/* Note about delivery boy self pickup */}
-              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200 text-xs flex items-start gap-2">
-                <span className="text-sm shrink-0">💡</span>
-                <p className="leading-relaxed">
-                  <strong>Note:</strong> Delivery boys can also pick up this parcel directly at the kitchen counter even if not pre-assigned.
-                </p>
-              </div>
-
-              {/* Error Banner */}
-              {assignError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
-                  <AlertTriangle size={15} className="shrink-0" />
-                  <span>{assignError}</span>
-                </div>
-              )}
-
-              {/* Manager Self-Delivery Option */}
-              <div className="p-3.5 rounded-xl border-2 border-dashed border-stone-200 dark:border-white/10 hover:border-orange-500/50 dark:hover:border-orange-500/50 transition">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <span className="font-bold text-xs text-stone-900 dark:text-white flex items-center gap-1.5">
-                      <span>🚗</span>
-                      <span>Deliver This Order Myself</span>
-                    </span>
-                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
-                      Assign manager directly for immediate delivery dispatch
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={assignSubmitting}
-                    onClick={() => handleSelfDelivery(assignModalOrder._id)}
-                    className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 font-bold text-xs cursor-pointer transition shadow-xs disabled:opacity-50 shrink-0"
-                  >
-                    {assignSubmitting ? "Assigning..." : "Deliver Myself"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Delivery Staff List */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                    Active Delivery Boys ({deliveryStaffList.filter((s) => s.isActive).length})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={fetchDeliveryStaff}
-                    disabled={loadingStaff}
-                    className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <RefreshCw size={11} className={loadingStaff ? "animate-spin" : ""} />
-                    <span>Refresh</span>
-                  </button>
-                </div>
-
-                {loadingStaff ? (
-                  <div className="p-8 text-center text-xs text-stone-400 flex flex-col items-center gap-2">
-                    <RefreshCw size={18} className="animate-spin text-orange-500" />
-                    <span>Loading delivery staff...</span>
-                  </div>
-                ) : deliveryStaffList.length === 0 ? (
-                  <div className="p-6 text-center rounded-xl bg-stone-50 dark:bg-white/[0.02] border border-stone-200/60 dark:border-white/5 space-y-2">
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                      No staff accounts with the <strong>Delivery</strong> role found.
-                    </p>
-                    <a
-                      href="/settings?tab=staff"
-                      className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline"
-                    >
-                      <span>Add Delivery Staff in Settings</span>
-                      <ArrowRight size={12} />
-                    </a>
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {deliveryStaffList.map((staff) => {
-                      const isCurrentlyAssigned =
-                        assignModalOrder.assignedDeliveryStaff?.id &&
-                        String(assignModalOrder.assignedDeliveryStaff.id) === String(staff._id);
-
-                      return (
-                        <div
-                          key={staff._id}
-                          className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 ${
-                            isCurrentlyAssigned
-                              ? "bg-blue-500/10 border-blue-500/40"
-                              : "bg-white dark:bg-white/[0.02] border-stone-200/80 dark:border-white/5 hover:border-orange-500/30"
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs text-stone-900 dark:text-white truncate">
-                                {staff.name}
-                              </span>
-                              {isCurrentlyAssigned && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0">
-                                  Currently Assigned
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 dark:text-stone-400 flex-wrap">
-                              {staff.phone && (
-                                <a
-                                  href={`tel:${staff.phone}`}
-                                  className="font-mono hover:text-orange-600 dark:hover:text-orange-400"
-                                >
-                                  {staff.phone}
-                                </a>
-                              )}
-                              <span>•</span>
-                              <span className={staff.activeDeliveries > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
-                                {staff.activeDeliveries || 0} active deliveries
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={assignSubmitting || isCurrentlyAssigned}
-                            onClick={() => handleAssignDriver(assignModalOrder._id, staff._id, staff.name)}
-                            className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer transition shadow-xs shrink-0 ${
-                              isCurrentlyAssigned
-                                ? "bg-stone-200 dark:bg-white/10 text-stone-500 cursor-default"
-                                : "bg-orange-600 hover:bg-orange-700 text-white active:scale-95 disabled:opacity-50"
-                            }`}
-                          >
-                            {isCurrentlyAssigned ? "Assigned" : "Assign"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Unassign Option if order already has an assigned driver */}
-              {assignModalOrder.assignedDeliveryStaff?.id && (
-                <div className="pt-2 border-t border-stone-200 dark:border-white/10 flex justify-end">
-                  <button
-                    type="button"
-                    disabled={assignSubmitting}
-                    onClick={() => handleUnassignDriver(assignModalOrder._id)}
-                    className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer disabled:opacity-50"
-                  >
-                    Unassign Current Driver (Return to Pool)
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

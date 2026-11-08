@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import {
   Tag,
   Plus,
@@ -18,8 +19,16 @@ import {
 export default function OffersSection() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setRawError] = useState("");
+  const setError = (msg) => {
+    setRawError(msg);
+    if (msg) toast.error(msg);
+  };
+  const [success, setRawSuccess] = useState("");
+  const setSuccess = (msg) => {
+    setRawSuccess(msg);
+    if (msg) toast.success(msg);
+  };
 
   const [kitchenProducts, setKitchenProducts] = useState([]);
   const [kitchenCategories, setKitchenCategories] = useState([]);
@@ -220,19 +229,7 @@ export default function OffersSection() {
         </button>
       </div>
 
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
-      {success && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
 
       {/* Offers Cards */}
       <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 transition-colors">

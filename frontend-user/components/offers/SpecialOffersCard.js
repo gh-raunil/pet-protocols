@@ -5,8 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Check,
   Tag,
@@ -32,11 +30,6 @@ export default function SpecialOffersCard({ offers = [] }) {
   const nextOffer = useCallback(() => {
     if (validOffers.length <= 1) return;
     setActiveIndex((prev) => (prev + 1) % validOffers.length);
-  }, [validOffers.length]);
-
-  const prevOffer = useCallback(() => {
-    if (validOffers.length <= 1) return;
-    setActiveIndex((prev) => (prev - 1 + validOffers.length) % validOffers.length);
   }, [validOffers.length]);
 
   useEffect(() => {
@@ -183,28 +176,6 @@ export default function SpecialOffersCard({ offers = [] }) {
                 />
               </div>
             </div>
-
-            {/* Prev / Next Chevrons (if multiple offers exist) */}
-            {validOffers.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={prevOffer}
-                  aria-label="Previous offer"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white/90 dark:bg-black/60 text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center shadow-xs hover:scale-105 active:scale-90 transition"
-                >
-                  <ChevronLeft size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={nextOffer}
-                  aria-label="Next offer"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white/90 dark:bg-black/60 text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center shadow-xs hover:scale-105 active:scale-90 transition"
-                >
-                  <ChevronRight size={13} />
-                </button>
-              </>
-            )}
           </div>
 
           {/* Carousel Pagination Dots */}

@@ -51,64 +51,56 @@ export default function ProductCarousel({
   return (
     <section className="relative my-8 sm:my-10 w-full max-w-full overflow-hidden">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-4 px-1 gap-2">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {badge && (
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20 shrink-0">
-              {badge}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base sm:text-xl md:text-2xl font-black text-[var(--text-main)] flex items-center gap-2 tracking-tight truncate">
+      <div className="flex items-end justify-between mb-3 px-1 gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-[var(--text-main)] flex items-center gap-1.5 tracking-tight">
               {icon && <span className="text-[var(--brand-accent)] shrink-0">{icon}</span>}
-              <span className="truncate">{title}</span>
+              <span>{title}</span>
             </h2>
-            {subtitle && (
-              <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
-                {subtitle}
-              </p>
+            {badge && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/20 shrink-0">
+                {badge}
+              </span>
             )}
           </div>
+          {subtitle && (
+            <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-1">
+              {subtitle}
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* View All Link */}
           {viewAllHref && (
             <Link
               href={viewAllHref}
-              className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-[var(--brand-accent)] hover:underline mr-1"
+              className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-[var(--brand-accent)] hover:underline mr-1"
             >
               View All <ArrowRight size={13} />
             </Link>
           )}
 
-          {/* Desktop Arrow Controls */}
+          {/* Desktop/Touch Arrow Controls */}
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => scroll("left")}
               disabled={!canScrollLeft}
               aria-label="Scroll left"
-              className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
-                canScrollLeft
-                  ? "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-main)] hover:bg-[var(--brand-accent)] hover:border-[var(--brand-accent)] hover:text-white shadow-xs"
-                  : "bg-[var(--bg-sub)] border-[var(--border-color)] text-[var(--text-muted)] cursor-not-allowed opacity-40"
-              }`}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] hover:bg-[var(--brand-accent)] hover:border-[var(--brand-accent)] hover:text-white disabled:opacity-25 disabled:pointer-events-none transition cursor-pointer shadow-2xs"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={15} />
             </button>
             <button
               type="button"
               onClick={() => scroll("right")}
               disabled={!canScrollRight}
               aria-label="Scroll right"
-              className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
-                canScrollRight
-                  ? "bg-[var(--text-main)] text-[var(--bg-main)] border-[var(--text-main)] hover:bg-[var(--brand-accent)] hover:border-[var(--brand-accent)] hover:text-white shadow-xs"
-                  : "bg-[var(--bg-sub)] border-[var(--border-color)] text-[var(--text-muted)] cursor-not-allowed opacity-40"
-              }`}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] hover:bg-[var(--brand-accent)] hover:border-[var(--brand-accent)] hover:text-white disabled:opacity-25 disabled:pointer-events-none transition cursor-pointer shadow-2xs"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={15} />
             </button>
           </div>
         </div>

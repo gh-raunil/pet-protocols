@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
 import { performLogout } from "@/lib/logoutHelper";
 import {
@@ -25,17 +26,17 @@ export default function SecuritySection() {
   async function handlePasswordChange(e) {
     e.preventDefault();
     if (!currentPassword || !newPassword) {
-      setError("Please fill in both current and new password.");
+      toast.error("Please fill in both current and new password.");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters long.");
+      toast.error("New password must be at least 6 characters long.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match. Please verify.");
+      toast.error("New passwords do not match. Please verify.");
       return;
     }
 
@@ -52,16 +53,16 @@ export default function SecuritySection() {
       const data = await res.json();
 
       if (data.success) {
-        setSuccess("Password updated successfully!");
+        toast.success("Password updated successfully!");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        setError(data.message || "Failed to update password.");
+        toast.error(data.message || "Failed to update password.");
       }
     } catch (err) {
       console.error("Password update error:", err);
-      setError("Network error while updating password.");
+      toast.error("Network error while updating password.");
     } finally {
       setLoading(false);
     }
@@ -77,19 +78,7 @@ export default function SecuritySection() {
         </p>
       </div>
 
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
-      {success && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
 
       {/* 1. Change Password */}
       <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 transition-colors">

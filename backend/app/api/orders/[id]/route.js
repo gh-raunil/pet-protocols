@@ -156,7 +156,7 @@ export async function GET(request, { params }) {
     const targetOrder = await Order.findOne({
       $and: [orderIdentifierFilter, ownershipFilter],
     })
-      .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings')
+      .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings orderingSettings')
       .populate('user', 'name email');
 
     if (!targetOrder) {
@@ -187,12 +187,13 @@ export async function GET(request, { params }) {
       };
 
       siblingOrders = await Order.find(siblingFilter)
-        .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings')
+        .populate('restaurant', 'name slug image phone address whatsappNumber showPhoneToCustomers showWhatsappToCustomers cancellationSettings orderingSettings')
         .populate('user', 'name email')
         .sort({ createdAt: -1, _id: -1 });
     }
 
-    const sanitizedTarget = sanitizeOrderForCustomer(targetOrder);
+    const matchingTarget = siblingOrders.find((s) => s._id.toString() === targetOrder._id.toString()) || targetOrder;
+    const sanitizedTarget = sanitizeOrderForCustomer(matchingTarget);
     const sanitizedSiblings = siblingOrders.map(sanitizeOrderForCustomer);
 
     return NextResponse.json(

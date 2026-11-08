@@ -9,7 +9,7 @@ import { executeOrderRefund, retryFailedDeduction } from "@/lib/refundService";
 import { notifyOrderEvent, sendPushToUser } from "@/lib/pushService";
 import { enqueueOrderEvents } from "@/lib/notificationOutboxService";
 import { getOrderDistanceInfo } from "@/lib/geoDistance";
-import { processStalePickupOrders, logWasteForOrder } from "@/lib/orderMaintenanceService";
+import { processStalePickupOrders, processAllStaleOrders, processUnrespondedStaleOrders, logWasteForOrder } from "@/lib/orderMaintenanceService";
 import { verifyAndCompleteDelivery, issueDeliveryOtpForOrder } from "@/lib/deliveryOtpService";
 
 let _requireRestaurantAdmin = requireRestaurantAdmin;
@@ -184,18 +184,24 @@ export async function PUT(request) {
       cancellationReason,
     } = body;
 
-    if (action === "dismiss_stale_pickups") {
+    if (action === "dismiss_stale_pickups" || action === "dismiss_stale_orders") {
       if (auth.isStaff && !auth.isAdmin && !auth.staffRoles.includes("Manager")) {
         return NextResponse.json(
-          { success: false, message: "Only managers or restaurant admins can trigger stale pickup maintenance." },
+          { success: false, message: "Only managers or restaurant admins can trigger stale order maintenance." },
           { status: 403 }
         );
       }
       await connectDB();
-      const maintenanceRes = await processStalePickupOrders({ restaurantId });
+      const managerLimitMinutes = body.timeoutMinutes ? Number(body.timeoutMinutes) : null;
+      let maintenanceRes;
+      if (action === "dismiss_stale_pickups") {
+        maintenanceRes = await processStalePickupOrders({ restaurantId, managerLimitMinutes });
+      } else {
+        maintenanceRes = await processAllStaleOrders({ restaurantId, managerLimitMinutes });
+      }
       return NextResponse.json({
         success: true,
-        message: `Processed stale pickup maintenance: ${maintenanceRes.processedCount} order(s) cancelled.`,
+        message: `Processed stale order maintenance: ${maintenanceRes.processedCount} order(s) cancelled.`,
         results: maintenanceRes,
       });
     }
@@ -524,6 +530,14 @@ export async function PUT(request) {
       if (status === "out_for_delivery" && isPickup) {
         return NextResponse.json(
           { success: false, message: "Pickup orders do not transition to 'out_for_delivery'. Mark as 'ready' and 'delivered' at counter." },
+          { status: 400 }
+        );
+      }
+
+      // Delivery orders must reach 'ready' before being dispatched for delivery
+      if (status === "out_for_delivery" && !isPickup && order.status !== "ready" && order.status !== "out_for_delivery") {
+        return NextResponse.json(
+          { success: false, message: "Order must be marked 'ready' before it can be dispatched for delivery." },
           { status: 400 }
         );
       }

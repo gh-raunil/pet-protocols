@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { toast } from "@/components/ui/ToastProvider";
 import {
   PackageCheck,
   ChefHat,
@@ -207,7 +208,11 @@ export default function OrderStatusTracker({
   // Secure Handover OTP State
   const [otpData, setOtpData] = React.useState(null);
   const [otpLoading, setOtpLoading] = React.useState(false);
-  const [otpError, setOtpError] = React.useState("");
+  const [otpError, setRawOtpError] = React.useState("");
+  const setOtpError = React.useCallback((msg) => {
+    setRawOtpError(msg);
+    if (msg) toast.error(msg);
+  }, []);
   const [reissueCooldown, setReissueCooldown] = React.useState(0);
   const [reissuing, setReissuing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -290,6 +295,16 @@ export default function OrderStatusTracker({
   const effectiveCancelReason =
     cancellationReason || cancelEntry?.note || "This order was cancelled by the kitchen or customer.";
 
+  const isTimeoutCancellation =
+    isCancelled &&
+    Boolean(
+      effectiveCancelReason?.toLowerCase().includes("unresponded") ||
+      effectiveCancelReason?.toLowerCase().includes("timed out") ||
+      effectiveCancelReason?.toLowerCase().includes("inactivity") ||
+      effectiveCancelReason?.toLowerCase().includes("cutoff") ||
+      effectiveCancelReason?.toLowerCase().includes("uncollected")
+    );
+
   // 1. Cancelled or Failed Order State
   if (isCancelled || isFailed) {
     return (
@@ -302,7 +317,11 @@ export default function OrderStatusTracker({
             <div className="space-y-1.5 flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="inline-block text-xs font-black uppercase tracking-wider bg-rose-500/20 text-rose-500 px-3 py-1 rounded-full border border-rose-500/30">
-                  {isCancelled ? "Order Cancelled" : "Payment Declined"}
+                  {isTimeoutCancellation
+                    ? "Kitchen Response Cutoff Exceeded"
+                    : isCancelled
+                    ? "Order Cancelled"
+                    : "Payment Declined"}
                 </span>
                 {cancelledAtDisplay && (
                   <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1 font-medium">
@@ -311,15 +330,28 @@ export default function OrderStatusTracker({
                 )}
               </div>
               <h4 className="text-base font-bold text-[var(--text-main)]">
-                {isCancelled ? "This order will not be fulfilled" : "Payment could not be processed"}
+                {isTimeoutCancellation
+                  ? "Order Unresponded by Kitchen & Auto-Cancelled"
+                  : isCancelled
+                  ? "This order will not be fulfilled"
+                  : "Payment could not be processed"}
               </h4>
               <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                {isCancelled
+                {isTimeoutCancellation
+                  ? `The restaurant did not accept or prepare your order within the response window (${effectiveCancelReason}). Any payment captured has been refunded in full to your source payment method.`
+                  : isCancelled
                   ? (effectiveCancelReason
                       ? `Cancellation reason: ${effectiveCancelReason}. If any payment was captured, the full refund is initiated to the source payment method.`
                       : "This order was cancelled by the kitchen or user. If any payment was captured, the full refund is initiated to the source payment method.")
                   : "The payment transaction failed. Please retry your order using Cash on Delivery or another digital payment method."}
               </p>
+              {isTimeoutCancellation && (
+                <div className="pt-2 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                    <CheckCircle2 size={11} /> 100% Refund Initiated
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -587,12 +619,7 @@ export default function OrderStatusTracker({
               </div>
             )}
 
-            {otpError && (
-              <div className="mt-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
-                <AlertTriangle size={14} className="shrink-0" />
-                <span>{otpError}</span>
-              </div>
-            )}
+
           </div>
         )}
 

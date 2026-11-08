@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { toast } from "react-hot-toast";
 import {
   Users,
   UserPlus,
@@ -83,8 +84,16 @@ export const AVAILABLE_ROLES = [
 export default function StaffSection() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setRawError] = useState("");
+  const setError = (msg) => {
+    setRawError(msg);
+    if (msg) toast.error(msg);
+  };
+  const [success, setRawSuccess] = useState("");
+  const setSuccess = (msg) => {
+    setRawSuccess(msg);
+    if (msg) toast.success(msg);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
@@ -319,19 +328,7 @@ export default function StaffSection() {
         </button>
       </div>
 
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
-      {success && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
 
       {/* Role Summary Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">

@@ -25,7 +25,9 @@ import {
   AlertTriangle,
   Receipt,
   Store,
+  Play,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { getOrderElapsedInfo, handlePrintKOT } from "../orders/OrdersClient";
 
 export function formatOrderId(order) {
@@ -68,6 +70,74 @@ export default function DashboardClient() {
     }
     return true;
   });
+  const [isUpdatingKitchen, setIsUpdatingKitchen] = useState(false);
+
+  // Synchronize kitchen status across all tabs and components
+  useEffect(() => {
+    function handleKitchenChange(e) {
+      if (e.detail && typeof e.detail.active === "boolean") {
+        setTimeout(() => {
+          setKitchenActive(e.detail.active);
+        }, 0);
+      }
+    }
+    function handleStorage(e) {
+      if (e.key === "restaurant_kitchen_active") {
+        setTimeout(() => {
+          setKitchenActive(e.newValue !== "false");
+        }, 0);
+      }
+    }
+    window.addEventListener("pet_protocols_kitchen_active_changed", handleKitchenChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("pet_protocols_kitchen_active_changed", handleKitchenChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const applyKitchenToggle = async (nextState) => {
+    if (isUpdatingKitchen) return;
+    setIsUpdatingKitchen(true);
+
+    try {
+      const res = await fetch("/api/restaurant/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isOpen: nextState,
+          acceptingOrders: nextState,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success !== false) {
+        setKitchenActive(nextState);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("restaurant_kitchen_active", String(nextState));
+          queueMicrotask(() => {
+            window.dispatchEvent(
+              new CustomEvent("pet_protocols_kitchen_active_changed", {
+                detail: { active: nextState },
+              })
+            );
+          });
+        }
+        if (nextState) {
+          toast.success("Accepting orders — storefront is now open.");
+        } else {
+          toast.success("Orders paused — storefront is temporarily closed.");
+        }
+      } else {
+        toast.error(data.message || "Failed to update restaurant status.");
+      }
+    } catch (err) {
+      console.error("Failed to toggle restaurant status:", err);
+      toast.error("Network error updating restaurant status.");
+    } finally {
+      setIsUpdatingKitchen(false);
+    }
+  };
 
   // Today's date in YYYY-MM-DD
   const todayStr = useMemo(() => {
@@ -183,15 +253,12 @@ export default function DashboardClient() {
             </div>
           </div>
           <button
-            onClick={() => {
-              setKitchenActive(true);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("restaurant_kitchen_active", "true");
-              }
-            }}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+            onClick={() => applyKitchenToggle(true)}
+            disabled={isUpdatingKitchen}
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs transition active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
           >
-            Resume Orders Now
+            <Play size={13} fill="currentColor" />
+            <span>Resume Orders Now</span>
           </button>
         </div>
       )}
@@ -200,12 +267,12 @@ export default function DashboardClient() {
       <div className="bg-white dark:bg-[#10141f] border border-stone-200/90 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white tracking-tight">
                 {restaurantName}
               </h1>
-              <span className="text-[11px] font-mono text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-500/20 font-bold">
-                #{session?.user?.restaurantId?.slice(-6) || "PARTNER"}
+              <span className="text-[11px] font-mono text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2.5 py-0.5 rounded-md border border-orange-200 dark:border-orange-500/20 font-bold tracking-wider">
+                STORE ID: {(session?.user?.restaurantId?.slice(-6) || "PARTNER").toUpperCase()}
               </span>
             </div>
             <p className="text-xs text-stone-500 dark:text-stone-400">
@@ -213,30 +280,8 @@ export default function DashboardClient() {
             </p>
           </div>
 
+          {/* Right Workflow Actions */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const nextState = !kitchenActive;
-                setKitchenActive(nextState);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("restaurant_kitchen_active", String(nextState));
-                }
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border active:scale-95 cursor-pointer ${
-                kitchenActive
-                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
-                  : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  kitchenActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                }`}
-              />
-              <span>{kitchenActive ? "Accepting Orders" : "Kitchen Paused"}</span>
-            </button>
-
             <Link
               href="/products"
               className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition shadow-xs active:scale-95"
@@ -585,7 +630,7 @@ export default function DashboardClient() {
                               <Printer size={13} />
                             </button>
                             <Link
-                              href="/orders"
+                              href={`/orders?orderId=${order._id}`}
                               className="px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs transition shadow-xs flex items-center gap-1"
                             >
                               <span>Manage</span>
@@ -676,7 +721,7 @@ export default function DashboardClient() {
                         Print KOT
                       </button>
                       <Link
-                        href="/orders"
+                        href={`/orders?orderId=${order._id}`}
                         className="px-3 py-1 rounded-lg bg-orange-500 text-white font-bold text-xs"
                       >
                         Manage Order

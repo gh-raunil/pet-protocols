@@ -40,6 +40,42 @@ export async function PUT(request, { params }) {
       product.price = p;
     }
     if (body.image !== undefined) product.image = body.image;
+
+    if (body.images !== undefined) {
+      if (!Array.isArray(body.images)) {
+        return NextResponse.json({ success: false, message: "Images must be an array." }, { status: 400 });
+      }
+      if (body.images.length > 5) {
+        return NextResponse.json({ success: false, message: "A dish cannot have more than 5 images." }, { status: 400 });
+      }
+      const sanitizedImages = [];
+      let foundPrimary = false;
+      for (let i = 0; i < body.images.length; i++) {
+        const img = body.images[i];
+        if (!img || !img.url || typeof img.url !== "string" || !img.url.trim()) {
+          continue;
+        }
+        const isPrimary = Boolean(img.isPrimary) && !foundPrimary;
+        if (isPrimary) foundPrimary = true;
+
+        sanitizedImages.push({
+          url: String(img.url).trim(),
+          alt: img.alt ? String(img.alt).trim().slice(0, 200) : (product.name || "").slice(0, 200),
+          order: typeof img.order === "number" ? img.order : i,
+          isPrimary,
+        });
+      }
+
+      if (sanitizedImages.length > 0 && !foundPrimary) {
+        sanitizedImages[0].isPrimary = true;
+      }
+
+      product.images = sanitizedImages;
+      if (sanitizedImages.length > 0) {
+        const prim = sanitizedImages.find((img) => img.isPrimary) || sanitizedImages[0];
+        product.image = prim.url;
+      }
+    }
     if (body.category !== undefined) product.category = body.category;
     if (body.type !== undefined) product.type = body.type;
     if (body.preparationTime !== undefined) product.preparationTime = Math.max(1, Number(body.preparationTime) || 15);
@@ -79,28 +115,66 @@ export async function PUT(request, { params }) {
           );
         }
         const sanitizedVariants = [];
-        for (const v of body.variants) {
+        const seenVariantNames = new Set();
+        for (let i = 0; i < body.variants.length; i++) {
+          const v = body.variants[i];
           if (!v || !v.name || !String(v.name).trim()) {
-            return NextResponse.json({ success: false, message: "All variants must have a name." }, { status: 400 });
+            return NextResponse.json({ success: false, message: "All variants must have a name (e.g. Small, Medium, Large, 250 g)." }, { status: 400 });
           }
+          const cleanName = String(v.name).trim().slice(0, 100);
+          const lowerName = cleanName.toLowerCase();
+          if (seenVariantNames.has(lowerName)) {
+            return NextResponse.json(
+              { success: false, message: `Duplicate variant name '${cleanName}'. Each variant name must be unique.` },
+              { status: 400 }
+            );
+          }
+          seenVariantNames.add(lowerName);
+
           const vPrice = Number(v.price);
           if (isNaN(vPrice) || vPrice < 0) {
-            return NextResponse.json({ success: false, message: `Price for variant '${v.name}' must be non-negative.` }, { status: 400 });
+            return NextResponse.json({ success: false, message: `Price for variant '${cleanName}' must be non-negative.` }, { status: 400 });
           }
+
+          let vCompareAt = null;
+          if (v.compareAtPrice !== undefined && v.compareAtPrice !== "" && v.compareAtPrice !== null) {
+            const cap = Number(v.compareAtPrice);
+            if (isNaN(cap) || cap <= 0) {
+              return NextResponse.json(
+                { success: false, message: `Compare-at price for '${cleanName}' must be a positive number.` },
+                { status: 400 }
+              );
+            }
+            if (cap <= vPrice) {
+              return NextResponse.json(
+                { success: false, message: `Compare-at price (₹${cap}) for '${cleanName}' must be greater than the selling price (₹${vPrice}).` },
+                { status: 400 }
+              );
+            }
+            vCompareAt = cap;
+          }
+
           const vQty = v.portionQuantity !== undefined && v.portionQuantity !== "" && v.portionQuantity !== null
             ? Number(v.portionQuantity)
             : null;
           if (vQty !== null && (isNaN(vQty) || vQty <= 0)) {
-            return NextResponse.json({ success: false, message: `Portion quantity for variant '${v.name}' must be positive.` }, { status: 400 });
+            return NextResponse.json({ success: false, message: `Portion quantity for variant '${cleanName}' must be positive.` }, { status: 400 });
           }
+
+          const vImage = v.image && typeof v.image === "string" && v.image.trim() ? v.image.trim() : null;
+
           sanitizedVariants.push({
-            name: String(v.name).trim().slice(0, 100),
+            ...(v._id && mongoose.Types.ObjectId.isValid(v._id) ? { _id: v._id } : {}),
+            name: cleanName,
             price: vPrice,
+            compareAtPrice: vCompareAt,
             portionQuantity: vQty,
             portionUnit: v.portionUnit ? String(v.portionUnit).trim() : null,
             servingLabel: v.servingLabel ? String(v.servingLabel).trim().slice(0, 100) : null,
             size: v.size ? String(v.size).trim().slice(0, 50) : null,
             isAvailable: v.isAvailable !== false,
+            image: vImage,
+            sortOrder: typeof v.sortOrder === "number" ? v.sortOrder : i,
           });
         }
         product.variants = sanitizedVariants;

@@ -77,7 +77,11 @@ export default function AssignDeliveryClient() {
   const [completeHandoverModalOrder, setCompleteHandoverModalOrder] = useState(null);
   const [handoverOtpInput, setHandoverOtpInput] = useState("");
   const [handoverSubmitting, setHandoverSubmitting] = useState(false);
-  const [handoverError, setHandoverError] = useState("");
+  const [handoverError, setRawHandoverError] = useState("");
+  const setHandoverError = (msg) => {
+    setRawHandoverError(msg);
+    if (msg) toast.error(msg);
+  };
 
   // Load Data
   const loadData = useCallback(async (isSilent = false) => {
@@ -1023,11 +1027,7 @@ export default function AssignDeliveryClient() {
                 .
               </p>
 
-              {handoverError && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-700 dark:text-rose-400 font-medium">
-                  {handoverError}
-                </div>
-              )}
+
 
               <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
                 <div>

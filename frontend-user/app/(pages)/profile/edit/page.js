@@ -41,12 +41,12 @@ export default function EditProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image file");
+      toast.error("Please select a valid image file");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be less than 5MB");
+      toast.error("Image must be less than 5MB");
       return;
     }
 
@@ -68,12 +68,12 @@ export default function EditProfilePage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError("Full name is required");
+      toast.error("Full name is required");
       return;
     }
 
     if (phone && phone.length !== 10) {
-      setError("Phone number must be exactly 10 digits");
+      toast.error("Phone number must be exactly 10 digits");
       return;
     }
 
@@ -98,7 +98,7 @@ export default function EditProfilePage() {
         const uploadData = await uploadRes.json();
 
         if (!uploadData.success) {
-          setError("Image upload failed. Please try again.");
+          toast.error("Image upload failed. Please try again.");
           setSaving(false);
           setUploading(false);
           return;
@@ -133,10 +133,10 @@ export default function EditProfilePage() {
           router.push("/profile");
         }, 1200);
       } else {
-        setError(data.message || "Failed to update profile");
+        toast.error(data.message || "Failed to update profile");
       }
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -200,28 +200,16 @@ export default function EditProfilePage() {
             onChange={handleImageChange}
             className="hidden"
           />
-          <div className="flex items-center gap-3">
+          {previewImage && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[var(--brand-accent)] text-xs font-semibold hover:underline transition"
+              onClick={handleRemoveImage}
+              className="text-red-500 hover:text-red-400 text-xs font-semibold hover:underline transition flex items-center gap-1 cursor-pointer"
             >
-              {imageFile ? "Image selected — click to change" : "Upload new profile photo"}
+              <Trash2 size={12} />
+              <span>Remove photo</span>
             </button>
-            {previewImage && (
-              <>
-                <span className="text-[var(--text-muted)] text-xs">•</span>
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="text-red-500 hover:text-red-400 text-xs font-semibold hover:underline transition flex items-center gap-1 cursor-pointer"
-                >
-                  <Trash2 size={12} />
-                  <span>Remove photo</span>
-                </button>
-              </>
-            )}
-          </div>
+          )}
           {uploading && (
             <p className="text-[var(--text-muted)] text-xs animate-pulse">
               Uploading picture...
@@ -272,12 +260,7 @@ export default function EditProfilePage() {
           />
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-500/15 border border-red-500/30 text-red-500 text-xs px-4 py-3 rounded-xl font-medium">
-            {error}
-          </div>
-        )}
+
 
         {/* Save button */}
         <button

@@ -21,7 +21,21 @@ export async function GET(request, { params }) {
       'name slug status rating image isOpen acceptingOrders isTemporarilyClosed closureReason openingHours weeklyHours regionalSettings orderTypes orderLimits cancellationSettings menuSettings paymentSettings chargeSettings deliverySettings'
     );
     if (!product) return NextResponse.json({ success: false, message: 'Product not found' }, { status: 404 })
-    return NextResponse.json({ success: true, product })
+
+    const productObj = product.toObject ? product.toObject() : product;
+    if ((!productObj.images || productObj.images.length === 0) && productObj.image) {
+      productObj.images = [
+        {
+          url: productObj.image,
+          alt: productObj.name || '',
+          order: 0,
+          isPrimary: true,
+        },
+      ];
+    }
+
+    return NextResponse.json({ success: true, product: productObj })
+    
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
@@ -69,6 +83,37 @@ export async function PUT(request, { params }) {
       }
       // Never allow a branch admin to transfer a product to another restaurant
       delete body.restaurant;
+    }
+
+    if (body.images !== undefined) {
+      if (!Array.isArray(body.images)) {
+        return NextResponse.json({ success: false, message: "Images must be an array." }, { status: 400 });
+      }
+      if (body.images.length > 5) {
+        return NextResponse.json({ success: false, message: "A dish cannot have more than 5 images." }, { status: 400 });
+      }
+      const sanitized = [];
+      let foundPrimary = false;
+      for (let i = 0; i < body.images.length; i++) {
+        const img = body.images[i];
+        if (!img || !img.url || typeof img.url !== "string" || !img.url.trim()) continue;
+        const isPrimary = Boolean(img.isPrimary) && !foundPrimary;
+        if (isPrimary) foundPrimary = true;
+        sanitized.push({
+          url: String(img.url).trim(),
+          alt: img.alt ? String(img.alt).trim().slice(0, 200) : (body.name || existingProduct.name || "").slice(0, 200),
+          order: typeof img.order === "number" ? img.order : i,
+          isPrimary,
+        });
+      }
+      if (sanitized.length > 0 && !foundPrimary) {
+        sanitized[0].isPrimary = true;
+      }
+      body.images = sanitized;
+      if (sanitized.length > 0) {
+        const prim = sanitized.find((img) => img.isPrimary) || sanitized[0];
+        body.image = prim.url;
+      }
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

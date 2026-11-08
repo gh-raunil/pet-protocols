@@ -188,9 +188,10 @@ export default function CustomerProfileClient() {
       return;
     }
 
+    let toastId = null;
     try {
       setImageActionLoading(true);
-      toast.loading("Uploading profile image...", { id: "profile-image-action" });
+      toastId = toast.loading("Uploading profile image...");
 
       const formData = new FormData();
       formData.append("image", file);
@@ -202,7 +203,8 @@ export default function CustomerProfileClient() {
 
       const uploadData = await uploadRes.json();
       if (!uploadData.success || !uploadData.imageUrl) {
-        toast.error(uploadData.message || "Failed to upload image", { id: "profile-image-action" });
+        if (toastId) toast.remove(toastId);
+        toast.error(uploadData.message || "Failed to upload image");
         return;
       }
 
@@ -214,7 +216,8 @@ export default function CustomerProfileClient() {
 
       const updateResult = await updateRes.json();
       if (!updateResult.success) {
-        toast.error(updateResult.message || "Failed to update profile", { id: "profile-image-action" });
+        if (toastId) toast.remove(toastId);
+        toast.error(updateResult.message || "Failed to update profile");
         return;
       }
 
@@ -222,10 +225,12 @@ export default function CustomerProfileClient() {
         await update({ image: uploadData.imageUrl });
       }
 
-      toast.success("Profile photo updated successfully!", { id: "profile-image-action" });
+      if (toastId) toast.remove(toastId);
+      toast.success("Profile photo updated successfully!");
     } catch (err) {
       console.error("Avatar upload failed:", err);
-      toast.error("Failed to upload profile photo", { id: "profile-image-action" });
+      if (toastId) toast.remove(toastId);
+      toast.error("Failed to upload profile photo");
     } finally {
       setImageActionLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -233,9 +238,10 @@ export default function CustomerProfileClient() {
   };
 
   const handleDeleteImage = async () => {
+    let toastId = null;
     try {
       setImageActionLoading(true);
-      toast.loading("Removing profile image...", { id: "profile-image-action" });
+      toastId = toast.loading("Removing profile image...");
 
       const res = await fetch("/api/user/update", {
         method: "DELETE",
@@ -243,7 +249,8 @@ export default function CustomerProfileClient() {
 
       const data = await res.json();
       if (!data.success) {
-        toast.error(data.message || "Failed to remove image", { id: "profile-image-action" });
+        if (toastId) toast.remove(toastId);
+        toast.error(data.message || "Failed to remove image");
         return;
       }
 
@@ -252,10 +259,12 @@ export default function CustomerProfileClient() {
       }
 
       setShowDeleteConfirm(false);
-      toast.success("Profile photo removed successfully", { id: "profile-image-action" });
+      if (toastId) toast.remove(toastId);
+      toast.success("Profile photo removed successfully");
     } catch (err) {
       console.error("Avatar delete failed:", err);
-      toast.error("Failed to remove profile photo", { id: "profile-image-action" });
+      if (toastId) toast.remove(toastId);
+      toast.error("Failed to remove profile photo");
     } finally {
       setImageActionLoading(false);
     }
@@ -410,59 +419,54 @@ export default function CustomerProfileClient() {
                 )}
               </div>
 
-              {/* Verified badge */}
-              <span
-                className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-2 border-[var(--bg-card)] rounded-full flex items-center justify-center text-[10px] text-white font-bold shadow"
-                title="Verified Customer"
+              {/* Camera icon badge button on avatar */}
+              <button
+                type="button"
+                onClick={() => !imageActionLoading && fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 p-2 rounded-xl text-white shadow-sm bg-[var(--brand-accent)] hover:opacity-90 border-2 border-[var(--bg-card)] transition cursor-pointer"
+                title="Change Profile Photo"
               >
-                ✓
-              </span>
+                <Camera size={13} />
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
             </div>
 
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 text-xs font-bold uppercase tracking-wider mb-1.5">
                 <Crown size={13} /> {foodieTier}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-main)]">
-                {session?.user?.name || "Customer"}
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-main)] flex items-center gap-2">
+                <span>{session?.user?.name || "Customer"}</span>
+                <span className="w-5 h-5 bg-emerald-500 rounded-full inline-flex items-center justify-center text-[10px] text-white font-bold shadow-xs shrink-0" title="Verified Customer">
+                  ✓
+                </span>
               </h1>
               <p className="text-xs sm:text-sm font-medium text-[var(--text-muted)] mt-0.5">
                 {session?.user?.email}
               </p>
 
-              {/* Profile Image Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2 mt-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={imageActionLoading}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-accent)]/15 hover:bg-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-bold border border-[var(--brand-accent)]/30 transition cursor-pointer disabled:opacity-50 shadow-sm"
-                  title="Upload or change profile photo"
-                >
-                  <Camera size={13} />
-                  <span>{session?.user?.image ? "Update Photo" : "Upload Photo"}</span>
-                </button>
-
-                {session?.user?.image && (
+              {/* Profile Image Remove Option if photo exists */}
+              {session?.user?.image && (
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={imageActionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold border border-red-500/25 transition cursor-pointer disabled:opacity-50 shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold border border-red-500/25 transition cursor-pointer disabled:opacity-50 shadow-2xs"
                     title="Delete profile photo"
                   >
-                    <Trash2 size={13} />
-                    <span>Delete Photo</span>
+                    <Trash2 size={12} />
+                    <span>Remove Photo</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 

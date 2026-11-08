@@ -324,7 +324,11 @@ export default function RestaurantAdminProfileClient() {
         <div className="flex flex-row items-start gap-4 sm:gap-5">
           {/* Avatar with Camera upload trigger */}
           <div className="relative group shrink-0">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[#eefbf4] dark:bg-emerald-950/20 border border-[#a7f3d0] dark:border-emerald-500/30 flex items-center justify-center overflow-hidden">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[#eefbf4] dark:bg-emerald-950/20 border border-[#a7f3d0] dark:border-emerald-500/30 flex items-center justify-center overflow-hidden cursor-pointer"
+              title="Click camera icon to change profile photo"
+            >
               {profileData.image ? (
                 <img
                   src={profileData.image}
@@ -378,29 +382,20 @@ export default function RestaurantAdminProfileClient() {
               <span>{profileData.phone}</span>
             </p>
 
-            {/* Profile Image Action Controls */}
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#fff4ed] hover:bg-[#ffe8d9] text-[#ff6a1f] text-xs font-bold border border-[#ffd8bf] transition shadow-2xs cursor-pointer"
-                title="Upload or change profile photo"
-              >
-                <Camera size={13} />
-                <span>{profileData.image ? "Change Photo" : "Upload Photo"}</span>
-              </button>
-              {profileData.image && (
+            {/* Profile Image Remove Option if photo exists */}
+            {profileData.image && (
+              <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition shadow-2xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-200 dark:border-rose-500/30 transition shadow-2xs cursor-pointer"
                   title="Remove profile picture"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={12} />
                   <span>Remove Photo</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

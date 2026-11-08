@@ -48,7 +48,7 @@ export function getRestaurantOperationalStatus(restaurant) {
     return {
       isOpen: false,
       reason: restaurant.closureReason || "Temporarily Closed",
-      hoursText: restaurant.openingHours || "Temporarily closed",
+      hoursText: "Temporarily closed",
     };
   }
 
@@ -57,7 +57,7 @@ export function getRestaurantOperationalStatus(restaurant) {
     return {
       isOpen: false,
       reason: restaurant.closureReason || "Currently Closed",
-      hoursText: restaurant.openingHours || "Closed",
+      hoursText: "Currently closed",
     };
   }
 
@@ -66,7 +66,7 @@ export function getRestaurantOperationalStatus(restaurant) {
     return {
       isOpen: false,
       reason: "Not Accepting Online Orders",
-      hoursText: restaurant.openingHours || "Ordering paused",
+      hoursText: "Ordering paused",
     };
   }
 

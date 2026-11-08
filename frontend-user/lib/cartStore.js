@@ -18,8 +18,9 @@ export function getCartItemKey(item) {
   if (!item) return "";
   if (item.cartItemId) return String(item.cartItemId);
   const baseId = (item._id || item.product)?.toString() || "";
-  if (item.variantName && typeof item.variantName === "string" && item.variantName.trim()) {
-    return `${baseId}__${item.variantName.trim()}`;
+  const variantPart = (item.variantId && String(item.variantId).trim()) || (item.variantName && typeof item.variantName === "string" && item.variantName.trim());
+  if (variantPart) {
+    return `${baseId}__${variantPart}`;
   }
   return baseId;
 }
@@ -42,7 +43,9 @@ function cleanCartItems(items) {
       quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, Math.floor(Number(item.quantity) || 1))),
       restaurant: item.restaurant?._id?.toString() || item.restaurant?.toString() || item.restaurantId,
       restaurantId: item.restaurantId || item.restaurant?._id?.toString() || item.restaurant?.toString(),
+      variantId: item.variantId ? String(item.variantId).trim() : (item.variant?._id ? String(item.variant._id) : null),
       variantName: item.variantName ? String(item.variantName).trim() : null,
+      compareAtPrice: item.compareAtPrice !== undefined && item.compareAtPrice !== null && !isNaN(Number(item.compareAtPrice)) ? Number(item.compareAtPrice) : null,
       portionQuantity: item.portionQuantity !== undefined && item.portionQuantity !== null ? Number(item.portionQuantity) : null,
       portionUnit: item.portionUnit ? String(item.portionUnit).trim() : null,
       servingLabel: item.servingLabel ? String(item.servingLabel).trim() : null,

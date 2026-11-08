@@ -10,11 +10,7 @@ const NavLinks = () => {
   const { data: session } = useSession();
   const {
     menuBadge,
-    offersBadge,
-    ordersBadge,
     clearMenuBadge,
-    clearOffersBadge,
-    clearOrdersBadge,
   } = useNavBadges();
 
   const links = [
@@ -33,12 +29,6 @@ const NavLinks = () => {
       href: "/restaurants",
       label: "Restaurants",
       badge: 0,
-    },
-    {
-      href: "/offers",
-      label: "Offers",
-      badge: offersBadge,
-      onClear: clearOffersBadge,
     },
   ];
 

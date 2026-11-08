@@ -31,8 +31,16 @@ const OrderItemSchema = new mongoose.Schema(
       type: String,
       default: "veg",
     },
+    variantId: {
+      type: String,
+      default: null,
+    },
     variantName: {
       type: String,
+      default: null,
+    },
+    compareAtPrice: {
+      type: Number,
       default: null,
     },
     portionQuantity: {
@@ -553,7 +561,7 @@ OrderSchema.methods.canTransitionTo = function (nextStatus) {
   const allowed = {
     pending: ["confirmed", "preparing", "cancelled"],
     confirmed: ["preparing", "ready", "cancelled"],
-    preparing: ["ready", "out_for_delivery", "delivered", "cancelled"],
+    preparing: ["ready", "cancelled"],
     ready: ["out_for_delivery", "delivered", "cancelled"],
     out_for_delivery: ["delivered", "cancelled"],
   };

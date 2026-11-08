@@ -116,9 +116,9 @@ export default function ProductCard({
     ? product.variants.filter((v) => v.isAvailable !== false)
     : [];
 
-  const variantPrices = (availableVariants.length > 0 ? availableVariants : product?.variants || []).map(
-    (v) => Number(v.price) || 0
-  );
+  const allVariantsOutOfStock = hasMultipleVariants && availableVariants.length === 0;
+
+  const variantPrices = availableVariants.map((v) => Number(v.price) || 0);
   const minVariantPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : (product?.price || 0);
 
   if (!product) return null;
@@ -331,9 +331,9 @@ export default function ProductCard({
             <button
               type="button"
               onClick={handleAddToCart}
-              className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5"
+              className="w-full py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5"
             >
-              <Clock size={12} /> Closed
+              <Clock size={12} /> Restaurant Closed
             </button>
           ) : hasMultipleVariants ? (
             <button
@@ -493,9 +493,15 @@ export default function ProductCard({
           {/* Pricing & Offer Row */}
           <div className="min-w-0 pt-0.5">
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-sm sm:text-base font-black text-[var(--text-main)]">
-                {hasMultipleVariants ? `From ₹${displayPrice}` : `₹${displayPrice}`}
-              </span>
+              {allVariantsOutOfStock ? (
+                <span className="text-xs sm:text-sm font-bold text-rose-500">
+                  Currently Unavailable
+                </span>
+              ) : (
+                <span className="text-sm sm:text-base font-black text-[var(--text-main)]">
+                  {hasMultipleVariants ? `From ₹${displayPrice}` : `₹${displayPrice}`}
+                </span>
+              )}
               {hasMultipleVariants ? (
                 <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                   {product.variants.length} sizes
@@ -534,28 +540,34 @@ export default function ProductCard({
 
       {/* Action Button Row */}
       <div className="px-3 pb-3 sm:px-3.5 sm:pb-3.5 pt-0">
-        {!product.isAvailable ? (
-          <Tooltip content="This dish is currently out of stock in the kitchen" placement="top">
+        {!product.isAvailable || allVariantsOutOfStock ? (
+          <Tooltip
+            content={allVariantsOutOfStock ? "All sizes of this dish are currently sold out" : "This dish is currently out of stock in the kitchen"}
+            placement="top"
+            wrapperClassName="w-full"
+          >
             <button
               disabled
               aria-disabled="true"
               className="w-full py-2.5 rounded-xl bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)] text-xs font-semibold cursor-not-allowed min-h-[44px]"
             >
-              Unavailable
+              {allVariantsOutOfStock ? "Sold Out" : "Unavailable"}
             </button>
           </Tooltip>
         ) : !restStatus.isOpen ? (
           <Tooltip
             content={`Kitchen is currently closed: ${restStatus.reason || "Check back during restaurant opening hours"}`}
             placement="top"
+            wrapperClassName="w-full"
           >
             <button
               type="button"
               onClick={handleAddToCart}
               aria-label={`Kitchen is closed: ${restStatus.reason || "Currently Closed"}`}
-              className="w-full py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/20 active:scale-98 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[44px]"
+              className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-98 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus:outline-hidden min-h-[44px]"
             >
-              <Clock size={14} /> Closed
+              <Clock size={14} className="text-amber-600 dark:text-amber-400" />
+              <span>Restaurant Closed</span>
             </button>
           </Tooltip>
         ) : hasMultipleVariants ? (

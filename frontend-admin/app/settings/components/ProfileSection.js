@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 import {
   User,
   Camera,
@@ -108,7 +109,7 @@ export default function ProfileSection() {
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      setError("Image size must be less than 2MB.");
+      toast.error("Image size must be less than 2MB.");
       return;
     }
 
@@ -140,7 +141,7 @@ export default function ProfileSection() {
 
       const data = await res.json();
       if (!data.success) {
-        setError(data.message || "Failed to update profile.");
+        toast.error(data.message || "Failed to update profile.");
         return;
       }
 
@@ -169,11 +170,10 @@ export default function ProfileSection() {
         update();
       }
 
-      setSuccess("Profile settings saved successfully!");
-      setTimeout(() => setSuccess(""), 4000);
+      toast.success("Profile settings saved successfully!");
     } catch (err) {
       console.error("Profile save error:", err);
-      setError("Network error while saving profile.");
+      toast.error("Network error while saving profile.");
     } finally {
       setSaving(false);
     }
@@ -216,19 +216,7 @@ export default function ProfileSection() {
         </Link>
       </div>
 
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
-      {success && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSaveProfile} className="space-y-6">
         {/* 1. Identity & Avatar Card */}

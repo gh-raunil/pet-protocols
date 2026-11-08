@@ -194,15 +194,28 @@ export function ToastProvider({ children }) {
         createdAt: now,
       };
 
-      setToasts((prev) => [...prev.slice(-3), newToast]); // Limit to max 4 active to prevent blocking
+      setToasts((prev) => {
+        if (opts.id && prev.some((t) => t.id === id)) {
+          return prev.map((t) => (t.id === id ? newToast : t));
+        }
+        return [...prev.slice(-3), newToast];
+      }); // Limit to max 4 active to prevent blocking
       return id;
     },
     []
   );
 
   useEffect(() => {
-    globalToastHandler = (type, content, opts) => addToast(type, content, opts);
-    globalToastHandler.remove = (id) => removeToast(id, "fade");
+    globalToastHandler = (type, content, opts) => {
+      setTimeout(() => {
+        addToast(type, content, opts);
+      }, 0);
+    };
+    globalToastHandler.remove = (id) => {
+      setTimeout(() => {
+        removeToast(id, "fade");
+      }, 0);
+    };
     return () => {
       globalToastHandler = null;
     };

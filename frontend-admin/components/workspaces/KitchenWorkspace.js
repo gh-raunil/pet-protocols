@@ -153,11 +153,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
     );
   }, [orders]);
 
-  // Identify stale orders exceeding the manager-configured pickup timeout
+  // Identify stale orders exceeding the manager-configured timeout (pending, preparing, or ready)
   const staleOrders = useMemo(() => {
     return activeTickets.filter((order) => {
-      const isReady = order.status === "out_for_delivery" || order.status === "ready";
-      if (!isReady) return false;
       const elapsedMins = Math.floor((now - new Date(order.createdAt).getTime()) / 60000);
       return elapsedMins >= timeoutMinutes;
     });
@@ -166,13 +164,31 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
   async function handleDismissAllStale() {
     if (staleOrders.length === 0) return;
     const confirmed = confirm(
-      `Are you sure you want to dismiss all ${staleOrders.length} uncollected order(s) exceeding ${timeoutMinutes} minutes?`
+      `Are you sure you want to dismiss all ${staleOrders.length} stale/unresponded order(s) exceeding ${timeoutMinutes} minutes?`
     );
     if (!confirmed) return;
 
+    try {
+      const res = await fetch("/api/restaurant/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss_stale_orders", timeoutMinutes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadOrders(true);
+        return;
+      }
+    } catch {
+      // Fallback to per-order update below
+    }
+
     for (const ord of staleOrders) {
+      const isPendingOrd = ord.status === "pending" || ord.status === "confirmed";
       await updateStatus(ord._id, "cancelled", {
-        cancellationReason: `Auto-dismissed: Undelivered order timed out after >${timeoutMinutes}m waiting window`,
+        cancellationReason: isPendingOrd
+          ? `Auto-dismissed: Order unresponded after >${timeoutMinutes}m response window`
+          : `Auto-dismissed: Undelivered order timed out after >${timeoutMinutes}m waiting window`,
       });
     }
   }
@@ -292,10 +308,10 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
             </div>
             <div>
               <span className="text-xs sm:text-sm font-bold block text-stone-900 dark:text-white">
-                {staleOrders.length} ticket{staleOrders.length > 1 ? "s" : ""} waiting uncollected for over {timeoutMinutes}m
+                {staleOrders.length} ticket{staleOrders.length > 1 ? "s" : ""} exceeding {timeoutMinutes}m operational timeout
               </span>
               <span className="text-[11px] text-stone-500 dark:text-stone-400">
-                These orders have exceeded the pickup window and are waiting indefinitely. Dismiss them to clear the kitchen line.
+                These tickets include unresponded or uncollected orders that have passed the cutoff window. Dismiss them to clear the kitchen queue and process customer refunds.
               </span>
             </div>
           </div>
@@ -372,13 +388,14 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
             const diffMinutes = Math.floor(
               (now - new Date(order.createdAt).getTime()) / 60000
             );
-            const isStale = isReady && diffMinutes >= timeoutMinutes;
+            const isStale = diffMinutes >= timeoutMinutes;
+            const isUnresponded = isPending && isStale;
 
             return (
               <div
                 key={order._id}
                 className={`bg-white dark:bg-[#10141f] rounded-2xl border flex flex-col justify-between shadow-xs overflow-hidden transition-all ${
-                  isStale
+                  isUnresponded || isStale
                     ? "border-rose-500 ring-2 ring-rose-500/30"
                     : isPending
                     ? "border-amber-400 dark:border-amber-500/40 ring-2 ring-amber-400/20"
@@ -390,7 +407,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                 {/* Header */}
                 <div
                   className={`p-3 border-b flex items-center justify-between gap-2 ${
-                    isStale
+                    isUnresponded || isStale
                       ? "bg-rose-500/15 text-rose-950 dark:text-rose-200 border-rose-500/30"
                       : isPending
                       ? "bg-amber-500/10 text-amber-900 dark:text-amber-200 border-amber-500/20"
@@ -408,7 +425,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                     </span>
                     <Tooltip
                       content={
-                        isPending
+                        isUnresponded
+                          ? `Order unresponded for ${diffMinutes}m (cutoff: ${timeoutMinutes}m)`
+                          : isPending
                           ? "New order placed by customer, waiting for kitchen acceptance"
                           : isPreparing
                           ? "Order is currently being cooked at the station"
@@ -418,7 +437,9 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                     >
                       <span
                         className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 cursor-help ${
-                          isStale
+                          isUnresponded
+                            ? "bg-rose-600 text-white animate-pulse"
+                            : isStale
                             ? "bg-rose-600 text-white animate-pulse"
                             : isPending
                             ? "bg-amber-500 text-white"
@@ -427,7 +448,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                             : "bg-emerald-500 text-white"
                         }`}
                       >
-                        {isStale ? "STALE" : isPending ? "NEW" : isPreparing ? "COOKING" : "READY"}
+                        {isUnresponded ? `⚠️ UNRESPONDED (${diffMinutes}m)` : isStale ? "STALE" : isPending ? "NEW" : isPreparing ? "COOKING" : "READY"}
                       </span>
                     </Tooltip>
                     {order.isOutOfRange && (
@@ -557,7 +578,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
 
                 {/* Status Advancement Actions */}
                 <div className="p-3 border-t border-stone-100 dark:border-white/5 bg-stone-50/50 dark:bg-white/[0.01]">
-                  {isPending && (
+                  {isPending && !isUnresponded && (
                     <Tooltip
                       fullWidth
                       className="w-full"
@@ -585,6 +606,50 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                         )}
                       </button>
                     </Tooltip>
+                  )}
+
+                  {isPending && isUnresponded && (
+                    <div className="space-y-2">
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <AlertTriangle size={13} className="text-rose-500 shrink-0" />
+                          <span>Unresponded ({diffMinutes}m elapsed)</span>
+                        </div>
+                        <p className="text-[11px] text-stone-600 dark:text-stone-300 mt-0.5 leading-snug">
+                          Exceeded {timeoutMinutes}m cutoff. Ticket should be dismissed to auto-cancel and refund customer.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Tooltip fullWidth className="w-full" content="Cancel this unresponded order and trigger customer refund" position="top">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDismissReason(`Unresponded by kitchen after ${diffMinutes}m (cutoff: ${timeoutMinutes}m)`);
+                              setCustomReason("");
+                              setDismissPromptOrder(order);
+                            }}
+                            disabled={isUpdating}
+                            className="w-full min-h-[44px] py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-white bg-rose-600 hover:bg-rose-700 transition shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <XCircle size={14} />
+                            <span>Dismiss / Cancel</span>
+                          </button>
+                        </Tooltip>
+
+                        <Tooltip fullWidth className="w-full" content="Override timeout and start cooking anyway" position="top">
+                          <button
+                            type="button"
+                            onClick={() => handleStartCooking(order)}
+                            disabled={isUpdating}
+                            className="w-full min-h-[44px] py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm border border-stone-300 dark:border-white/10 hover:bg-stone-100 dark:hover:bg-white/5 text-stone-700 dark:text-stone-300 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <Flame size={14} className="text-amber-500" />
+                            <span>Force Cook</span>
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </div>
                   )}
 
                   {isPreparing && (
@@ -716,6 +781,7 @@ export default function KitchenWorkspace({ restaurantName = "" }) {
                 Select reason for dismissal:
               </label>
               {[
+                "Unresponded: Kitchen did not accept order in time",
                 "Uncollected: Customer / rider did not arrive",
                 "Delivery cancelled / Rider no-show",
                 "Customer refused delivery",

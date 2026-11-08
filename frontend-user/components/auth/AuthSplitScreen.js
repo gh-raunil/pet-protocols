@@ -177,7 +177,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       const password = signInData.password;
 
       if (!email || !password) {
-        setSignInError("Please enter your email and password.");
+        toast.error("Please enter your email and password.");
         return;
       }
 
@@ -194,9 +194,9 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       if (result?.error) {
         const errorMsg = String(result.error);
         if (errorMsg.toLowerCase().includes("too many") || errorMsg.toLowerCase().includes("wait")) {
-          setSignInError(errorMsg);
+          toast.error(errorMsg);
         } else {
-          setSignInError("Invalid email address or password.");
+          toast.error("Invalid email address or password.");
         }
         return;
       }
@@ -208,7 +208,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       }
     } catch (err) {
       console.error("[Auth] Login error:", err);
-      setSignInError("An unexpected error occurred. Please check your connection.");
+      toast.error("An unexpected error occurred. Please check your connection.");
     } finally {
       signInInFlightRef.current = false;
       setSignInLoading(false);
@@ -263,27 +263,27 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       const pwd = signUpData.password;
 
       if (!name) {
-        setSignUpError("Please enter your full name.");
+        toast.error("Please enter your full name.");
         return;
       }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setSignUpError("Please enter a valid email address.");
+        toast.error("Please enter a valid email address.");
         return;
       }
 
       if (!hasMinLength) {
-        setSignUpError("Password must be at least 8 characters long.");
+        toast.error("Password must be at least 8 characters long.");
         return;
       }
 
       if (!isWithinMax) {
-        setSignUpError("Password exceeds maximum length (72 bytes).");
+        toast.error("Password exceeds maximum length (72 bytes).");
         return;
       }
 
       if (!hasLetter || !hasNumberOrSymbol) {
-        setSignUpError("Password must contain at least one letter and at least one number or special character.");
+        toast.error("Password must contain at least one letter and at least one number or special character.");
         return;
       }
 
@@ -300,7 +300,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
       const data = await response.json();
 
       if (!data.success) {
-        setSignUpError(data.message || "Unable to create your account. Please try again.");
+        toast.error(data.message || "Unable to create your account. Please try again.");
         return;
       }
 
@@ -319,11 +319,11 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
         // Fallback if automatic sign-in encounters rate-limit or delay
         setActiveTab("signin");
         setSignInData({ email, password: "" });
-        setSuccessNotice("Account created successfully! Please enter your password to sign in.");
+        toast.success("Account created successfully! Please enter your password to sign in.");
       }
     } catch (err) {
       console.error("[Auth] Signup error:", err);
-      setSignUpError("An unexpected error occurred. Please check your connection.");
+      toast.error("An unexpected error occurred. Please check your connection.");
     } finally {
       signUpInFlightRef.current = false;
       setSignUpLoading(false);
@@ -522,16 +522,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
             </button>
           </div>
 
-          {/* Success Banner Notice (e.g. after registration redirect) */}
-          {successNotice && (
-            <div
-              role="status"
-              className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-semibold flex items-start gap-2.5 animate-[fadeIn_0.2s_ease]"
-            >
-              <Check size={16} className="shrink-0 mt-0.5" />
-              <span>{successNotice}</span>
-            </div>
-          )}
+
 
           {/* ═════════════════════════════════════════════════════════
               SIGN IN TAB PANEL
@@ -600,16 +591,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                   </div>
                 </div>
 
-                {/* Accessible Error Notice */}
-                {signInError && (
-                  <div
-                    role="alert"
-                    className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold flex items-center gap-2 animate-[fadeIn_0.2s_ease]"
-                  >
-                    <AlertCircle size={16} className="shrink-0" />
-                    <span>{signInError}</span>
-                  </div>
-                )}
+
 
                 {/* Primary Sign In Button */}
                 <button
@@ -790,16 +772,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                   )}
                 </div>
 
-                {/* Accessible Error Notice */}
-                {signUpError && (
-                  <div
-                    role="alert"
-                    className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold flex items-center gap-2 animate-[fadeIn_0.2s_ease]"
-                  >
-                    <AlertCircle size={16} className="shrink-0" />
-                    <span>{signUpError}</span>
-                  </div>
-                )}
+
 
                 {/* Primary Create Account Button */}
                 <button

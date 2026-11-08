@@ -27,6 +27,10 @@ import {
   Globe,
   Building,
   Pencil,
+  ArrowLeft,
+  ArrowRight,
+  Star,
+  GripVertical,
 } from "lucide-react";
 
 export const PRESET_FOOD_PHOTOS = [
@@ -272,6 +276,7 @@ export default function ProductsClient() {
     description: "",
     price: "",
     image: "",
+    images: [],
     category: "Other",
     customCategory: "",
     type: "veg",
@@ -290,7 +295,10 @@ export default function ProductsClient() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [imageMode, setImageMode] = useState("file"); // "file" | "url"
+  const [imageMode, setImageMode] = useState("file"); // "file" | "url" | "preset"
+  const [customImageUrl, setCustomImageUrl] = useState("");
+  const [draggedImgIndex, setDraggedImgIndex] = useState(null);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const fileInputRef = useRef(null);
 
   // Route protection
@@ -439,14 +447,27 @@ export default function ProductsClient() {
           id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           name: "",
           price: "",
+          compareAtPrice: "",
           portionQuantity: "",
           portionUnit: prev.portion?.unit || "piece",
           servingLabel: "",
           size: "",
           isAvailable: true,
+          image: "",
         },
       ],
     }));
+  }
+
+  function handleMoveVariantRow(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    setModalForm((prev) => {
+      const list = [...(prev.variants || [])];
+      if (toIndex < 0 || toIndex >= list.length) return prev;
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
+      return { ...prev, variants: list };
+    });
   }
 
   function handleUpdateVariantRow(index, field, value) {
@@ -528,6 +549,7 @@ export default function ProductsClient() {
       description: "",
       price: "",
       image: defaultImg,
+      images: defaultImg ? [{ url: defaultImg, alt: "", order: 0, isPrimary: true }] : [],
       category: categoryName || "Other",
       customCategory: "",
       type: "veg",
@@ -559,6 +581,7 @@ export default function ProductsClient() {
       description: "",
       price: "",
       image: defaultImg,
+      images: defaultImg ? [{ url: defaultImg, alt: "", order: 0, isPrimary: true }] : [],
       category: initialCat,
       customCategory: "",
       type: "veg",
@@ -604,20 +627,38 @@ export default function ProductsClient() {
           id: v._id || `var_${i}_${Date.now()}`,
           name: v.name || "",
           price: v.price !== undefined ? v.price : "",
+          compareAtPrice: v.compareAtPrice !== undefined && v.compareAtPrice !== null ? v.compareAtPrice : "",
           portionQuantity: v.portionQuantity !== undefined && v.portionQuantity !== null ? v.portionQuantity : "",
           portionUnit: v.portionUnit || "piece",
           servingLabel: v.servingLabel || "",
           size: v.size || "",
           isAvailable: v.isAvailable !== false,
+          image: v.image || "",
         }))
       : [];
+
+    const existingImages = Array.isArray(product.images) && product.images.length > 0
+      ? product.images.map((img, i) => ({
+          url: typeof img === "string" ? img : img.url,
+          alt: (typeof img === "object" && img.alt) || product.name || "",
+          order: typeof img === "object" && typeof img.order === "number" ? img.order : i,
+          isPrimary: typeof img === "object" ? Boolean(img.isPrimary) : i === 0,
+        }))
+      : product.image
+        ? [{ url: product.image, alt: product.name || "", order: 0, isPrimary: true }]
+        : [];
+
+    if (existingImages.length > 0 && !existingImages.some((m) => m.isPrimary)) {
+      existingImages[0].isPrimary = true;
+    }
 
     setModalForm({
       _id: product._id,
       name: product.name,
       description: product.description || "",
       price: product.price,
-      image: product.image,
+      image: product.image || (existingImages[0]?.url || ""),
+      images: existingImages,
       category: isExisting ? product.category : "Other",
       customCategory: isExisting ? "" : (product.category || ""),
       type: product.type || "veg",
@@ -637,48 +678,195 @@ export default function ProductsClient() {
     setIsModalOpen(true);
   }
 
-  // Handle image upload from device for product
-  async function handleFileSelect(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Multi-image upload and gallery management handlers
+  async function handleFilesUpload(files) {
+    if (!files || files.length === 0) return;
+    const currentImages = modalForm.images || [];
+    const availableSlots = 5 - currentImages.length;
+
+    if (availableSlots <= 0) {
+      toast.error("Maximum 5 images allowed per dish. Please remove an image before adding more.");
+      return;
+    }
+
+    const filesArray = Array.from(files);
+    const filesToUpload = filesArray.slice(0, availableSlots);
+    if (filesArray.length > availableSlots) {
+      toast.error(`Only adding ${availableSlots} image${availableSlots > 1 ? "s" : ""} to stay within the 5 image limit.`);
+    }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Only JPEG, PNG, and WebP images are allowed.");
-      return;
+    const validFiles = [];
+
+    for (const file of filesToUpload) {
+      if (!allowedTypes.includes(file.type)) {
+        toast.error(`"${file.name}" is not supported. Use JPG, PNG, or WebP.`);
+        continue;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`"${file.name}" exceeds 5 MB limit.`);
+        continue;
+      }
+      validFiles.push(file);
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image exceeds 5 MB limit. Please select a smaller photo.");
-      return;
-    }
+    if (validFiles.length === 0) return;
 
     try {
       setUploadingImage(true);
-      const localPreview = URL.createObjectURL(file);
-      setModalForm((prev) => ({ ...prev, image: localPreview }));
+      toast.loading(`Uploading ${validFiles.length} photo${validFiles.length > 1 ? "s" : ""}...`, { id: "upload-gallery" });
 
-      const formData = new FormData();
-      formData.append("image", file);
+      const uploadedImages = [];
 
-      const res = await fetch("/api/restaurant/upload", {
-        method: "POST",
-        body: formData,
-      });
+      for (const file of validFiles) {
+        const formData = new FormData();
+        formData.append("image", file);
 
-      const data = await res.json();
-      if (data.success && data.imageUrl) {
-        setModalForm((prev) => ({ ...prev, image: data.imageUrl }));
-        toast.success("Dish photo uploaded from device successfully!");
+        const res = await fetch("/api/restaurant/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.success && data.imageUrl) {
+          uploadedImages.push({
+            url: data.imageUrl,
+            alt: modalForm.name.trim() || "Food Photo",
+            order: currentImages.length + uploadedImages.length,
+            isPrimary: currentImages.length === 0 && uploadedImages.length === 0,
+          });
+        }
+      }
+
+      if (uploadedImages.length > 0) {
+        setModalForm((prev) => {
+          const combined = [...(prev.images || []), ...uploadedImages];
+          // Ensure first image is primary if none is
+          if (!combined.some((m) => m.isPrimary)) {
+            combined[0].isPrimary = true;
+          }
+          const primary = combined.find((m) => m.isPrimary) || combined[0];
+          return {
+            ...prev,
+            images: combined,
+            image: primary ? primary.url : prev.image,
+          };
+        });
+        toast.success(`Uploaded ${uploadedImages.length} image${uploadedImages.length > 1 ? "s" : ""} successfully!`, { id: "upload-gallery" });
       } else {
-        toast.error(data.message || "Failed to upload image.");
+        toast.error("Failed to upload images.", { id: "upload-gallery" });
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Error uploading image from device.");
+      console.error("Gallery upload error:", err);
+      toast.error("Error uploading image from device.", { id: "upload-gallery" });
     } finally {
       setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function handleFileSelect(e) {
+    handleFilesUpload(e.target.files);
+  }
+
+  function handleSetPrimaryImage(index) {
+    setModalForm((prev) => {
+      const updated = (prev.images || []).map((img, i) => ({
+        ...img,
+        isPrimary: i === index,
+      }));
+      const primaryUrl = updated[index]?.url || prev.image;
+      return {
+        ...prev,
+        images: updated,
+        image: primaryUrl,
+      };
+    });
+    toast.success("Set as primary image");
+  }
+
+  function handleRemoveImage(index) {
+    setModalForm((prev) => {
+      const filtered = (prev.images || []).filter((_, i) => i !== index);
+      if (filtered.length > 0 && !filtered.some((m) => m.isPrimary)) {
+        filtered[0].isPrimary = true;
+      }
+      const primary = filtered.find((m) => m.isPrimary) || filtered[0];
+      return {
+        ...prev,
+        images: filtered,
+        image: primary ? primary.url : "",
+      };
+    });
+  }
+
+  function handleMoveImage(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    setModalForm((prev) => {
+      const list = [...(prev.images || [])];
+      if (toIndex < 0 || toIndex >= list.length) return prev;
+      const [movedItem] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, movedItem);
+
+      // Re-index order
+      const reindexed = list.map((item, idx) => ({
+        ...item,
+        order: idx,
+      }));
+      return { ...prev, images: reindexed };
+    });
+  }
+
+  function handleAddPresetImage(presetUrl, presetLabel) {
+    const currentImages = modalForm.images || [];
+    if (currentImages.length >= 5) {
+      toast.error("Maximum 5 images allowed per dish.");
+      return;
+    }
+    const isFirst = currentImages.length === 0;
+    const newEntry = {
+      url: presetUrl,
+      alt: presetLabel || modalForm.name.trim() || "Preset Dish Photo",
+      order: currentImages.length,
+      isPrimary: isFirst,
+    };
+    setModalForm((prev) => {
+      const updated = [...(prev.images || []), newEntry];
+      return {
+        ...prev,
+        images: updated,
+        image: isFirst ? presetUrl : prev.image,
+      };
+    });
+    toast.success(`Added ${presetLabel} to dish gallery`);
+  }
+
+  function handleAddCustomUrlImage() {
+    if (!customImageUrl.trim()) {
+      toast.error("Please enter a valid image URL");
+      return;
+    }
+    const currentImages = modalForm.images || [];
+    if (currentImages.length >= 5) {
+      toast.error("Maximum 5 images allowed per dish.");
+      return;
+    }
+    const isFirst = currentImages.length === 0;
+    const newEntry = {
+      url: customImageUrl.trim(),
+      alt: modalForm.name.trim() || "Dish Photo",
+      order: currentImages.length,
+      isPrimary: isFirst,
+    };
+    setModalForm((prev) => {
+      const updated = [...(prev.images || []), newEntry];
+      return {
+        ...prev,
+        images: updated,
+        image: isFirst ? customImageUrl.trim() : prev.image,
+      };
+    });
+    setCustomImageUrl("");
+    toast.success("Image URL added to gallery");
   }
 
   // Submit Product Add or Edit
@@ -707,25 +895,50 @@ export default function ProductsClient() {
           setSubmitting(false);
           return;
         }
+        const seenVariantNames = new Set();
         for (const v of modalForm.variants) {
           if (!v.name?.trim()) {
-            toast.error("Each variant must have a name (e.g. Small, Medium, Large).");
+            toast.error("Each variant must have a name (e.g. 250 g, Regular, Large).");
             setSubmitting(false);
             return;
           }
+          const cleanName = v.name.trim();
+          const lowerName = cleanName.toLowerCase();
+          if (seenVariantNames.has(lowerName)) {
+            toast.error(`Duplicate variant name "${cleanName}". Each variant name must be unique.`);
+            setSubmitting(false);
+            return;
+          }
+          seenVariantNames.add(lowerName);
+
           if (v.price === "" || isNaN(Number(v.price)) || Number(v.price) < 0) {
-            toast.error(`Please provide a valid price for variant "${v.name}".`);
+            toast.error(`Please provide a valid selling price for variant "${cleanName}".`);
             setSubmitting(false);
             return;
           }
+
+          let compAt = null;
+          if (v.compareAtPrice !== undefined && v.compareAtPrice !== "" && v.compareAtPrice !== null) {
+            const cap = Number(v.compareAtPrice);
+            if (isNaN(cap) || cap <= Number(v.price)) {
+              toast.error(`Compare-at price for "${cleanName}" must be greater than selling price (₹${v.price}).`);
+              setSubmitting(false);
+              return;
+            }
+            compAt = cap;
+          }
+
           variantsPayload.push({
-            name: v.name.trim(),
+            ...(v.id && !String(v.id).startsWith("var_") ? { _id: v.id } : {}),
+            name: cleanName,
             price: Number(v.price),
+            compareAtPrice: compAt,
             portionQuantity: v.portionQuantity !== "" && v.portionQuantity !== null ? Number(v.portionQuantity) : null,
             portionUnit: v.portionUnit ? v.portionUnit.trim() : null,
             servingLabel: v.servingLabel ? v.servingLabel.trim() : null,
             size: v.size ? v.size.trim() : null,
             isAvailable: v.isAvailable !== false,
+            image: v.image?.trim() || null,
           });
         }
       }
@@ -750,7 +963,20 @@ export default function ProductsClient() {
         name: modalForm.name.trim(),
         description: modalForm.description?.trim() || "",
         price: Number(modalForm.price),
-        image: modalForm.image?.trim() || defaultImage,
+        image: (modalForm.images?.find((m) => m.isPrimary)?.url || modalForm.images?.[0]?.url || modalForm.image?.trim() || defaultImage),
+        images: (modalForm.images && modalForm.images.length > 0)
+          ? modalForm.images.map((img, idx) => ({
+              url: img.url,
+              alt: img.alt?.trim() || modalForm.name.trim(),
+              order: idx,
+              isPrimary: img.isPrimary ?? (idx === 0),
+            }))
+          : [{
+              url: modalForm.image?.trim() || defaultImage,
+              alt: modalForm.name.trim(),
+              order: 0,
+              isPrimary: true,
+            }],
         category: finalCategory,
         type: modalForm.type,
         preparationTime: Number(modalForm.preparationTime) || 15,
@@ -1665,82 +1891,123 @@ export default function ProductsClient() {
                   </div>
                 </div>
 
-                {/* ── MULTIPLE SIZES / PRICING VARIANTS ───────────────── */}
-                <div className="p-4 rounded-2xl bg-stone-50 dark:bg-white/[0.02] border border-stone-200/80 dark:border-white/10 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(modalForm.hasVariants)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
+                {/* ── SIZES & VARIANTS SECTION (PHASE 3) ───────────────── */}
+                <div className="p-4 rounded-2xl bg-stone-50/70 dark:bg-white/5 border border-stone-200/80 dark:border-white/10 space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <label className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider block">
+                        Pricing Mode
+                      </label>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        Choose how this dish is priced and sold to customers
+                      </p>
+                    </div>
+
+                    {/* Pricing Mode Selector Buttons */}
+                    <div className="flex items-center gap-1 text-xs font-semibold bg-stone-200/60 dark:bg-white/5 p-1 rounded-xl border border-stone-200 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalForm((prev) => ({ ...prev, hasVariants: false }));
+                        }}
+                        className={`min-h-[34px] px-3.5 py-1 rounded-lg transition cursor-pointer font-bold flex items-center justify-center text-xs ${
+                          !modalForm.hasVariants
+                            ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                        }`}
+                      >
+                        Single Price
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           setModalForm((prev) => ({
                             ...prev,
-                            hasVariants: checked,
+                            hasVariants: true,
                             variants:
-                              checked && (!prev.variants || prev.variants.length === 0)
+                              !prev.variants || prev.variants.length === 0
                                 ? [
                                     {
                                       id: `var_${Date.now()}_1`,
-                                      name: "Small",
+                                      name: "Regular",
                                       price: prev.price || "149",
+                                      compareAtPrice: "",
                                       portionQuantity: prev.portion?.quantity || "1",
                                       portionUnit: prev.portion?.unit || "serving",
                                       servingLabel: "Serves 1",
                                       size: "",
                                       isAvailable: true,
+                                      image: "",
                                     },
                                     {
                                       id: `var_${Date.now()}_2`,
-                                      name: "Medium",
+                                      name: "Large",
                                       price: prev.price ? String(Math.round(Number(prev.price) * 1.5)) : "249",
+                                      compareAtPrice: "",
                                       portionQuantity: prev.portion?.quantity ? String(Number(prev.portion.quantity) * 2) : "2",
                                       portionUnit: prev.portion?.unit || "serving",
                                       servingLabel: "Serves 2",
                                       size: "",
                                       isAvailable: true,
+                                      image: "",
                                     },
                                   ]
                                 : prev.variants,
                           }));
                         }}
-                        className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 cursor-pointer"
-                      />
-                      <span className="text-xs font-bold text-stone-900 dark:text-white">
-                        Multiple Sizes / Pricing Variants (e.g. Small / Medium / Large)
-                      </span>
-                    </label>
+                        className={`min-h-[34px] px-3.5 py-1 rounded-lg transition cursor-pointer font-bold flex items-center justify-center text-xs ${
+                          modalForm.hasVariants
+                            ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                        }`}
+                      >
+                        Multiple Sizes / Variants
+                      </button>
+                    </div>
                   </div>
 
                   {modalForm.hasVariants && (
-                    <div className="space-y-3 pt-1">
-                      <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                        Configure size variants with individual pricing and portions. Customers will choose their desired size on the menu.
-                      </p>
+                    <div className="space-y-3 pt-2 border-t border-stone-200/80 dark:border-white/10">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+                            Sizes & Variants
+                          </h4>
+                          <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                            Offer this dish in different sizes, quantities, or serving options. Each option can have its own price.
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                          {(modalForm.variants || []).length} variant{(modalForm.variants || []).length === 1 ? "" : "s"} configured
+                        </span>
+                      </div>
 
-                      <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                      {/* Variants List */}
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                         {(modalForm.variants || []).map((variant, idx) => (
                           <div
                             key={variant.id || idx}
-                            className="p-3 rounded-xl bg-white dark:bg-stone-900/80 border border-stone-200 dark:border-white/10 space-y-2 shadow-xs"
+                            className="p-3 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-white/10 space-y-2.5 shadow-xs"
                           >
-                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                              {/* Name */}
                               <div className="sm:col-span-4">
-                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
+                                <label className="block text-[10px] font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wider mb-1">
                                   Variant Name *
                                 </label>
                                 <input
                                   type="text"
                                   required
-                                  placeholder="e.g. Regular / 250g / Large"
+                                  placeholder="e.g. 250 g / Regular / 1 kg"
                                   value={variant.name}
                                   onChange={(e) => handleUpdateVariantRow(idx, "name", e.target.value)}
                                   className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-medium focus:border-orange-500 outline-none"
                                 />
                               </div>
 
+                              {/* Selling Price */}
                               <div className="sm:col-span-3">
-                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
+                                <label className="block text-[10px] font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wider mb-1">
                                   Price (₹) *
                                 </label>
                                 <input
@@ -1754,29 +2021,87 @@ export default function ProductsClient() {
                                 />
                               </div>
 
-                              <div className="sm:col-span-4">
-                                <label className="block text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-0.5">
-                                  Portion / Size
+                              {/* Compare-at Price */}
+                              <div className="sm:col-span-3">
+                                <label className="block text-[10px] font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wider mb-1">
+                                  Compare-At (₹)
                                 </label>
                                 <input
-                                  type="text"
-                                  placeholder="e.g. 250 ml / 8 inches"
-                                  value={variant.servingLabel || ""}
-                                  onChange={(e) => handleUpdateVariantRow(idx, "servingLabel", e.target.value)}
-                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-medium focus:border-orange-500 outline-none"
+                                  type="number"
+                                  min="0"
+                                  placeholder="Optional"
+                                  value={variant.compareAtPrice || ""}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "compareAtPrice", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 dark:text-white font-mono focus:border-orange-500 outline-none"
                                 />
                               </div>
 
-                              <div className="sm:col-span-1 flex items-center justify-end pt-3 sm:pt-0">
+                              {/* Available Toggle */}
+                              <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-1.5 pb-1">
+                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-stone-700 dark:text-stone-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={variant.isAvailable !== false}
+                                    onChange={(e) => handleUpdateVariantRow(idx, "isAvailable", e.target.checked)}
+                                    className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 cursor-pointer"
+                                  />
+                                  <span className="text-[11px]">{variant.isAvailable !== false ? "In Stock" : "Sold Out"}</span>
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Serving / Size + Optional Image + Reorder / Delete */}
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center pt-1 border-t border-stone-100 dark:border-white/5">
+                              <div className="sm:col-span-4">
+                                <input
+                                  type="text"
+                                  placeholder="Portion / Size (e.g. 500 ml / Serves 2)"
+                                  value={variant.servingLabel || ""}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "servingLabel", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-5">
+                                <input
+                                  type="url"
+                                  placeholder="Optional Variant Image URL"
+                                  value={variant.image || ""}
+                                  onChange={(e) => handleUpdateVariantRow(idx, "image", e.target.value)}
+                                  className="w-full bg-stone-50 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-lg px-2.5 py-1 text-[11px] text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-3 flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveVariantRow(idx, idx - 1)}
+                                  disabled={idx === 0}
+                                  title="Move earlier"
+                                  aria-label="Move variant up"
+                                  className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-white/10 disabled:opacity-20 transition cursor-pointer"
+                                >
+                                  <ArrowLeft size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveVariantRow(idx, idx + 1)}
+                                  disabled={idx === (modalForm.variants || []).length - 1}
+                                  title="Move later"
+                                  aria-label="Move variant down"
+                                  className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 dark:hover:bg-white/10 disabled:opacity-20 transition cursor-pointer"
+                                >
+                                  <ArrowRight size={13} />
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveVariantRow(idx)}
                                   disabled={(modalForm.variants || []).length <= 1}
-                                  className="min-w-[40px] min-h-[40px] rounded-xl text-rose-500 hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer flex items-center justify-center"
+                                  className="p-1 rounded text-rose-500 hover:bg-rose-500/10 disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
                                   title="Delete variant"
                                   aria-label="Delete variant"
                                 >
-                                  <Trash2 size={16} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
                             </div>
@@ -1787,37 +2112,38 @@ export default function ProductsClient() {
                       <button
                         type="button"
                         onClick={handleAddVariantRow}
-                        className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 rounded-xl border border-dashed border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs sm:text-sm font-bold hover:bg-orange-500/10 transition cursor-pointer"
+                        className="inline-flex items-center justify-center gap-2 min-h-[38px] px-4 py-2 rounded-xl border border-dashed border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs font-bold hover:bg-orange-500/10 transition cursor-pointer"
                       >
-                        <PlusCircle size={16} />
+                        <PlusCircle size={15} />
                         <span>+ Add Another Variant</span>
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Dish Image Source */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-                    <label className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
-                      Dish Photo
-                    </label>
-                    <div className="flex items-center gap-1 text-xs font-semibold bg-stone-100 dark:bg-white/5 p-1 rounded-xl border border-stone-200/80 dark:border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => setImageMode("preset")}
-                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
-                          imageMode === "preset"
-                            ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
-                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
-                        }`}
-                      >
-                        Presets
-                      </button>
+                {/* ── FOOD IMAGES GALLERY SECTION ── */}
+                <div className="space-y-3.5 p-4 rounded-2xl bg-stone-50/70 dark:bg-white/5 border border-stone-200/80 dark:border-white/10">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-stone-800 dark:text-stone-200 uppercase tracking-wider">
+                          Food Images
+                        </label>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                          {(modalForm.images || []).length} / 5 images
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        Upload up to 5 images. The first image appears as the main dish photo.
+                      </p>
+                    </div>
+
+                    {/* Mode switcher */}
+                    <div className="flex items-center gap-1 text-xs font-semibold bg-stone-200/60 dark:bg-white/5 p-1 rounded-xl border border-stone-200 dark:border-white/10">
                       <button
                         type="button"
                         onClick={() => setImageMode("file")}
-                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
+                        className={`min-h-[34px] px-3 py-1 rounded-lg transition cursor-pointer font-bold flex items-center justify-center text-xs ${
                           imageMode === "file"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
                             : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
@@ -1827,8 +2153,19 @@ export default function ProductsClient() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => setImageMode("preset")}
+                        className={`min-h-[34px] px-3 py-1 rounded-lg transition cursor-pointer font-bold flex items-center justify-center text-xs ${
+                          imageMode === "preset"
+                            ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
+                            : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+                        }`}
+                      >
+                        Presets
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setImageMode("url")}
-                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition cursor-pointer font-bold flex items-center justify-center ${
+                        className={`min-h-[34px] px-3 py-1 rounded-lg transition cursor-pointer font-bold flex items-center justify-center text-xs ${
                           imageMode === "url"
                             ? "bg-white dark:bg-stone-800 text-orange-600 shadow-xs"
                             : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
@@ -1839,101 +2176,229 @@ export default function ProductsClient() {
                     </div>
                   </div>
 
-                  {imageMode === "file" && (
-                    <div className="space-y-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadingImage}
-                        className="w-full p-4 border border-dashed border-stone-300 dark:border-white/20 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-stone-50 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center">
-                          {uploadingImage ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Upload className="w-5 h-5" />
-                          )}
-                        </div>
-                        <span className="text-xs font-bold text-stone-700 dark:text-stone-200">
-                          {uploadingImage ? "Uploading to Cloud..." : "Choose Photo from Device"}
-                        </span>
-                        <span className="text-[10px] text-stone-400">JPG, PNG, WEBP (Max 5MB)</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {imageMode === "preset" && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-44 overflow-y-auto p-1.5 border border-stone-200/80 dark:border-white/10 rounded-xl bg-stone-50/50 dark:bg-white/5">
-                      {PRESET_FOOD_PHOTOS.map((preset) => {
-                        const isSelected = modalForm.image === preset.url;
-                        return (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              setModalForm((prev) => ({
-                                ...prev,
-                                image: preset.url,
-                              }));
-                            }}
-                            className={`group relative rounded-xl overflow-hidden border p-1 flex flex-col items-center gap-1 transition text-left cursor-pointer ${
-                              isSelected
-                                ? "border-orange-500 ring-2 ring-orange-500/20 bg-orange-50/40 dark:bg-orange-500/10"
-                                : "border-stone-200/80 dark:border-white/10 hover:border-stone-300 dark:hover:border-white/20 bg-white dark:bg-stone-800"
-                            }`}
-                          >
-                            <div className="w-full h-14 rounded-lg overflow-hidden relative bg-stone-100">
-                              <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
-                              {isSelected && (
-                                <div className="absolute inset-0 bg-orange-500/40 flex items-center justify-center">
-                                  <Check className="w-4 h-4 text-white drop-shadow" />
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-[10px] font-bold text-stone-700 dark:text-stone-200 truncate w-full text-center">
-                              {preset.icon} {preset.label}
+                  {/* Upload Area (Disabled/Hidden if 5 images reached) */}
+                  {(modalForm.images || []).length < 5 ? (
+                    <div>
+                      {imageMode === "file" && (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDraggingFiles(true);
+                          }}
+                          onDragLeave={() => setIsDraggingFiles(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDraggingFiles(false);
+                            if (e.dataTransfer?.files) {
+                              handleFilesUpload(e.dataTransfer.files);
+                            }
+                          }}
+                          className={`w-full p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition cursor-pointer ${
+                            isDraggingFiles
+                              ? "border-orange-500 bg-orange-500/10"
+                              : "border-stone-300 dark:border-white/20 hover:bg-stone-100/50 dark:hover:bg-white/5"
+                          }`}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center">
+                            {uploadingImage ? (
+                              <RefreshCw className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Upload className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <span className="text-xs font-bold text-stone-700 dark:text-stone-200 block">
+                              {uploadingImage ? "Uploading to Cloud..." : "Choose or drag photos from device"}
                             </span>
+                            <span className="text-[10px] text-stone-400 mt-0.5 block">
+                              JPG, PNG, WEBP (Max 5MB each). Select multiple files at once.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {imageMode === "preset" && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] text-stone-500 dark:text-stone-400 font-medium">
+                            Click a photo preset to append it to your gallery:
+                          </p>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-1.5 border border-stone-200 dark:border-white/10 rounded-xl bg-white dark:bg-stone-900">
+                            {PRESET_FOOD_PHOTOS.map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => handleAddPresetImage(preset.url, preset.label)}
+                                className="group relative rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 hover:border-orange-500 p-1 flex flex-col items-center gap-1 transition text-left cursor-pointer bg-stone-50 dark:bg-stone-800"
+                              >
+                                <div className="w-full h-12 rounded-lg overflow-hidden relative bg-stone-100">
+                                  <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
+                                </div>
+                                <span className="text-[10px] font-bold text-stone-700 dark:text-stone-200 truncate w-full text-center">
+                                  {preset.icon} {preset.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {imageMode === "url" && (
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            placeholder="https://images.unsplash.com/... or any picture URL"
+                            value={customImageUrl}
+                            onChange={(e) => setCustomImageUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddCustomUrlImage();
+                              }
+                            }}
+                            className="flex-1 bg-white dark:bg-stone-900 border border-stone-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddCustomUrlImage}
+                            className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                          >
+                            <PlusCircle size={14} /> Add
                           </button>
-                        );
-                      })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-stone-200/50 dark:bg-white/5 border border-stone-200 dark:border-white/10 text-center">
+                      <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">
+                        Maximum 5 images reached. To add new ones, remove an existing photo below.
+                      </span>
                     </div>
                   )}
 
-                  {imageMode === "url" && (
-                    <div className="space-y-1.5">
-                      <input
-                        type="url"
-                        placeholder="https://images.unsplash.com/... or any picture URL"
-                        value={modalForm.image}
-                        onChange={(e) => setModalForm((prev) => ({ ...prev, image: e.target.value }))}
-                        className="w-full bg-stone-50/80 dark:bg-white/5 border border-stone-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:border-orange-500 outline-none transition font-medium"
-                      />
-                      <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                        Paste any web image URL. If unreachable, a category-matched food photo will automatically be used.
-                      </p>
-                    </div>
-                  )}
+                  {/* Gallery Items Grid */}
+                  {(modalForm.images || []).length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-[11px] font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wider block">
+                        Gallery Order & Primary Photo (Drag or use arrows to reorder)
+                      </label>
 
-                  {modalForm.image && (
-                    <div className="relative h-28 rounded-xl overflow-hidden border border-stone-200 dark:border-white/10 mt-2 bg-stone-100 dark:bg-white/5 group">
-                      <img
-                        src={modalForm.image}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = getProductFallbackImage(modalForm);
-                        }}
-                      />
-                      <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold">
-                        Preview
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {(modalForm.images || []).map((img, idx) => {
+                          const isPrimary = Boolean(img.isPrimary) || idx === 0;
+                          return (
+                            <div
+                              key={`${img.url}-${idx}`}
+                              draggable
+                              onDragStart={() => setDraggedImgIndex(idx)}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedImgIndex !== null && draggedImgIndex !== idx) {
+                                  handleMoveImage(draggedImgIndex, idx);
+                                }
+                                setDraggedImgIndex(null);
+                              }}
+                              className={`relative p-2 rounded-xl border flex items-center gap-3 transition bg-white dark:bg-stone-900 ${
+                                isPrimary
+                                  ? "border-orange-500 ring-2 ring-orange-500/20 shadow-xs"
+                                  : "border-stone-200 dark:border-white/10 hover:border-stone-300"
+                              }`}
+                            >
+                              {/* Drag handle */}
+                              <div
+                                className="cursor-grab text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 shrink-0"
+                                title="Drag to reorder"
+                              >
+                                <GripVertical size={16} />
+                              </div>
+
+                              {/* Thumbnail preview */}
+                              <div className="w-14 h-14 rounded-lg overflow-hidden relative shrink-0 bg-stone-100 border border-stone-200 dark:border-white/10">
+                                <img
+                                  src={img.url}
+                                  alt={img.alt || `Photo ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = getProductFallbackImage(modalForm);
+                                  }}
+                                />
+                                {isPrimary && (
+                                  <div className="absolute top-0 left-0 bg-orange-600 text-white p-0.5 rounded-br-md shadow">
+                                    <Star size={10} className="fill-white" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Details & Actions */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {isPrimary ? (
+                                    <span className="px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-wider border border-orange-500/30">
+                                      PRIMARY IMAGE
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetPrimaryImage(idx)}
+                                      className="text-[10px] font-bold text-stone-500 hover:text-orange-600 dark:text-stone-400 flex items-center gap-1 transition cursor-pointer"
+                                    >
+                                      <Star size={11} /> Set as Primary
+                                    </button>
+                                  )}
+                                  <span className="text-[10px] text-stone-400">
+                                    Slot {idx + 1}
+                                  </span>
+                                </div>
+
+                                {/* Reorder Controls & Delete Button */}
+                                <div className="flex items-center gap-1 mt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveImage(idx, idx - 1)}
+                                    disabled={idx === 0}
+                                    title="Move earlier"
+                                    aria-label="Move photo earlier"
+                                    className="p-1 rounded-md text-stone-500 hover:text-stone-800 hover:bg-stone-100 dark:hover:bg-white/10 disabled:opacity-25 transition cursor-pointer"
+                                  >
+                                    <ArrowLeft size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveImage(idx, idx + 1)}
+                                    disabled={idx === (modalForm.images || []).length - 1}
+                                    title="Move later"
+                                    aria-label="Move photo later"
+                                    className="p-1 rounded-md text-stone-500 hover:text-stone-800 hover:bg-stone-100 dark:hover:bg-white/10 disabled:opacity-25 transition cursor-pointer"
+                                  >
+                                    <ArrowRight size={13} />
+                                  </button>
+
+                                  <div className="flex-1" />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage(idx)}
+                                    title="Remove photo"
+                                    aria-label="Remove photo from gallery"
+                                    className="p-1 rounded-md text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

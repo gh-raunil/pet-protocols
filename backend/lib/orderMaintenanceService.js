@@ -5,6 +5,7 @@ import Restaurant from "@/models/Restaurant";
 import Waste from "@/models/Waste";
 import { executeOrderRefund } from "@/lib/refundService";
 import { notifyOrderEvent } from "@/lib/pushService";
+import { restoreStockForOrder } from "@/lib/inventoryService";
 
 /**
  * Idempotently records Waste entries for an order with prepared food.
@@ -440,4 +441,175 @@ export async function processStalePickupOrders({ restaurantId = null, managerLim
   }
 
   return results;
+}
+
+/**
+ * Safely processes and auto-cancels unresponded stale orders sitting in 'pending' or 'confirmed'
+ * status that exceed the restaurant's response timeout (e.g. managerLimitMinutes,
+ * uncollectedTimeoutMinutes, or autoCancelTimeoutMinutes).
+ *
+ * Rules:
+ * 1. ONLY evaluate orders sitting in 'pending' or 'confirmed' status.
+ * 2. Timeout is measured strictly from order creation (createdAt).
+ * 3. Because food preparation was NEVER started, raw ingredient stock is restored (if deducted),
+ *    and Waste logging is marked 'not_applicable' (no prepared food discarded).
+ * 4. Eligible online prepaid orders undergo full idempotently tracked refund evaluation.
+ * 5. Customers are notified of cancellation via push service.
+ *
+ * @param {Object} options
+ * @param {string|null} options.restaurantId - Optional filter by specific restaurant
+ * @param {number|null} options.managerLimitMinutes - Optional override for timeout
+ * @returns {Promise<Object>} Summary of processed unresponded orders
+ */
+export async function processUnrespondedStaleOrders({ restaurantId = null, managerLimitMinutes = null } = {}) {
+  await connectDB();
+
+  const restaurantFilter = { status: "active" };
+  if (restaurantId) {
+    restaurantFilter._id = restaurantId;
+  }
+  const restaurants = await Restaurant.find(restaurantFilter).lean();
+
+  const results = {
+    processedCount: 0,
+    cancelledOrders: [],
+    errors: [],
+  };
+
+  for (const rest of restaurants) {
+    const autoDismiss = rest?.orderingSettings?.autoDismissUncollectedOrders !== false;
+    const timeoutMins = Number(
+      managerLimitMinutes ||
+      rest?.orderingSettings?.uncollectedTimeoutMinutes ||
+      rest?.orderingSettings?.autoCancelTimeoutMinutes ||
+      60
+    );
+
+    if (!autoDismiss || timeoutMins <= 0) continue;
+
+    const cutoffDate = new Date(Date.now() - timeoutMins * 60 * 1000);
+
+    const candidateOrders = await Order.find({
+      restaurant: rest._id,
+      status: { $in: ["pending", "confirmed"] },
+      createdAt: { $lt: cutoffDate },
+    });
+
+    for (const order of candidateOrders) {
+      try {
+        const elapsedMs = Date.now() - new Date(order.createdAt).getTime();
+        const elapsedMins = Math.round(elapsedMs / 60000);
+        const reasonMsg = `Auto-cancelled: Order unresponded by kitchen after ${elapsedMins}m (cutoff: ${timeoutMins}m)`;
+
+        // Atomic conditional claim to prevent duplicate cancellation or race conditions
+        const claimed = await Order.findOneAndUpdate(
+          {
+            _id: order._id,
+            status: { $in: ["pending", "confirmed"] },
+          },
+          {
+            $set: {
+              status: "cancelled",
+              cancellationReason: reasonMsg,
+              cancelledBy: "system_timeout",
+              stockRestored: true,
+              "stockRestoration.status": "completed",
+              "wasteLogging.status": "not_applicable",
+            },
+            $push: {
+              statusHistory: {
+                status: "cancelled",
+                changedAt: new Date(),
+                changedBy: { role: "system", name: "System (Auto-Cancel Unresponded)" },
+                note: reasonMsg,
+              },
+            },
+            $inc: { __v: 1 },
+          },
+          { returnDocument: "after" }
+        );
+
+        if (!claimed) {
+          // Concurrently modified or accepted by kitchen
+          continue;
+        }
+
+        // 1. Restore raw ingredient stock safely if it was deducted
+        let stockRestorationResult = null;
+        try {
+          stockRestorationResult = await restoreStockForOrder(claimed);
+        } catch (stockErr) {
+          console.warn("[Auto-Cancel Unresponded Stock Restore Error]", claimed._id, stockErr.message);
+          stockRestorationResult = { success: false, error: stockErr.message };
+        }
+
+        // 2. Safe full refund evaluation for eligible prepaid online orders
+        let refundResult = null;
+        const isPrepaid =
+          ["paid", "refund_pending"].includes(claimed.paymentStatus) &&
+          (claimed.paymentMethod?.toLowerCase().includes("razorpay") || claimed.paymentMethod?.toLowerCase().includes("online"));
+
+        if (isPrepaid && claimed.refundDetails?.status !== "processed") {
+          try {
+            refundResult = await executeOrderRefund({
+              orderId: claimed._id,
+              reason: reasonMsg,
+              initiatedBy: "system_auto_cancel_unresponded",
+            });
+          } catch (refErr) {
+            console.warn("[Auto-Cancel Unresponded Refund Error]", claimed._id, refErr.message);
+            refundResult = { success: false, error: refErr.message };
+          }
+        }
+
+        // 3. Dispatch customer notification
+        try {
+          await notifyOrderEvent(claimed, "status_update", {
+            status: "cancelled",
+            previousStatus: order.status,
+            reason: reasonMsg,
+          });
+        } catch (pushErr) {
+          console.warn("[Auto-Cancel Unresponded Push Error]", claimed._id, pushErr.message);
+        }
+
+        results.processedCount++;
+        results.cancelledOrders.push({
+          orderId: claimed.orderId || claimed._id.toString(),
+          elapsedMinutes: elapsedMins,
+          stockRestorationResult,
+          refundResult,
+        });
+      } catch (orderErr) {
+        results.errors.push({
+          orderId: order._id?.toString(),
+          error: orderErr.message,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Consolidated runner that processes both stale pickup orders and unresponded orders.
+ *
+ * @param {Object} options
+ * @param {string|null} options.restaurantId
+ * @param {number|null} options.managerLimitMinutes
+ * @returns {Promise<Object>} Combined maintenance results
+ */
+export async function processAllStaleOrders({ restaurantId = null, managerLimitMinutes = null } = {}) {
+  const pickupResults = await processStalePickupOrders({ restaurantId, managerLimitMinutes });
+  const unrespondedResults = await processUnrespondedStaleOrders({ restaurantId, managerLimitMinutes });
+
+  return {
+    recoverySummary: pickupResults.recoverySummary,
+    processedCount: pickupResults.processedCount + unrespondedResults.processedCount,
+    pickupProcessedCount: pickupResults.processedCount,
+    unrespondedProcessedCount: unrespondedResults.processedCount,
+    cancelledOrders: [...pickupResults.cancelledOrders, ...unrespondedResults.cancelledOrders],
+    errors: [...pickupResults.errors, ...unrespondedResults.errors],
+  };
 }

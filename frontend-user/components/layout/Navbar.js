@@ -91,7 +91,7 @@ const Navbar = () => {
           <SearchBar />
         </div>
 
-        {/* Right Section: Theme Toggle, Notifications, Cart, Profile */}
+        {/* Right Section: Notifications, Cart, Profile */}
         <div className="flex gap-1.5 sm:gap-2 xl:gap-2.5 items-center shrink-0">
           <RightSection
             onOpenMobileSearch={() => setMobileSearchOpen(true)}

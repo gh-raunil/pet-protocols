@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import { Building2, Upload, AlertCircle, Phone, MessageSquare, Mail, MapPin, FileText, Globe } from "lucide-react";
 import RestaurantLocationPicker from "./RestaurantLocationPicker";
 
 export default function GeneralSection({ form, onChange, onSave, saving }) {
   const [logoUploading, setLogoUploading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setRawErrorMsg] = useState("");
+  const setErrorMsg = (msg) => {
+    setRawErrorMsg(msg);
+    if (msg) toast.error(msg);
+  };
 
   const address = form.address || {
     street: "",
@@ -68,12 +73,7 @@ export default function GeneralSection({ form, onChange, onSave, saving }) {
         </p>
       </div>
 
-      {errorMsg && (
-        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+
 
       {/* YOUR RESTAURANT CARD */}
       <section className="bg-white dark:bg-[#10141f]/90 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">

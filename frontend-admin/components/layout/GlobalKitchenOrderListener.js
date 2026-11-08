@@ -47,7 +47,8 @@ export default function GlobalKitchenOrderListener({ onPendingCountChange }) {
 
     async function checkNewOrders() {
       try {
-        const res = await fetch("/api/restaurant/orders?status=pending&date=all");
+        const today = new Date().toISOString().split("T")[0];
+        const res = await fetch(`/api/restaurant/orders?status=pending&date=${today}`);
         if (!res.ok) return;
         const data = await res.json();
 

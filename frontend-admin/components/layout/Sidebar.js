@@ -144,25 +144,24 @@ export default function Sidebar({
         {
           title: "Operations",
           items: [
-            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: "Hub" },
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
             {
               href: "/orders",
-              label: "Live Orders",
+              label: "Order Command Center",
               icon: ShoppingBag,
-              badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : "Live",
+              badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : null,
               isAlertBadge: effectivePendingCount > 0,
               alertCount: effectivePendingCount,
             },
-            { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
-            { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
-            { href: "/delivery/assign", label: "Assign Delivery Boy", icon: Bike, badge: "Assign" },
+            { href: "/kitchen", label: "Kitchen Display (KDS)", icon: ChefHat },
+            { href: "/delivery", label: "Delivery Fleet & Cash", icon: Truck },
           ].filter((item) => isFeatureEnabled(item.href)),
         },
         {
           title: "Front Desk & Billing",
           items: [
-            { href: "/cashier", label: "Cashier & Billing", icon: Receipt, badge: "POS" },
-            { href: "/feedback", label: "Feedback & Reviews", icon: Star, badge: "Reviews" },
+            { href: "/cashier", label: "Cashier & Billing", icon: Receipt },
+            { href: "/feedback", label: "Feedback & Reviews", icon: Star },
             { href: "/support", label: "Customer Support", icon: Headphones },
           ].filter((item) => isFeatureEnabled(item.href)),
         },
@@ -170,8 +169,8 @@ export default function Sidebar({
           title: "Catalog & Stock",
           items: [
             { href: "/products", label: "Dishes & Menu", icon: UtensilsCrossed },
-            { href: "/products/availability", label: "Quick 86 Stock", icon: ToggleLeft, badge: "86" },
-            { href: "/inventory", label: "Inventory ERP", icon: Package, badge: "ERP" },
+            { href: "/products/availability", label: "Quick 86 Stock", icon: ToggleLeft },
+            { href: "/inventory", label: "Inventory ERP", icon: Package },
           ].filter((item) => isFeatureEnabled(item.href)),
         },
         {
@@ -193,19 +192,19 @@ export default function Sidebar({
     }
 
     if (isStaff) {
-      const staffItems = [{ href: "/", label: "Front Station", icon: LayoutDashboard, badge: "Duty" }];
+      const staffItems = [{ href: "/", label: "Front Station", icon: LayoutDashboard }];
 
       if (staffRoles.includes("Delivery")) {
         staffItems.push({ href: "/delivery", label: "Delivery & Dispatch", icon: Truck });
       }
       if (staffRoles.includes("Kitchen")) {
-        staffItems.push({ href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" });
+        staffItems.push({ href: "/kitchen", label: "Kitchen KDS", icon: ChefHat });
       }
       if (staffRoles.includes("Cashier")) {
-        staffItems.push({ href: "/cashier", label: "Cashier & Billing", icon: Receipt, badge: "POS" });
+        staffItems.push({ href: "/cashier", label: "Cashier & Billing", icon: Receipt });
       }
       if (staffRoles.includes("Inventory")) {
-        staffItems.push({ href: "/inventory", label: "Inventory ERP", icon: Package, badge: "ERP" });
+        staffItems.push({ href: "/inventory", label: "Inventory ERP", icon: Package });
       }
       if (staffRoles.includes("Support")) {
         staffItems.push({ href: "/support", label: "Customer Support", icon: Headphones });
@@ -220,22 +219,21 @@ export default function Sidebar({
               { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
               {
                 href: "/orders",
-                label: "Live Orders",
+                label: "Order Command Center",
                 icon: ShoppingBag,
-                badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : "Live",
+                badge: effectivePendingCount > 0 ? `${effectivePendingCount} NEW` : null,
                 isAlertBadge: effectivePendingCount > 0,
                 alertCount: effectivePendingCount,
               },
-              { href: "/kitchen", label: "Kitchen KDS", icon: ChefHat, badge: "KDS" },
-              { href: "/delivery", label: "Delivery & Dispatch", icon: Truck },
-              { href: "/delivery/assign", label: "Assign Delivery Boy", icon: Bike, badge: "Assign" },
+              { href: "/kitchen", label: "Kitchen Display (KDS)", icon: ChefHat },
+              { href: "/delivery", label: "Delivery Fleet & Cash", icon: Truck },
             ].filter((item) => isFeatureEnabled(item.href)),
           },
           {
             title: "Front Desk & POS",
             items: [
-              { href: "/cashier", label: "Cashier & Billing", icon: Receipt, badge: "POS" },
-              { href: "/feedback", label: "Feedback & Reviews", icon: Star, badge: "Reviews" },
+              { href: "/cashier", label: "Cashier & Billing", icon: Receipt },
+              { href: "/feedback", label: "Feedback & Reviews", icon: Star },
               { href: "/support", label: "Customer Support", icon: Headphones },
             ].filter((item) => isFeatureEnabled(item.href)),
           },
@@ -243,8 +241,8 @@ export default function Sidebar({
             title: "Menu & Inventory",
             items: [
               { href: "/products", label: "Dishes & Menu", icon: UtensilsCrossed },
-              { href: "/products/availability", label: "Quick 86 Stock", icon: ToggleLeft, badge: "86" },
-              { href: "/inventory", label: "Inventory ERP", icon: Package, badge: "ERP" },
+              { href: "/products/availability", label: "Quick 86 Stock", icon: ToggleLeft },
+              { href: "/inventory", label: "Inventory ERP", icon: Package },
             ].filter((item) => isFeatureEnabled(item.href)),
           },
           {

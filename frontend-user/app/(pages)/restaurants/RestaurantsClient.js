@@ -544,7 +544,7 @@ export default function RestaurantsClient() {
                 value={sortFromUrl}
                 onChange={(e) => updateQuery({ sort: e.target.value })}
                 aria-label="Sort restaurants by"
-                className="h-9 pl-3 pr-8 rounded-xl bg-[#171B22] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] hover:border-[#FF7900]/50 focus:outline-none focus:border-[#FF7900] transition cursor-pointer appearance-none shadow-2xs"
+                className="h-9 min-w-[165px] pl-3 pr-7 rounded-xl bg-[#171B22] border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] hover:border-[#FF7900]/50 focus:outline-none focus:border-[#FF7900] transition cursor-pointer appearance-none shadow-2xs"
               >
                 <option value="recommended">Sort: Recommended</option>
                 <option value="rating">Top Rated</option>

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Building,
   Clock,
@@ -12,6 +13,7 @@ import {
   Minus,
   ShoppingBag,
   Sparkles,
+  Check,
   CheckCircle2,
   Share2,
   Star,
@@ -23,10 +25,13 @@ import {
   MessageSquare,
   ChevronRight,
   X,
+  Maximize2,
   Flame,
   Layers,
   Utensils,
   Award,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
 import useFavoritesStore, { useIsFavorite } from "@/lib/favoritesStore";
@@ -35,18 +40,65 @@ import { toast } from "@/components/ui/ToastProvider";
 import { useOperationalStatus } from "@/lib/restaurantHours";
 import { trackAddToCart, trackProductView } from "@/lib/userPreferences";
 import ProductCarousel from "@/components/products/ProductCarousel";
+import FullscreenImageViewer from "@/components/gallery/FullscreenImageViewer";
 import {
   getProductActiveOffer,
   calculateItemDiscount,
   isProductNewArrival,
 } from "@/lib/offersHelper";
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatReviewDate(dateStr) {
+  if (!dateStr) return "Recent Order";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Recent Order";
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = MONTH_NAMES[d.getMonth()] || "Jan";
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch (e) {
+    return "Recent Order";
+  }
+}
+
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800";
 
 export default function ProductDetailClient({ product }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [quantity, setQuantity] = useState(1);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
+
+  const galleryImages = useMemo(() => {
+    if (Array.isArray(product?.images) && product.images.length > 0) {
+      return product.images
+        .filter((img) => img && (typeof img === "string" ? img.trim() : img.url?.trim()))
+        .map((img, idx) => ({
+          url: typeof img === "string" ? img.trim() : img.url.trim(),
+          alt: (typeof img === "object" && img.alt) || product?.name || "Dish photo",
+          order: typeof img?.order === "number" ? img.order : idx,
+          isPrimary: typeof img === "object" ? Boolean(img.isPrimary) : idx === 0,
+        }));
+    }
+    if (product?.image) {
+      return [{
+        url: product.image,
+        alt: product.name || "Dish photo",
+        order: 0,
+        isPrimary: true,
+      }];
+    }
+    return [{
+      url: FALLBACK_IMAGE,
+      alt: product?.name || "Dish photo",
+      order: 0,
+      isPrimary: true,
+    }];
+  }, [product?.images, product?.image, product?.name]);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [reviewsList, setReviewsList] = useState(product?.reviews || []);
   const [currentRating, setCurrentRating] = useState(
@@ -60,18 +112,18 @@ export default function ProductDetailClient({ product }) {
   const [helpfulReviews, setHelpfulReviews] = useState({});
 
   const handleToggleHelpful = (reviewKey, baseCount = 0) => {
-    setHelpfulReviews((prev) => {
-      const current = prev[reviewKey] || { liked: false, count: baseCount };
-      const nextLiked = !current.liked;
-      const nextCount = nextLiked ? current.count + 1 : Math.max(0, current.count - 1);
-      if (nextLiked) {
-        toast.success("Thank you! Marked review as helpful.");
-      }
-      return {
-        ...prev,
-        [reviewKey]: { liked: nextLiked, count: nextCount },
-      };
-    });
+    const current = helpfulReviews[reviewKey] || { liked: false, count: baseCount };
+    const nextLiked = !current.liked;
+    const nextCount = nextLiked ? current.count + 1 : Math.max(0, current.count - 1);
+
+    setHelpfulReviews((prev) => ({
+      ...prev,
+      [reviewKey]: { liked: nextLiked, count: nextCount },
+    }));
+
+    if (nextLiked) {
+      toast.success("Thank you! Marked review as helpful.");
+    }
   };
 
   // Rate Modal State & Accessibility Refs
@@ -81,8 +133,24 @@ export default function ProductDetailClient({ product }) {
   const [reviewerName, setReviewerName] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [myReviews, setMyReviews] = useState({});
   const modalRef = useRef(null);
   const triggerRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("pet_my_review_tokens");
+      if (stored) {
+        setMyReviews(JSON.parse(stored));
+      }
+      const storedName = localStorage.getItem("pet_reviewer_name");
+      if (storedName && !reviewerName) {
+        setReviewerName(storedName);
+      } else if (session?.user?.name && !reviewerName) {
+        setReviewerName(session.user.name);
+      }
+    } catch (e) {}
+  }, [session?.user?.name]);
 
   const addItem = useCartStore((s) => s.addItem);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
@@ -122,6 +190,10 @@ export default function ProductDetailClient({ product }) {
     hasVariants && selectedVariantIndex >= 0
       ? product.variants[selectedVariantIndex]
       : null;
+
+  const allVariantsOutOfStock = Boolean(
+    hasVariants && !product.variants.some((v) => v.isAvailable !== false)
+  );
 
   // Base price: variant price or product.price
   const rawBasePrice = selectedVariant
@@ -176,10 +248,13 @@ export default function ProductDetailClient({ product }) {
 
   // Option A: catalog price is NOT reduced; coupon code is displayed
   const baseComparePrice = rawBasePrice;
+  const variantComparePrice = selectedVariant?.compareAtPrice ? Number(selectedVariant.compareAtPrice) : null;
+  const effectiveComparePrice = variantComparePrice || product?.originalPrice || null;
+
   const hasStrikethrough = isAutoDiscount
     ? true
-    : Boolean(product?.originalPrice && product.originalPrice > baseComparePrice);
-  const struckPrice = isAutoDiscount ? baseComparePrice : product?.originalPrice;
+    : Boolean(effectiveComparePrice && effectiveComparePrice > baseComparePrice);
+  const struckPrice = isAutoDiscount ? baseComparePrice : effectiveComparePrice;
   const discountPercent =
     struckPrice > displayPrice
       ? Math.round(((struckPrice - displayPrice) / struckPrice) * 100)
@@ -288,7 +363,10 @@ export default function ProductDetailClient({ product }) {
       ...product,
       _id: product._id.toString(),
       price: rawBasePrice,
+      variantId: selectedVariant ? (selectedVariant._id?.toString() || selectedVariant.id || `var_${selectedVariantIndex}`) : undefined,
       variantName: selectedVariant ? selectedVariant.name : undefined,
+      compareAtPrice: selectedVariant?.compareAtPrice ?? product.originalPrice ?? null,
+      image: selectedVariant?.image || galleryImages[activeImageIndex]?.url || imgSrc,
       portionQuantity: activePortion?.quantity,
       portionUnit:
         activePortion?.unit === "custom"
@@ -323,7 +401,10 @@ export default function ProductDetailClient({ product }) {
       ...product,
       _id: product._id.toString(),
       price: rawBasePrice,
+      variantId: selectedVariant ? (selectedVariant._id?.toString() || selectedVariant.id || `var_${selectedVariantIndex}`) : undefined,
       variantName: selectedVariant ? selectedVariant.name : undefined,
+      compareAtPrice: selectedVariant?.compareAtPrice ?? product.originalPrice ?? null,
+      image: selectedVariant?.image || galleryImages[activeImageIndex]?.url || imgSrc,
       portionQuantity: activePortion?.quantity,
       portionUnit:
         activePortion?.unit === "custom"
@@ -371,15 +452,76 @@ export default function ProductDetailClient({ product }) {
         if (data.reviews) setReviewsList(data.reviews);
         if (data.rating) setCurrentRating(data.rating);
         if (data.numRatings) setNumRatings(data.numRatings);
+        if (data.reviewId && data.deleteToken) {
+          setMyReviews((prev) => {
+            const next = { ...prev, [data.reviewId]: data.deleteToken };
+            try {
+              localStorage.setItem("pet_my_review_tokens", JSON.stringify(next));
+              localStorage.setItem("pet_reviewer_name", reviewerName.trim());
+            } catch (e) {}
+            return next;
+          });
+        }
         setIsRateModalOpen(false);
         setReviewComment("");
       } else {
-        toast.error(data.message || "Failed to submit rating");
+        toast.error(data.message || data.error || "Failed to submit rating");
       }
     } catch (err) {
       toast.error("Network error while submitting rating");
     } finally {
       setSubmittingRating(false);
+    }
+  };
+
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+
+  // Delete Review
+  const handleDeleteReview = async (reviewId, revAuthorName) => {
+    if (!reviewId) {
+      toast.error("Unable to identify review ID to delete.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this review?")) {
+      return;
+    }
+
+    try {
+      setDeletingReviewId(reviewId);
+      const token = myReviews[reviewId] || "";
+      const res = await fetch("/api/ratings", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetType: "product",
+          targetId: product._id,
+          reviewId,
+          deleteToken: token,
+          reviewerName: revAuthorName || reviewerName || session?.user?.name,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Review deleted successfully.");
+        if (data.reviews) setReviewsList(data.reviews);
+        setCurrentRating(data.rating !== undefined ? data.rating : null);
+        setNumRatings(typeof data.numRatings === "number" ? data.numRatings : 0);
+        setMyReviews((prev) => {
+          const next = { ...prev };
+          delete next[reviewId];
+          try {
+            localStorage.setItem("pet_my_review_tokens", JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      } else {
+        toast.error(data.message || data.error || "Failed to delete review.");
+      }
+    } catch (err) {
+      toast.error("Network error while deleting review.");
+    } finally {
+      setDeletingReviewId(null);
     }
   };
 
@@ -499,12 +641,25 @@ export default function ProductDetailClient({ product }) {
 
       {/* ── MAIN PRODUCT SECTION (2 COLUMNS) ───────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-        {/* LEFT COLUMN: Large Hero Image & Trust Badges (5 Columns) */}
-        <div className="lg:col-span-5 lg:sticky lg:top-28 space-y-4">
-          <div className="group relative aspect-square w-full rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm">
+        {/* LEFT COLUMN: Large Hero Image & Gallery (5 Columns) */}
+        <div className="lg:col-span-5 lg:sticky lg:top-28 space-y-3.5">
+          {/* Main Interactive Food Image */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsFullscreenViewerOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setIsFullscreenViewerOpen(true);
+              }
+            }}
+            aria-label="View images fullscreen"
+            className="group relative aspect-square w-full rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)] select-none"
+          >
             <Image
-              src={imgSrc}
-              alt={product.name}
+              src={selectedVariant?.image || galleryImages[activeImageIndex]?.url || imgSrc}
+              alt={selectedVariant ? `${product.name} - ${selectedVariant.name}` : (galleryImages[activeImageIndex]?.alt || product.name)}
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 40vw"
@@ -513,6 +668,22 @@ export default function ProductDetailClient({ product }) {
               }`}
               onError={() => setImgSrc(FALLBACK_IMAGE)}
             />
+
+            {/* Counter Badge (When multiple images exist) */}
+            {galleryImages.length > 1 && (
+              <div className="absolute bottom-3.5 left-3.5 z-20 px-2.5 py-1 rounded-full bg-stone-950/75 backdrop-blur-md text-white text-xs font-bold border border-white/15 shadow-sm">
+                {activeImageIndex + 1} / {galleryImages.length}
+              </div>
+            )}
+
+            {/* Fullscreen Expand Action Button */}
+            <div
+              className="absolute bottom-3.5 right-3.5 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-950/75 hover:bg-stone-900 text-white text-xs font-semibold backdrop-blur-md border border-white/20 shadow-md transition hover:scale-105"
+              title="View images fullscreen"
+            >
+              <Maximize2 size={13} />
+              <span className="hidden sm:inline">Fullscreen</span>
+            </div>
 
             {/* Out of Stock Overlay */}
             {!product.isAvailable && (
@@ -573,6 +744,45 @@ export default function ProductDetailClient({ product }) {
               <Heart size={16} className={isFav ? "fill-white" : ""} />
             </button>
           </div>
+
+          {/* Thumbnail Navigation Strip */}
+          {galleryImages.length > 1 && (
+            <div
+              role="tablist"
+              aria-label="Food gallery thumbnail choices"
+              className="flex items-center gap-2.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar"
+            >
+              {galleryImages.map((img, idx) => {
+                const isActive = idx === activeImageIndex;
+                return (
+                  <button
+                    key={`${img.url}-${idx}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={`Select image ${idx + 1} of ${galleryImages.length}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIndex(idx);
+                    }}
+                    className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 bg-[var(--bg-sub)] ${
+                      isActive
+                        ? "border-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]/30 scale-102 opacity-100"
+                        : "border-[var(--border-color)] hover:border-stone-400 opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <Image
+                      src={img.url}
+                      alt={img.alt || `${product.name} thumbnail ${idx + 1}`}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Safe & Hygiene Trust Badges Card */}
           <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 text-xs text-[var(--text-muted)] shadow-2xs">
@@ -675,6 +885,11 @@ export default function ProductDetailClient({ product }) {
                   {discountPercent}% off
                 </span>
               )}
+              {quantity > 1 && (
+                <span className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-[var(--brand-accent)]/10 text-[var(--brand-accent)] border border-[var(--brand-accent)]/25">
+                  Total for {quantity}: ₹{displayPrice * quantity}
+                </span>
+              )}
             </div>
 
             {/* Serving / Portion Summary */}
@@ -707,71 +922,121 @@ export default function ProductDetailClient({ product }) {
             </div>
           </div>
 
-          {/* Multiple Sizes / Pricing Variants Selector */}
+          {/* Choose Quantity & Size Variant Cards (Phase 5) */}
           {hasVariants && (
-            <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
-                  <Layers size={14} className="text-[var(--brand-accent)]" />
-                  Select Size / Variant
-                </h3>
+            <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-3.5 shadow-2xs">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-main)] flex items-center gap-1.5">
+                    <Layers size={14} className="text-[var(--brand-accent)]" />
+                    Choose Quantity & Size
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Select your preferred serving option below
+                  </p>
+                </div>
                 {selectedVariant && (
-                  <span className="text-[11px] font-bold text-[var(--brand-accent)]">
-                    Selected: {selectedVariant.name} (₹{selectedVariant.price})
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/25">
+                    Active: {selectedVariant.name} · ₹{selectedVariant.price}
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {product.variants.map((v, idx) => {
-                  const isSelected = selectedVariantIndex === idx;
-                  const isOutOfStock = v.isAvailable === false;
-                  const vPortion =
-                    v.servingLabel ||
-                    (v.portionQuantity && v.portionUnit
-                      ? `${v.portionQuantity} ${v.portionUnit}`
-                      : "") ||
-                    v.size;
+              {allVariantsOutOfStock ? (
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold text-center">
+                  All size variants are currently sold out in the kitchen.
+                </div>
+              ) : (
+                <div
+                  role="radiogroup"
+                  aria-label="Select dish size or variant"
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5"
+                >
+                  {product.variants.map((v, idx) => {
+                    const isSelected = selectedVariantIndex === idx;
+                    const isOutOfStock = v.isAvailable === false;
+                    const vPortion =
+                      v.servingLabel ||
+                      (v.portionQuantity && v.portionUnit
+                        ? `${v.portionQuantity} ${v.portionUnit}`
+                        : "") ||
+                      v.size;
+                    const hasComparePrice = Boolean(v.compareAtPrice && Number(v.compareAtPrice) > Number(v.price));
+                    const isBestValue = idx === product.variants.length - 1 && product.variants.length > 1;
 
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      disabled={isOutOfStock}
-                      onClick={() => setSelectedVariantIndex(idx)}
-                      className={`p-3 rounded-2xl border text-left transition relative cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                        isSelected
-                          ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-2 ring-[var(--brand-accent)]/20 shadow-xs"
-                          : isOutOfStock
-                          ? "border-[var(--border-color)] bg-[var(--bg-sub)] opacity-50 cursor-not-allowed"
-                          : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card)]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-extrabold text-xs text-[var(--text-main)] truncate">
-                          {v.name}
-                        </span>
-                        {isSelected && (
-                          <span className="w-2 h-2 rounded-full bg-[var(--brand-accent)] shrink-0" />
-                        )}
-                      </div>
-                      <div className="text-xs font-black text-[var(--brand-accent)] mt-1">
-                        ₹{v.price}
-                      </div>
-                      {vPortion && (
-                        <div className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-                          {vPortion}
+                    return (
+                      <button
+                        key={v._id || idx}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        disabled={isOutOfStock}
+                        onClick={() => setSelectedVariantIndex(idx)}
+                        className={`p-3.5 rounded-2xl border text-left transition relative cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden flex flex-col justify-between ${
+                          isSelected
+                            ? "border-[var(--brand-accent)] bg-[var(--brand-accent)]/10 ring-2 ring-[var(--brand-accent)]/25 shadow-sm scale-[1.01]"
+                            : isOutOfStock
+                            ? "border-[var(--border-color)] bg-[var(--bg-sub)] opacity-40 cursor-not-allowed"
+                            : "border-[var(--border-color)] bg-[var(--bg-sub)] hover:border-[var(--brand-accent)]/40 hover:bg-[var(--bg-card)]"
+                        }`}
+                      >
+                        {/* Top Row: Name + Selected checkmark / Best Value badge */}
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-extrabold text-xs sm:text-sm text-[var(--text-main)] block truncate">
+                              {v.name}
+                            </span>
+                            {vPortion && (
+                              <span className="text-[10px] text-[var(--text-muted)] block truncate mt-0.5">
+                                {vPortion}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isBestValue && !isOutOfStock && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                                Best Value
+                              </span>
+                            )}
+                            {isSelected ? (
+                              <span className="w-5 h-5 rounded-full bg-[var(--brand-accent)] text-white flex items-center justify-center shadow-xs">
+                                <Check size={12} strokeWidth={3} />
+                              </span>
+                            ) : (
+                              <span className="w-5 h-5 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]" />
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {isOutOfStock && (
-                        <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider mt-1 block">
-                          Sold Out
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+
+                        {/* Bottom Row: Price & Compare-at */}
+                        <div className="mt-2.5 pt-2 border-t border-[var(--border-color)]/60 flex items-baseline justify-between w-full">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-sm font-black text-[var(--text-main)]">
+                              ₹{v.price}
+                            </span>
+                            {hasComparePrice && (
+                              <span className="text-[10px] text-[var(--text-muted)] line-through">
+                                ₹{v.compareAtPrice}
+                              </span>
+                            )}
+                          </div>
+
+                          {isOutOfStock ? (
+                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider">
+                              Sold Out
+                            </span>
+                          ) : hasComparePrice ? (
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              {Math.round(((v.compareAtPrice - v.price) / v.compareAtPrice) * 100)}% off
+                            </span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -858,10 +1123,25 @@ export default function ProductDetailClient({ product }) {
 
           {/* ── UNIFIED PURCHASE MODULE (COHESIVE QUANTITY & ACTIONS) ── */}
           <div className="p-4 sm:p-5 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
-                Quantity:
-              </span>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] block">
+                  Quantity:
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-xs text-[var(--text-muted)] font-semibold">
+                    Total:
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-[var(--text-main)] font-serif">
+                    ₹{displayPrice * quantity}
+                  </span>
+                  {quantity > 1 && (
+                    <span className="text-[11px] text-[var(--text-muted)] font-medium">
+                      ({quantity} × ₹{displayPrice})
+                    </span>
+                  )}
+                </div>
+              </div>
 
               {/* Quantity Stepper (1..20 clamp) */}
               <div className="flex items-center gap-3 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-2xl p-1 shadow-2xs">
@@ -894,21 +1174,21 @@ export default function ProductDetailClient({ product }) {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={!product.isAvailable || !restStatus.isOpen}
+                disabled={!product.isAvailable || allVariantsOutOfStock || !restStatus.isOpen}
                 className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus-visible:ring-offset-2 focus:outline-hidden"
               >
                 <ShoppingBag size={17} />
-                <span>Add To Cart</span>
+                <span>Add To Cart · ₹{displayPrice * quantity}</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleBuyNow}
-                disabled={!product.isAvailable || !restStatus.isOpen}
+                disabled={!product.isAvailable || allVariantsOutOfStock || !restStatus.isOpen}
                 className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 bg-[var(--text-main)] hover:opacity-90 text-[var(--bg-main)] shadow-md hover:shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus:outline-hidden"
               >
                 <Zap size={17} />
-                <span>Order Now</span>
+                <span>Order Now · ₹{displayPrice * quantity}</span>
               </button>
             </div>
           </div>
@@ -1043,8 +1323,8 @@ export default function ProductDetailClient({ product }) {
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-color)] space-y-4 pt-2">
-            {reviewsList.slice(0, 5).map((rev, idx) => (
-              <div key={rev._id || idx} className="pt-4 first:pt-0 space-y-2">
+            {(showAllReviews ? reviewsList : reviewsList.slice(0, 5)).map((rev, idx) => (
+              <div key={rev._id || idx} className="pt-4 first:pt-0 space-y-2 group">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-0.5 bg-emerald-600 dark:bg-emerald-500 text-white px-1.5 py-0.5 rounded-[4px] text-[10px] font-black">
                     {rev.rating || 5} <Star size={9} className="fill-white" />
@@ -1067,43 +1347,82 @@ export default function ProductDetailClient({ product }) {
                     {rev.comment}
                   </p>
                 )}
-                <div className="text-[10px] text-[var(--text-muted)] opacity-80 flex items-center gap-3">
-                  <span>
-                    {rev.createdAt
-                      ? new Date(rev.createdAt).toLocaleDateString()
-                      : "Recent Order"}
-                  </span>
-                  {(() => {
-                    const reviewKey = rev._id || rev.id || `rev-${rev.userName || idx}`;
-                    const helpfulData = helpfulReviews[reviewKey] || {
-                      liked: false,
-                      count: typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0,
-                    };
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleHelpful(reviewKey, typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0)}
-                        aria-label={helpfulData.liked ? "Unmark review as helpful" : "Mark review as helpful"}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition active:scale-95 cursor-pointer ${
-                          helpfulData.liked
-                            ? "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 font-bold"
-                            : "hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] border border-transparent text-[var(--text-muted)]"
-                        }`}
-                      >
-                        <ThumbsUp
-                          size={11}
-                          className={helpfulData.liked ? "fill-[var(--brand-accent)] stroke-[var(--brand-accent)]" : ""}
-                        />
-                        <span>Helpful</span>
-                        {helpfulData.count > 0 && (
-                          <span className="font-bold">({helpfulData.count})</span>
-                        )}
-                      </button>
-                    );
-                  })()}
+                <div className="text-[10px] text-[var(--text-muted)] opacity-80 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span suppressHydrationWarning>
+                      {formatReviewDate(rev.createdAt)}
+                    </span>
+                    {(() => {
+                      const reviewKey = rev._id || rev.id || `rev-${rev.userName || idx}`;
+                      const helpfulData = helpfulReviews[reviewKey] || {
+                        liked: false,
+                        count: typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0,
+                      };
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHelpful(reviewKey, typeof rev.helpfulCount === "number" ? rev.helpfulCount : 0)}
+                          aria-label={helpfulData.liked ? "Unmark review as helpful" : "Mark review as helpful"}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition active:scale-95 cursor-pointer ${
+                            helpfulData.liked
+                              ? "bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] border border-[var(--brand-accent)]/30 font-bold"
+                              : "hover:text-[var(--text-main)] hover:bg-[var(--bg-sub)] border border-transparent text-[var(--text-muted)]"
+                          }`}
+                        >
+                          <ThumbsUp
+                            size={11}
+                            className={helpfulData.liked ? "fill-[var(--brand-accent)] stroke-[var(--brand-accent)]" : ""}
+                          />
+                          <span>Helpful</span>
+                          {helpfulData.count > 0 && (
+                            <span className="font-bold">({helpfulData.count})</span>
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Delete Review Action (Authorized to Author or Admin) */}
+                  {Boolean(
+                    myReviews[rev._id] ||
+                    (session?.user?.id && rev.user && String(rev.user) === String(session.user.id)) ||
+                    (session?.user?.name && rev.userName && rev.userName.toLowerCase() === session.user.name.toLowerCase()) ||
+                    (reviewerName && rev.userName && rev.userName.toLowerCase() === reviewerName.trim().toLowerCase()) ||
+                    ["admin", "restaurant_admin"].includes(session?.user?.role)
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteReview(rev._id, rev.userName)}
+                      disabled={deletingReviewId === rev._id}
+                      aria-label="Delete this review"
+                      title="Delete review"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 transition py-0.5 px-2 rounded-lg hover:bg-rose-500/10 cursor-pointer disabled:opacity-50"
+                    >
+                      {deletingReviewId === rev._id ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={11} />
+                      )}
+                      <span>Delete</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+
+            {reviewsList.length > 5 && (
+              <div className="pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllReviews((prev) => !prev)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--brand-accent)] bg-[var(--brand-accent)]/10 hover:bg-[var(--brand-accent)]/20 transition cursor-pointer"
+                >
+                  {showAllReviews
+                    ? "Show less reviews"
+                    : `View all ${reviewsList.length} reviews`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1142,7 +1461,7 @@ export default function ProductDetailClient({ product }) {
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!product.isAvailable || !restStatus.isOpen}
+              disabled={!product.isAvailable || allVariantsOutOfStock || !restStatus.isOpen}
               className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-[var(--brand-accent)] hover:bg-[var(--brand-accent-hover)] text-white shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <ShoppingBag size={14} />
@@ -1151,7 +1470,7 @@ export default function ProductDetailClient({ product }) {
             <button
               type="button"
               onClick={handleBuyNow}
-              disabled={!product.isAvailable || !restStatus.isOpen}
+              disabled={!product.isAvailable || allVariantsOutOfStock || !restStatus.isOpen}
               className="py-2.5 px-3.5 rounded-xl text-xs font-bold bg-[var(--text-main)] text-[var(--bg-main)] shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Zap size={14} />
@@ -1275,6 +1594,14 @@ export default function ProductDetailClient({ product }) {
           </div>
         </div>
       )}
+      {/* Fullscreen Image Lightbox Modal */}
+      <FullscreenImageViewer
+        isOpen={isFullscreenViewerOpen}
+        onClose={() => setIsFullscreenViewerOpen(false)}
+        images={galleryImages}
+        initialIndex={activeImageIndex}
+        dishName={product.name}
+      />
     </main>
   );
 }

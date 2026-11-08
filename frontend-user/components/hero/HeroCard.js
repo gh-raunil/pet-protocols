@@ -5,8 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   UtensilsCrossed,
   PackageCheck,
   Clock3,
@@ -182,23 +180,7 @@ export default function HeroCard() {
           </div>
         </div>
 
-        {/* Carousel Chevrons (< and >) */}
-        <button
-          type="button"
-          onClick={prevSlide}
-          aria-label="Previous hero slide"
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-[var(--bg-card)]/80 hover:bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] flex items-center justify-center shadow-md backdrop-blur-xs transition active:scale-90"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={nextSlide}
-          aria-label="Next hero slide"
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 border-2 border-[var(--brand-accent)] text-white flex items-center justify-center shadow-md backdrop-blur-xs transition active:scale-90"
-        >
-          <ChevronRight size={16} />
-        </button>
+
 
         {/* Bottom Pagination Dots */}
         <div

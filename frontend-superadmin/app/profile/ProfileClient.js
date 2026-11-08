@@ -259,8 +259,28 @@ export default function SuperadminProfileClient() {
                   {superEmail}
                 </p>
 
-                {/* Profile Photo Controls */}
-                <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                {/* Profile Image Remove Option if photo exists */}
+                {session?.user?.image && (
+                  <div className="pt-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={imageActionLoading}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-200 dark:border-rose-500/20 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 size={12} />
+                      <span>Remove Photo</span>
+                    </button>
+                  </div>
+                )}
+                {!session?.user?.image && (
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -268,27 +288,7 @@ export default function SuperadminProfileClient() {
                     onChange={handleImageUpload}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={imageActionLoading}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 text-xs font-semibold border border-indigo-200 dark:border-indigo-500/20 transition cursor-pointer disabled:opacity-50"
-                  >
-                    <Camera size={12} />
-                    <span>{session?.user?.image ? "Update Photo" : "Upload Photo"}</span>
-                  </button>
-                  {session?.user?.image && (
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      disabled={imageActionLoading}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold border border-rose-200 dark:border-rose-500/20 transition cursor-pointer disabled:opacity-50"
-                    >
-                      <Trash2 size={12} />
-                      <span>Remove Photo</span>
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
 
