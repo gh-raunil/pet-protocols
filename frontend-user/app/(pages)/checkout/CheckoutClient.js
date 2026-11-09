@@ -323,6 +323,9 @@ export default function CheckoutClient() {
             pincode: defaultAddress.pincode || "110001",
             latitude: defaultAddress.latitude ?? (hasExact ? locDetails.latitude : null),
             longitude: defaultAddress.longitude ?? (hasExact ? locDetails.longitude : null),
+            recipientName: defaultAddress.recipientName || "",
+            recipientPhone: defaultAddress.recipientPhone || "",
+            isDifferentRecipient: Boolean(defaultAddress.isDifferentRecipient),
           });
         } else {
           setSelectedAddressId("new");
@@ -1603,7 +1606,7 @@ export default function CheckoutClient() {
                     id="checkout-fullName"
                     name="fullName"
                     placeholder="e.g. Rahul Roy"
-                    value={address.fullName}
+                    value={address.fullName || ""}
                     onChange={handleChange}
                     autoComplete="name"
                     required
@@ -1631,7 +1634,7 @@ export default function CheckoutClient() {
                     inputMode="numeric"
                     autoComplete="tel"
                     placeholder="e.g. 9876543210"
-                    value={address.phone}
+                    value={address.phone || ""}
                     onChange={handleChange}
                     required
                     aria-invalid={Boolean(fieldErrors.phone)}
@@ -1657,7 +1660,7 @@ export default function CheckoutClient() {
                         id="checkout-street"
                         name="street"
                         placeholder="e.g. Flat 302, Green Valley Apartments"
-                        value={address.street}
+                        value={address.street || ""}
                         onChange={handleChange}
                         autoComplete="street-address"
                         required
@@ -1682,7 +1685,7 @@ export default function CheckoutClient() {
                         id="checkout-city"
                         name="city"
                         placeholder="New Delhi"
-                        value={address.city}
+                        value={address.city || ""}
                         onChange={handleChange}
                         autoComplete="address-level2"
                         required
@@ -1710,7 +1713,7 @@ export default function CheckoutClient() {
                         maxLength={6}
                         inputMode="numeric"
                         autoComplete="postal-code"
-                        value={address.pincode}
+                        value={address.pincode || ""}
                         onChange={handleChange}
                         required
                         aria-invalid={Boolean(fieldErrors.pincode)}
@@ -1833,7 +1836,7 @@ export default function CheckoutClient() {
                               id="checkout-recipientName"
                               name="recipientName"
                               placeholder="e.g. Priya Sharma / Roommate Name"
-                              value={address.recipientName}
+                              value={address.recipientName || ""}
                               onChange={handleChange}
                               required={address.isDifferentRecipient}
                               className={`w-full bg-[var(--bg-card)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
@@ -1857,7 +1860,7 @@ export default function CheckoutClient() {
                               type="tel"
                               inputMode="numeric"
                               placeholder="e.g. 9876543210"
-                              value={address.recipientPhone}
+                              value={address.recipientPhone || ""}
                               onChange={handleChange}
                               required={address.isDifferentRecipient}
                               className={`w-full bg-[var(--bg-card)] border rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm ${
@@ -1891,7 +1894,7 @@ export default function CheckoutClient() {
                         ? "e.g. Arriving at 7:30 PM, extra spicy, separate bag"
                         : "e.g. Ring bell, leave at reception, extra napkins"
                     }
-                    value={notes}
+                    value={notes || ""}
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-main)] text-sm focus:border-[var(--brand-accent)] focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden transition shadow-sm"
                   />
@@ -2353,7 +2356,7 @@ export default function CheckoutClient() {
                     type="text"
                     aria-label="Promo code"
                     placeholder="Enter coupon code"
-                    value={couponInput}
+                    value={couponInput || ""}
                     onChange={(e) => {
                       setCouponInput(e.target.value.toUpperCase());
                       setCouponError("");

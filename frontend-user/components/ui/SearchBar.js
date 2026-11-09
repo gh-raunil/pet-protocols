@@ -259,7 +259,7 @@ export default function SearchBar({
             <input
               ref={inputRef}
               type="search"
-              value={query}
+              value={query || ""}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setIsOpen(true);
@@ -483,7 +483,7 @@ export default function SearchBar({
         />
         <input
           type="search"
-          value={query}
+          value={query || ""}
           onChange={(e) => {
             setQuery(e.target.value);
             setIsOpen(true);
