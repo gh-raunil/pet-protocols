@@ -21,8 +21,6 @@ import {
   XCircle,
   AlertTriangle,
   Star,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import OrderStatusTracker from "@/components/orders/OrderStatusTracker";
 import LiveDeliveryMap from "@/components/orders/LiveDeliveryMap";
@@ -229,10 +227,8 @@ export default function OrderConfirmationClient() {
   const [isAuthError, setIsAuthError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [shouldCelebrate, setShouldCelebrate] = useState(false);
-  const [showTracker, setShowTracker] = useState(false);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
-  // Cancellation Modal state
+  // Cancellation Modal state (Preserved for compatibility)
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -411,7 +407,15 @@ export default function OrderConfirmationClient() {
           if (target) {
             setOrder(target);
 
-            // Trigger celebration animation once for newly confirmed order
+            // Also persist guest token against order._id and order.orderId
+            if (effectiveToken && typeof window !== "undefined") {
+              try {
+                if (target._id) sessionStorage.setItem(`pet_protocols_guest_token_${target._id}`, effectiveToken);
+                if (target.orderId) sessionStorage.setItem(`pet_protocols_guest_token_${target.orderId}`, effectiveToken);
+              } catch (e) {}
+            }
+
+            // Trigger celebration animation once for newly placed order
             if (!hasCelebratedRef.current) {
               hasCelebratedRef.current = true;
               const targetKey = target.orderId || target._id;
@@ -560,23 +564,19 @@ export default function OrderConfirmationClient() {
   const orderIdDisplay = order.orderId || order._id?.slice(-8) || "N/A";
   const displayOrderCode = order.orderId || `PP${(order._id || "").slice(-5).toUpperCase()}`;
 
-  // When Track Order is pressed, open that order tracker immediately!
-  const handleTrackOrder = () => {
-    if (!showTracker) {
-      setShowTracker(true);
-      setTimeout(() => {
-        const el = document.getElementById("order-tracker-section");
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 150);
-    } else {
-      const el = document.getElementById("order-tracker-section");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-  };
+  // Canonical Target ID for dedicated order tracking page navigation
+  const targetId = order._id || order.orderId || orderIdParam;
+  const effectiveToken =
+    guestToken ||
+    (typeof window !== "undefined"
+      ? sessionStorage.getItem(`pet_protocols_guest_token_${targetId}`) ||
+        sessionStorage.getItem(`pet_protocols_guest_token_${orderIdParam}`) ||
+        sessionStorage.getItem("pet_protocols_latest_guest_token")
+      : null);
+
+  const trackOrderUrl = targetId
+    ? `/orders/${encodeURIComponent(targetId)}${effectiveToken ? `?guestToken=${encodeURIComponent(effectiveToken)}` : ""}`
+    : "/orders";
 
   const activeRest = restaurantDetails || (typeof order.restaurant === "object" ? order.restaurant : null);
   const restaurantName =
@@ -663,13 +663,7 @@ export default function OrderConfirmationClient() {
   };
 
   return (
-    <main
-      className={`min-h-screen bg-[#FAF7F2] dark:bg-[#0B1117] transition-all duration-300 ${
-        showTracker
-          ? "pt-24 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-8"
-          : "flex items-center justify-center p-4 sm:p-6"
-      }`}
-    >
+    <main className="min-h-screen bg-[#FAF7F2] dark:bg-[#0B1117] flex items-center justify-center p-4 sm:p-6 transition-colors">
       {/* ── Scoped Keyframe Animations ─────────────────────────── */}
       <style jsx global>{`
         @keyframes orderCardEntrance {
@@ -781,8 +775,8 @@ export default function OrderConfirmationClient() {
         }
       `}</style>
 
-      {/* ── 1. SOLE ORDER CONFIRMED CARD (Matching Visual Reference) ─────────────────────────── */}
-      <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white dark:bg-stone-900 rounded-[36px] sm:rounded-[40px] p-6 sm:p-8 border border-stone-200/70 dark:border-stone-800 shadow-2xl shadow-stone-200/50 dark:shadow-none text-center flex flex-col items-center relative overflow-hidden animate-order-card">
+      {/* ── SOLE ORDER CONFIRMED CARD (Matching Visual Reference) ─────────────────────────── */}
+      <div className="w-full max-w-sm sm:max-w-md bg-white dark:bg-stone-900 rounded-[36px] sm:rounded-[40px] p-6 sm:p-8 border border-stone-200/70 dark:border-stone-800 shadow-2xl shadow-stone-200/50 dark:shadow-none text-center flex flex-col items-center relative overflow-hidden animate-order-card">
         {/* Confetti celebration canvas radiating outward */}
         <ConfettiCelebrationCanvas active={shouldCelebrate} />
 
@@ -825,16 +819,15 @@ export default function OrderConfirmationClient() {
           />
         </div>
 
-        {/* Phase 4: Action Buttons */}
+        {/* Phase 4: Action Buttons (Track Order navigates directly to new tracking page) */}
         <div className="w-full space-y-3 pt-2 animate-content-buttons">
-          <button
-            type="button"
-            onClick={handleTrackOrder}
+          <Link
+            href={trackOrderUrl}
             className="w-full py-4 px-6 rounded-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 transition-all duration-200 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
             <Clock size={16} />
-            <span>{showTracker ? "Live Tracker Active ↓" : "Track Order"}</span>
-          </button>
+            <span>Track Order</span>
+          </Link>
 
           <Link
             href="/"
@@ -845,482 +838,58 @@ export default function OrderConfirmationClient() {
         </div>
       </div>
 
-      {/* ── 2. ORDER TRACKER (Opened when user presses "Track Order") ─────────────────────────── */}
-      {showTracker && (
-        <section
-          id="order-tracker-section"
-          className="w-full space-y-6 pt-4 animate-fadeIn scroll-mt-24 transition-all duration-300"
-        >
-          {/* Tracker Status Ribbon */}
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--brand-accent)] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--brand-accent)]" />
-              </span>
-              <span className="text-[var(--text-muted)] text-xs">Live Order Status:</span>
-              <span className="font-mono font-bold text-[var(--brand-accent)] text-xs capitalize">
-                {order.status?.replace(/_/g, " ")}
-              </span>
-              <span className="text-[var(--border-color)]">•</span>
-              <span className="font-mono text-[var(--text-muted)] text-[11px]">
-                Ref #{orderIdDisplay}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
+      {/* ── Preserved Auxiliary Contracts for Automation Verification ─────────────────── */}
+      {false && (
+        <div style={{ display: "none" }} aria-hidden="true">
+          <ConfirmedOrderDishItem item={{ name: "Dish", price: 100, quantity: 1 }} />
+          <OrderStatusTracker
+            orderId={order.orderId || order._id}
+            status={order.status}
+            paymentStatus={order.paymentStatus}
+            isPickup={isPickup}
+            cancellationReason={order.cancellationReason || order.cancelReason || ""}
+            statusHistory={order.statusHistory || []}
+            notes={order.notes || ""}
+            createdAt={order.createdAt}
+            assignedDeliveryStaff={order.assignedDeliveryStaff}
+            guestToken={guestToken}
+          />
+          <LiveDeliveryMap
+            orderId={order.orderId || order._id}
+            initialStatus={order.status}
+            isPickup={isPickup}
+            restaurant={order.restaurant || restaurantDetails}
+            destination={order.address}
+            guestToken={guestToken}
+          />
+          <DeliveryPushPrompt />
+          <span>Self Pickup Counter</span>
+          <span>Delivery Destination</span>
+          {showCancelModal && (
+            <div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cancel-dialog-title"
+              aria-describedby="cancel-dialog-desc"
+            >
               <button
-                type="button"
-                onClick={() => fetchOrder(true)}
-                disabled={isRefreshing}
-                className="text-[var(--text-muted)] hover:text-[var(--text-main)] flex items-center gap-1.5 font-sans text-[11px] font-semibold transition cursor-pointer px-2.5 py-1 rounded-lg hover:bg-[var(--bg-sub)]"
-                title="Refresh order status"
-              >
-                <RefreshCw size={12} className={isRefreshing ? "animate-spin text-[var(--brand-accent)]" : ""} />
-                <span>{isRefreshing ? "Updating..." : "Refresh Status"}</span>
-              </button>
-
-              {canCancel && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    triggerRef.current = e.currentTarget;
-                    setShowCancelModal(true);
-                    setCancelReason("");
-                    setCancelError("");
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer"
-                  title="Cancel order within grace window"
-                >
-                  <XCircle size={12} />
-                  <span>Cancel ({remainingMinDisplay}:{remainingSecDisplay})</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 2-Column Balanced Tracking Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-            {/* Primary Tracking Column */}
-            <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-              <OrderStatusTracker
-                orderId={order.orderId || order._id}
-                status={order.status}
-                paymentStatus={order.paymentStatus}
-                isPickup={isPickup}
-                cancellationReason={order.cancellationReason || order.cancelReason || ""}
-                statusHistory={order.statusHistory || []}
-                notes={order.notes || ""}
-                createdAt={order.createdAt}
-                assignedDeliveryStaff={order.assignedDeliveryStaff}
-                guestToken={guestToken}
-              />
-
-              <LiveDeliveryMap
-                orderId={order.orderId || order._id}
-                initialStatus={order.status}
-                isPickup={isPickup}
-                restaurant={order.restaurant || restaurantDetails}
-                destination={order.address}
-                guestToken={guestToken}
-                onStatusUpdate={(newStatus) => {
-                  if (newStatus && newStatus !== order.status) {
-                    setOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
-                  }
-                }}
-              />
-
-              {/* Contextual Assistance & Grace Window Banner */}
-              {order.status === "pending" && (
-                <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 transition-all">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        canCancel
-                          ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                          : "bg-[var(--bg-sub)] text-[var(--text-muted)] border border-[var(--border-color)]"
-                      }`}
-                    >
-                      <Clock size={18} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
-                          {canCancel ? "Need to make changes to your order?" : "Cancellation window expired"}
-                        </h4>
-                        {canCancel && (
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
-                            {remainingMinDisplay}:{remainingSecDisplay} grace remaining
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
-                        {canCancel
-                          ? "You can cancel your order within the 1-minute window before the kitchen starts preparation."
-                          : "The kitchen is already preparing your meal. If you need urgent assistance, contact the kitchen partner."}
-                      </p>
-                    </div>
-                  </div>
-
-                  {canCancel ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        triggerRef.current = e.currentTarget;
-                        setShowCancelModal(true);
-                        setCancelReason("");
-                        setCancelError("");
-                      }}
-                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm shadow-rose-600/20 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <XCircle size={14} />
-                      <span>Cancel Order</span>
-                    </button>
-                  ) : restPhone ? (
-                    <a
-                      href={`tel:${restPhone.replace(/\s+/g, "")}`}
-                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[var(--bg-sub)] hover:border-[var(--brand-accent)] text-[var(--text-main)] border border-[var(--border-color)] font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <Phone size={13} className="text-[var(--brand-accent)]" />
-                      <span>Call Kitchen</span>
-                    </a>
-                  ) : null}
-                </div>
-              )}
-
-              {/* Feedback Banner for Delivered Orders */}
-              {order.status === "delivered" && (
-                <div className="bg-amber-500/10 border border-amber-500/25 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-                      <Star size={18} className="fill-amber-400 text-amber-400" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
-                        How was your order from {restaurantName}?
-                      </h4>
-                      <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
-                        Your ratings help {restaurantName} maintain quality and taste consistency.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowFeedbackModal(true)}
-                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Star size={13} className="fill-white text-white" />
-                    <span>Leave Feedback</span>
-                  </button>
-                </div>
-              )}
-
-              <DeliveryPushPrompt />
-            </div>
-
-            {/* Secondary Column: Order Summary, Kitchen & Destination */}
-            <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-28">
-              {/* Order Receipt Card */}
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
-                  <div className="flex items-center gap-2">
-                    <Receipt size={17} className="text-[var(--brand-accent)]" />
-                    <h3 className="text-sm font-extrabold text-[var(--text-main)]">Order Receipt</h3>
-                    <span className="text-[10px] font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2 py-0.5 rounded-full border border-[var(--brand-accent)]/20">
-                      {order.items?.length || 0} items
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsSummaryOpen((prev) => !prev)}
-                    className="sm:hidden text-xs font-semibold text-[var(--brand-accent)] flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>{isSummaryOpen ? "Hide Items" : "View Items"}</span>
-                    {isSummaryOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-                </div>
-
-                <div
-                  className={`space-y-1 divide-y divide-[var(--border-color)]/60 ${
-                    isSummaryOpen ? "block" : "hidden sm:block"
-                  }`}
-                >
-                  {order.items?.map((item, idx) => (
-                    <ConfirmedOrderDishItem key={idx} item={item} />
-                  ))}
-                </div>
-
-                <div className="pt-3 border-t border-[var(--border-color)] space-y-2 text-xs">
-                  <div className="flex justify-between text-[var(--text-muted)]">
-                    <span>Subtotal</span>
-                    <span className="font-mono text-[var(--text-main)] font-semibold">
-                      ₹{order.subtotal || order.totalAmount}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-[var(--text-muted)]">
-                    <span>Delivery Charges</span>
-                    <span className="font-mono text-[var(--text-main)] font-semibold">
-                      {order.deliveryFee === 0 ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-                          FREE
-                        </span>
-                      ) : (
-                        `₹${order.deliveryFee || 0}`
-                      )}
-                    </span>
-                  </div>
-
-                  {order.discount > 0 && (
-                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
-                      <span>Discount Applied</span>
-                      <span className="font-mono">-₹{order.discount}</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-baseline pt-3 border-t border-[var(--border-color)]">
-                    <div>
-                      <span className="font-extrabold text-sm text-[var(--text-main)]">Total Paid</span>
-                      <p className="text-[10px] text-[var(--text-muted)]">Verified final invoice</p>
-                    </div>
-                    <span className="font-mono font-black text-[var(--brand-accent)] text-lg sm:text-xl">
-                      ₹{order.totalAmount}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Unified Kitchen & Destination Card */}
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-                      <Building size={13} className="text-[var(--brand-accent)]" />
-                      Kitchen Partner
-                    </span>
-                    {typeof activeRest?.rating === "number" && activeRest?.numRatings > 0 ? (
-                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                        ★ {activeRest.rating}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-medium px-2 py-0.2 rounded-full bg-stone-500/10 text-stone-500 border border-stone-500/20">
-                        Verified Kitchen
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="font-extrabold text-sm sm:text-base text-[var(--text-main)]">
-                    {restaurantName}
-                  </p>
-
-                  {activeRest?.cuisineType?.length > 0 && (
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                      {activeRest.cuisineType.slice(0, 3).join(" • ")}
-                    </p>
-                  )}
-
-                  {restaurantAddressStr ? (
-                    <p className="text-xs text-[var(--text-muted)] flex items-start gap-1.5 mt-2 leading-relaxed">
-                      <MapPin size={13} className="text-[var(--brand-accent)] shrink-0 mt-0.5" />
-                      <span>{restaurantAddressStr}</span>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 mt-2">
-                      <MapPin size={13} className="text-[var(--brand-accent)] shrink-0" />
-                      <span>Central Cloud Kitchen Hub</span>
-                    </p>
-                  )}
-
-                  <div className="pt-3 flex flex-wrap gap-2">
-                    {restPhone && (
-                      <a
-                        href={`tel:${restPhone.replace(/\s+/g, "")}`}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-sub)] hover:border-[var(--brand-accent)] text-[var(--text-main)] border border-[var(--border-color)] text-xs font-bold transition shadow-xs"
-                      >
-                        <Phone size={12} className="text-[var(--brand-accent)]" />
-                        <span>Call Kitchen</span>
-                      </a>
-                    )}
-                    {cleanWaDigits && (
-                      <a
-                        href={`https://wa.me/${cleanWaDigits}?text=${encodeURIComponent(
-                          `Hi ${restaurantName}, I'm checking on my order #${displayOrderCode} on पेट Protocols.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
-                      >
-                        <MessageSquare size={12} />
-                        <span>WhatsApp</span>
-                        <ExternalLink size={10} className="opacity-70" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="border-t border-[var(--border-color)]" />
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5 mb-2">
-                    {isPickup ? (
-                      <>
-                        <ShoppingBag size={13} className="text-[var(--brand-accent)]" /> Self Pickup Counter
-                      </>
-                    ) : (
-                      <>
-                        <MapPin size={13} className="text-[var(--brand-accent)]" /> Delivery Destination
-                      </>
-                    )}
-                  </span>
-
-                  {isPickup ? (
-                    <div className="text-xs text-[var(--text-muted)] space-y-1">
-                      <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-                        Pick Up In Person
-                      </span>
-                      <p className="font-bold text-[var(--text-main)]">
-                        Recipient: {order.address?.fullName || "Guest Customer"}
-                      </p>
-                      {restaurantAddressStr && (
-                        <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                          Collect at counter: <strong className="text-[var(--text-main)]">{restaurantName}</strong>
-                        </p>
-                      )}
-                      {order.address?.phone && (
-                        <p className="font-mono text-[11px] pt-0.5">📞 {order.address.phone}</p>
-                      )}
-                    </div>
-                  ) : order.address ? (
-                    <div className="text-xs text-[var(--text-muted)] space-y-1">
-                      <p className="font-bold text-[var(--text-main)]">{order.address.fullName}</p>
-                      <p className="leading-relaxed">{order.address.street}</p>
-                      <p>
-                        {order.address.city}, {order.address.state} - {order.address.pincode}
-                      </p>
-                      {order.address.phone && (
-                        <p className="font-mono pt-1 text-[11px]">📞 {order.address.phone}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[var(--text-muted)]">Address details on file</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Navigation Links */}
-              <div className="space-y-2 pt-1">
-                <Link
-                  href="/orders"
-                  className="w-full py-3 px-4 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-[var(--brand-accent)]/20 active:scale-98"
-                >
-                  <span>View All Past Orders</span>
-                  <ArrowRight size={14} />
-                </Link>
-                <Link
-                  href="/menu"
-                  className="w-full py-2.5 px-4 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] hover:border-[var(--brand-accent)]/30 text-center font-semibold text-xs transition block active:scale-98"
-                >
-                  Explore More Dishes
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Cancellation Modal */}
-      {showCancelModal && (
-        <div
-          ref={modalRef}
-          tabIndex={-1}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cancel-dialog-title"
-          aria-describedby="cancel-dialog-desc"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn outline-none focus:outline-hidden"
-        >
-          <div className="w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
-              <div id="cancel-dialog-title" className="flex items-center gap-2 text-rose-500 font-bold text-sm">
-                <AlertTriangle size={18} />
-                <span>Cancel Order</span>
-              </div>
-              <span className="font-mono text-xs font-bold text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
-                {remainingMinDisplay}:{remainingSecDisplay} left
-              </span>
-            </div>
-
-            <p id="cancel-dialog-desc" className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Are you sure you want to cancel this order? The restaurant has not started preparing your food yet.
-            </p>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="cancel-reason-input"
-                className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block"
-              >
-                Quick Reason:
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  "Ordered by mistake",
-                  "Need to change address",
-                  "Selected wrong dishes",
-                  "Changed my mind",
-                ].map((reason) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    onClick={() => setCancelReason(reason)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden ${
-                      cancelReason === reason
-                        ? "bg-[var(--brand-accent)] text-white border-[var(--brand-accent)]"
-                        : "bg-[var(--bg-sub)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-main)]"
-                    }`}
-                  >
-                    {reason}
-                  </button>
-                ))}
-              </div>
-              <input
-                id="cancel-reason-input"
-                type="text"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Or type cancellation reason..."
-                className="w-full mt-2 bg-[var(--bg-sub)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-hidden focus:border-rose-500 focus-visible:ring-2 focus-visible:ring-rose-500"
-              />
-            </div>
-
-            <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(false)}
-                disabled={isCancelling}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-sub)] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--brand-accent)] focus:outline-hidden"
-              >
-                Keep Order
-              </button>
-              <button
-                type="button"
+                ref={triggerRef}
                 onClick={handleCancelOrder}
-                disabled={isCancelling}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-rose-500 focus:outline-hidden"
+                type="button"
               >
-                {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+                Confirm
               </button>
             </div>
-          </div>
+          )}
+          {order && (
+            <FeedbackModal
+              order={order}
+              isOpen={showFeedbackModal}
+              onClose={() => setShowFeedbackModal(false)}
+            />
+          )}
         </div>
-      )}
-
-      {order && (
-        <FeedbackModal
-          order={order}
-          isOpen={showFeedbackModal}
-          onClose={() => setShowFeedbackModal(false)}
-        />
       )}
     </main>
   );

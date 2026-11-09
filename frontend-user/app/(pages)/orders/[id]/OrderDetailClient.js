@@ -382,7 +382,7 @@ export default function OrderDetailClient({ orderId }) {
   };
 
   // Loading Skeleton State
-  if (loading || authStatus === "loading") {
+  if (loading || (authStatus === "loading" && !effectiveGuestToken)) {
     return (
       <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)]">
         <div className="h-6 w-32 bg-[var(--bg-card)] rounded-lg animate-pulse mb-6" />
