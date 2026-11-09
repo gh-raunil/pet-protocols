@@ -101,14 +101,14 @@ export default function AppInstallCard() {
           </div>
         </div>
 
-        {/* Right Artwork */}
-        <div className="relative w-20 h-24 sm:w-24 sm:h-28 shrink-0">
+        {/* Right Logo Artwork */}
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl overflow-hidden border border-amber-200/80 dark:border-white/10 shrink-0 shadow-md bg-white dark:bg-stone-900 p-2 sm:p-2.5 flex items-center justify-center">
           <Image
-            src="/images/category_img_phone.png"
-            alt="पेट Protocols App mobile interface"
-            fill
-            sizes="96px"
-            className="object-contain drop-shadow-md"
+            src="/images/logo1.png"
+            alt="पेट Protocols Logo"
+            width={96}
+            height={96}
+            className="object-contain w-full h-full rounded-xl sm:rounded-2xl"
           />
         </div>
       </div>
