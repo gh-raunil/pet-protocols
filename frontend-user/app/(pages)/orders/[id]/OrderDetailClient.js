@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -106,6 +106,15 @@ const formatDate = (dateStr) => {
 export default function OrderDetailClient({ orderId }) {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const guestTokenParam = searchParams?.get("guestToken") || searchParams?.get("guestAccessToken");
+  const effectiveGuestToken =
+    guestTokenParam ||
+    (typeof window !== "undefined"
+      ? sessionStorage.getItem(`pet_protocols_guest_token_${orderId}`) ||
+        sessionStorage.getItem("pet_protocols_latest_guest_token")
+      : null);
+
   const addBatch = useCartStore((s) => s.addBatch);
   const openCart = useCartStore((s) => s.openCart);
 
@@ -142,7 +151,12 @@ export default function OrderDetailClient({ orderId }) {
       if (isManual) setIsRefreshing(true);
 
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
+        const headers = {};
+        if (effectiveGuestToken) {
+          headers["x-guest-access-token"] = effectiveGuestToken;
+        }
+
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { headers });
         const data = await res.json();
 
         if (res.status === 401) {
@@ -181,21 +195,21 @@ export default function OrderDetailClient({ orderId }) {
         setIsRefreshing(false);
       }
     },
-    [orderId]
+    [orderId, effectiveGuestToken]
   );
 
-  // Initial fetch on authentication
+  // Initial fetch on authentication or guest token
   useEffect(() => {
-    if (authStatus === "authenticated") {
+    if (authStatus === "authenticated" || effectiveGuestToken) {
       fetchOrderDetail(false);
-    } else if (authStatus === "unauthenticated") {
+    } else if (authStatus === "unauthenticated" && !effectiveGuestToken) {
       router.push(`/auth/login?callbackUrl=/orders/${encodeURIComponent(orderId)}`);
     }
-  }, [authStatus, orderId, fetchOrderDetail, router]);
+  }, [authStatus, orderId, fetchOrderDetail, router, effectiveGuestToken]);
 
-  // Background polling for in-progress orders (30 seconds, pauses when tab is hidden)
+  // Background polling for in-progress orders (20 seconds, pauses when tab is hidden)
   useEffect(() => {
-    if (!order || !session) return;
+    if (!order || (!session && !effectiveGuestToken)) return;
     const activeStatuses = ["pending", "confirmed", "preparing", "ready", "out_for_delivery"];
     if (!activeStatuses.includes(order.status)) return;
 
