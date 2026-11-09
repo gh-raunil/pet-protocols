@@ -251,6 +251,11 @@ const OrderSchema = new mongoose.Schema(
       enum: ["delivery", "pickup"],
       default: undefined,
     },
+    checkoutIntent: {
+      type: String,
+      enum: ["cart", "buy_now"],
+      default: "cart",
+    },
     deliveryDistanceKm: {
       type: Number,
       default: null,

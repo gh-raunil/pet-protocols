@@ -49,6 +49,11 @@ const PaymentIntentSchema = new mongoose.Schema(
       enum: ["delivery", "pickup"],
       default: "delivery",
     },
+    checkoutIntent: {
+      type: String,
+      enum: ["cart", "buy_now"],
+      default: "cart",
+    },
     calcResult: {
       type: Object,
       required: true,

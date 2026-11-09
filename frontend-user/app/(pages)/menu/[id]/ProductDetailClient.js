@@ -34,6 +34,7 @@ import {
   Loader2,
 } from "lucide-react";
 import useCartStore from "@/lib/cartStore";
+import { setBuyNowItem } from "@/lib/buyNowStore";
 import useFavoritesStore, { useIsFavorite } from "@/lib/favoritesStore";
 import useRecentStore from "@/lib/recentStore";
 import { toast } from "@/components/ui/ToastProvider";
@@ -397,7 +398,7 @@ export default function ProductDetailClient({ product }) {
       return;
     }
 
-    const itemToAdd = {
+    const buyNowPayload = {
       ...product,
       _id: product._id.toString(),
       price: rawBasePrice,
@@ -412,11 +413,12 @@ export default function ProductDetailClient({ product }) {
           : activePortion?.unit,
       servingLabel: activePortion?.servingLabel,
       size: activePortion?.size,
+      quantity,
     };
 
-    addItem(itemToAdd, quantity);
-    trackAddToCart(product);
-    router.push("/cart");
+    // Isolated Buy Now context - does NOT modify persistent cart
+    setBuyNowItem(buyNowPayload);
+    router.push("/checkout?intent=buy_now");
   };
 
   const handleShare = () => {

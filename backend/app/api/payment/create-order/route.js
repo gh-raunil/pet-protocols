@@ -11,7 +11,8 @@ import { checkPaymentCreateOrderRateLimit } from '@/lib/rateLimit';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { items, address, notes = '', orderType, couponCode } = body || {};
+    const { items, address, notes = '', orderType, couponCode, checkoutIntent = 'cart' } = body || {};
+    const sanitizedCheckoutIntent = checkoutIntent === 'buy_now' ? 'buy_now' : 'cart';
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -110,6 +111,7 @@ export async function POST(request) {
       address: address || {},
       notes: notes || '',
       orderType: orderType || 'delivery',
+      checkoutIntent: sanitizedCheckoutIntent,
       calcResult: {
         subtotal: calcResult.subtotal,
         deliveryFee: calcResult.deliveryFee,

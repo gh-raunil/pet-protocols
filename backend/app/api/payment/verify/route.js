@@ -594,6 +594,7 @@ export async function POST(request) {
               paymentMethod: 'Razorpay (Online Payment)',
               status: 'pending',
               orderType: lockedIntent.orderType === 'pickup' ? 'pickup' : 'delivery',
+              checkoutIntent: lockedIntent.checkoutIntent || 'cart',
               deliveryDistanceKm: calcOrder.deliveryDistanceKm ?? null,
               notes: isPickup ? `[PICKUP] ${notes}` : notes,
             });

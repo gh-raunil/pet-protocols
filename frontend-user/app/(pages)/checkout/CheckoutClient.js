@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useCartStore from "@/lib/cartStore";
+import { getBuyNowItem, clearBuyNowItem } from "@/lib/buyNowStore";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "@/components/ui/ToastProvider";
@@ -146,8 +147,29 @@ export default function CheckoutClient() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const intent = searchParams?.get("intent");
+  const isBuyNow = intent === "buy_now";
 
-  const { items, getTotalPrice, clearCart } = useCartStore();
+  const { items: cartItems, clearCart } = useCartStore();
+  const [buyNowItem, setBuyNowItem] = useState(null);
+  const [buyNowLoaded, setBuyNowLoaded] = useState(false);
+
+  useEffect(() => {
+    if (isBuyNow) {
+      const stored = getBuyNowItem();
+      setBuyNowItem(stored);
+      setBuyNowLoaded(true);
+    } else {
+      setBuyNowLoaded(true);
+    }
+  }, [isBuyNow]);
+
+  const items = useMemo(() => {
+    if (isBuyNow) {
+      return buyNowItem ? [buyNowItem] : [];
+    }
+    return cartItems || [];
+  }, [isBuyNow, buyNowItem, cartItems]);
 
   const isSimulatorAvailable =
     process.env.NODE_ENV !== "production" &&
@@ -632,7 +654,12 @@ export default function CheckoutClient() {
   }, [orderType, pickupCapability]);
 
   // Subtotal, Delivery & Discounts (Option A Coupon + Option B Auto)
-  const subtotal = getTotalPrice();
+  const subtotal = useMemo(() => {
+    return items.reduce(
+      (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+      0
+    );
+  }, [items]);
   const isFreeDelivery = orderType === "pickup" || subtotal >= freeThreshold;
   const deliveryFee = orderType === "pickup" ? 0 : isFreeDelivery ? 0 : flatFee;
 
@@ -876,6 +903,7 @@ export default function CheckoutClient() {
           orderType,
           discount: discountAmount,
           couponCode: appliedOffer?.code || "",
+          checkoutIntent: isBuyNow ? "buy_now" : "cart",
         }),
       });
 
@@ -906,7 +934,9 @@ export default function CheckoutClient() {
         amount: orderData.order.amount,
         currency: orderData.order.currency || "INR",
         name: "पेट Protocols",
-        description: `Food Feast Order (${items.length} items)`,
+        description: isBuyNow
+          ? `Instant Order · ${items[0]?.name || "Dish"}`
+          : `Food Feast Order (${items.length} items)`,
         order_id: orderData.order.id,
         prefill: {
           name: address.fullName,
@@ -941,6 +971,7 @@ export default function CheckoutClient() {
                 orderType,
                 discount: discountAmount,
                 couponCode: appliedOffer?.code || "",
+                checkoutIntent: isBuyNow ? "buy_now" : "cart",
               }),
             });
 
@@ -951,7 +982,11 @@ export default function CheckoutClient() {
                 localStorage.removeItem("pet_protocols_applied_coupon");
               } catch (e) {}
               await saveAddressIfRequested();
-              await clearCart();
+              if (isBuyNow) {
+                clearBuyNowItem();
+              } else {
+                await clearCart();
+              }
               const targetOrderId = verifyData.order?._id || verifyData.orderId || "";
               if (verifyData.guestAccessToken) {
                 try {
@@ -1026,6 +1061,7 @@ export default function CheckoutClient() {
           couponCode: appliedOffer?.code || "",
           paymentMethod: "Instant Simulator (Test Mode)",
           idempotencyKey: currentIdempotencyKey,
+          checkoutIntent: isBuyNow ? "buy_now" : "cart",
         }),
       });
 
@@ -1040,7 +1076,11 @@ export default function CheckoutClient() {
       try {
         localStorage.removeItem("pet_protocols_applied_coupon");
       } catch (e) {}
-      await clearCart();
+      if (isBuyNow) {
+        clearBuyNowItem();
+      } else {
+        await clearCart();
+      }
       const targetOrderId = data.order?._id || data.orderId || "";
       if (data.guestAccessToken) {
         try {
@@ -1094,6 +1134,7 @@ export default function CheckoutClient() {
           couponCode: appliedOffer?.code || "",
           paymentMethod: paymentMethodLabel,
           idempotencyKey: currentIdempotencyKey,
+          checkoutIntent: isBuyNow ? "buy_now" : "cart",
         }),
       });
 
@@ -1108,7 +1149,11 @@ export default function CheckoutClient() {
       try {
         localStorage.removeItem("pet_protocols_applied_coupon");
       } catch (e) {}
-      await clearCart();
+      if (isBuyNow) {
+        clearBuyNowItem();
+      } else {
+        await clearCart();
+      }
       const targetOrderId = data.order?._id || data.orderId || "";
       if (data.guestAccessToken) {
         try {
@@ -1148,9 +1193,45 @@ export default function CheckoutClient() {
     }
   };
 
-  if (!isMounted) return null;
+  if (!isMounted || !buyNowLoaded) return null;
 
-  if (items.length === 0) {
+  if (isBuyNow && items.length === 0) {
+    return (
+      <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 flex items-center justify-center text-center text-[var(--text-main)]">
+        <div className="max-w-md w-full p-8 sm:p-12 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-6 shadow-xs">
+            <Zap size={38} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-[var(--text-main)]">
+            Instant Order Not Found
+          </h1>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+            The instant order session has expired or no dish was selected. Your persistent cart items remain safely saved.
+          </p>
+          <div className="mt-8 space-y-3">
+            <Link
+              href="/menu"
+              className="inline-flex items-center justify-center gap-2 w-full min-h-[48px] py-3.5 rounded-2xl bg-[var(--brand-accent)] hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-[var(--brand-accent)]/20 transition active:scale-98"
+            >
+              <span>Explore Menu</span>
+              <ArrowRight size={16} />
+            </Link>
+            {cartItems && cartItems.length > 0 && (
+              <Link
+                href="/cart"
+                className="inline-flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-2xl bg-[var(--bg-sub)] hover:bg-[var(--border-color)] text-[var(--text-main)] font-semibold text-xs border border-[var(--border-color)] transition"
+              >
+                <ShoppingBag size={15} />
+                <span>Return to Cart ({cartItems.length} {cartItems.length > 1 ? "items" : "item"})</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isBuyNow && items.length === 0) {
     return (
       <main className="min-h-screen pt-32 pb-24 px-4 sm:px-6 flex items-center justify-center text-center text-[var(--text-main)]">
         <div className="max-w-md w-full p-8 sm:p-12 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl">
@@ -1200,14 +1281,55 @@ export default function CheckoutClient() {
           Menu
         </Link>
         <ChevronRight size={12} className="shrink-0 opacity-60" />
-        <Link href="/cart" className="hover:text-[var(--brand-accent)] transition font-medium shrink-0">
-          Cart
-        </Link>
-        <ChevronRight size={12} className="shrink-0 opacity-60" />
-        <span className="font-bold text-[var(--text-main)] shrink-0">
-          Checkout
-        </span>
+        {isBuyNow ? (
+          <span className="font-bold text-[var(--text-main)] shrink-0">
+            Instant Checkout
+          </span>
+        ) : (
+          <>
+            <Link href="/cart" className="hover:text-[var(--brand-accent)] transition font-medium shrink-0">
+              Cart
+            </Link>
+            <ChevronRight size={12} className="shrink-0 opacity-60" />
+            <span className="font-bold text-[var(--text-main)] shrink-0">
+              Checkout
+            </span>
+          </>
+        )}
       </nav>
+
+      {/* ── BUY NOW ISOLATION BANNER ─────────────────────────── */}
+      {isBuyNow && (
+        <div className="mb-6 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--brand-accent)]/30 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--brand-accent)]/15 text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              <Zap size={20} />
+            </div>
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-wider text-[var(--brand-accent)]">
+                Instant Buy Now Checkout
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Ordering <span className="font-bold text-[var(--text-main)]">{items[0]?.name}</span> directly.
+                {cartItems && cartItems.length > 0 && (
+                  <span className="ml-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                    Your {cartItems.length} cart {cartItems.length > 1 ? "items remain" : "item remains"} saved and untouched.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          {cartItems && cartItems.length > 0 && (
+            <Link
+              href="/cart"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--brand-accent)] bg-[var(--brand-accent)]/10 hover:bg-[var(--brand-accent)]/20 border border-[var(--brand-accent)]/20 transition shrink-0"
+            >
+              <ShoppingBag size={13} />
+              <span>View Saved Cart ({cartItems.length})</span>
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* ── HEADER & STEPPER ────────────────── */}
       <div className="mb-8">
@@ -2318,14 +2440,14 @@ export default function CheckoutClient() {
             <h2 className="text-base font-serif font-black text-[var(--text-main)] flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
               <span>🧾 Order Summary</span>
               <span className="text-xs font-mono text-[var(--brand-accent)] font-bold bg-[var(--brand-accent)]/10 px-2.5 py-0.5 rounded-full border border-[var(--brand-accent)]/20">
-                {items.length} {items.length > 1 ? "items" : "item"}
+                {isBuyNow ? "Instant Buy Now" : `${items.length} ${items.length > 1 ? "items" : "item"}`}
               </span>
             </h2>
 
             {/* Items List */}
             <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
               {items.map((item) => (
-                <CheckoutItemRow key={item._id} item={item} />
+                <CheckoutItemRow key={item.cartItemId || item.variantId || item._id} item={item} />
               ))}
             </div>
 
@@ -2400,12 +2522,31 @@ export default function CheckoutClient() {
               <p>Historical price snapshot is locked upon placement.</p>
             </div>
 
-            <Link
-              href="/cart"
-              className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] mt-3 transition font-semibold"
-            >
-              ← Modify Cart Items
-            </Link>
+            {isBuyNow ? (
+              <div className="pt-2 space-y-2 border-t border-[var(--border-color)] mt-3">
+                <Link
+                  href="/menu"
+                  className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] transition font-semibold"
+                >
+                  ← Continue Shopping
+                </Link>
+                {cartItems && cartItems.length > 0 && (
+                  <Link
+                    href="/cart"
+                    className="block text-center text-xs text-[var(--brand-accent)] hover:underline transition font-bold"
+                  >
+                    Return to Saved Cart ({cartItems.length} {cartItems.length > 1 ? "items" : "item"}) →
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/cart"
+                className="block text-center text-xs text-[var(--text-muted)] hover:text-[var(--brand-accent)] mt-3 transition font-semibold"
+              >
+                ← Modify Cart Items
+              </Link>
+            )}
           </div>
         </div>
       </div>

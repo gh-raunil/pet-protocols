@@ -271,7 +271,8 @@ export async function POST(request) {
   try {
     const session = await resolveSession();
     const body = await request.json();
-    const { items, address, paymentMethod = '', notes = '' } = body;
+    const { items, address, paymentMethod = '', notes = '', checkoutIntent = 'cart' } = body;
+    const sanitizedCheckoutIntent = checkoutIntent === 'buy_now' ? 'buy_now' : 'cart';
     let idempotencyKey = request.headers.get('x-idempotency-key') || body.idempotencyKey || null;
     if (typeof idempotencyKey === 'string') {
       idempotencyKey = idempotencyKey.trim();
@@ -573,6 +574,7 @@ export async function POST(request) {
           paymentMethod: finalPaymentMethod,
           status: "pending",
           orderType: body.orderType === "pickup" ? "pickup" : "delivery",
+          checkoutIntent: sanitizedCheckoutIntent,
           deliveryDistanceKm: calcOrder.deliveryDistanceKm ?? null,
           notes: body.orderType === "pickup" ? `[PICKUP] ${notes}` : notes,
           idempotencyKey: scopedKey,
