@@ -11,6 +11,7 @@ import {
   Clock,
   Phone,
   MapPin,
+  Check,
   CheckCircle,
   ArrowRight,
   Receipt,
@@ -434,6 +435,17 @@ export default function OrderConfirmationClient() {
   }
 
   const orderIdDisplay = order.orderId || order._id?.slice(-8) || "N/A";
+  const displayOrderCode = order.orderId
+    ? order.orderId.replace(/^ORD_/, "PP")
+    : `PP${(order._id || "").slice(-5).toUpperCase()}`;
+
+  const handleTrackOrder = () => {
+    const el = document.getElementById("order-tracking-details");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   const activeRest = restaurantDetails || (typeof order.restaurant === "object" ? order.restaurant : null);
   const restaurantName = activeRest?.name || (typeof order.restaurant === "object" ? order.restaurant?.name : "पेट Protocols Kitchen") || "Partner Kitchen";
 
@@ -494,26 +506,62 @@ export default function OrderConfirmationClient() {
 
   return (
     <main className="min-h-screen pt-28 pb-24 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-[var(--text-main)] space-y-8 transition-colors">
-      {/* Celebration Header */}
-      <div className="text-center space-y-3 pt-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-[var(--brand-accent)]/10 border border-[var(--brand-accent)]/20 text-3xl shadow-xl shadow-[var(--brand-accent)]/10 mb-1">
-          🎉
+      {/* ── ORDER CONFIRMED HERO CARD (Requested Visual Layout) ─────────────────────────── */}
+      <div className="w-full max-w-sm sm:max-w-md mx-auto bg-[var(--bg-card)] rounded-[36px] p-6 sm:p-8 border border-[var(--border-color)] shadow-2xl text-center flex flex-col items-center">
+        {/* Soft Mint Green Circle with Dark Green Check */}
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#E2F7E9] dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-5 shadow-xs">
+          <Check size={44} strokeWidth={3.5} className="text-emerald-600 dark:text-emerald-400" />
         </div>
-        <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--brand-accent)]">
-          <Sparkles size={14} /> Kitchen Order Received
-        </div>
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black tracking-tight text-[var(--text-main)]">
-          Order <span className="text-[var(--brand-accent)]">Confirmed!</span>
+
+        {/* Heading */}
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-main)]">
+          Order Confirmed!
         </h1>
-        <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-          Your order has been received by <span className="font-bold text-[var(--text-main)]">{restaurantName}</span>.
-          Fresh food. Zero compromises. Follow kitchen preparation progress below.
+
+        {/* Subtitle with Order Number */}
+        <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+          Your order <span className="font-extrabold text-[var(--text-main)] font-mono">#{displayOrderCode}</span>
+          <br />
+          has been placed successfully.
         </p>
 
+        {/* Center Delivery Rider Illustration */}
+        <div className="relative w-full max-w-[260px] h-44 sm:h-48 my-5 flex items-center justify-center">
+          <Image
+            src="/images/order-confirmed-scooter-clean.png"
+            alt="Delivery on the way"
+            width={240}
+            height={150}
+            className="object-contain drop-shadow-md select-none pointer-events-none"
+            priority
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="w-full space-y-3 pt-2">
+          <button
+            type="button"
+            onClick={handleTrackOrder}
+            className="w-full py-4 px-6 rounded-full bg-[#f97316] hover:bg-[#ea580c] text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 transition-all duration-200 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>Track Order</span>
+          </button>
+
+          <Link
+            href="/"
+            className="w-full py-3.5 px-6 rounded-full bg-[var(--bg-sub)] hover:bg-[var(--border-color)] text-[var(--text-main)] border border-[var(--border-color)] font-bold text-sm transition-all duration-200 active:scale-98 text-center block"
+          >
+            Back to Home
+          </Link>
+        </div>
+      </div>
+
+      {/* ── LIVE TRACKING & KITCHEN STATUS DETAILS ─────────────────────────── */}
+      <section id="order-tracking-details" className="space-y-6 pt-4 scroll-mt-28">
         {/* Quick status bar */}
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-mono shadow-sm">
-            <span className="text-[var(--text-muted)]">Order ID:</span>
+          <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-mono shadow-xs">
+            <span className="text-[var(--text-muted)]">Order Ref:</span>
             <span className="text-[var(--brand-accent)] font-bold">#{orderIdDisplay}</span>
             <span className="text-[var(--border-color)]">•</span>
             <button
@@ -536,7 +584,7 @@ export default function OrderConfirmationClient() {
                 setCancelReason("");
                 setCancelError("");
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-bold transition shadow-sm cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-bold transition shadow-xs cursor-pointer"
               title="Cancel order within 1-minute grace window"
             >
               <XCircle size={13} />
@@ -544,10 +592,6 @@ export default function OrderConfirmationClient() {
             </button>
           )}
         </div>
-      </div>
-
-      {/* Honest Order-Status Progress Tracker (No fake GPS) */}
-      <section className="space-y-4">
         <OrderStatusTracker
           orderId={order.orderId || order._id}
           status={order.status}
