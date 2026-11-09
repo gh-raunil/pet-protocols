@@ -1804,7 +1804,7 @@ export default function CheckoutClient() {
                       <label className="flex items-start gap-3 cursor-pointer select-none group">
                         <input
                           type="checkbox"
-                          checked={address.isDifferentRecipient}
+                          checked={Boolean(address.isDifferentRecipient)}
                           onChange={(e) => {
                             const checked = e.target.checked;
                             setAddress((prev) => ({
@@ -1906,7 +1906,7 @@ export default function CheckoutClient() {
                     <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
                       <input
                         type="checkbox"
-                        checked={saveAddressToProfile}
+                        checked={Boolean(saveAddressToProfile)}
                         onChange={(e) => setSaveAddressToProfile(e.target.checked)}
                         className="rounded border-[var(--border-color)] bg-[var(--bg-sub)] text-[var(--brand-accent)] focus:ring-[var(--brand-accent)] w-4 h-4 cursor-pointer"
                       />

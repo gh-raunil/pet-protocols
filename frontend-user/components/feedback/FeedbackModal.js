@@ -499,7 +499,7 @@ export default function FeedbackModal({
                 <input
                   id="anonymous-toggle"
                   type="checkbox"
-                  checked={isAnonymous}
+                  checked={Boolean(isAnonymous)}
                   onChange={(e) => setIsAnonymous(e.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-[var(--border-color)] text-[var(--brand-accent)] focus:ring-[var(--brand-accent)] cursor-pointer"
                 />
@@ -524,7 +524,7 @@ export default function FeedbackModal({
                     <input
                       id="complaint-toggle"
                       type="checkbox"
-                      checked={hasComplaint}
+                      checked={Boolean(hasComplaint)}
                       onChange={(e) => setHasComplaint(e.target.checked)}
                       className="h-4 w-4 rounded border-[var(--border-color)] text-[var(--brand-accent)] focus:ring-[var(--brand-accent)] cursor-pointer"
                     />

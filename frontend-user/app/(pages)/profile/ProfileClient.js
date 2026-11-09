@@ -553,7 +553,7 @@ export default function CustomerProfileClient() {
                 </label>
                 <input
                   type="text"
-                  value={name}
+                  value={name || ""}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-sm font-medium focus:border-[var(--brand-accent)] transition shadow-sm"
                   placeholder="Your Full Name"
@@ -977,7 +977,7 @@ export default function CustomerProfileClient() {
                       type="text"
                       required
                       placeholder="e.g. Rahul Roy"
-                      value={addressForm.fullName}
+                      value={addressForm.fullName || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition"
                     />
@@ -991,7 +991,7 @@ export default function CustomerProfileClient() {
                       type="tel"
                       required
                       placeholder="e.g. 9876543210"
-                      value={addressForm.phone}
+                      value={addressForm.phone || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition font-mono"
                     />
@@ -1005,7 +1005,7 @@ export default function CustomerProfileClient() {
                       type="text"
                       required
                       placeholder="e.g. Flat 402, Royal Palms, 12th Main Road, Indiranagar"
-                      value={addressForm.street}
+                      value={addressForm.street || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition"
                     />
@@ -1019,7 +1019,7 @@ export default function CustomerProfileClient() {
                       type="text"
                       required
                       placeholder="New Delhi"
-                      value={addressForm.city}
+                      value={addressForm.city || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition"
                     />
@@ -1033,7 +1033,7 @@ export default function CustomerProfileClient() {
                       type="text"
                       required
                       placeholder="Delhi"
-                      value={addressForm.state}
+                      value={addressForm.state || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition"
                     />
@@ -1047,7 +1047,7 @@ export default function CustomerProfileClient() {
                       type="text"
                       required
                       placeholder="110001"
-                      value={addressForm.pincode}
+                      value={addressForm.pincode || ""}
                       onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] outline-none focus:border-[var(--brand-accent)] transition"
                     />
@@ -1058,7 +1058,7 @@ export default function CustomerProfileClient() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={addressForm.isDefault}
+                      checked={Boolean(addressForm.isDefault)}
                       onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
                       className="w-4 h-4 rounded text-[var(--brand-accent)] focus:ring-[var(--brand-accent)]"
                     />

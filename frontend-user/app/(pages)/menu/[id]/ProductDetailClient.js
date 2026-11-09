@@ -1554,7 +1554,7 @@ export default function ProductDetailClient({ product }) {
                 <input
                   type="text"
                   required
-                  value={reviewerName}
+                  value={reviewerName || ""}
                   onChange={(e) => setReviewerName(e.target.value)}
                   placeholder="e.g. Rahul Sharma"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:outline-hidden"

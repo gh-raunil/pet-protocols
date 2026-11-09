@@ -423,7 +423,7 @@ export default function RestaurantsClient() {
             </div>
             <input
               type="text"
-              value={searchInput}
+              value={searchInput || ""}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search restaurants or cuisines…"
               aria-label="Search restaurants or cuisines"

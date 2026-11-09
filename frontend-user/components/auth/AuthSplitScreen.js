@@ -548,7 +548,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                       name="email"
                       autoComplete="email"
                       placeholder="alex@example.com"
-                      value={signInData.email}
+                      value={signInData.email || ""}
                       onChange={(e) => {
                         setSignInData((prev) => ({ ...prev, email: e.target.value }));
                         setSignInError("");
@@ -572,7 +572,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                       name="password"
                       autoComplete="current-password"
                       placeholder="Enter your password"
-                      value={signInData.password}
+                      value={signInData.password || ""}
                       onChange={(e) => {
                         setSignInData((prev) => ({ ...prev, password: e.target.value }));
                         setSignInError("");
@@ -667,7 +667,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                       name="name"
                       autoComplete="name"
                       placeholder="e.g. Jordan Smith"
-                      value={signUpData.name}
+                      value={signUpData.name || ""}
                       onChange={(e) => {
                         setSignUpData((prev) => ({ ...prev, name: e.target.value }));
                         setSignUpError("");
@@ -692,7 +692,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                       name="email"
                       autoComplete="email"
                       placeholder="alex@example.com"
-                      value={signUpData.email}
+                      value={signUpData.email || ""}
                       onChange={(e) => {
                         setSignUpData((prev) => ({ ...prev, email: e.target.value }));
                         setSignUpError("");
@@ -716,7 +716,7 @@ export default function AuthSplitScreen({ initialTab = "signin" }) {
                       name="password"
                       autoComplete="new-password"
                       placeholder="Create a strong password"
-                      value={signUpData.password}
+                      value={signUpData.password || ""}
                       onChange={(e) => {
                         setSignUpData((prev) => ({ ...prev, password: e.target.value }));
                         setSignUpError("");

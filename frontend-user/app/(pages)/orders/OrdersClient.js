@@ -628,7 +628,7 @@ export default function OrdersClient() {
           </label>
           <input
             type="date"
-            value={selectedDate}
+            value={selectedDate || ""}
             max={todayDateStr}
             onChange={(e) => handleDateChange(e.target.value)}
             className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-accent)] cursor-pointer w-auto min-w-0 max-w-[130px] sm:max-w-none"
@@ -824,7 +824,7 @@ export default function OrdersClient() {
                     <input
                       type="text"
                       placeholder="Or type reason for cancellation..."
-                      value={cancelReason}
+                      value={cancelReason || ""}
                       onChange={(e) => setCancelReason(e.target.value)}
                       className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
                     />

@@ -362,7 +362,7 @@ export default function FilterDrawer({
                   <input
                     type="text"
                     placeholder="Search categories..."
-                    value={categorySearchQuery}
+                    value={categorySearchQuery || ""}
                     onChange={(e) => setCategorySearchQuery(e.target.value)}
                     className="w-full h-10 pl-9 pr-3 rounded-xl bg-[var(--bg-card)] dark:bg-[#131922] border border-[var(--border-color)] dark:border-stone-800 text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none focus:border-orange-500 transition"
                   />
@@ -511,7 +511,7 @@ export default function FilterDrawer({
                     </span>
                     <input
                       type="number"
-                      value={draftMinPrice}
+                      value={draftMinPrice ?? ""}
                       placeholder={`Min ${effectiveMin}`}
                       onChange={(e) => setDraftMinPrice(e.target.value)}
                       className="w-full h-10 pl-8 pr-3 rounded-xl bg-[var(--bg-card)] dark:bg-[#131922] border border-[var(--border-color)] dark:border-stone-800 text-xs font-medium text-[var(--text-main)] outline-none focus:border-orange-500 transition"
@@ -523,7 +523,7 @@ export default function FilterDrawer({
                     </span>
                     <input
                       type="number"
-                      value={draftMaxPrice}
+                      value={draftMaxPrice ?? ""}
                       placeholder={`Max ${effectiveMax}`}
                       onChange={(e) => setDraftMaxPrice(e.target.value)}
                       className="w-full h-10 pl-8 pr-3 rounded-xl bg-[var(--bg-card)] dark:bg-[#131922] border border-[var(--border-color)] dark:border-stone-800 text-xs font-medium text-[var(--text-main)] outline-none focus:border-orange-500 transition"

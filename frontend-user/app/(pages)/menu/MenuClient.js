@@ -567,7 +567,7 @@ export default function MenuClient() {
             <input
               type="text"
               aria-label="Search dishes by name or category"
-              value={searchInput}
+              value={searchInput || ""}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search dishes or cuisines..."
               className="h-10 w-full pl-10 pr-9 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:ring-1 focus:ring-[var(--brand-accent)]/30 outline-none transition font-medium"

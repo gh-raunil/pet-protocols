@@ -775,7 +775,7 @@ export default function OrderDetailClient({ orderId }) {
             <input
               type="text"
               placeholder="Or type reason for cancellation..."
-              value={cancelReason}
+              value={cancelReason || ""}
               onChange={(e) => setCancelReason(e.target.value)}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2 text-xs text-[var(--text-main)] outline-none focus:border-rose-500"
             />

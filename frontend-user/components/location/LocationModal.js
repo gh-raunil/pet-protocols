@@ -261,7 +261,7 @@ export default function LocationModal() {
               <input
                 ref={inputRef}
                 type="text"
-                value={searchQuery}
+                value={searchQuery || ""}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search area, landmark or street name..."
                 className="w-full pl-10 pr-9 py-2.5 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-xs sm:text-sm text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:border-[var(--brand-accent)] focus:bg-[var(--bg-card)] transition outline-none"
