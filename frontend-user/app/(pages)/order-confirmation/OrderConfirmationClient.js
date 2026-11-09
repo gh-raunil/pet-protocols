@@ -808,13 +808,13 @@ export default function OrderConfirmationClient() {
         </p>
 
         {/* Phase 4: Center Food Delivery Scooter Illustration */}
-        <div className="relative w-full max-w-[260px] h-40 sm:h-44 my-5 flex items-center justify-center animate-content-illustration">
+        <div className="relative w-full max-w-[280px] sm:max-w-[320px] my-4 flex items-center justify-center animate-content-illustration">
           <Image
-            src="/images/order-confirmed-scooter-clean.png"
+            src="/Delivery_Boy_Logo/Scooter_Delivery_Rider.png"
             alt="Delivery on the way"
-            width={240}
-            height={150}
-            className="object-contain drop-shadow-md select-none pointer-events-none"
+            width={320}
+            height={213}
+            className="w-full h-auto object-contain select-none pointer-events-none"
             priority
           />
         </div>
